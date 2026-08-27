@@ -4,6 +4,9 @@ param()
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $ok = $true
 
+$installCmake = 'winget install --id Kitware.CMake -e'
+$installCompiler = 'winget install --id Microsoft.VisualStudio.2026.Community -e --override "--add Microsoft.VisualStudio.Workload.NativeDesktop"'
+
 Write-Host 'Checking dependencies...'
 
 try {
@@ -11,7 +14,8 @@ try {
     Write-Host "  [ok] cmake found ($cmakeVersionLine)"
 }
 catch {
-    Write-Host "  [missing] cmake: $($_.Exception.Message)"
+    Write-Host "  [missing] cmake: $($_.Exception.Message) -- $installCmake"
+    Write-Host "  [missing] MSVC C++ toolset may also be missing -- $installCompiler"
     $ok = $false
 }
 
