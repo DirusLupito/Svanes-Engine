@@ -9,6 +9,10 @@ cmake := if os() == "windows" {
 default:
     @just --list
 
+# Verify cmake and vendored third-party sources (currently SDL3) are present.
+check-deps:
+    powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File scripts/check-deps.ps1
+
 # Generate the Visual Studio/CMake build tree.
 configure:
     {{cmake}} --preset windows-msvc
