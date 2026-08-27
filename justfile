@@ -13,6 +13,9 @@ default:
 configure:
     {{cmake}} --preset windows-msvc
 
+# Download/update third-party dependencies (e.g. SDL3) into thirdparty/.
+fetch-deps: configure
+
 # Configure and build the debug sandbox.
 build: configure
     {{cmake}} --build --preset debug --parallel

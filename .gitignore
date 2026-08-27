@@ -46,6 +46,10 @@ build-*/
 out/
 .vs/
 
+# Third-party dependencies fetched by CMake (see thirdparty/README.md)
+thirdparty/*
+!thirdparty/README.md
+
 # CMake generated files
 CMakeFiles/
 CMakeCache.txt

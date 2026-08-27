@@ -9,6 +9,11 @@ project(
 
 include(FetchContent)
 
+# Fetch third-party sources into a persistent thirdparty/ directory instead of
+# the build tree, so they survive `just clean`/deleting out/ and aren't
+# re-downloaded on every configure.
+set(FETCHCONTENT_BASE_DIR "${CMAKE_SOURCE_DIR}/thirdparty" CACHE PATH "Third-party dependency cache" FORCE)
+
 # Keep the first build self-contained: SDL is pinned and built as a static
 # dependency instead of requiring every developer to install it globally.
 set(SDL_SHARED OFF CACHE BOOL "Build SDL as a shared library")
