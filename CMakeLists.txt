@@ -42,7 +42,7 @@ target_sources(
         FILES include/svanes/application.hpp
 )
 
-target_compile_features(svanes_engine PUBLIC cxx_std_20)
+target_compile_features(svanes_engine PUBLIC cxx_std_23)
 target_link_libraries(svanes_engine PUBLIC SDL3::SDL3)
 
 if(MSVC)
