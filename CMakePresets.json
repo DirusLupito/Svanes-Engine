@@ -14,19 +14,34 @@
         "value": "x64",
         "strategy": "set"
       },
-      "binaryDir": "${sourceDir}/out/build/windows-msvc"
+      "binaryDir": "${sourceDir}/out/build/windows-msvc",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
     },
     {
       "name": "linux-gcc",
       "displayName": "Linux x64 (Ninja Multi-Config)",
       "generator": "Ninja Multi-Config",
-      "binaryDir": "${sourceDir}/out/build/linux-gcc"
+      "binaryDir": "${sourceDir}/out/build/linux-gcc",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
     },
     {
       "name": "macos-clang",
       "displayName": "macOS (Ninja Multi-Config)",
       "generator": "Ninja Multi-Config",
-      "binaryDir": "${sourceDir}/out/build/macos-clang"
+      "binaryDir": "${sourceDir}/out/build/macos-clang",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      }
     }
   ],
   "buildPresets": [
