@@ -1,3 +1,6 @@
+// This code was permanently borrowed from the following repository
+// https://github.com/AlexanderCard/CSC481-581-M1
+
 #include <svanes/application.hpp>
 
 #include <SDL3/SDL.h>
