@@ -22,11 +22,13 @@ configure-preset := if os() == "windows" {
 
 os-prefix := if os() == "windows" { "windows" } else if os() == "macos" { "macos" } else { "linux" }
 
-sandbox-exe := if os() == "windows" {
-    "./out/build/windows-msvc/bin/Debug/svanes_sandbox.exe"
+bin-dir := if os() == "windows" {
+    "./out/build/windows-msvc/bin/Debug/"
 } else {
-    "./out/build/" + configure-preset + "/bin/Debug/svanes_sandbox"
+    "./out/build/" + configure-preset + "/bin/Debug/"
 }
+
+exe-suffix := if os() == "windows" { ".exe" } else { "" }
 
 default:
     @just --list
@@ -50,9 +52,13 @@ build: configure
 release: configure
     {{cmake}} --build --preset {{os-prefix}}-release --parallel
 
-# Build and launch the sandbox.
-run: build
-    {{sandbox-exe}}
+# Fail fast with a clear message if `run` was given an unknown target.
+_check-target target:
+    @{{ if target == "" { "" } else if target == "erik" { "" } else if target == "alex" { "" } else if target == "chris" { "" } else { error("no game named '" + target + "'. Try: alex, chris, erik, or leave it blank for the sandbox.") } }}
+
+# Build and launch a game: alex, chris, or erik. Leave blank for the sandbox.
+run target="": (_check-target target) build
+    {{bin-dir}}{{ if target == "" { "svanes_sandbox" } else if target == "erik" { "svanes_game_erik" } else if target == "alex" { "svanes_game_alex" } else { "svanes_game_chris" } }}{{exe-suffix}}
 
 # Remove compiled outputs while retaining the configured build tree.
 clean: configure

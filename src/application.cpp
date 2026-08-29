@@ -3,12 +3,11 @@
 
 #include <svanes/application.hpp>
 
+#include <svanes/game.hpp>
 #include <svanes/input.hpp>
 
 #include <SDL3/SDL.h>
 
-#include <algorithm>
-#include <cmath>
 #include <utility>
 
 namespace svanes {
@@ -18,7 +17,7 @@ Application::Application(ApplicationSettings settings)
 {
 }
 
-int Application::run() const
+int Application::run(IGame& game) const
 {
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         SDL_Log("Could not initialize SDL: %s", SDL_GetError());
@@ -45,6 +44,8 @@ int Application::run() const
 
     InputManager input;
 
+    Uint64 previous_ticks = SDL_GetTicks();
+
     bool running = true;
     while (running) {
         input.BeginFrame();
@@ -57,25 +58,17 @@ int Application::run() const
             input.HandleEvent(event);
         }
 
+        const Uint64 current_ticks = SDL_GetTicks();
+        const float delta_seconds = static_cast<float>(current_ticks - previous_ticks) / 1000.0F;
+        previous_ticks = current_ticks;
+
+        game.OnUpdate(delta_seconds, input);
+
         int output_width = 0;
         int output_height = 0;
         SDL_GetCurrentRenderOutputSize(renderer, &output_width, &output_height);
 
-        constexpr float square_size = 96.0F;
-        const float available_width = std::max(0.0F, static_cast<float>(output_width) - square_size);
-        const float elapsed_seconds = static_cast<float>(SDL_GetTicks()) / 1000.0F;
-        const float normalized_position = (std::sin(elapsed_seconds * 2.0F) + 1.0F) * 0.5F;
-        const SDL_FRect square{
-            normalized_position * available_width,
-            (static_cast<float>(output_height) - square_size) * 0.5F,
-            square_size,
-            square_size,
-        };
-
-        SDL_SetRenderDrawColor(renderer, 17, 24, 39, SDL_ALPHA_OPAQUE);
-        SDL_RenderClear(renderer);
-        SDL_SetRenderDrawColor(renderer, 56, 189, 248, SDL_ALPHA_OPAQUE);
-        SDL_RenderFillRect(renderer, &square);
+        game.OnRender(renderer, output_width, output_height);
         SDL_RenderPresent(renderer);
 
         SDL_Delay(1);

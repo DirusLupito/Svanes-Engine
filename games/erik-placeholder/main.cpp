@@ -1,15 +1,15 @@
-#include "sandbox_game.hpp"
+#include "erik_game.hpp"
 
 #include <svanes/application.hpp>
 
 int main()
 {
     const svanes::Application application({
-        .title = "Svanes Engine Poopbox",
+        .title = "Erik's Game",
         .width = 1920,
         .height = 1080,
     });
 
-    SandboxGame game;
+    ErikGame game;
     return application.run(game);
 }
