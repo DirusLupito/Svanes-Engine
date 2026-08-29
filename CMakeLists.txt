@@ -36,10 +36,13 @@ target_sources(
     svanes_engine
     PRIVATE
         src/application.cpp
+        src/input.cpp
     PUBLIC
         FILE_SET HEADERS
         BASE_DIRS include
-        FILES include/svanes/application.hpp
+        FILES
+            include/svanes/application.hpp
+            include/svanes/input.hpp
 )
 
 target_compile_features(svanes_engine PUBLIC cxx_std_23)
@@ -67,7 +70,9 @@ set_target_properties(
 
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FILES
     include/svanes/application.hpp
+    include/svanes/input.hpp
 )
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/application.cpp
+    src/input.cpp
 )

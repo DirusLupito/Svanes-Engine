@@ -3,6 +3,8 @@
 
 #include <svanes/application.hpp>
 
+#include <svanes/input.hpp>
+
 #include <SDL3/SDL.h>
 
 #include <algorithm>
@@ -41,13 +43,18 @@ int Application::run() const
         return 1;
     }
 
+    InputManager input;
+
     bool running = true;
     while (running) {
+        input.BeginFrame();
+
         SDL_Event event{};
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_EVENT_QUIT) {
                 running = false;
             }
+            input.HandleEvent(event);
         }
 
         int output_width = 0;
