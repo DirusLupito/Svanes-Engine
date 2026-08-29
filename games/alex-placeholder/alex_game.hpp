@@ -4,9 +4,12 @@
 
 class AlexGame final : public svanes::IGame {
 public:
+    ~AlexGame() override;
+
     void OnUpdate(float delta_seconds, const svanes::InputManager& input) override;
     void OnRender(SDL_Renderer* renderer, int output_width, int output_height) override;
 
 private:
     float elapsed_seconds_ = 0.0F;
+    SDL_Texture* gradient_texture_ = nullptr;
 };

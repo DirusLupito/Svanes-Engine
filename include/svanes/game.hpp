@@ -12,6 +12,8 @@ public:
 
     virtual void OnUpdate(float delta_seconds, const InputManager& input) = 0;
     virtual void OnRender(SDL_Renderer* renderer, int output_width, int output_height) = 0;
+
+    [[nodiscard]] virtual bool ShouldQuit() const { return false; }
 };
 
 } // namespace svanes

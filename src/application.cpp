@@ -64,6 +64,10 @@ int Application::run(IGame& game) const
 
         game.OnUpdate(delta_seconds, input);
 
+        if (game.ShouldQuit()) {
+            running = false;
+        }
+
         int output_width = 0;
         int output_height = 0;
         SDL_GetCurrentRenderOutputSize(renderer, &output_width, &output_height);

@@ -1,11 +1,22 @@
 #include "erik_game.hpp"
 
+#include <svanes/input.hpp>
+
 #include <algorithm>
 #include <cmath>
 
-void ErikGame::OnUpdate(float delta_seconds, const svanes::InputManager& /*input*/)
+void ErikGame::OnUpdate(float delta_seconds, const svanes::InputManager& input)
 {
     elapsed_seconds_ += delta_seconds;
+
+    if (input.WasPressed(SDL_SCANCODE_ESCAPE)) {
+        should_quit_ = true;
+    }
+}
+
+bool ErikGame::ShouldQuit() const
+{
+    return should_quit_;
 }
 
 void ErikGame::OnRender(SDL_Renderer* renderer, int output_width, int output_height)

@@ -22,6 +22,6 @@ void ChrisGame::OnRender(SDL_Renderer* renderer, int output_width, int output_he
 
     SDL_SetRenderDrawColor(renderer, 17, 24, 39, SDL_ALPHA_OPAQUE);
     SDL_RenderClear(renderer);
-    SDL_SetRenderDrawColor(renderer, 250, 204, 21, SDL_ALPHA_OPAQUE);
+    SDL_SetRenderDrawColor(renderer, 37, 99, 235, SDL_ALPHA_OPAQUE);
     SDL_RenderFillRect(renderer, &square);
 }
