@@ -39,4 +39,4 @@ bool Registry::IsValid(Entity entity) const
         && generations_[entity.index] == entity.generation;
 }
 
-} // namespace svanes
+}

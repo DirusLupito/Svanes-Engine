@@ -78,8 +78,6 @@ target_sources(
             include/svanes/input.hpp
             include/svanes/registry.hpp
             include/svanes/sprite_animation_system.hpp
-            include/svanes/components/sprite_animation.hpp
-            include/svanes/components/transform.hpp
 )
 
 target_compile_features(svanes_engine PUBLIC cxx_std_23)
@@ -128,8 +126,6 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/input.hpp
     include/svanes/registry.hpp
     include/svanes/sprite_animation_system.hpp
-    include/svanes/components/sprite_animation.hpp
-    include/svanes/components/transform.hpp
 )
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/application.cpp

@@ -1,7 +1,5 @@
 #include "erik_game.hpp"
 
-#include <svanes/components/sprite_animation.hpp>
-#include <svanes/components/transform.hpp>
 #include <svanes/input.hpp>
 #include <svanes/sprite_animation_system.hpp>
 

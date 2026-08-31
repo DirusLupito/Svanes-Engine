@@ -175,4 +175,4 @@ private:
     std::unordered_map<std::type_index, std::unique_ptr<detail::IComponentPool>> pools_;
 };
 
-} // namespace svanes
+}

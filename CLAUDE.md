@@ -27,6 +27,13 @@ demonstrate engine features. Core features, in implementation order:
   abstraction rather than spreading `#ifdef`s through engine code.
 - **Use `std::stacktrace` when debugging** (e.g. in assertions/error paths),
   not platform-specific backtrace APIs.
+- **Data lives with the system that uses it.** Don't split a component/data
+  struct into its own header just because it's "data" — that's pointless
+  separation. Define it in the header of the system that owns it. A type
+  only earns its own header (e.g. under `components/`) once it has enough
+  of its own logic to need a `.cpp` file — a bare struct with no behavior
+  isn't split out just because it might be shared or used elsewhere
+  someday.
 
 ## Build system
 
