@@ -13,7 +13,7 @@
 namespace svanes {
 
 Application::Application(ApplicationSettings settings)
-    : settings_(std::move(settings))
+    : settings(std::move(settings))
 {
 }
 
@@ -28,9 +28,9 @@ int Application::run(IGame& game) const
     SDL_Renderer* renderer = nullptr;
 
     const bool created = SDL_CreateWindowAndRenderer(
-        settings_.title.c_str(),
-        settings_.width,
-        settings_.height,
+        settings.title.c_str(),
+        settings.width,
+        settings.height,
         SDL_WINDOW_RESIZABLE,
         &window,
         &renderer

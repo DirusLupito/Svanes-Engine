@@ -35,6 +35,13 @@ demonstrate engine features. Core features, in implementation order:
   isn't split out just because it might be shared or used elsewhere
   someday.
 
+## Style guide
+
+- **No trailing underscore on private member variables.** e.g. use
+  `count`, not `count_`.
+- **No `[[nodiscard]]`.** It's a small team; trust callers to use return
+  values correctly without a compiler nag.
+
 ## Build system
 
 - CMake + `FetchContent` for dependencies (currently SDL3), `just` as the

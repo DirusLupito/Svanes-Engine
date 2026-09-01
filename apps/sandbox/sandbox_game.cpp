@@ -5,14 +5,14 @@
 
 void SandboxGame::OnUpdate(float delta_seconds, const svanes::InputManager& /*input*/)
 {
-    elapsed_seconds_ += delta_seconds;
+    elapsed_seconds += delta_seconds;
 }
 
 void SandboxGame::OnRender(SDL_Renderer* renderer, int output_width, int output_height)
 {
     constexpr float square_size = 96.0F;
     const float available_width = std::max(0.0F, static_cast<float>(output_width) - square_size);
-    const float normalized_position = (std::sin(elapsed_seconds_ * 2.0F) + 1.0F) * 0.5F;
+    const float normalized_position = (std::sin(elapsed_seconds * 2.0F) + 1.0F) * 0.5F;
     const SDL_FRect square{
         normalized_position * available_width,
         (static_cast<float>(output_height) - square_size) * 0.5F,

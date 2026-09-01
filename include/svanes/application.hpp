@@ -16,10 +16,10 @@ class Application final {
 public:
     explicit Application(ApplicationSettings settings = {});
 
-    [[nodiscard]] int run(IGame& game) const;
+    int run(IGame& game) const;
 
 private:
-    ApplicationSettings settings_;
+    ApplicationSettings settings;
 };
 
 } // namespace svanes

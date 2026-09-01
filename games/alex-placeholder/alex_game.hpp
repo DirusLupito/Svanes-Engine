@@ -10,6 +10,6 @@ public:
     void OnRender(SDL_Renderer* renderer, int output_width, int output_height) override;
 
 private:
-    float elapsed_seconds_ = 0.0F;
-    SDL_Texture* gradient_texture_ = nullptr;
+    float elapsed_seconds = 0.0F;
+    SDL_Texture* gradient_texture = nullptr;
 };

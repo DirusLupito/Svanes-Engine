@@ -47,25 +47,25 @@ SDL_Texture* CreateGradientTexture(SDL_Renderer* renderer)
 
 AlexGame::~AlexGame()
 {
-    if (gradient_texture_ != nullptr) {
-        SDL_DestroyTexture(gradient_texture_);
+    if (gradient_texture != nullptr) {
+        SDL_DestroyTexture(gradient_texture);
     }
 }
 
 void AlexGame::OnUpdate(float delta_seconds, const svanes::InputManager& /*input*/)
 {
-    elapsed_seconds_ += delta_seconds;
+    elapsed_seconds += delta_seconds;
 }
 
 void AlexGame::OnRender(SDL_Renderer* renderer, int output_width, int output_height)
 {
-    if (gradient_texture_ == nullptr) {
-        gradient_texture_ = CreateGradientTexture(renderer);
+    if (gradient_texture == nullptr) {
+        gradient_texture = CreateGradientTexture(renderer);
     }
 
     constexpr float square_size = static_cast<float>(kSquarePixels);
     const float available_width = std::max(0.0F, static_cast<float>(output_width) - square_size);
-    const float normalized_position = (std::sin(elapsed_seconds_ * 2.0F) + 1.0F) * 0.5F;
+    const float normalized_position = (std::sin(elapsed_seconds * 2.0F) + 1.0F) * 0.5F;
     const SDL_FRect square{
         normalized_position * available_width,
         (static_cast<float>(output_height) - square_size) * 0.5F,
@@ -75,5 +75,5 @@ void AlexGame::OnRender(SDL_Renderer* renderer, int output_width, int output_hei
 
     SDL_SetRenderDrawColor(renderer, 17, 24, 39, SDL_ALPHA_OPAQUE);
     SDL_RenderClear(renderer);
-    SDL_RenderTexture(renderer, gradient_texture_, nullptr, &square);
+    SDL_RenderTexture(renderer, gradient_texture, nullptr, &square);
 }
