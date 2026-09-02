@@ -25,8 +25,8 @@ just build
 On Windows, CMake generates the Visual Studio solution during this process. Open
 the solution matching the Visual Studio version selected by the build scripts:
 
-- **Visual Studio 2026:** `out/build/windows-msvc/SvanesEngine.sln`
-- **Visual Studio 2022:** `out/build/windows-vs2022/SvanesEngine.sln`
+- **Visual Studio 2026:** `out/build/windows-msvc/SvanesEngine.slnx`
+- **Visual Studio 2022:** `out/build/windows-vs2022/SvanesEngine.slnx`
 
 Regardless of whether or not you use Visual Studio, you can launch the games from the command line:
 
