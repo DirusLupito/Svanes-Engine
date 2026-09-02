@@ -5,8 +5,6 @@
 #include <cstdint>
 #include <vector>
 
-namespace {
-
 constexpr int kSquarePixels = 96;
 
 SDL_Texture* CreateGradientTexture(SDL_Renderer* renderer)
@@ -42,8 +40,6 @@ SDL_Texture* CreateGradientTexture(SDL_Renderer* renderer)
     SDL_UpdateTexture(texture, nullptr, pixels.data(), kSquarePixels * 4);
     return texture;
 }
-
-} // namespace
 
 AbmGame::~AbmGame()
 {
