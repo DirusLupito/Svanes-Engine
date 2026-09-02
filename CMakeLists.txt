@@ -27,6 +27,8 @@ FetchContent_Declare(
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     SOURCE_DIR "${CMAKE_SOURCE_DIR}/thirdparty/sdl3-src"
 )
+
+set(CMAKE_POLICY_DEFAULT_CMP0219 NEW)
 FetchContent_MakeAvailable(SDL3)
 
 set(BUILD_SHARED_LIBS OFF)
