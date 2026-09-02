@@ -2,7 +2,7 @@
 set -u
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-min_cmake_version="4.2.0"
+min_cmake_version="3.25.0"
 ok=1
 
 case "$(uname -s)" in
@@ -21,8 +21,23 @@ esac
 echo "Checking dependencies..."
 
 version_ge() {
-    # true if $1 >= $2
-    [ "$(printf '%s\n%s\n' "$2" "$1" | sort -V | head -n1)" = "$2" ]
+    local actual_major actual_minor actual_patch
+    local required_major required_minor required_patch
+
+    IFS=. read -r actual_major actual_minor actual_patch <<< "$1"
+    IFS=. read -r required_major required_minor required_patch <<< "$2"
+
+    if (( actual_major != required_major )); then
+        (( actual_major > required_major ))
+        return
+    fi
+
+    if (( actual_minor != required_minor )); then
+        (( actual_minor > required_minor ))
+        return
+    fi
+
+    (( actual_patch >= required_patch ))
 }
 
 if command -v cmake >/dev/null 2>&1; then
@@ -57,6 +72,13 @@ if [ -d "$repo_root/thirdparty/sdl3-src" ]; then
     echo "  [ok] SDL3 found (thirdparty/sdl3-src)"
 else
     echo "  [missing] SDL3 not fetched yet -- run 'just fetch-deps'"
+    ok=0
+fi
+
+if [ -d "$repo_root/thirdparty/sdl3_image-src" ]; then
+    echo "  [ok] SDL3_image found (thirdparty/sdl3_image-src)"
+else
+    echo "  [missing] SDL3_image not fetched yet -- run 'just fetch-deps'"
     ok=0
 fi
 

@@ -12,28 +12,36 @@ check-deps-cmd := if os() == "windows" {
     "bash scripts/check-deps.sh"
 }
 
+windows-configure-preset := if os() == "windows" {
+    `powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File scripts/run-cmake.ps1 -ResolveWindowsPreset`
+} else {
+    ""
+}
+
 configure-preset := if os() == "windows" {
-    "windows-msvc"
+    windows-configure-preset
 } else if os() == "macos" {
     "macos-clang"
 } else {
     "linux-gcc"
 }
 
-os-prefix := if os() == "windows" { "windows" } else if os() == "macos" { "macos" } else { "linux" }
-
-bin-dir := if os() == "windows" {
-    "./out/build/windows-msvc/bin/Debug/"
+build-preset-prefix := if os() == "windows" {
+    if configure-preset == "windows-msvc" { "windows" } else { "windows-vs2022" }
+} else if os() == "macos" {
+    "macos"
 } else {
-    "./out/build/" + configure-preset + "/bin/Debug/"
+    "linux"
 }
+
+bin-dir := "./out/build/" + configure-preset + "/bin/Debug/"
 
 exe-suffix := if os() == "windows" { ".exe" } else { "" }
 
 default:
     @just --list
 
-# Verify cmake, a compiler/generator, and vendored third-party sources (currently SDL3) are present.
+# Verify CMake, the compiler/generator, and vendored third-party sources are present.
 check-deps:
     {{check-deps-cmd}}
 
@@ -41,16 +49,16 @@ check-deps:
 configure:
     {{cmake}} --preset {{configure-preset}}
 
-# Download/update third-party dependencies (e.g. SDL3) into thirdparty/.
+# Download/update third-party dependencies into thirdparty/.
 fetch-deps: configure
 
 # Configure and build. Pass a target (sandbox, erik, alex, chris) to build only that game; leave blank to build everything.
 build target="": configure
-    {{cmake}} --build --preset {{os-prefix}}-debug --parallel {{ if target == "" { "" } else { "--target " + (if target == "sandbox" { "svanes_sandbox" } else if target == "erik" { "svanes_game_erik" } else if target == "alex" { "svanes_game_alex" } else { "svanes_game_chris" }) } }}
+    {{cmake}} --build --preset {{build-preset-prefix}}-debug --parallel {{ if target == "" { "" } else { "--target " + (if target == "sandbox" { "svanes_sandbox" } else if target == "erik" { "svanes_game_erik" } else if target == "alex" { "svanes_game_alex" } else { "svanes_game_chris" }) } }}
 
-# Configure and build an optimized sandbox.
+# Configure and build all targets in Release mode.
 release: configure
-    {{cmake}} --build --preset {{os-prefix}}-release --parallel
+    {{cmake}} --build --preset {{build-preset-prefix}}-release --parallel
 
 # Fail fast with a clear message if `run` was given an unknown target.
 _check-target target:
@@ -62,4 +70,4 @@ run target="": (_check-target target) (build if target == "" { "sandbox" } else 
 
 # Remove compiled outputs while retaining the configured build tree.
 clean: configure
-    {{cmake}} --build --preset {{os-prefix}}-debug --target clean
+    {{cmake}} --build --preset {{build-preset-prefix}}-debug --target clean

@@ -5,7 +5,8 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $ok = $true
 
 $installCmake = 'winget install --id Kitware.CMake -e'
-$installCompiler = 'winget install --id Microsoft.VisualStudio.2026.Community -e --override "--add Microsoft.VisualStudio.Workload.NativeDesktop"'
+$installCompiler = 'Install Visual Studio 2026 or Visual Studio 2022 with the Desktop development with C++ workload'
+$installCompilerCmd = 'winget install --id Microsoft.VisualStudio.2026.Community -e --override "--add Microsoft.VisualStudio.Workload.NativeDesktop"'
 
 Write-Host 'Checking dependencies...'
 
@@ -15,12 +16,14 @@ try {
 }
 catch {
     Write-Host "  [missing] cmake: $($_.Exception.Message) -- $installCmake"
-    Write-Host "  [missing] MSVC C++ toolset may also be missing -- $installCompiler"
+    Write-Host "  [missing] compatible MSVC C++ toolset may also be missing -- $installCompiler"
+    Write-Host "  [missing] to install MSVC C++ toolset via winget, run: $installCompilerCmd"
     $ok = $false
 }
 
-$thirdparty = @{
+$thirdparty = [ordered] @{
     'SDL3' = Join-Path $repoRoot 'thirdparty\sdl3-src'
+    'SDL3_image' = Join-Path $repoRoot 'thirdparty\sdl3_image-src'
 }
 
 foreach ($name in $thirdparty.Keys) {

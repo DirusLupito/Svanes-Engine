@@ -9,17 +9,13 @@ project(
 
 include(FetchContent)
 
-# Keep the first build self-contained: SDL is pinned and built as a static
-# dependency instead of requiring every developer to install it globally.
 set(SDL_SHARED OFF CACHE BOOL "Build SDL as a shared library")
 set(SDL_STATIC ON CACHE BOOL "Build SDL as a static library")
 set(SDL_TEST_LIBRARY OFF CACHE BOOL "Build the SDL test library")
 set(SDL_TESTS OFF CACHE BOOL "Build the SDL tests")
 
-# The extracted source is cached in thirdparty/ so it survives `just clean`
-# and deleted build trees without being re-downloaded. The subbuild/build
-# directories stay under the (per-preset, generator-specific) binary
-# directory, since those aren't safe to share across generators/compilers.
+# We save the SDL (and other third party dependencies tbh) in the thirdparty
+# folder so that they should only ever need to be downloaded once.
 FetchContent_Declare(
     SDL3
     URL https://github.com/libsdl-org/SDL/releases/download/release-3.4.14/SDL3-3.4.14.tar.gz

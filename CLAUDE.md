@@ -18,7 +18,7 @@ demonstrate engine features. Core features, in implementation order:
 
 - **No comments in code.** Comments are written by the team, not generated.
 - **No `new`/`delete`.** Use smart pointers (`std::unique_ptr`,
-  `std::shared_ptr`) for all owned allocations.
+  `std::shared_ptr`, etc) for all owned allocations.
 - **No platform-specific threading APIs.** Use `std::thread`/`std::jthread`
   (and the rest of `<thread>`/`<stop_token>`), not pthreads/Win32 threads.
 - **Nothing platform-specific in general.** The engine must build and run on
@@ -39,14 +39,30 @@ demonstrate engine features. Core features, in implementation order:
 
 - **No trailing underscore on private member variables.** e.g. use
   `count`, not `count_`.
-- **No `[[nodiscard]]`.** It's a small team; trust callers to use return
-  values correctly without a compiler nag.
+- If statements and else statements should always use curly brackets even if they are not necessary. 
+  And for loops and... etc. Blocks should be easily identifiable and not hidden in a single line.
+- When writing code, do not try to silently succeed and ignore non-critical errors.
+  Crashing with an informative log message is preferable to succeeding in a mysterious way, 
+  as such successes can lead to mysterious and difficult to debug issues.
+
+
+Additionally, a core idea here is that we should earn our complexity.
+For example, don't just slap a `[[nodiscard]]` attribute on a function
+because "it's good practice elsewhere". 
+It's not that we don't care about fancy elements
+of the C++ language, but instead that if we don't need to do something
+in a complex way, we shouldn't. More than just about anything else,
+this should guide everyone and everything developing in this project.
+Eventually, maybe we will have a reason to use `[[nodiscard]]`.
+But until a clear pattern in which some feature should be used emerges,
+we should avoid it.
 
 ## Build system
 
-- CMake + `FetchContent` for dependencies (currently SDL3), `just` as the
-  command runner. Presets: `windows-msvc` (Visual Studio), `linux-gcc` /
-  `macos-clang` (Ninja Multi-Config) — see `CMakePresets.json`.
+- CMake + `FetchContent` for dependencies (currently SDL3 and SDL3_image),
+  `just` as the command runner. Windows prefers `windows-msvc` (Visual
+  Studio 2026) and falls back to `windows-vs2022`; `linux-gcc` and
+  `macos-clang` use Ninja Multi-Config — see `CMakePresets.json`.
 - `just check-deps`, `just build`, `just run`, `just release`, `just clean`,
   `just fetch-deps` work identically on all three platforms.
 - Third-party sources are cached in `thirdparty/` (gitignored except

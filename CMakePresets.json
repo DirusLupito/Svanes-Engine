@@ -1,8 +1,8 @@
 {
   "version": 3,
   "cmakeMinimumRequired": {
-    "major": 4,
-    "minor": 2,
+    "major": 3,
+    "minor": 25,
     "patch": 0
   },
   "configurePresets": [
@@ -15,6 +15,21 @@
         "strategy": "set"
       },
       "binaryDir": "${sourceDir}/out/build/windows-msvc",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "windows-vs2022",
+      "displayName": "Windows x64 (Visual Studio 2022)",
+      "generator": "Visual Studio 17 2022",
+      "architecture": {
+        "value": "x64",
+        "strategy": "set"
+      },
+      "binaryDir": "${sourceDir}/out/build/windows-vs2022",
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
@@ -55,6 +70,18 @@
       "name": "windows-release",
       "displayName": "Release",
       "configurePreset": "windows-msvc",
+      "configuration": "Release"
+    },
+    {
+      "name": "windows-vs2022-debug",
+      "displayName": "Visual Studio 2022 Debug",
+      "configurePreset": "windows-vs2022",
+      "configuration": "Debug"
+    },
+    {
+      "name": "windows-vs2022-release",
+      "displayName": "Visual Studio 2022 Release",
+      "configurePreset": "windows-vs2022",
       "configuration": "Release"
     },
     {
