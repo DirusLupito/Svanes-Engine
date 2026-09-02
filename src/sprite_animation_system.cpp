@@ -1,5 +1,7 @@
 #include <svanes/sprite_animation_system.hpp>
 
+#include <cmath>
+
 #include <svanes/registry.hpp>
 
 namespace svanes {
