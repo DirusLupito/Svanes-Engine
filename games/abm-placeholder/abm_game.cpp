@@ -1,4 +1,4 @@
-#include "alex_game.hpp"
+#include "abm_game.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -45,19 +45,19 @@ SDL_Texture* CreateGradientTexture(SDL_Renderer* renderer)
 
 } // namespace
 
-AlexGame::~AlexGame()
+AbmGame::~AbmGame()
 {
     if (gradient_texture != nullptr) {
         SDL_DestroyTexture(gradient_texture);
     }
 }
 
-void AlexGame::OnUpdate(float delta_seconds, const svanes::InputManager& /*input*/)
+void AbmGame::OnUpdate(float delta_seconds, const svanes::InputManager& /*input*/)
 {
     elapsed_seconds += delta_seconds;
 }
 
-void AlexGame::OnRender(SDL_Renderer* renderer, int output_width, int output_height)
+void AbmGame::OnRender(SDL_Renderer* renderer, int output_width, int output_height)
 {
     if (gradient_texture == nullptr) {
         gradient_texture = CreateGradientTexture(renderer);
