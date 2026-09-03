@@ -4,7 +4,9 @@
 
 class SandboxGame final : public svanes::IGame {
 public:
-    void OnUpdate(float delta_seconds, const svanes::InputManager& input) override;
+    void Initialize(svanes::GameContext& context) override;
+    void Update(const svanes::FrameContext& frame) override;
+    void BuildRenderQueue(svanes::RenderQueue& render_queue) override;
     void OnRender(SDL_Renderer* renderer, int32_t output_width, int32_t output_height) override;
 
 private:

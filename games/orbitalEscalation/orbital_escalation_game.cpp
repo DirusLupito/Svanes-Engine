@@ -48,9 +48,17 @@ OrbitalEscalationGame::~OrbitalEscalationGame()
     }
 }
 
-void OrbitalEscalationGame::OnUpdate(float delta_seconds, const svanes::InputManager& /*input*/)
+void OrbitalEscalationGame::Initialize(svanes::GameContext&)
 {
-    elapsed_seconds += delta_seconds;
+}
+
+void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
+{
+    elapsed_seconds += frame.delta_seconds;
+}
+
+void OrbitalEscalationGame::BuildRenderQueue(svanes::RenderQueue&)
+{
 }
 
 void OrbitalEscalationGame::OnRender(SDL_Renderer* renderer, int32_t output_width, int32_t output_height)

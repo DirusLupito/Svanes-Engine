@@ -3,9 +3,17 @@
 #include <algorithm>
 #include <cmath>
 
-void SandboxGame::OnUpdate(float delta_seconds, const svanes::InputManager& /*input*/)
+void SandboxGame::Initialize(svanes::GameContext&)
 {
-    elapsed_seconds += delta_seconds;
+}
+
+void SandboxGame::Update(const svanes::FrameContext& frame)
+{
+    elapsed_seconds += frame.delta_seconds;
+}
+
+void SandboxGame::BuildRenderQueue(svanes::RenderQueue&)
+{
 }
 
 void SandboxGame::OnRender(SDL_Renderer* renderer, int32_t output_width, int32_t output_height)
