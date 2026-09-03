@@ -33,6 +33,6 @@ struct SpriteAnimation {
 };
 
 void AdvanceSpriteAnimations(Registry& registry, float delta_seconds);
-void RenderSprites(Registry& registry, SDL_Renderer* renderer);
+void RenderSprites(const Registry& registry, SDL_Renderer* renderer);
 
 }

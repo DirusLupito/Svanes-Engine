@@ -121,6 +121,40 @@ public:
         }
     }
 
+    /**
+     * Const overload of GetComponent to allow for read-only access to
+     * a given component.
+    * 
+    * @tparam T The component to get.
+    * @param entity The entity to check.
+    * @return A reference to the component.
+    */
+    template <typename T>
+    const T& GetComponent(Entity entity) const
+    {
+        return std::any_cast<const T&>(components.at(entity).at(std::type_index{typeid(T)}));
+    }
+
+
+    /**
+     * Const overload of ForEach to allow for read-only access to components.
+     * 
+     * @tparam Components The component types to check for.
+     * @tparam Func The type of the function to call for each entity.
+     * @param func The function to call for each entity.
+     */
+    template <typename... Components, typename Func>
+    void ForEach(Func&& func) const
+    {
+        static_assert(sizeof...(Components) > 0, "ForEach requires at least one component type");
+
+        for (const auto& [entity, comps] : components) {
+            if ((HasComponent<Components>(entity) && ...)) {
+                func(entity, GetComponent<Components>(entity)...);
+            }
+        }
+    }
+
 private:
 	// The unique ID for each entity, which is incremented each time a new entity is created.
     Entity next_entity = 0;

@@ -52,7 +52,7 @@ void AdvanceSpriteAnimations(Registry& registry, float delta_seconds)
     });
 }
 
-void RenderSprites(Registry& registry, SDL_Renderer* renderer)
+void RenderSprites(const Registry& registry, SDL_Renderer* renderer)
 {
     // Run a ForEach on our registry, only including entities that have both a <SpriteAnimation> and <Transform> component.
     // 
@@ -61,7 +61,7 @@ void RenderSprites(Registry& registry, SDL_Renderer* renderer)
     // only over the components with <SpriteAnimation>, and then only take those that have a <Transform> component. This 
     // is because there are likely a less amount of entities to have a <SpriteAnimation> component than amount of entities 
     // that have a <Transform> component.
-    registry.ForEach<SpriteAnimation, Transform>([renderer](Entity /*entity*/, SpriteAnimation& animation, Transform& transform) {
+    registry.ForEach<SpriteAnimation, Transform>([renderer](Entity /*entity*/, const SpriteAnimation& animation, const Transform& transform) {
         if (animation.texture == nullptr) {
             return;
         }
