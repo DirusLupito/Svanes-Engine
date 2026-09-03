@@ -2,9 +2,9 @@
 
 #include <svanes/game.hpp>
 
-class AbmGame final : public svanes::IGame {
+class OrbitalEscalationGame final : public svanes::IGame {
 public:
-    ~AbmGame() override;
+    ~OrbitalEscalationGame() override;
 
     void OnUpdate(float delta_seconds, const svanes::InputManager& input) override;
     void OnRender(SDL_Renderer* renderer, int32_t output_width, int32_t output_height) override;

@@ -1,15 +1,15 @@
-#include "abm_game.hpp"
+#include "orbital_escalation_game.hpp"
 
 #include <svanes/application.hpp>
 
 int32_t main()
 {
     const svanes::Application application({
-        .title = "Abm's Game",
+        .title = "Orbital Escalation",
         .width = 1920,
         .height = 1080,
     });
 
-    AbmGame game;
+    OrbitalEscalationGame game;
     return application.run(game);
 }

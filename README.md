@@ -33,6 +33,6 @@ Regardless of whether or not you use Visual Studio, you can launch the games fro
 ```sh
 just run
 just run erik
-just run abm
+just run orbitalEscalation
 just run chris
 ```

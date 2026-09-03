@@ -52,9 +52,9 @@ configure:
 # Download/update third-party dependencies into thirdparty/.
 fetch-deps: configure
 
-# Configure and build. Pass a target (sandbox, erik, abm, chris) to build only that game; leave blank to build everything.
+# Configure and build. Pass a target (sandbox, erik, orbitalEscalation, chris) to build only that game; leave blank to build everything.
 build target="": configure
-    {{cmake}} --build --preset {{build-preset-prefix}}-debug --parallel {{ if target == "" { "" } else { "--target " + (if target == "sandbox" { "svanes_sandbox" } else if target == "erik" { "svanes_game_erik" } else if target == "abm" { "svanes_game_abm" } else { "svanes_game_chris" }) } }}
+    {{cmake}} --build --preset {{build-preset-prefix}}-debug --parallel {{ if target == "" { "" } else { "--target " + (if target == "sandbox" { "svanes_sandbox" } else if target == "erik" { "svanes_game_erik" } else if target == "orbitalEscalation" { "svanes_game_orbital_escalation" } else { "svanes_game_chris" }) } }}
 
 # Configure and build all targets in Release mode.
 release: configure
@@ -62,11 +62,11 @@ release: configure
 
 # Fail fast with a clear message if `run` was given an unknown target.
 _check-target target:
-    @{{ if target == "" { "" } else if target == "erik" { "" } else if target == "abm" { "" } else if target == "chris" { "" } else { error("no game named '" + target + "'. Try: abm, chris, erik, or leave it blank for the sandbox.") } }}
+    @{{ if target == "" { "" } else if target == "erik" { "" } else if target == "orbitalEscalation" { "" } else if target == "chris" { "" } else { error("no game named '" + target + "'. Try: chris, erik, orbitalEscalation, or leave it blank for the sandbox.") } }}
 
-# Build and launch a game: abm, chris, or erik. Leave blank for the sandbox.
+# Build and launch a game: chris, erik, or orbitalEscalation. Leave blank for the sandbox.
 run target="": (_check-target target) (build if target == "" { "sandbox" } else { target })
-    {{bin-dir}}{{ if target == "" { "svanes_sandbox" } else if target == "erik" { "svanes_game_erik" } else if target == "abm" { "svanes_game_abm" } else { "svanes_game_chris" } }}{{exe-suffix}}
+    {{bin-dir}}{{ if target == "" { "svanes_sandbox" } else if target == "erik" { "svanes_game_erik" } else if target == "orbitalEscalation" { "svanes_game_orbital_escalation" } else { "svanes_game_chris" } }}{{exe-suffix}}
 
 # Remove compiled outputs while retaining the configured build tree.
 clean: configure

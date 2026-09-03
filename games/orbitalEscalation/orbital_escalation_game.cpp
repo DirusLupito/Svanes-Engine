@@ -1,4 +1,4 @@
-#include "abm_game.hpp"
+#include "orbital_escalation_game.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -41,19 +41,19 @@ SDL_Texture* CreateGradientTexture(SDL_Renderer* renderer)
     return texture;
 }
 
-AbmGame::~AbmGame()
+OrbitalEscalationGame::~OrbitalEscalationGame()
 {
     if (gradient_texture != nullptr) {
         SDL_DestroyTexture(gradient_texture);
     }
 }
 
-void AbmGame::OnUpdate(float delta_seconds, const svanes::InputManager& /*input*/)
+void OrbitalEscalationGame::OnUpdate(float delta_seconds, const svanes::InputManager& /*input*/)
 {
     elapsed_seconds += delta_seconds;
 }
 
-void AbmGame::OnRender(SDL_Renderer* renderer, int32_t output_width, int32_t output_height)
+void OrbitalEscalationGame::OnRender(SDL_Renderer* renderer, int32_t output_width, int32_t output_height)
 {
     if (gradient_texture == nullptr) {
         gradient_texture = CreateGradientTexture(renderer);
