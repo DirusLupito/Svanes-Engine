@@ -64,6 +64,8 @@ target_sources(
     PRIVATE
         src/application.cpp
         src/input.cpp
+        src/render/texture_manager.cpp
+        src/render/texture_manager_internal.hpp
         src/registry.cpp
         src/sprite_animation_system.cpp
     PUBLIC
@@ -75,12 +77,17 @@ target_sources(
             include/svanes/game.hpp
             include/svanes/input.hpp
             include/svanes/render/basic_render_types.hpp
+            include/svanes/render/texture_manager.hpp
             include/svanes/registry.hpp
             include/svanes/sprite_animation_system.hpp
 )
 
 target_compile_features(svanes_engine PUBLIC cxx_std_23)
-target_link_libraries(svanes_engine PUBLIC SDL3::SDL3)
+target_link_libraries(
+    svanes_engine
+    PUBLIC SDL3::SDL3
+    PRIVATE SDL3_image::SDL3_image
+)
 
 if(MSVC)
     target_compile_options(svanes_engine PRIVATE /W4 /permissive-)
@@ -128,12 +135,15 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/game.hpp
     include/svanes/input.hpp
     include/svanes/render/basic_render_types.hpp
+    include/svanes/render/texture_manager.hpp
     include/svanes/registry.hpp
     include/svanes/sprite_animation_system.hpp
 )
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/application.cpp
     src/input.cpp
+    src/render/texture_manager.cpp
+    src/render/texture_manager_internal.hpp
     src/registry.cpp
     src/sprite_animation_system.cpp
 )
