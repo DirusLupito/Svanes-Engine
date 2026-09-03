@@ -99,9 +99,6 @@ else()
     target_compile_options(svanes_engine PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
-add_executable(svanes_sandbox apps/sandbox/main.cpp apps/sandbox/sandbox_game.cpp)
-target_link_libraries(svanes_sandbox PRIVATE Svanes::Engine)
-
 add_executable(svanes_game_erik games/erik-placeholder/main.cpp games/erik-placeholder/erik_game.cpp)
 target_link_libraries(svanes_game_erik PRIVATE Svanes::Engine SDL3_image::SDL3_image)
 
@@ -122,10 +119,10 @@ target_link_libraries(svanes_game_orbital_escalation PRIVATE Svanes::Engine)
 add_executable(svanes_game_chris games/chris-placeholder/main.cpp games/chris-placeholder/chris_game.cpp)
 target_link_libraries(svanes_game_chris PRIVATE Svanes::Engine)
 
-set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT svanes_sandbox)
+set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT svanes_game_orbital_escalation)
 
 set_target_properties(
-    svanes_engine svanes_sandbox svanes_game_erik svanes_game_orbital_escalation svanes_game_chris
+    svanes_engine svanes_game_erik svanes_game_orbital_escalation svanes_game_chris
     PROPERTIES
         CXX_EXTENSIONS OFF
         ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/$<CONFIG>"
