@@ -17,7 +17,7 @@ Application::Application(ApplicationSettings settings)
 {
 }
 
-int Application::run(IGame& game) const
+int32_t Application::run(IGame& game) const
 {
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         SDL_Log("Could not initialize SDL: %s", SDL_GetError());
@@ -68,8 +68,8 @@ int Application::run(IGame& game) const
             running = false;
         }
 
-        int output_width = 0;
-        int output_height = 0;
+        int32_t output_width = 0;
+        int32_t output_height = 0;
         SDL_GetCurrentRenderOutputSize(renderer, &output_width, &output_height);
 
         game.OnRender(renderer, output_width, output_height);

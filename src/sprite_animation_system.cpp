@@ -44,7 +44,7 @@ void AdvanceSpriteAnimations(Registry& registry, float delta_seconds)
             // Calculate the next frame to move to.
             // Realistically, only if there's a lag spike.
             else {
-                int num_frames = static_cast<int>(std::trunc(animation.elapsed_seconds / animation.seconds_per_frame));
+                int32_t num_frames = static_cast<int32_t>(std::trunc(animation.elapsed_seconds / animation.seconds_per_frame));
                 animation.elapsed_seconds = std::fmod(animation.elapsed_seconds, animation.seconds_per_frame);
                 animation.current_frame = (animation.current_frame + num_frames) % animation.frame_count;
             }

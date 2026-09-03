@@ -56,7 +56,7 @@ bool ErikGame::ShouldQuit() const
     return should_quit;
 }
 
-void ErikGame::OnRender(SDL_Renderer* renderer, int output_width, int output_height)
+void ErikGame::OnRender(SDL_Renderer* renderer, int32_t output_width, int32_t output_height)
 {
     EnsureOrbLoaded(renderer);
 

@@ -7,7 +7,7 @@ public:
     ~AbmGame() override;
 
     void OnUpdate(float delta_seconds, const svanes::InputManager& input) override;
-    void OnRender(SDL_Renderer* renderer, int output_width, int output_height) override;
+    void OnRender(SDL_Renderer* renderer, int32_t output_width, int32_t output_height) override;
 
 private:
     float elapsed_seconds = 0.0F;

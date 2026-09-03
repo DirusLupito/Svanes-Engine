@@ -19,6 +19,8 @@ demonstrate engine features. Core features, in implementation order:
 - **No comments in code.** Comments are written by the team, not generated.
 - **No `new`/`delete`.** Use smart pointers (`std::unique_ptr`,
   `std::shared_ptr`, etc) for all owned allocations.
+- **Prefer specified width types.** Rather than use int, short, long, etc,
+prefer their equivalents with specified widths, int8_t, uint32_t, etc.
 - **No platform-specific threading APIs.** Use `std::thread`/`std::jthread`
   (and the rest of `<thread>`/`<stop_token>`), not pthreads/Win32 threads.
 - **Nothing platform-specific in general.** The engine must build and run on

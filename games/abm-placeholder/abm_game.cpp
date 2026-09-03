@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <vector>
 
-constexpr int kSquarePixels = 96;
+constexpr int32_t kSquarePixels = 96;
 
 SDL_Texture* CreateGradientTexture(SDL_Renderer* renderer)
 {
@@ -26,8 +26,8 @@ SDL_Texture* CreateGradientTexture(SDL_Renderer* renderer)
     constexpr float end_g = 0x00;
     constexpr float end_b = 0xFE;
 
-    for (int y = 0; y < kSquarePixels; ++y) {
-        for (int x = 0; x < kSquarePixels; ++x) {
+    for (int32_t y = 0; y < kSquarePixels; ++y) {
+        for (int32_t x = 0; x < kSquarePixels; ++x) {
             const float t = static_cast<float>(x + y) / (2.0F * (kSquarePixels - 1));
             const std::size_t offset = (static_cast<std::size_t>(y) * kSquarePixels + x) * 4;
             pixels[offset + 0] = static_cast<std::uint8_t>(std::lerp(start_r, end_r, t));
@@ -53,7 +53,7 @@ void AbmGame::OnUpdate(float delta_seconds, const svanes::InputManager& /*input*
     elapsed_seconds += delta_seconds;
 }
 
-void AbmGame::OnRender(SDL_Renderer* renderer, int output_width, int output_height)
+void AbmGame::OnRender(SDL_Renderer* renderer, int32_t output_width, int32_t output_height)
 {
     if (gradient_texture == nullptr) {
         gradient_texture = CreateGradientTexture(renderer);

@@ -8,7 +8,7 @@ void SandboxGame::OnUpdate(float delta_seconds, const svanes::InputManager& /*in
     elapsed_seconds += delta_seconds;
 }
 
-void SandboxGame::OnRender(SDL_Renderer* renderer, int output_width, int output_height)
+void SandboxGame::OnRender(SDL_Renderer* renderer, int32_t output_width, int32_t output_height)
 {
     constexpr float square_size = 96.0F;
     const float available_width = std::max(0.0F, static_cast<float>(output_width) - square_size);

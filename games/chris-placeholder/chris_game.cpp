@@ -8,7 +8,7 @@ void ChrisGame::OnUpdate(float delta_seconds, const svanes::InputManager& /*inpu
     elapsed_seconds += delta_seconds;
 }
 
-void ChrisGame::OnRender(SDL_Renderer* renderer, int output_width, int output_height)
+void ChrisGame::OnRender(SDL_Renderer* renderer, int32_t output_width, int32_t output_height)
 {
     constexpr float square_size = 96.0F;
     const float available_width = std::max(0.0F, static_cast<float>(output_width) - square_size);

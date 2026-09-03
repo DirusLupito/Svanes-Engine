@@ -8,15 +8,15 @@ class IGame;
 
 struct ApplicationSettings {
     std::string title = "Svanes Engine";
-    int width = 1920;
-    int height = 1080;
+    int32_t width = 1920;
+    int32_t height = 1080;
 };
 
 class Application final {
 public:
     explicit Application(ApplicationSettings settings = {});
 
-    int run(IGame& game) const;
+    int32_t run(IGame& game) const;
 
 private:
     ApplicationSettings settings;

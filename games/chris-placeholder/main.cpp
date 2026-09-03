@@ -2,7 +2,7 @@
 
 #include <svanes/application.hpp>
 
-int main()
+int32_t main()
 {
     const svanes::Application application({
         .title = "Chris's Game",
