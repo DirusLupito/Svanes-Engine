@@ -24,10 +24,10 @@ public:
     void DestroyEntity(Entity entity);
 
     /**
-	* Adds a component of type T to the specified entity. If the entity already has a component of that type, it will be replaced.
+    * Adds a component of type T to the specified entity. If the entity already has a component of that type, it will be replaced.
     * 
-	* Gets a reference to where the component will live in the registry, writes the new component to that location and passes in
-	* the provided arguments to the component's constructor, and returns a reference to the newly added component
+    * Gets a reference to where the component will live in the registry, writes the new component to that location and passes in
+    * the provided arguments to the component's constructor, and returns a reference to the newly added component
     * 
     * Example usage:
     * 
@@ -55,12 +55,12 @@ public:
     }
 
     /**
-	* Removes a component from the given entity. 
+    * Removes a component from the given entity. 
     * 
     * If the entity does not have a component of that type, this function is a no-op.
     * 
     * @tparam T The component to remove.
-	* @param entity The entity to remove the component from.
+    * @param entity The entity to remove the component from.
     */
     template <typename T>
     void RemoveComponent(Entity entity)
@@ -72,7 +72,7 @@ public:
     }
 
     /**
-	* Checks if the given entity has a component of the given type.
+    * Checks if the given entity has a component of the given type.
     * 
     * @tparam T The component to find.
     * @param entity The entity to check.
@@ -90,7 +90,7 @@ public:
     }
 
     /**
-	* Gets a reference to the component of the given type associated with the given entity.
+    * Gets a reference to the component of the given type associated with the given entity.
     * 
     * @tparam T The component to get.
     * @param entity The entity to check.
@@ -103,7 +103,7 @@ public:
     }
 
     /**
-	* Iterates over all entities that have all of the specified components.
+    * Iterates over all entities that have all of the specified components.
     *
     * @tparam Components The component types to check for.
     * @tparam Func The type of the function to call for each entity.
@@ -156,7 +156,7 @@ public:
     }
 
 private:
-	// The unique ID for each entity, which is incremented each time a new entity is created.
+    // The unique ID for each entity, which is incremented each time a new entity is created.
     Entity next_entity = 0;
     
     // A 2D map of all components in the registry, first indexed by entity and then component type.
