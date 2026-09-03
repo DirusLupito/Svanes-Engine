@@ -1,6 +1,6 @@
 #pragma once
 
-#include <SDL3/SDL.h>
+#include <cstdint>
 
 namespace svanes {
 
@@ -31,6 +31,20 @@ struct FrameContext {
 };
 
 /**
+ * Defines the context used to build one frame's render queue.
+ *
+ * FIELDS:
+ * - render_queue: The render queue that receives commands for the current frame.
+ * - output_width: The current render output width in pixels.
+ * - output_height: The current render output height in pixels.
+ */
+struct RenderContext {
+    RenderQueue& render_queue;
+    std::int32_t output_width;
+    std::int32_t output_height;
+};
+
+/**
  * Any game that is to be run by the engine must implement this interface.
  * It provides a bridge between the engine and the game, allowing the engine
  * to manage the game loop and rendering while the game implements its own logic.
@@ -57,18 +71,9 @@ public:
     /**
      * Builds the render queue for the current frame.
      * This method is called once per frame, allowing the game to specify what should be rendered.
-     * @param render_queue The render queue to which the game should add its renderable objects
+     * @param context The context containing the render queue and current output dimensions.
      */
-    virtual void BuildRenderQueue(RenderQueue& render_queue) = 0;
-
-    /**
-     * Renders the current frame using the provided SDL_Renderer.
-     * This method is called once per frame to render the game state to the screen.
-     * @param renderer The SDL_Renderer to use for rendering.
-     * @param output_width The width of the output window.
-     * @param output_height The height of the output window.
-     */
-    virtual void OnRender(SDL_Renderer* renderer, int32_t output_width, int32_t output_height) = 0;
+    virtual void BuildRenderQueue(const RenderContext& context) = 0;
 
     /**
      * Determines whether the game should quit on the next

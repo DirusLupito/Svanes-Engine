@@ -85,8 +85,8 @@ void RunGameLoop(IGame& game, SDL_Renderer* renderer)
         SDL_GetCurrentRenderOutputSize(renderer, &output_width, &output_height);
 
         render_queue.Reset();
-        game.BuildRenderQueue(render_queue);
-        game.OnRender(renderer, output_width, output_height);
+        const RenderContext render_context{render_queue, output_width, output_height};
+        game.BuildRenderQueue(render_context);
         render_queue_executor.Execute(render_queue);
         SDL_RenderPresent(renderer);
 

@@ -48,7 +48,12 @@ struct TextureHandle {
 /**
  * Represents image data, including its dimensions and pixel data in RGBA format.
  * The pixel data is stored as a vector of 8-bit unsigned integers.
- * May be 
+ * May be used to create textures or manipulate images before rendering.
+ *
+ * FIELDS:
+ * - width: The width of the image in pixels.
+ * - height: The height of the image in pixels.
+ * - rgba_pixels: A vector containing the pixel data in RGBA format.
  */
 struct ImageData {
     std::int32_t width = 0;

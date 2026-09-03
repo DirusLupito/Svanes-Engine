@@ -20,7 +20,7 @@ demonstrate engine features. Core features, in implementation order:
 - **No `new`/`delete`.** Use smart pointers (`std::unique_ptr`,
   `std::shared_ptr`, etc) for all owned allocations.
 - **Prefer specified width types.** Rather than use int, short, long, etc,
-prefer their equivalents with specified widths, int8_t, uint32_t, etc.
+  prefer their equivalents with specified widths, int8_t, uint32_t, etc.
 - **No platform-specific threading APIs.** Use `std::thread`/`std::jthread`
   (and the rest of `<thread>`/`<stop_token>`), not pthreads/Win32 threads.
 - **Nothing platform-specific in general.** The engine must build and run on
@@ -46,6 +46,8 @@ prefer their equivalents with specified widths, int8_t, uint32_t, etc.
 - When writing code, do not try to silently succeed and ignore non-critical errors.
   Crashing with an informative log message is preferable to succeeding in a mysterious way, 
   as such successes can lead to mysterious and difficult to debug issues.
+- All structs must document the exact field names. This is done to allow things like intellisense
+  to report the field names as part of the documentation for a struct.
 
 
 Additionally, a core idea here is that we should earn our complexity.
