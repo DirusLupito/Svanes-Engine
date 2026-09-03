@@ -74,6 +74,7 @@ target_sources(
             include/svanes/entity.hpp
             include/svanes/game.hpp
             include/svanes/input.hpp
+            include/svanes/render/basic_render_types.hpp
             include/svanes/registry.hpp
             include/svanes/sprite_animation_system.hpp
 )
@@ -126,6 +127,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/entity.hpp
     include/svanes/game.hpp
     include/svanes/input.hpp
+    include/svanes/render/basic_render_types.hpp
     include/svanes/registry.hpp
     include/svanes/sprite_animation_system.hpp
 )
