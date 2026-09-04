@@ -167,6 +167,14 @@ std::optional<Key> internal::InputManagerInternal::TranslateKey(SDL_Scancode sca
         return Key::Right;
     case SDL_SCANCODE_SPACE:
         return Key::Space;
+    case SDL_SCANCODE_W:
+        return Key::W;
+    case SDL_SCANCODE_A:
+        return Key::A;
+    case SDL_SCANCODE_S:
+        return Key::S;
+    case SDL_SCANCODE_D:
+        return Key::D;
     default:
         return std::nullopt;
     }

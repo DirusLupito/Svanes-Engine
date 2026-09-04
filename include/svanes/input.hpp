@@ -21,6 +21,10 @@ class InputManagerInternal;
  * - Left: The Left Arrow key.
  * - Right: The Right Arrow key.
  * - Space: The Spacebar key.
+ * - W: The W key.
+ * - A: The A key.
+ * - S: The S key.
+ * - D: The D key.
  * - Count: A fake key used to get the number of keys in the enum. 
  *   Used to size the arrays in InputManager.
  */
@@ -29,6 +33,10 @@ enum class Key : std::uint8_t {
     Left,
     Right,
     Space,
+    W,
+    A,
+    S,
+    D,
     Count,
 };
 
