@@ -28,7 +28,7 @@ struct GameContext {
  */
 struct FrameContext {
     Registry& world;
-    const InputManager& input;
+    InputManager& input;
     float delta_seconds;
     std::int32_t output_width;
     std::int32_t output_height;

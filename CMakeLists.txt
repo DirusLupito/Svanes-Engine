@@ -64,6 +64,7 @@ target_sources(
     PRIVATE
         src/application.cpp
         src/input.cpp
+        src/input_manager_internal.hpp
         src/render/render_queue.cpp
         src/render/render_queue_executor.cpp
         src/render/render_queue_executor.hpp
@@ -147,6 +148,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/application.cpp
     src/input.cpp
+    src/input_manager_internal.hpp
     src/render/render_queue.cpp
     src/render/render_queue_executor.cpp
     src/render/render_queue_executor.hpp

@@ -48,6 +48,7 @@ demonstrate engine features. Core features, in implementation order:
   as such successes can lead to mysterious and difficult to debug issues.
 - All structs must document the exact field names. This is done to allow things like intellisense
   to report the field names as part of the documentation for a struct.
+- Likewise, enums (and enum classes, and enum structs) must document the exact names of the enum values. 
 - (For humans) Write documentation for functions, classes, structs, etc inside
   the header file they are defined in, not the implementation file.
 

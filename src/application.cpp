@@ -9,6 +9,7 @@
 #include <svanes/render/render_system.hpp>
 #include <svanes/sprite_animation_system.hpp>
 
+#include "input_manager_internal.hpp"
 #include "render/render_queue_executor.hpp"
 #include "render/texture_manager_internal.hpp"
 
@@ -26,10 +27,11 @@ namespace internal {
  * This function shall handle input processing, calculating delta time,
  * updating the game state, and building and executing the render queue for each frame.
  * @param game The game instance to run within the application.
+ * @param window The SDL_Window used for input.
  * @param renderer The SDL_Renderer used for rendering.
  * @param world The registry containing all entities and their components.
  */
-void RunGameLoop(IGame& game, SDL_Renderer* renderer, Registry& world)
+void RunGameLoop(IGame& game, SDL_Window* window, SDL_Renderer* renderer, Registry& world)
 {
 
     // First time setup.
@@ -53,14 +55,14 @@ void RunGameLoop(IGame& game, SDL_Renderer* renderer, Registry& world)
         // INPUT DETECTION AND PROCESSING
         //
 
-        input.BeginFrame();
+        InputManagerInternal::BeginFrame(input);
 
         SDL_Event event{};
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_EVENT_QUIT) {
                 running = false;
             }
-            input.HandleEvent(event);
+            InputManagerInternal::HandleEvent(input, event);
         }
 
         const Uint64 current_ticks = SDL_GetTicks();
@@ -78,6 +80,7 @@ void RunGameLoop(IGame& game, SDL_Renderer* renderer, Registry& world)
 
         const FrameContext frame_context{world, input, delta_seconds, output_width, output_height};
         game.Update(frame_context);
+        InputManagerInternal::SynchronizeTextInput(input, window);
         AdvanceSpriteAnimations(world, delta_seconds);
 
         if (game.ShouldQuit()) {
@@ -144,7 +147,7 @@ int32_t Application::run(IGame& game)
     }
 
     // This is where the actual logic of the game loop is executed.
-    internal::RunGameLoop(game, renderer, world);
+    internal::RunGameLoop(game, window, renderer, world);
 
     // Cleanup
 

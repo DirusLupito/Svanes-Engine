@@ -23,9 +23,12 @@ public:
      */
     void Update(const svanes::FrameContext& frame) override;
 
+    bool ShouldQuit() const override;
+
 private:
     // Total time elapsed since the start of the game, in seconds.
     float elapsed_seconds = 0.0F;
     svanes::Entity background_entity = 0;
     svanes::Entity square_entity = 0;
+    bool should_quit = false;
 };

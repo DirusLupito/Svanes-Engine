@@ -1,5 +1,6 @@
 #include "orbital_escalation_game.hpp"
 
+#include <svanes/input.hpp>
 #include <svanes/registry.hpp>
 #include <svanes/render/render_system.hpp>
 #include <svanes/render/texture_manager.hpp>
@@ -72,6 +73,10 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext& context)
 
 void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
 {
+    if (frame.input.WasPressed(svanes::Key::Escape)) {
+        should_quit = true;
+    }
+
     elapsed_seconds += frame.delta_seconds;
 
     svanes::Transform& background = frame.world.GetComponent<svanes::Transform>(background_entity);
@@ -85,4 +90,9 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
     svanes::Transform& square = frame.world.GetComponent<svanes::Transform>(square_entity);
     square.x = normalized_position * available_width;
     square.y = (static_cast<float>(frame.output_height) - square_size) * 0.5F;
+}
+
+bool OrbitalEscalationGame::ShouldQuit() const
+{
+    return should_quit;
 }
