@@ -16,21 +16,6 @@
 
 namespace svanes {
 
-/**
- * Used by std::unique_ptr to automatically manage the lifetime of SDL_Texture objects.
- * Destroying a texture is simple, as the only resource that needs to be freed is the SDL_Texture itself.
- */
-
-// We define the call operator () to specify how to delete an SDL_Texture.
-// Essentially this means we can say deleter(texture) which is equivalent to
-// deleter.operator()(texture)
-// Alternatively, we could have used a function pointer and decltype the 
-// function pointer type, but then every time we wanted to make a unique_ptr
-// we would have to give it the exact delete function.
-// Whereas here by passing in a struct which has a call operator, the unique_ptr
-// code will already try to call the operator() on the deleter.
-// For the function pointer, that tries to call the function pointed to,
-// and for the struct, it tries to call the operator() on the struct.
 void TextureManager::TextureDeleter::operator()(SDL_Texture* texture) const
 {
     SDL_DestroyTexture(texture);
@@ -41,13 +26,6 @@ TextureManager::TextureManager(SDL_Renderer* renderer)
 {
 }
 
-/**
- * Calculates the expected number of pixels in an image based on its width and height.
- * Throws an exception if the width or height is non-positive or if the calculated pixel count exceeds the maximum size of std::size_t.
- * @param image The image data for which to calculate the expected pixel count.
- * @return The expected number of pixels in the image.
- * @throws std::invalid_argument if the image dimensions are invalid or too large.
- */
 std::size_t TextureManager::GetExpectedPixelCount(const ImageData& image)
 {
     if (image.width <= 0 || image.height <= 0) {
@@ -66,13 +44,6 @@ std::size_t TextureManager::GetExpectedPixelCount(const ImageData& image)
     return width * height * channel_count;
 }
 
-/**
- * Stores a texture in the manager and returns a handle to it.
- * Throws an exception if the texture handle space is exhausted.
- * @param texture The unique pointer to the SDL_Texture to store.
- * @return A TextureHandle that can be used to reference the stored texture.
- * @throws std::runtime_error if the texture handle space is exhausted.
- */
 TextureHandle TextureManager::Store(TexturePointer texture)
 {
     if (next_id == 0) {
@@ -92,22 +63,8 @@ TextureHandle TextureManager::Store(TexturePointer texture)
     return handle;
 }
 
-/**
- * Destructor for the TextureManager class. 
- * Currently, it does not need to perform any special cleanup,
- * as the unique pointers in the textures map will automatically 
- * clean up the SDL_Texture resources when the TextureManager is destroyed.
- */
 TextureManager::~TextureManager() = default;
 
-/**
- * Loads a texture from a file and stores it in the manager.
- * Throws an exception if the path is empty or if the texture cannot be loaded.
- * @param path The file path to the texture image.
- * @return A TextureHandle that can be used to reference the loaded texture.
- * @throws std::invalid_argument if the path is empty.
- * @throws std::runtime_error if the texture cannot be loaded.
- */
 TextureHandle TextureManager::LoadTexture(std::string_view path)
 {
     if (path.empty()) {
@@ -125,14 +82,6 @@ TextureHandle TextureManager::LoadTexture(std::string_view path)
     return Store(std::move(texture));
 }
 
-/**
- * Creates a texture from raw image data and stores it in the manager.
- * Throws an exception if the image data is invalid or if the texture cannot be created.
- * @param image The raw image data to create the texture from.
- * @return A TextureHandle that can be used to reference the created texture.
- * @throws std::invalid_argument if the image data is invalid.
- * @throws std::runtime_error if the texture cannot be created or if the pixel data cannot be uploaded.
- */
 TextureHandle TextureManager::CreateTexture(const ImageData& image)
 {
     const std::size_t expected_pixel_count = GetExpectedPixelCount(image);
@@ -169,13 +118,6 @@ TextureHandle TextureManager::CreateTexture(const ImageData& image)
     return Store(std::move(texture));
 }
 
-/**
- * Creates a TextureManager instance using the provided SDL_Renderer.
- * Throws an exception if the renderer is null.
- * @param renderer The SDL_Renderer to use for texture management.
- * @return A TextureManager instance.
- * @throws std::invalid_argument if the renderer is null.
- */
 TextureManager internal::TextureManagerInternal::Create(SDL_Renderer* renderer)
 {
     if (renderer == nullptr) {
@@ -185,15 +127,6 @@ TextureManager internal::TextureManagerInternal::Create(SDL_Renderer* renderer)
     return TextureManager{renderer};
 }
 
-/**
- * Resolves a texture handle to its corresponding SDL_Texture pointer using the provided TextureManager.
- * This should not be exposed to game code, as it returns a raw pointer to an SDL_Texture.
- * Throws an exception if the handle is invalid or does not exist in the manager.
- * @param texture_manager The TextureManager instance to use for resolving the handle.
- * @param handle The TextureHandle to resolve.
- * @return A pointer to the SDL_Texture associated with the handle.
- * @throws std::invalid_argument if the handle is invalid or does not exist.
- */
 SDL_Texture* internal::TextureManagerInternal::Resolve(
     const TextureManager& texture_manager,
     TextureHandle handle
