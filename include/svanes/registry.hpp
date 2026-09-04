@@ -33,8 +33,11 @@ public:
     * 
     * registry.AddComponent<svanes::Transform>(entity);
     * 
-    * registry.AddComponent<svanes::SpriteAnimation>(entity, svanes::SpriteAnimation{
+    * registry.AddComponent<svanes::Sprite>(entity, svanes::Sprite{
     *     .texture = orb_texture,
+    * });
+    *
+    * registry.AddComponent<svanes::SpriteAnimation>(entity, svanes::SpriteAnimation{
     *     .frame_width = 128,
     *     .frame_height = 128,
     *     .frame_count = 4,

@@ -16,17 +16,16 @@ For example the [SpriteAnimation](../include/svanes/sprite_animation_system.hpp)
 
 ```cpp
 struct SpriteAnimation {
-    SDL_Texture* texture = nullptr;
-    int32_t frame_width = 0;
-    int32_t frame_height = 0;
-    int32_t frame_count = 1;
-    int32_t current_frame = 0;
+    std::int32_t frame_width = 0;
+    std::int32_t frame_height = 0;
+    std::int32_t frame_count = 1;
+    std::int32_t current_frame = 0;
     float seconds_per_frame = 0.1F;
     float elapsed_seconds = 0.0F;
 };
 ```
 
-Like stated above, this struct only contains the data that we want to store and action on.
+Like stated above, this struct only contains the data that we want to store and action on. The entity's `Sprite` component owns the texture handle and source rectangle used for rendering; `SpriteAnimation` updates that source rectangle as frames advance.
 
 The logic for this component is contained in a utility function that operates on the data contained within the struct.
 For example the [AdvanceSpriteAnimations](sprite_animation_system.cpp) function is roughly defined like this:
@@ -34,11 +33,10 @@ For example the [AdvanceSpriteAnimations](sprite_animation_system.cpp) function 
 ```cpp
 void AdvanceSpriteAnimations(Registry& registry, float delta_seconds)
 {
-    // Run a ForEach on our registry to get every entity that has a <SpriteAnimation> component.
-    registry.ForEach<SpriteAnimation>([delta_seconds](Entity /*entity*/, SpriteAnimation& animation) {
-        // Return early when there is only one frame or there are '0' seconds per frame.
+    // Run a ForEach on our registry to get every entity that has both a <SpriteAnimation> and <Sprite> component.
+    registry.ForEach<SpriteAnimation, Sprite>([delta_seconds](Entity, SpriteAnimation& animation, Sprite& sprite) {
 
-        // Accumulate the elapsed_seconds and check if we need to advance the frame.
+        // Accumulate elapsed_seconds, advance the frame, and update sprite.source.
     });
 }
 ```
