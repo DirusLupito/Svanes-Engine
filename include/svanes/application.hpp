@@ -13,6 +13,11 @@ class IGame;
  * Defines the settings for the application.
  * 
  * Currently this only includes the title and dimensions of the game window.
+ *
+ * FIELDS:
+ * - title: The title displayed by the application window.
+ * - width: The initial width of the application window.
+ * - height: The initial height of the application window.
  */
 struct ApplicationSettings {
     std::string title = "Svanes Engine";

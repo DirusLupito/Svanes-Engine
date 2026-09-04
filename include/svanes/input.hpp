@@ -46,8 +46,8 @@ enum class Key : std::uint8_t {
  */
 enum class MouseButton : std::uint8_t {
     Left,   // aka mouse 1
-    Middle, // aka mouse 2
-    Right,  // aka mouse 3
+    Right,  // aka mouse 2
+    Middle, // aka mouse 3
     Mouse4,
     Mouse5,
     Count,
@@ -56,6 +56,10 @@ enum class MouseButton : std::uint8_t {
 /**
  * Struct representing a 2D vector for input purposes, 
  * such as mouse position, delta, and wheel movement.
+ *
+ * FIELDS:
+ * - x: The horizontal component of the input vector.
+ * - y: The vertical component of the input vector.
  */
 struct InputVector {
     float x = 0.0F;

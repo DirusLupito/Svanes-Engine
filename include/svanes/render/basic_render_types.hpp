@@ -16,6 +16,12 @@ namespace svanes {
  * Represents a color with red, green, blue, and alpha components.
  * Each component is an 8-bit unsigned integer (0-255).
  * The default color is black with full opacity (alpha = 255).
+ *
+ * FIELDS:
+ * - red: The red component of the color.
+ * - green: The green component of the color.
+ * - blue: The blue component of the color.
+ * - alpha: The opacity component of the color.
  */
 struct Color {
     std::uint8_t red = 0;
@@ -27,6 +33,12 @@ struct Color {
 /**
  * Represents a rectangle defined by its top-left corner (x, y) and its dimensions (width, height).
  * All values are floating-point numbers. Units may not necessarily be pixels.
+ *
+ * FIELDS:
+ * - x: The x-coordinate of the rectangle's top-left corner.
+ * - y: The y-coordinate of the rectangle's top-left corner.
+ * - width: The width of the rectangle.
+ * - height: The height of the rectangle.
  */
 struct Rectangle {
     float x = 0.0F;
@@ -40,6 +52,9 @@ struct Rectangle {
  * The 'id' is a unique identifier for the texture, assigned by the rendering system.
  * The texture manager shall return a valid TextureHandle when a texture is loaded.
  * Internally, this should be uniquely associated with an SDL_Texture* or similar resource.
+ *
+ * FIELDS:
+ * - id: The unique identifier assigned to the texture resource.
  */
 struct TextureHandle {
     std::uint32_t id = 0;

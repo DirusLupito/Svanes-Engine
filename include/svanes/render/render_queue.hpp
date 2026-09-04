@@ -64,6 +64,9 @@ private:
 
     /**
      * Represents a command to clear the screen with a specific color.
+     *
+     * FIELDS:
+     * - color: The color used to clear the screen.
      */
     struct ClearCommand {
         Color color;
@@ -71,6 +74,10 @@ private:
 
     /**
      * Represents a command to draw a rectangle with a specific color.
+     *
+     * FIELDS:
+     * - destination: The screen region where the rectangle is drawn.
+     * - color: The fill color of the rectangle.
      */
     struct RectangleCommand {
         Rectangle destination;
@@ -80,6 +87,11 @@ private:
     /**
      * Represents a command to draw a texture, optionally specifying a source rectangle.
      * If the source rectangle is not provided, the entire texture will be drawn.
+     *
+     * FIELDS:
+     * - texture: The handle of the texture to draw.
+     * - source: The optional region of the texture to draw.
+     * - destination: The screen region where the texture is drawn.
      */
     struct TextureCommand {
         TextureHandle texture;

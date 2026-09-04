@@ -12,6 +12,10 @@ class TextureManager;
  * Defines relevant context for a game. 
  * For games to have their textures managed by the engine,
  * they must use the TextureManager provided in this context.
+ *
+ * FIELDS:
+ * - world: The engine owned registry containing the game's entities and components.
+ * - assets: The engine owned texture manager used to load and create textures.
  */
 struct GameContext {
     Registry& world;
@@ -25,6 +29,13 @@ struct GameContext {
  * Furthermore, the engine fills in the delta_seconds field
  * with the time elapsed since the last frame, allowing the game
  * to update its state accordingly.
+ *
+ * FIELDS:
+ * - world: The engine owned registry containing the game's entities and components.
+ * - input: The input state for the current frame.
+ * - delta_seconds: The elapsed time since the previous frame, in seconds.
+ * - output_width: The current width of the rendering output.
+ * - output_height: The current height of the rendering output.
  */
 struct FrameContext {
     Registry& world;
