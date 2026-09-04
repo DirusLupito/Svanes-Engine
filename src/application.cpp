@@ -6,6 +6,8 @@
 #include <svanes/game.hpp>
 #include <svanes/input.hpp>
 #include <svanes/render/render_queue.hpp>
+#include <svanes/render/render_system.hpp>
+#include <svanes/sprite_animation_system.hpp>
 
 #include "render/render_queue_executor.hpp"
 #include "render/texture_manager_internal.hpp"
@@ -25,8 +27,9 @@ namespace internal {
  * updating the game state, and building and executing the render queue for each frame.
  * @param game The game instance to run within the application.
  * @param renderer The SDL_Renderer used for rendering.
+ * @param world The registry containing all entities and their components.
  */
-void RunGameLoop(IGame& game, SDL_Renderer* renderer)
+void RunGameLoop(IGame& game, SDL_Renderer* renderer, Registry& world)
 {
 
     // First time setup.
@@ -35,7 +38,7 @@ void RunGameLoop(IGame& game, SDL_Renderer* renderer)
     RenderQueueExecutor render_queue_executor{renderer, texture_manager};
     RenderQueue render_queue;
     InputManager input;
-    GameContext game_context{texture_manager};
+    GameContext game_context{world, texture_manager};
 
     // Custom initialization of the game. Implemented by the user of the engine.
 
@@ -69,8 +72,13 @@ void RunGameLoop(IGame& game, SDL_Renderer* renderer)
         // GAME STATE UPDATE
         //
 
-        const FrameContext frame_context{input, delta_seconds};
+        std::int32_t output_width = 0;
+        std::int32_t output_height = 0;
+        SDL_GetCurrentRenderOutputSize(renderer, &output_width, &output_height);
+
+        const FrameContext frame_context{world, input, delta_seconds, output_width, output_height};
         game.Update(frame_context);
+        AdvanceSpriteAnimations(world, delta_seconds);
 
         if (game.ShouldQuit()) {
             running = false;
@@ -80,13 +88,17 @@ void RunGameLoop(IGame& game, SDL_Renderer* renderer)
         // RENDERING
         //
 
-        int32_t output_width = 0;
-        int32_t output_height = 0;
-        SDL_GetCurrentRenderOutputSize(renderer, &output_width, &output_height);
-
         render_queue.Reset();
-        const RenderContext render_context{render_queue, output_width, output_height};
-        game.BuildRenderQueue(render_context);
+
+        // Clear the screen to black before submitting any
+        // rendering commands to the render queue.
+        // Note that we may want to change this in the future to allow
+        // games to retain the previous frame's rendering. 
+
+        render_queue.Clear(Color{});
+
+        SubmitRectangles(world, render_queue);
+        SubmitSprites(world, render_queue);
         render_queue_executor.Execute(render_queue);
         SDL_RenderPresent(renderer);
 
@@ -103,7 +115,7 @@ Application::Application(ApplicationSettings settings)
 {
 }
 
-int32_t Application::run(IGame& game) const
+int32_t Application::run(IGame& game)
 {
 
     // SDL initialization and window/renderer creation.
@@ -132,7 +144,7 @@ int32_t Application::run(IGame& game) const
     }
 
     // This is where the actual logic of the game loop is executed.
-    internal::RunGameLoop(game, renderer);
+    internal::RunGameLoop(game, renderer, world);
 
     // Cleanup
 

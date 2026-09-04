@@ -67,6 +67,7 @@ target_sources(
         src/render/render_queue.cpp
         src/render/render_queue_executor.cpp
         src/render/render_queue_executor.hpp
+        src/render/render_system.cpp
         src/render/texture_manager.cpp
         src/render/texture_manager_internal.hpp
         src/registry.cpp
@@ -81,6 +82,7 @@ target_sources(
             include/svanes/input.hpp
             include/svanes/render/basic_render_types.hpp
             include/svanes/render/render_queue.hpp
+            include/svanes/render/render_system.hpp
             include/svanes/render/texture_manager.hpp
             include/svanes/registry.hpp
             include/svanes/sprite_animation_system.hpp
@@ -137,6 +139,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/input.hpp
     include/svanes/render/basic_render_types.hpp
     include/svanes/render/render_queue.hpp
+    include/svanes/render/render_system.hpp
     include/svanes/render/texture_manager.hpp
     include/svanes/registry.hpp
     include/svanes/sprite_animation_system.hpp
@@ -147,6 +150,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/render/render_queue.cpp
     src/render/render_queue_executor.cpp
     src/render/render_queue_executor.hpp
+    src/render/render_system.cpp
     src/render/texture_manager.cpp
     src/render/texture_manager_internal.hpp
     src/registry.cpp

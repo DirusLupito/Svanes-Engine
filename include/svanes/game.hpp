@@ -5,7 +5,7 @@
 namespace svanes {
 
 class InputManager;
-class RenderQueue;
+class Registry;
 class TextureManager;
 
 /**
@@ -14,6 +14,7 @@ class TextureManager;
  * they must use the TextureManager provided in this context.
  */
 struct GameContext {
+    Registry& world;
     TextureManager& assets;
 };
 
@@ -26,20 +27,9 @@ struct GameContext {
  * to update its state accordingly.
  */
 struct FrameContext {
+    Registry& world;
     const InputManager& input;
     float delta_seconds;
-};
-
-/**
- * Defines the context used to build one frame's render queue.
- *
- * FIELDS:
- * - render_queue: The render queue that receives commands for the current frame.
- * - output_width: The current render output width in pixels.
- * - output_height: The current render output height in pixels.
- */
-struct RenderContext {
-    RenderQueue& render_queue;
     std::int32_t output_width;
     std::int32_t output_height;
 };
@@ -67,13 +57,6 @@ public:
      * InputManager and the time elapsed since the last frame.
      */
     virtual void Update(const FrameContext& frame) = 0;
-
-    /**
-     * Builds the render queue for the current frame.
-     * This method is called once per frame, allowing the game to specify what should be rendered.
-     * @param context The context containing the render queue and current output dimensions.
-     */
-    virtual void BuildRenderQueue(const RenderContext& context) = 0;
 
     /**
      * Determines whether the game should quit on the next

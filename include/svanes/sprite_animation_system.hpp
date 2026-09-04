@@ -1,15 +1,12 @@
 #pragma once
 
+#include <svanes/render/render_system.hpp>
+
 #include <SDL3/SDL.h>
 
 namespace svanes {
 
 class Registry;
-
-struct Transform {
-    float x = 0.0F;
-    float y = 0.0F;
-};
 
 /**
  * Represents a sprite animation in a 2D game.

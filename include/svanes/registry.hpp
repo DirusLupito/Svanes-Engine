@@ -75,7 +75,7 @@ public:
     * Checks if the given entity has a component of the given type.
     * 
     * @tparam T The component to find.
-    * @param entity The entity to check.
+    * @param entity The entity to check for the component.
     * @return true if the entity has the component, false otherwise.
     */
     template <typename T>
@@ -93,7 +93,7 @@ public:
     * Gets a reference to the component of the given type associated with the given entity.
     * 
     * @tparam T The component to get.
-    * @param entity The entity to check.
+    * @param entity The entity who owns the component we are requesting.
     * @return A reference to the component.
     */
     template <typename T>
@@ -126,7 +126,7 @@ public:
      * a given component.
     * 
     * @tparam T The component to get.
-    * @param entity The entity to check.
+    * @param entity The entity who owns the component we are requesting.
     * @return A reference to the component.
     */
     template <typename T>

@@ -1,6 +1,7 @@
 #include "orbital_escalation_game.hpp"
 
-#include <svanes/render/render_queue.hpp>
+#include <svanes/registry.hpp>
+#include <svanes/render/render_system.hpp>
 #include <svanes/render/texture_manager.hpp>
 
 #include <algorithm>
@@ -48,26 +49,40 @@ svanes::ImageData CreateGradientImage()
 
 void OrbitalEscalationGame::Initialize(svanes::GameContext& context)
 {
-    gradient_texture = context.assets.CreateTexture(CreateGradientImage());
+    const svanes::TextureHandle gradient_texture = context.assets.CreateTexture(CreateGradientImage());
+    constexpr float square_size = static_cast<float>(kSquarePixels);
+
+    background_entity = context.world.CreateEntity();
+    context.world.AddComponent<svanes::Transform>(background_entity);
+    context.world.AddComponent<svanes::SolidRectangle>(
+        background_entity,
+        svanes::SolidRectangle{svanes::Color{17, 24, 39, 255}}
+    );
+
+    square_entity = context.world.CreateEntity();
+    context.world.AddComponent<svanes::Transform>(
+        square_entity,
+        svanes::Transform{0.0F, 0.0F, square_size, square_size}
+    );
+    context.world.AddComponent<svanes::Sprite>(
+        square_entity,
+        svanes::Sprite{.texture = gradient_texture}
+    );
 }
 
 void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
 {
     elapsed_seconds += frame.delta_seconds;
-}
 
-void OrbitalEscalationGame::BuildRenderQueue(const svanes::RenderContext& context)
-{
+    svanes::Transform& background = frame.world.GetComponent<svanes::Transform>(background_entity);
+    background.width = static_cast<float>(frame.output_width);
+    background.height = static_cast<float>(frame.output_height);
+
     constexpr float square_size = static_cast<float>(kSquarePixels);
-    const float available_width = std::max(0.0F, static_cast<float>(context.output_width) - square_size);
+    const float available_width = std::max(0.0F, static_cast<float>(frame.output_width) - square_size);
     const float normalized_position = (std::sin(elapsed_seconds * 2.0F) + 1.0F) * 0.5F;
-    const svanes::Rectangle square{
-        normalized_position * available_width,
-        (static_cast<float>(context.output_height) - square_size) * 0.5F,
-        square_size,
-        square_size,
-    };
 
-    context.render_queue.Clear(svanes::Color{17, 24, 39, 255});
-    context.render_queue.DrawTexture(gradient_texture, square);
+    svanes::Transform& square = frame.world.GetComponent<svanes::Transform>(square_entity);
+    square.x = normalized_position * available_width;
+    square.y = (static_cast<float>(frame.output_height) - square_size) * 0.5F;
 }

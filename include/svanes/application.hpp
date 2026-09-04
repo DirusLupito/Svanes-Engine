@@ -1,5 +1,8 @@
 #pragma once
 
+#include <svanes/registry.hpp>
+
+#include <cstdint>
 #include <string>
 
 namespace svanes {
@@ -40,11 +43,14 @@ public:
      * @param game The game instance to run within the application.
      * @return An integer status code indicating the result of the application run.
      */
-    int32_t run(IGame& game) const;
+    int32_t run(IGame& game);
 
 private:
     // The settings for the application, including the window title and dimensions.
     ApplicationSettings settings;
+
+    // The registry that holds all entities and their components in the game world.
+    Registry world;
 };
 
 } // namespace svanes
