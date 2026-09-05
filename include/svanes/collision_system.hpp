@@ -11,11 +11,8 @@ struct Transform;
 /**
  * Component for 2D entity collision detection.
  * 
- * FIELDS:
- * - is_static: Flag indicating whether an entity is static (true) or movable (false)
  */
 struct Collider2D {
-    bool is_static = false;
 };
 
 /**

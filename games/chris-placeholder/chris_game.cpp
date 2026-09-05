@@ -78,7 +78,7 @@ void ChrisGame::Initialize(svanes::GameContext& context)
         square_entity,
         svanes::Sprite{.texture = square_texture}
     );
-    context.world.AddComponent<svanes::Collider2D>(square_entity, svanes::Collider2D{.is_static = true});
+    context.world.AddComponent<svanes::Collider2D>(square_entity, svanes::Collider2D{});
 
     idle_texture = context.assets.LoadTexture(std::string{CHRIS_GAME_ASSETS_DIR} + "/" + kIdleSpriteSheetFilename);
     running_texture = context.assets.LoadTexture(std::string{CHRIS_GAME_ASSETS_DIR} + "/" + kRunningSpriteSheetFilename);
@@ -115,7 +115,7 @@ void ChrisGame::Initialize(svanes::GameContext& context)
         ground_entity,
         svanes::Sprite{.texture = ground_texture}
     );
-    context.world.AddComponent<svanes::Collider2D>(ground_entity, svanes::Collider2D{.is_static = true});
+    context.world.AddComponent<svanes::Collider2D>(ground_entity, svanes::Collider2D{});
 
     const svanes::TextureHandle platform_texture = CreateSolidColorTexture(context.assets, kPlatformColor);
 
@@ -125,7 +125,7 @@ void ChrisGame::Initialize(svanes::GameContext& context)
         platform_entity,
         svanes::Sprite{.texture = platform_texture}
     );
-    context.world.AddComponent<svanes::Collider2D>(platform_entity, svanes::Collider2D{.is_static = true});
+    context.world.AddComponent<svanes::Collider2D>(platform_entity, svanes::Collider2D{});
 }
 
 void ChrisGame::ResolveCharacterHorizontal(svanes::Registry& world)
@@ -138,8 +138,8 @@ void ChrisGame::ResolveCharacterHorizontal(svanes::Registry& world)
         float deepest_overlap_width = 0.0F;
 
         world.ForEach<svanes::Transform, svanes::Collider2D>(
-            [&](svanes::Entity, const svanes::Transform& static_transform, const svanes::Collider2D& static_collider) {
-                if (!static_collider.is_static) {
+            [&](svanes::Entity candidate_entity, const svanes::Transform& static_transform, const svanes::Collider2D&) {
+                if (candidate_entity == character_entity) {
                     return;
                 }
 
@@ -175,8 +175,8 @@ void ChrisGame::ResolveCharacterVertical(svanes::Registry& world)
         float deepest_overlap_height = 0.0F;
 
         world.ForEach<svanes::Transform, svanes::Collider2D>(
-            [&](svanes::Entity, const svanes::Transform& static_transform, const svanes::Collider2D& static_collider) {
-                if (!static_collider.is_static) {
+            [&](svanes::Entity candidate_entity, const svanes::Transform& static_transform, const svanes::Collider2D&) {
+                if (candidate_entity == character_entity) {
                     return;
                 }
 
