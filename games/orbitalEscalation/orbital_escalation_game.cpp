@@ -5,7 +5,6 @@
 #include <svanes/render/render_system.hpp>
 #include <svanes/render/texture_manager.hpp>
 
-#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -77,19 +76,32 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
         should_quit = true;
     }
 
-    elapsed_seconds += frame.delta_seconds;
-
     svanes::Transform& background = frame.world.GetComponent<svanes::Transform>(background_entity);
     background.width = static_cast<float>(frame.output_width);
     background.height = static_cast<float>(frame.output_height);
 
-    constexpr float square_size = static_cast<float>(kSquarePixels);
-    const float available_width = std::max(0.0F, static_cast<float>(frame.output_width) - square_size);
-    const float normalized_position = (std::sin(elapsed_seconds * 2.0F) + 1.0F) * 0.5F;
-
     svanes::Transform& square = frame.world.GetComponent<svanes::Transform>(square_entity);
-    square.x = normalized_position * available_width;
-    square.y = (static_cast<float>(frame.output_height) - square_size) * 0.5F;
+    // first time setup in the middle of the screen
+    if (!square_positioned) {
+        square.x = (static_cast<float>(frame.output_width) - square.width) * 0.5F;
+        square.y = (static_cast<float>(frame.output_height) - square.height) * 0.5F;
+        square_positioned = true;
+    }
+
+    constexpr float movement_speed = 300.0F;
+    const float movement = movement_speed * frame.delta_seconds;
+    if (frame.input.IsDown(svanes::Key::W)) {
+        square.y -= movement;
+    }
+    if (frame.input.IsDown(svanes::Key::A)) {
+        square.x -= movement;
+    }
+    if (frame.input.IsDown(svanes::Key::S)) {
+        square.y += movement;
+    }
+    if (frame.input.IsDown(svanes::Key::D)) {
+        square.x += movement;
+    }
 }
 
 bool OrbitalEscalationGame::ShouldQuit() const

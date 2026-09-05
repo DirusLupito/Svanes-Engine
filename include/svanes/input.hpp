@@ -18,17 +18,264 @@ class InputManagerInternal;
  * 
  * MEMBERS:
  * - Escape: The Escape key.
+ * - Space: The Spacebar key.
+ * - A: The A key.
+ * - B: The B key.
+ * - C: The C key.
+ * - D: The D key.
+ * - E: The E key.
+ * - F: The F key.
+ * - G: The G key.
+ * - H: The H key.
+ * - I: The I key.
+ * - J: The J key.
+ * - K: The K key.
+ * - L: The L key.
+ * - M: The M key.
+ * - N: The N key.
+ * - O: The O key.
+ * - P: The P key.
+ * - Q: The Q key.
+ * - R: The R key.
+ * - S: The S key.
+ * - T: The T key.
+ * - U: The U key.
+ * - V: The V key.
+ * - W: The W key.
+ * - X: The X key.
+ * - Y: The Y key.
+ * - Z: The Z key.
+ * 
+ * - Digit0: The 0 key on the main number row.
+ * - Digit1: The 1 key on the main number row.
+ * - Digit2: The 2 key on the main number row.
+ * - Digit3: The 3 key on the main number row.
+ * - Digit4: The 4 key on the main number row.
+ * - Digit5: The 5 key on the main number row.
+ * - Digit6: The 6 key on the main number row.
+ * - Digit7: The 7 key on the main number row.
+ * - Digit8: The 8 key on the main number row.
+ * - Digit9: The 9 key on the main number row.
+ * 
+ * - Enter: The Enter key.
+ * - Backspace: The Backspace key.
+ * - Tab: The Tab key.
+ * - Minus: The Minus key.
+ * - Equals: The Equals key.
+ * - LeftBracket: The Left Bracket key.
+ * - RightBracket: The Right Bracket key.
+ * - Backslash: The Backslash key.
+ * - Semicolon: The Semicolon key.
+ * - Apostrophe: The Apostrophe key.
+ * - Grave: The grave accent/backtick key.
+ * - Comma: The Comma key.
+ * - Period: The Period key.
+ * - Slash: The Slash key.
+ * - CapsLock: The Caps Lock key.
+ * 
+ * - F1: The F1 key.
+ * - F2: The F2 key.
+ * - F3: The F3 key.
+ * - F4: The F4 key.
+ * - F5: The F5 key.
+ * - F6: The F6 key.
+ * - F7: The F7 key.
+ * - F8: The F8 key.
+ * - F9: The F9 key.
+ * - F10: The F10 key.
+ * - F11: The F11 key.
+ * - F12: The F12 key.
+ * - F13: The F13 key.
+ * - F14: The F14 key.
+ * - F15: The F15 key.
+ * - F16: The F16 key.
+ * - F17: The F17 key.
+ * - F18: The F18 key.
+ * - F19: The F19 key.
+ * - F20: The F20 key.
+ * - F21: The F21 key.
+ * - F22: The F22 key.
+ * - F23: The F23 key.
+ * - F24: The F24 key.
+ * 
+ * - PrintScreen: The Print Screen key.
+ * - ScrollLock: The Scroll Lock key.
+ * - Pause: The Pause key.
+ * - Insert: The Insert key.
+ * - Home: The Home key.
+ * - PageUp: The Page Up key.
+ * - Delete: The Delete key.
+ * - End: The End key.
+ * - PageDown: The Page Down key.
+ * 
+ * - Up: The Up Arrow key.
+ * - Down: The Down Arrow key.
  * - Left: The Left Arrow key.
  * - Right: The Right Arrow key.
- * - Space: The Spacebar key.
+ * 
+ * - NumLock: The Num Lock key (Clear on Mac keyboards).
+ * - KeypadDivide: The numeric keypad divide key.
+ * - KeypadMultiply: The numeric keypad multiply key.
+ * - KeypadMinus: The numeric keypad minus key.
+ * - KeypadPlus: The numeric keypad plus key.
+ * - KeypadEnter: The numeric keypad enter key.
+ * - Keypad0: The numeric keypad 0 key.
+ * - Keypad1: The numeric keypad 1 key.
+ * - Keypad2: The numeric keypad 2 key.
+ * - Keypad3: The numeric keypad 3 key.
+ * - Keypad4: The numeric keypad 4 key.
+ * - Keypad5: The numeric keypad 5 key.
+ * - Keypad6: The numeric keypad 6 key.
+ * - Keypad7: The numeric keypad 7 key.
+ * - Keypad8: The numeric keypad 8 key.
+ * - Keypad9: The numeric keypad 9 key.
+ * - KeypadPeriod: The numeric keypad decimal point key.
+ * - KeypadEquals: The numeric keypad equals key.
+ * 
+ * - LeftControl: The Left Control key.
+ * - LeftShift: The Left Shift key.
+ * - LeftAlt: The left Alt key (Option on Mac keyboards).
+ * - LeftSuper: The left Windows, Command, or Super key.
+ * - RightControl: The Right Control key.
+ * - RightShift: The Right Shift key.
+ * - RightAlt: The right Alt key (AltGr or Option, depending on the keyboard).
+ * - RightSuper: The right Windows, Command, or Super key.
+ * - Menu: The context menu key.
+ * - NonUsHash: The non-US hash key used by some ISO keyboards.
+ * - NonUsBackslash: The additional ISO key between Left Shift and Z.
+ * 
  * - Count: A fake key used to get the number of keys in the enum. 
  *   Used to size the arrays in InputManager.
  */
 enum class Key : std::uint8_t {
     Escape,
+    Space,
+
+    A,
+    B,
+    C,
+    D,
+    E,
+    F,
+    G,
+    H,
+    I,
+    J,
+    K,
+    L,
+    M,
+    N,
+    O,
+    P,
+    Q,
+    R,
+    S,
+    T,
+    U,
+    V,
+    W,
+    X,
+    Y,
+    Z,
+
+    Digit0,
+    Digit1,
+    Digit2,
+    Digit3,
+    Digit4,
+    Digit5,
+    Digit6,
+    Digit7,
+    Digit8,
+    Digit9,
+
+    Enter,
+    Backspace,
+    Tab,
+    Minus,
+    Equals,
+    LeftBracket,
+    RightBracket,
+    Backslash,
+    Semicolon,
+    Apostrophe,
+    Grave,
+    Comma,
+    Period,
+    Slash,
+    CapsLock,
+
+    F1,
+    F2,
+    F3,
+    F4,
+    F5,
+    F6,
+    F7,
+    F8,
+    F9,
+    F10,
+    F11,
+    F12,
+    F13,
+    F14,
+    F15,
+    F16,
+    F17,
+    F18,
+    F19,
+    F20,
+    F21,
+    F22,
+    F23,
+    F24,
+
+    PrintScreen,
+    ScrollLock,
+    Pause,
+    Insert,
+    Home,
+    PageUp,
+    Delete,
+    End,
+    PageDown,
+
+    Up,
+    Down,
     Left,
     Right,
-    Space,
+
+    NumLock,
+    KeypadDivide,
+    KeypadMultiply,
+    KeypadMinus,
+    KeypadPlus,
+    KeypadEnter,
+    Keypad0,
+    Keypad1,
+    Keypad2,
+    Keypad3,
+    Keypad4,
+    Keypad5,
+    Keypad6,
+    Keypad7,
+    Keypad8,
+    Keypad9,
+    KeypadPeriod,
+    KeypadEquals,
+
+    LeftControl,
+    LeftShift,
+    LeftAlt,
+    LeftSuper,
+    RightControl,
+    RightShift,
+    RightAlt,
+    RightSuper,
+    Menu,
+
+    NonUsHash,
+    NonUsBackslash,
     Count,
 };
 

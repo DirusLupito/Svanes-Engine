@@ -26,8 +26,7 @@ public:
     bool ShouldQuit() const override;
 
 private:
-    // Total time elapsed since the start of the game, in seconds.
-    float elapsed_seconds = 0.0F;
+    bool square_positioned = false;
     svanes::Entity background_entity = 0;
     svanes::Entity square_entity = 0;
     bool should_quit = false;
