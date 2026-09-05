@@ -7,9 +7,11 @@
 namespace svanes {
 
 /**
- * Helper to convert an entitys transform into a rectangle for overlap calculations.
+ * Helper to convert an entity's transform into a rectangle for overlap calculations.
  *
- * transform - The transform of the entity to be conveerted
+ * @param transform The transform of the entity to be converted
+ * 
+ * @return SDL_FRect The rectangle representation of the entity's transform
  */
 static SDL_FRect ToRect(const Transform& transform)
 {
@@ -32,5 +34,6 @@ std::optional<Rectangle> GetOverlap(const Transform& a, const Transform& b)
 
     return Rectangle{overlap.x, overlap.y, overlap.w, overlap.h};
 }
+
 
 } // namespace svanes
