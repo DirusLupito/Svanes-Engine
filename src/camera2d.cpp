@@ -3,19 +3,42 @@
 #include <svanes/render/render_system.hpp>
 #include <svanes/rectangle_geometry.hpp>
 
+#include <cmath>
+#include <stdexcept>
+
 namespace svanes {
+
+/**
+ * Validates that the zoom factor is finite and greater than zero.
+ * If the zoom factor is invalid, an std::invalid_argument exception is thrown.
+ * @param zoom The zoom factor to validate.
+ * 
+ * @throws std::invalid_argument if the zoom factor is not finite or is less than or equal to zero.
+ */
+static void ValidateZoom(float zoom)
+{
+    if (!std::isfinite(zoom) || zoom <= 0.0F) {
+        throw std::invalid_argument("Camera zoom must be finite and greater than zero.");
+    }
+}
 
 Rectangle Camera2D::WorldToScreen(Rectangle world) const
 {
-    world.x -= x;
-    world.y -= y;
+    ValidateZoom(zoom);
+    world.x = (world.x - x) * zoom;
+    world.y = (world.y - y) * zoom;
+    world.width *= zoom;
+    world.height *= zoom;
     return world;
 }
 
 Rectangle Camera2D::ScreenToWorld(Rectangle screen) const
 {
-    screen.x += x;
-    screen.y += y;
+    ValidateZoom(zoom);
+    screen.x = screen.x / zoom + x;
+    screen.y = screen.y / zoom + y;
+    screen.width /= zoom;
+    screen.height /= zoom;
     return screen;
 }
 

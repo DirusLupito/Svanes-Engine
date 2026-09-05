@@ -8,6 +8,7 @@
 #include <svanes/render/render_system.hpp>
 #include <svanes/render/texture_manager.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -124,6 +125,13 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
     if (frame.input.WasPressed(svanes::Key::Escape)) {
         should_quit = true;
     }
+
+    // 1.1^delta
+    // Rolling harder on the mouse wheel will zoom in and out 
+    // faster compared to rolling the same distance slowly.
+    frame.camera.zoom = std::clamp(
+        frame.camera.zoom * std::pow(1.1F, frame.input.MouseWheelThisFrame().y), 0.1F, 10.0F
+    );
 
     constexpr float camera_speed = 300.0F;
     frame.camera.x += camera_speed * frame.delta_seconds * (
