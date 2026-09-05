@@ -15,19 +15,19 @@ void RenderQueue::Clear(Color color)
     commands.emplace_back(ClearCommand{color});
 }
 
-void RenderQueue::DrawRectangle(Rectangle destination, Color color)
+void RenderQueue::DrawRectangle(Rectangle destination, Color color, float rotation)
 {
-    commands.emplace_back(RectangleCommand{destination, color});
+    commands.emplace_back(RectangleCommand{destination, color, rotation});
 }
 
-void RenderQueue::DrawTexture(TextureHandle texture, Rectangle destination)
+void RenderQueue::DrawTexture(TextureHandle texture, Rectangle destination, float rotation)
 {
-    commands.emplace_back(TextureCommand{texture, std::nullopt, destination});
+    commands.emplace_back(TextureCommand{texture, std::nullopt, destination, rotation});
 }
 
-void RenderQueue::DrawTexture(TextureHandle texture, Rectangle source, Rectangle destination)
+void RenderQueue::DrawTexture(TextureHandle texture, Rectangle source, Rectangle destination, float rotation)
 {
-    commands.emplace_back(TextureCommand{texture, source, destination});
+    commands.emplace_back(TextureCommand{texture, source, destination, rotation});
 }
 
 // Except for reset which just clears the command queue

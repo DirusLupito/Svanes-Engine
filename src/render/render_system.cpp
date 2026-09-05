@@ -12,7 +12,8 @@ void SubmitRectangles(const Registry& world, RenderQueue& render_queue)
         [&render_queue](Entity /*entity*/, const Transform& transform, const SolidRectangle& rectangle) {
             render_queue.DrawRectangle(
                 Rectangle{transform.x, transform.y, transform.width, transform.height},
-                rectangle.color
+                rectangle.color,
+                transform.rotation
             );
         }
     );
@@ -31,9 +32,9 @@ void SubmitSprites(const Registry& world, RenderQueue& render_queue)
             };
 
             if (sprite.source.has_value()) {
-                render_queue.DrawTexture(sprite.texture, *sprite.source, destination);
+                render_queue.DrawTexture(sprite.texture, *sprite.source, destination, transform.rotation);
             } else {
-                render_queue.DrawTexture(sprite.texture, destination);
+                render_queue.DrawTexture(sprite.texture, destination, transform.rotation);
             }
         }
     );

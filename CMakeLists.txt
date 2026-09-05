@@ -63,6 +63,8 @@ target_sources(
     svanes_engine
     PRIVATE
         src/application.cpp
+        src/attractor_system.cpp
+        src/collision_system.cpp
         src/input.cpp
         src/kinematic_system.cpp
         src/input_manager_internal.hpp
@@ -79,6 +81,8 @@ target_sources(
         BASE_DIRS include
         FILES
             include/svanes/application.hpp
+            include/svanes/attractor_system.hpp
+            include/svanes/collision_system.hpp
             include/svanes/entity.hpp
             include/svanes/game.hpp
             include/svanes/input.hpp
@@ -136,6 +140,8 @@ set_target_properties(
 
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FILES
     include/svanes/application.hpp
+    include/svanes/attractor_system.hpp
+    include/svanes/collision_system.hpp
     include/svanes/entity.hpp
     include/svanes/game.hpp
     include/svanes/input.hpp
@@ -149,6 +155,8 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
 )
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/application.cpp
+    src/attractor_system.cpp
+    src/collision_system.cpp
     src/input.cpp
     src/kinematic_system.cpp
     src/input_manager_internal.hpp
