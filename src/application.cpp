@@ -3,6 +3,7 @@
 
 #include <svanes/application.hpp>
 
+#include <svanes/camera2d.hpp>
 #include <svanes/game.hpp>
 #include <svanes/input.hpp>
 #include <svanes/kinematic_system.hpp>
@@ -16,6 +17,8 @@
 
 #include <SDL3/SDL.h>
 
+#include <stdexcept>
+#include <string>
 #include <utility>
 
 namespace svanes {
@@ -41,7 +44,13 @@ void RunGameLoop(IGame& game, SDL_Window* window, SDL_Renderer* renderer, Regist
     RenderQueueExecutor render_queue_executor{renderer, texture_manager};
     RenderQueue render_queue;
     InputManager input;
-    GameContext game_context{world, texture_manager};
+    Camera2D camera;
+    std::int32_t output_width = 0;
+    std::int32_t output_height = 0;
+    if (!SDL_GetCurrentRenderOutputSize(renderer, &output_width, &output_height)) {
+        throw std::runtime_error("Could not get render output dimensions: " + std::string{SDL_GetError()});
+    }
+    GameContext game_context{world, texture_manager, camera, output_width, output_height};
 
     // Custom initialization of the game. Implemented by the user of the engine.
 
@@ -75,11 +84,11 @@ void RunGameLoop(IGame& game, SDL_Window* window, SDL_Renderer* renderer, Regist
         // GAME STATE UPDATE
         //
 
-        std::int32_t output_width = 0;
-        std::int32_t output_height = 0;
-        SDL_GetCurrentRenderOutputSize(renderer, &output_width, &output_height);
+        if (!SDL_GetCurrentRenderOutputSize(renderer, &output_width, &output_height)) {
+            throw std::runtime_error("Could not get render output dimensions: " + std::string{SDL_GetError()});
+        }
 
-        const FrameContext frame_context{world, input, delta_seconds, output_width, output_height};
+        const FrameContext frame_context{world, input, delta_seconds, output_width, output_height, camera};
         game.Update(frame_context);
         AdvanceKinematics(world, delta_seconds);
         InputManagerInternal::SynchronizeTextInput(input, window);
@@ -102,8 +111,8 @@ void RunGameLoop(IGame& game, SDL_Window* window, SDL_Renderer* renderer, Regist
 
         render_queue.Clear(Color{});
 
-        SubmitRectangles(world, render_queue);
-        SubmitSprites(world, render_queue);
+        SubmitRectangles(world, render_queue, camera, output_width, output_height);
+        SubmitSprites(world, render_queue, camera, output_width, output_height);
         render_queue_executor.Execute(render_queue);
         SDL_RenderPresent(renderer);
 

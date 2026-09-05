@@ -9,9 +9,11 @@
 
 #include "texture_manager_internal.hpp"
 
+#include <svanes/rectangle_geometry.hpp>
+
 #include <SDL3/SDL.h>
 
-#include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <numbers>
 #include <stdexcept>
@@ -70,16 +72,9 @@ void RenderQueueExecutor::Execute(const RenderQueue::RectangleCommand& command) 
 
     // If the rectangle has a non-zero rotation, 
     // we need draw it instead using SDL_RenderGeometry
-    // and calculate the four vertices of the rectangle after rotation.
+    // and calculate the four corners/vertices of the rectangle after rotation.
 
     if (command.rotation != 0.0F) {
-        const float half_width = destination.w * 0.5F;
-        const float half_height = destination.h * 0.5F;
-        const float center_x = destination.x + half_width;
-        const float center_y = destination.y + half_height;
-        const float cosine = std::cos(command.rotation);
-        const float sine = std::sin(command.rotation);
-
         // SDL_RenderGeometry requires the color to be specified
         // as a floating-point value in the range [0.0, 1.0]
 
@@ -90,65 +85,10 @@ void RenderQueueExecutor::Execute(const RenderQueue::RectangleCommand& command) 
             command.color.alpha / 255.0F,
         };
 
-        // The rectangle's center stays in the same place
-        // at (center_x, center_y) while the four corners
-        // are rotated around that center point.
-
-        // We initialize the vertices as relative positions
-        // to the center of the rectangle.
-
-        SDL_Vertex vertices[]{
-            // Top left
-            {{-half_width, -half_height}, color, {}},
-
-            // Top right
-            {{half_width, -half_height}, color, {}},
-
-            // Bottom right
-            {{half_width, half_height}, color, {}},
-
-            // Bottom left
-            {{-half_width, half_height}, color, {}},
-        };
-
-        for (SDL_Vertex& vertex : vertices) {
-            const SDL_FPoint offset = vertex.position;
-
-            // Given our center point (center_x, center_y), the angle of a given
-            // vertex from the center will be given by atan2(offset.y, offset.x)
-
-            // We can then just add the rotation to that angle, which gives us
-            // the new angle of the vertex from the center.
-
-            // Take     phi   = atan2(offset.y, offset.x)
-            // and take theta = command.rotation
-            // Then the new position of the vertex will be given by:
-
-            // x' = r * cos(phi + theta)
-            // y' = r * sin(phi + theta)
-
-            // Where r = sqrt(offset.x^2 + offset.y^2) is the distance from the center.
-            // Recall:
-            // cos(x + y) = cos(x)cos(y) - sin(x)sin(y)
-            // sin(x + y) = sin(x)cos(y) + cos(x)sin(y)
-            // x = r * cos(atan2(y, x))
-            // y = r * sin(atan2(y, x)).
-
-            // So we have
-            // x' = r * cos(phi + theta)
-            //    = r * (cos(phi)cos(theta) - sin(phi)sin(theta))
-            //    = x * cos(theta) - y * sin(theta)
-
-            // y' = r * sin(phi + theta)
-            //    = r * (sin(phi)cos(theta) + cos(phi)sin(theta))
-            //    = x * sin(theta) + y * cos(theta)
-
-            // We can then just add the center point back to get the final position of the vertex.
-
-            vertex.position = {
-                center_x + offset.x * cosine - offset.y * sine,
-                center_y + offset.x * sine + offset.y * cosine,
-            };
+        const auto corners = RectangleGeometry(command.destination, command.rotation).Corners();
+        SDL_Vertex vertices[4]{};
+        for (std::size_t i = 0; i < corners.size(); ++i) {
+            vertices[i] = {{corners[i].x, corners[i].y}, color, {}};
         }
 
         // Now we draw it as two triangles. In SDL_RenderGeometry,

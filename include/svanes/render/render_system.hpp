@@ -6,6 +6,7 @@
 
 namespace svanes {
 
+class Camera2D;
 class Registry;
 class RenderQueue;
 
@@ -61,15 +62,27 @@ struct SolidRectangle {
  * 
  * @param world The registry containing all entities and their components.
  * @param render_queue The render queue to which the rendering commands will be submitted.
+ * @param camera The camera used to convert world coordinates to screen coordinates.
+ * @param output_width The width of the rendering output.
+ * @param output_height The height of the rendering output.
  */
-void SubmitRectangles(const Registry& world, RenderQueue& render_queue);
+void SubmitRectangles(
+    const Registry& world, RenderQueue& render_queue, const Camera2D& camera,
+    std::int32_t output_width, std::int32_t output_height
+);
 
 /**
  * Submits all entities with a Transform and Sprite component to the render queue for rendering.
  * 
  * @param world The registry containing all entities and their components.
  * @param render_queue The render queue to which the rendering commands will be submitted.
+ * @param camera The camera used to convert world coordinates to screen coordinates.
+ * @param output_width The width of the rendering output.
+ * @param output_height The height of the rendering output.
  */
-void SubmitSprites(const Registry& world, RenderQueue& render_queue);
+void SubmitSprites(
+    const Registry& world, RenderQueue& render_queue, const Camera2D& camera,
+    std::int32_t output_width, std::int32_t output_height
+);
 
 }

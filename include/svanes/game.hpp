@@ -4,6 +4,7 @@
 
 namespace svanes {
 
+class Camera2D;
 class InputManager;
 class Registry;
 class TextureManager;
@@ -16,10 +17,16 @@ class TextureManager;
  * FIELDS:
  * - world: The engine owned registry containing the game's entities and components.
  * - assets: The engine owned texture manager used to load and create textures.
+ * - camera: The engine owned camera used to convert between screen and world coordinates.
+ * - output_width: The current width of the rendering output.
+ * - output_height: The current height of the rendering output.
  */
 struct GameContext {
     Registry& world;
     TextureManager& assets;
+    Camera2D& camera;
+    std::int32_t output_width;
+    std::int32_t output_height;
 };
 
 /**
@@ -36,6 +43,7 @@ struct GameContext {
  * - delta_seconds: The elapsed time since the previous frame, in seconds.
  * - output_width: The current width of the rendering output.
  * - output_height: The current height of the rendering output.
+ * - camera: The engine owned camera used to convert between screen and world coordinates.
  */
 struct FrameContext {
     Registry& world;
@@ -43,6 +51,7 @@ struct FrameContext {
     float delta_seconds;
     std::int32_t output_width;
     std::int32_t output_height;
+    Camera2D& camera;
 };
 
 /**

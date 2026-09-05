@@ -64,8 +64,10 @@ target_sources(
     PRIVATE
         src/application.cpp
         src/attractor_system.cpp
+        src/camera2d.cpp
         src/input.cpp
         src/kinematic_system.cpp
+        src/rectangle_geometry.cpp
         src/input_manager_internal.hpp
         src/render/render_queue.cpp
         src/render/render_queue_executor.cpp
@@ -81,10 +83,12 @@ target_sources(
         FILES
             include/svanes/application.hpp
             include/svanes/attractor_system.hpp
+            include/svanes/camera2d.hpp
             include/svanes/entity.hpp
             include/svanes/game.hpp
             include/svanes/input.hpp
             include/svanes/kinematic_system.hpp
+            include/svanes/rectangle_geometry.hpp
             include/svanes/render/basic_render_types.hpp
             include/svanes/render/render_queue.hpp
             include/svanes/render/render_system.hpp
@@ -143,10 +147,12 @@ set_target_properties(
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FILES
     include/svanes/application.hpp
     include/svanes/attractor_system.hpp
+    include/svanes/camera2d.hpp
     include/svanes/entity.hpp
     include/svanes/game.hpp
     include/svanes/input.hpp
     include/svanes/kinematic_system.hpp
+    include/svanes/rectangle_geometry.hpp
     include/svanes/render/basic_render_types.hpp
     include/svanes/render/render_queue.hpp
     include/svanes/render/render_system.hpp
@@ -157,8 +163,10 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/application.cpp
     src/attractor_system.cpp
+    src/camera2d.cpp
     src/input.cpp
     src/kinematic_system.cpp
+    src/rectangle_geometry.cpp
     src/input_manager_internal.hpp
     src/render/render_queue.cpp
     src/render/render_queue_executor.cpp
