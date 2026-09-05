@@ -4,7 +4,7 @@
 
 int32_t main()
 {
-    const svanes::Application application({
+    svanes::Application application({
         .title = "Erik's Game",
         .width = 1920,
         .height = 1080,
