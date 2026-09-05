@@ -11,7 +11,7 @@ class IGame;
 
 /**
  * Defines the settings for the application.
- * 
+ *
  * Currently this only includes the title and dimensions of the game window.
  *
  * FIELDS:

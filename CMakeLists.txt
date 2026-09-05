@@ -105,13 +105,9 @@ else()
 endif()
 
 add_executable(svanes_game_erik games/erik-placeholder/main.cpp games/erik-placeholder/erik_game.cpp)
-target_link_libraries(svanes_game_erik PRIVATE Svanes::Engine SDL3_image::SDL3_image)
-
-add_custom_command(
-    TARGET svanes_game_erik POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_SOURCE_DIR}/games/erik-placeholder/assets/darkworld_spawn_swirlingorb_idle.png"
-        "$<TARGET_FILE_DIR:svanes_game_erik>/darkworld_spawn_swirlingorb_idle.png"
+target_link_libraries(svanes_game_erik PRIVATE Svanes::Engine)
+target_compile_definitions(svanes_game_erik PRIVATE
+    ERIK_GAME_ASSETS_DIR="${CMAKE_SOURCE_DIR}/games/erik-placeholder/assets"
 )
 
 add_executable(
