@@ -1,5 +1,6 @@
 #include <svanes/kinematic_system.hpp>
 
+#include <svanes/attractor_system.hpp>
 #include <svanes/registry.hpp>
 #include <svanes/render/render_system.hpp>
 
@@ -69,19 +70,59 @@ void AdvanceKinematics(Registry& world, float delta_seconds)
         throw std::invalid_argument("Kinematics delta_seconds must be finite and nonnegative.");
     }
 
+    // Map of entity to the total acceleration applied to that entity by all attractors.
+    const auto attractions = EvaluateAttractors(world);
+
     // Filter to only update entities that have both a Transform (representing position and rotation)
     // and a Kinematic2D (representing motion state).
     world.ForEach<Transform, Kinematic2D>(
-        [delta_seconds](Entity, Transform& transform, Kinematic2D& motion) {
-            ClampMagnitude(motion.acceleration_x, motion.acceleration_y, motion.max_acceleration);
+        [&](Entity entity, Transform& transform, Kinematic2D& motion) {
+
+            float acceleration_x = motion.acceleration_x;
+            float acceleration_y = motion.acceleration_y;
+
+            // 
+            // Contributions from point source attractors
+            //
+
+            const auto attraction = attractions.find(entity);
+            if (attraction != attractions.end()) {
+                acceleration_x += attraction->second.x;
+                acceleration_y += attraction->second.y;
+            }
+
+            //
+            // Contributions from global acceleration fields
+            //
+
+            // TODO: Implement global acceleration fields, 
+            // like a downward gravitational field.
+
+            //
+            // Clamp accelerations
+            //
+
+            ClampMagnitude(acceleration_x, acceleration_y, motion.max_acceleration);
             ClampMagnitude(motion.angular_acceleration, motion.max_angular_acceleration);
 
-            motion.velocity_x += motion.acceleration_x * delta_seconds;
-            motion.velocity_y += motion.acceleration_y * delta_seconds;
+            //
+            // Velocity update from acceleration
+            //
+
+            motion.velocity_x += acceleration_x * delta_seconds;
+            motion.velocity_y += acceleration_y * delta_seconds;
             motion.angular_velocity += motion.angular_acceleration * delta_seconds;
+
+            //
+            // Velocity clamping
+            //
 
             ClampMagnitude(motion.velocity_x, motion.velocity_y, motion.max_speed);
             ClampMagnitude(motion.angular_velocity, motion.max_angular_speed);
+
+            //
+            // Position and rotation update from velocity
+            //
 
             transform.x += motion.velocity_x * delta_seconds;
             transform.y += motion.velocity_y * delta_seconds;

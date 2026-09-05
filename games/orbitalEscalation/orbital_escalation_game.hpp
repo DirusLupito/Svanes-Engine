@@ -29,5 +29,6 @@ private:
     bool square_positioned = false;
     svanes::Entity background_entity = 0;
     svanes::Entity square_entity = 0;
+    svanes::Entity attractor_entity = 0;
     bool should_quit = false;
 };

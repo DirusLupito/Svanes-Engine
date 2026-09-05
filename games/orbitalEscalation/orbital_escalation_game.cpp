@@ -1,5 +1,6 @@
 #include "orbital_escalation_game.hpp"
 
+#include <svanes/attractor_system.hpp>
 #include <svanes/input.hpp>
 #include <svanes/kinematic_system.hpp>
 #include <svanes/registry.hpp>
@@ -12,6 +13,19 @@
 #include <vector>
 
 constexpr std::int32_t kSquarePixels = 96;
+
+static svanes::Acceleration2D AttractionField(float offset_to_source_x, float offset_to_source_y)
+{
+    const float distance = std::hypot(offset_to_source_x, offset_to_source_y);
+    if (distance == 0.0F) {
+        return {};
+    }
+    const float strength = 100000.0F / distance;
+    return {
+        (offset_to_source_x / distance) * strength,
+        (offset_to_source_y / distance) * strength,
+    };
+}
 
 svanes::ImageData CreateGradientImage()
 {
@@ -62,6 +76,9 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext& context)
 
     square_entity = context.world.CreateEntity();
     context.world.AddComponent<svanes::Kinematic2D>(square_entity);
+    context.world.AddComponent<svanes::PointAttractor2D>(
+        square_entity, svanes::PointAttractor2D{.accelerationField = AttractionField}
+    );
     context.world.AddComponent<svanes::Transform>(
         square_entity,
         svanes::Transform{0.0F, 0.0F, square_size, square_size}
@@ -69,6 +86,21 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext& context)
     context.world.AddComponent<svanes::Sprite>(
         square_entity,
         svanes::Sprite{.texture = gradient_texture}
+    );
+
+    attractor_entity = context.world.CreateEntity();
+    context.world.AddComponent<svanes::Transform>(
+        attractor_entity, svanes::Transform{0.0F, 0.0F, square_size, square_size}
+    );
+    context.world.AddComponent<svanes::SolidRectangle>(
+        attractor_entity, svanes::SolidRectangle{svanes::Color{240, 160, 40, 255}}
+    );
+    context.world.AddComponent<svanes::Kinematic2D>(attractor_entity);
+
+    context.world.GetComponent<svanes::Kinematic2D>(attractor_entity).angular_velocity = 0.5F;
+
+    context.world.AddComponent<svanes::PointAttractor2D>(
+        attractor_entity, svanes::PointAttractor2D{.accelerationField = AttractionField}
     );
 }
 
@@ -87,6 +119,9 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
     if (!square_positioned) {
         square.x = (static_cast<float>(frame.output_width) - square.width) * 0.5F;
         square.y = (static_cast<float>(frame.output_height) - square.height) * 0.5F;
+        svanes::Transform& attractor = frame.world.GetComponent<svanes::Transform>(attractor_entity);
+        attractor.x = static_cast<float>(frame.output_width) * 0.25F - attractor.width * 0.5F;
+        attractor.y = (static_cast<float>(frame.output_height) - attractor.height) * 0.5F;
         square_positioned = true;
     }
 
