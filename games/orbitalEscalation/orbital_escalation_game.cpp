@@ -14,13 +14,22 @@
 
 constexpr std::int32_t kSquarePixels = 96;
 
+static float WrapPosition(float position, float extent)
+{
+    if (extent <= 0.0F) {
+        return position;
+    }
+    const float wrapped = std::fmod(position, extent);
+    return wrapped < 0.0F ? wrapped + extent : wrapped;
+}
+
 static svanes::Acceleration2D AttractionField(float offset_to_source_x, float offset_to_source_y)
 {
     const float distance = std::hypot(offset_to_source_x, offset_to_source_y);
     if (distance == 0.0F) {
         return {};
     }
-    const float strength = 100000.0F / distance;
+    const float strength = 1000.0F / ((distance / 100.0F) * (distance / 100.0F));
     return {
         (offset_to_source_x / distance) * strength,
         (offset_to_source_y / distance) * strength,
@@ -134,6 +143,15 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
     );
     motion.angular_acceleration = 100.0F * (
         frame.input.IsDown(svanes::Key::E) - frame.input.IsDown(svanes::Key::Q)
+    );
+
+    frame.world.ForEach<svanes::Transform, svanes::Kinematic2D>(
+        [&](svanes::Entity, svanes::Transform& transform, const svanes::Kinematic2D&) {
+            const float half_width = transform.width * 0.5F;
+            const float half_height = transform.height * 0.5F;
+            transform.x = WrapPosition(transform.x + half_width, static_cast<float>(frame.output_width)) - half_width;
+            transform.y = WrapPosition(transform.y + half_height, static_cast<float>(frame.output_height)) - half_height;
+        }
     );
 }
 
