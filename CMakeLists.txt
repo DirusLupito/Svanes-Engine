@@ -121,6 +121,9 @@ target_link_libraries(svanes_game_orbital_escalation PRIVATE Svanes::Engine)
 
 add_executable(svanes_game_chris games/chris-placeholder/main.cpp games/chris-placeholder/chris_game.cpp)
 target_link_libraries(svanes_game_chris PRIVATE Svanes::Engine)
+target_compile_definitions(svanes_game_chris PRIVATE
+    CHRIS_GAME_ASSETS_DIR="${CMAKE_SOURCE_DIR}/games/chris-placeholder/assets"
+)
 
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT svanes_game_orbital_escalation)
 
