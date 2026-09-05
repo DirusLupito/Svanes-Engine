@@ -35,16 +35,18 @@ public:
      * Adds a command to draw a rectangle to the render queue.
      * @param destination The destination rectangle.
      * @param color The color of the rectangle.
+     * @param rotation The rotation angle in radians (default is 0.0F).
      */
-    void DrawRectangle(Rectangle destination, Color color);
+    void DrawRectangle(Rectangle destination, Color color, float rotation = 0.0F);
 
     /**
      * Adds a command to draw a texture to the render queue.
      * This will draw the entire texture to the specified destination rectangle.
      * @param texture The handle of the texture to draw.
      * @param destination The destination rectangle where the texture will be drawn.
+     * @param rotation The rotation angle in radians (default is 0.0F).
      */
-    void DrawTexture(TextureHandle texture, Rectangle destination);
+    void DrawTexture(TextureHandle texture, Rectangle destination, float rotation = 0.0F);
 
     /**
      * Adds a command to draw a texture to the render queue with a specified source rectangle.
@@ -52,8 +54,9 @@ public:
      * @param texture The handle of the texture to draw.
      * @param source The source rectangle from the texture to draw.
      * @param destination The destination rectangle where the texture will be drawn.
+     * @param rotation The rotation angle in radians (default is 0.0F).
      */
-    void DrawTexture(TextureHandle texture, Rectangle source, Rectangle destination);
+    void DrawTexture(TextureHandle texture, Rectangle source, Rectangle destination, float rotation = 0.0F);
 
     /**
      * Resets the render queue by clearing all commands.
@@ -78,10 +81,12 @@ private:
      * FIELDS:
      * - destination: The screen region where the rectangle is drawn.
      * - color: The fill color of the rectangle.
+     * - rotation: The rotation angle in radians for the rectangle.
      */
     struct RectangleCommand {
         Rectangle destination;
         Color color;
+        float rotation;
     };
 
     /**
@@ -92,11 +97,13 @@ private:
      * - texture: The handle of the texture to draw.
      * - source: The optional region of the texture to draw.
      * - destination: The screen region where the texture is drawn.
+     * - rotation: The rotation angle in radians for the texture.
      */
     struct TextureCommand {
         TextureHandle texture;
         std::optional<Rectangle> source;
         Rectangle destination;
+        float rotation;
     };
 
     // union but safe

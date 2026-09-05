@@ -97,6 +97,9 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
     motion.acceleration_y = static_cast<float>(
         100.0f * (frame.input.IsDown(svanes::Key::S) - frame.input.IsDown(svanes::Key::W))
     );
+    motion.angular_acceleration = 100.0F * (
+        frame.input.IsDown(svanes::Key::E) - frame.input.IsDown(svanes::Key::Q)
+    );
 }
 
 bool OrbitalEscalationGame::ShouldQuit() const
