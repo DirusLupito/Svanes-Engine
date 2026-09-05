@@ -25,11 +25,17 @@ public:
     void Update(const svanes::FrameContext& frame) override;
 
 private:
+    void ResolveCharacterHorizontal(svanes::Registry& world);
+    void ResolveCharacterVertical(svanes::Registry& world);
+
+
     // Total time elapsed since the start of the game, in seconds.
     float elapsed_seconds = 0.0F;
     svanes::Entity background_entity = 0;
     svanes::Entity square_entity = 0;
     svanes::Entity character_entity = 0;
+    svanes::Entity ground_entity = 0;
+    svanes::Entity platform_entity = 0;
     svanes::TextureHandle idle_texture{};
     svanes::TextureHandle running_texture{};
     bool is_running = false;

@@ -65,6 +65,7 @@ target_sources(
         src/application.cpp
         src/attractor_system.cpp
         src/camera2d.cpp
+        src/collision_system.cpp
         src/input.cpp
         src/kinematic_system.cpp
         src/rectangle_geometry.cpp
@@ -84,6 +85,7 @@ target_sources(
             include/svanes/application.hpp
             include/svanes/attractor_system.hpp
             include/svanes/camera2d.hpp
+            include/svanes/collision_system.hpp
             include/svanes/entity.hpp
             include/svanes/game.hpp
             include/svanes/input.hpp
@@ -111,13 +113,9 @@ else()
 endif()
 
 add_executable(svanes_game_erik games/erik-placeholder/main.cpp games/erik-placeholder/erik_game.cpp)
-target_link_libraries(svanes_game_erik PRIVATE Svanes::Engine SDL3_image::SDL3_image)
-
-add_custom_command(
-    TARGET svanes_game_erik POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_SOURCE_DIR}/games/erik-placeholder/assets/darkworld_spawn_swirlingorb_idle.png"
-        "$<TARGET_FILE_DIR:svanes_game_erik>/darkworld_spawn_swirlingorb_idle.png"
+target_link_libraries(svanes_game_erik PRIVATE Svanes::Engine)
+target_compile_definitions(svanes_game_erik PRIVATE
+    ERIK_GAME_ASSETS_DIR="${CMAKE_SOURCE_DIR}/games/erik-placeholder/assets"
 )
 
 add_executable(
@@ -148,6 +146,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/application.hpp
     include/svanes/attractor_system.hpp
     include/svanes/camera2d.hpp
+    include/svanes/collision_system.hpp
     include/svanes/entity.hpp
     include/svanes/game.hpp
     include/svanes/input.hpp
@@ -164,6 +163,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/application.cpp
     src/attractor_system.cpp
     src/camera2d.cpp
+    src/collision_system.cpp
     src/input.cpp
     src/kinematic_system.cpp
     src/rectangle_geometry.cpp
