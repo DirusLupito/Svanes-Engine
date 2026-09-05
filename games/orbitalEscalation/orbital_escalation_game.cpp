@@ -129,9 +129,11 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
     // 1.1^delta
     // Rolling harder on the mouse wheel will zoom in and out 
     // faster compared to rolling the same distance slowly.
-    frame.camera.zoom = std::clamp(
+    const float zoom = std::clamp(
         frame.camera.zoom * std::pow(1.1F, frame.input.MouseWheelThisFrame().y), 0.1F, 10.0F
     );
+    const svanes::InputVector mouse = frame.input.MousePosition();
+    frame.camera.SetZoomAt(zoom, mouse.x, mouse.y);
 
     constexpr float camera_speed = 300.0F;
     frame.camera.x += camera_speed * frame.delta_seconds * (

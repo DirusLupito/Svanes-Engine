@@ -22,6 +22,18 @@ public:
     float zoom = 1.0F;
 
     /**
+     * Sets the zoom factor of the camera, keeping the specified screen coordinates
+     * anchored to the same world coordinates.
+     * 
+     * @param new_zoom The new zoom factor to set. Must be finite and greater than zero.
+     * @param screen_x The x-coordinate in screen space to anchor.
+     * @param screen_y The y-coordinate in screen space to anchor.
+     * 
+     * @throws std::invalid_argument if the new zoom factor is not finite or is less than or equal to zero.
+     */
+    void SetZoomAt(float new_zoom, float screen_x, float screen_y);
+
+    /**
      * Converts a rectangle from world coordinates to screen coordinates.
      * 
      * @param world The rectangle in world coordinates.
@@ -36,6 +48,8 @@ public:
      * @param screen The rectangle in screen coordinates.
      * 
      * @return The rectangle in world coordinates.
+     * 
+     * @throws std::invalid_argument if the zoom factor is not finite or is less than or equal to zero.
      */
     Rectangle ScreenToWorld(Rectangle screen) const;
 
@@ -50,6 +64,8 @@ public:
      * 
      * @return An optional Rectangle representing the destination rectangle in screen coordinates,
      * or std::nullopt if the rectangle is outside the bounds of the rendering output.
+     * 
+     * @throws std::invalid_argument if the zoom factor is not finite or is less than or equal to zero.
      */
     std::optional<Rectangle> PrepareForRendering(
         const Transform& transform, std::int32_t output_width, std::int32_t output_height

@@ -22,6 +22,55 @@ static void ValidateZoom(float zoom)
     }
 }
 
+void Camera2D::SetZoomAt(float new_zoom, float screen_x, float screen_y)
+{
+    ValidateZoom(new_zoom);
+    if (new_zoom == zoom) {
+        return;
+    }
+
+    // We want to keep the world coordinates of the point at (screen_x, screen_y) 
+    // the same before and after the zoom change.
+    // ScreenToWorld of the same point before and after the zoom change 
+    // should yield the same world coordinates.
+    
+    // So we need to update the top left corner of the camera (x, y)
+    // to ensure that the world coordinates of the point at (screen_x, screen_y) remain unchanged.
+
+    // Let (screen_x, screen_y) be the point in screen coordinates that we want to keep anchored.
+    // Let (world_x, world_y) be the corresponding point in world coordinates before the zoom change.
+    // Let (new_world_x, new_world_y) be the corresponding point in world coordinates after the zoom change.
+    // We want (world_x, world_y) to be equal to (new_world_x, new_world_y).
+
+    // Before the zoom change:
+    // world_x = (screen_x / zoom) + x
+    // world_y = (screen_y / zoom) + y
+
+    // After the zoom change:
+    // new_world_x = (screen_x / new_zoom) + new_x
+    // new_world_y = (screen_y / new_zoom) + new_y
+
+    // Solve for new_x and new_y:
+    //    (screen_x / zoom) + x = (screen_x / new_zoom) + new_x
+    // -> (screen_x / zoom) + x - (screen_x / new_zoom) = new_x
+    // 
+    //    (screen_y / zoom) + y = (screen_y / new_zoom) + new_y
+    // -> (screen_y / zoom) + y - (screen_y / new_zoom) = new_y
+
+    // Note that 
+    // anchor.x = (screen_x / zoom) + x
+    // anchor.y = (screen_y / zoom) + y
+
+    // So
+    // new_x = anchor.x - (screen_x / new_zoom)
+    // new_y = anchor.y - (screen_y / new_zoom)
+
+    const Rectangle anchor = ScreenToWorld({screen_x, screen_y, 0.0F, 0.0F});
+    zoom = new_zoom;
+    x = anchor.x - screen_x / zoom;
+    y = anchor.y - screen_y / zoom;
+}
+
 Rectangle Camera2D::WorldToScreen(Rectangle world) const
 {
     ValidateZoom(zoom);
