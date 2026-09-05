@@ -1,6 +1,7 @@
 #include "orbital_escalation_game.hpp"
 
 #include <svanes/input.hpp>
+#include <svanes/kinematic_system.hpp>
 #include <svanes/registry.hpp>
 #include <svanes/render/render_system.hpp>
 #include <svanes/render/texture_manager.hpp>
@@ -60,6 +61,7 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext& context)
     );
 
     square_entity = context.world.CreateEntity();
+    context.world.AddComponent<svanes::Kinematic2D>(square_entity);
     context.world.AddComponent<svanes::Transform>(
         square_entity,
         svanes::Transform{0.0F, 0.0F, square_size, square_size}
@@ -88,20 +90,13 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
         square_positioned = true;
     }
 
-    constexpr float movement_speed = 300.0F;
-    const float movement = movement_speed * frame.delta_seconds;
-    if (frame.input.IsDown(svanes::Key::W)) {
-        square.y -= movement;
-    }
-    if (frame.input.IsDown(svanes::Key::A)) {
-        square.x -= movement;
-    }
-    if (frame.input.IsDown(svanes::Key::S)) {
-        square.y += movement;
-    }
-    if (frame.input.IsDown(svanes::Key::D)) {
-        square.x += movement;
-    }
+    svanes::Kinematic2D& motion = frame.world.GetComponent<svanes::Kinematic2D>(square_entity);
+    motion.acceleration_x = static_cast<float>(
+        100.0f * (frame.input.IsDown(svanes::Key::D) - frame.input.IsDown(svanes::Key::A))
+    );
+    motion.acceleration_y = static_cast<float>(
+        100.0f * (frame.input.IsDown(svanes::Key::S) - frame.input.IsDown(svanes::Key::W))
+    );
 }
 
 bool OrbitalEscalationGame::ShouldQuit() const

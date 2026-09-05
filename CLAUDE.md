@@ -51,6 +51,8 @@ demonstrate engine features. Core features, in implementation order:
 - Likewise, enums (and enum classes, and enum structs) must document the exact names of the enum values. 
 - (For humans) Write documentation for functions, classes, structs, etc inside
   the header file they are defined in, not the implementation file.
+  This does not apply to static functions that are only used in the implementation file.
+  Those should be documented in the implementation file.
 
 
 Additionally, a core idea here is that we should earn our complexity.

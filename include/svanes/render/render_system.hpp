@@ -18,12 +18,14 @@ class RenderQueue;
  * - y: The y-coordinate of the entity's position.
  * - width: The width of the entity.
  * - height: The height of the entity.
+ * - rotation: The rotation in radians.
  */
 struct Transform {
     float x = 0.0F;
     float y = 0.0F;
     float width = 0.0F;
     float height = 0.0F;
+    float rotation = 0.0F;
 };
 
 /**

@@ -5,6 +5,7 @@
 
 #include <svanes/game.hpp>
 #include <svanes/input.hpp>
+#include <svanes/kinematic_system.hpp>
 #include <svanes/render/render_queue.hpp>
 #include <svanes/render/render_system.hpp>
 #include <svanes/sprite_animation_system.hpp>
@@ -80,6 +81,7 @@ void RunGameLoop(IGame& game, SDL_Window* window, SDL_Renderer* renderer, Regist
 
         const FrameContext frame_context{world, input, delta_seconds, output_width, output_height};
         game.Update(frame_context);
+        AdvanceKinematics(world, delta_seconds);
         InputManagerInternal::SynchronizeTextInput(input, window);
         AdvanceSpriteAnimations(world, delta_seconds);
 
