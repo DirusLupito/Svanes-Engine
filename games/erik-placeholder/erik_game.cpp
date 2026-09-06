@@ -12,10 +12,14 @@ void ErikGame::Initialize(svanes::GameContext& context)
 {
     const svanes::Entity background = context.world.CreateEntity();
     context.world.AddComponent<svanes::Transform>(background, svanes::Transform{
+        .x = 960.0F,
+        .y = 540.0F,
+    });
+    context.world.AddComponent<svanes::Rectangle2D>(background, svanes::Rectangle2D{
         .width = 1920.0F,
         .height = 1080.0F,
     });
-    context.world.AddComponent<svanes::SolidRectangle>(background, svanes::SolidRectangle{
+    context.world.AddComponent<svanes::SolidColor>(background, svanes::SolidColor{
         .color = svanes::Color{.blue = 255},
     });
 
@@ -24,8 +28,10 @@ void ErikGame::Initialize(svanes::GameContext& context)
 
     orb = context.world.CreateEntity();
     context.world.AddComponent<svanes::Transform>(orb, svanes::Transform{
-        .x = (static_cast<float>(context.output_width) - 128.0F) * 0.5F,
-        .y = (static_cast<float>(context.output_height) - 128.0F) * 0.5F,
+        .x = 960.0F,
+        .y = 540.0F,
+    });
+    context.world.AddComponent<svanes::Rectangle2D>(orb, svanes::Rectangle2D{
         .width = 128.0F,
         .height = 128.0F,
     });
