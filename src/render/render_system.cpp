@@ -62,6 +62,24 @@ static Vector2D ComputeOffset(ScaleMode mode, float scale, std::int32_t output_w
     return {offset_x, offset_y};
 }
 
+/**
+ * Reads the z order an entity is drawn at. The ZOrder component is optional,
+ * so an entity without one is drawn at z order 0.
+ *
+ * @param world The registry containing all entities and their components.
+ * @param entity The entity to read the z order of.
+ *
+ * @return The value of the entity's ZOrder component, or 0 if it has none.
+ */
+static std::int32_t ZOrderOf(const Registry& world, Entity entity)
+{
+    if (!world.HasComponent<ZOrder>(entity)) {
+        return 0;
+    }
+
+    return world.GetComponent<ZOrder>(entity).value;
+}
+
 void SubmitRectangles(
     const Registry& world, RenderQueue& render_queue, const Camera2D& camera,
     std::int32_t output_width, std::int32_t output_height, ScaleMode mode
@@ -70,8 +88,7 @@ void SubmitRectangles(
     const float scale = ComputeScale(mode, output_width, output_height);
     const Vector2D offset = ComputeOffset(mode, scale, output_width, output_height);
     world.ForEach<Transform, Rectangle2D, SolidColor>(
-        // Dont need the entity but the ForEach template will pass it in
-        [&](Entity /*entity*/, const Transform& transform, const Rectangle2D& geometry, const SolidColor& rectangle) {
+        [&](Entity entity, const Transform& transform, const Rectangle2D& geometry, const SolidColor& rectangle) {
             const auto destination = camera.PrepareForRendering(transform, geometry, output_width, output_height, scale, offset);
             if (!destination) {
                 return;
@@ -79,7 +96,8 @@ void SubmitRectangles(
             render_queue.DrawRectangle(
                 *destination,
                 rectangle.color,
-                transform.rotation
+                transform.rotation,
+                ZOrderOf(world, entity)
             );
         }
     );
@@ -93,10 +111,10 @@ void SubmitTriangles(
     const float scale = ComputeScale(mode, output_width, output_height);
     const Vector2D offset = ComputeOffset(mode, scale, output_width, output_height);
     world.ForEach<Transform, Triangle2D, SolidColor>(
-        [&](Entity, const Transform& transform, const Triangle2D& geometry, const SolidColor& fill) {
+        [&](Entity entity, const Transform& transform, const Triangle2D& geometry, const SolidColor& fill) {
             const auto destination = camera.PrepareForRendering(transform, geometry, output_width, output_height, scale, offset);
             if (destination) {
-                render_queue.DrawTriangle(*destination, fill.color);
+                render_queue.DrawTriangle(*destination, fill.color, ZOrderOf(world, entity));
             }
         }
     );
@@ -110,17 +128,17 @@ void SubmitSprites(
     const float scale = ComputeScale(mode, output_width, output_height);
     const Vector2D offset = ComputeOffset(mode, scale, output_width, output_height);
     world.ForEach<Transform, Rectangle2D, Sprite>(
-        // Again don't need the entity but the ForEach template will pass it in
-        [&](Entity /*entity*/, const Transform& transform, const Rectangle2D& geometry, const Sprite& sprite) {
+        [&](Entity entity, const Transform& transform, const Rectangle2D& geometry, const Sprite& sprite) {
             const auto destination = camera.PrepareForRendering(transform, geometry, output_width, output_height, scale, offset);
             if (!destination) {
                 return;
             }
 
+            const std::int32_t z_order = ZOrderOf(world, entity);
             if (sprite.source.has_value()) {
-                render_queue.DrawTexture(sprite.texture, *sprite.source, *destination, transform.rotation);
+                render_queue.DrawTexture(sprite.texture, *sprite.source, *destination, transform.rotation, z_order);
             } else {
-                render_queue.DrawTexture(sprite.texture, *destination, transform.rotation);
+                render_queue.DrawTexture(sprite.texture, *destination, transform.rotation, z_order);
             }
         }
     );

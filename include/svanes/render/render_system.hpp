@@ -61,12 +61,27 @@ struct Sprite {
 /**
  * Represents a solid color component that can be attached to an entity for rendering.
  * This component holds a color value that will be used to fill the entity's geometry.
- * 
+ *
  * FIELDS:
  * - color: The color value used to fill the entity's geometry.
  */
 struct SolidColor {
     Color color;
+};
+
+/**
+ * Optional render ordering component. Entities are drawn in ascending order of
+ * their z order, so an entity with a lower z order appears behind an entity with
+ * a higher one, regardless of which geometry either of them uses.
+ *
+ * This component may be omitted, in which case the entity is drawn as though its
+ * z order were 0. Entities sharing the same z order are drawn in creation order.
+ *
+ * FIELDS:
+ * - value: The z order the entity is drawn at. Lower values are drawn first.
+ */
+struct ZOrder {
+    std::int32_t value = 0;
 };
 
 /**

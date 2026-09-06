@@ -82,6 +82,9 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext& context)
         background_entity,
         svanes::SolidColor{svanes::Color{17, 24, 39, 255}}
     );
+    context.world.AddComponent<svanes::ZOrder>(
+        background_entity, svanes::ZOrder{-100}
+    );
 
     // first time setup in the middle of the screen
     square_entity = context.world.CreateEntity();

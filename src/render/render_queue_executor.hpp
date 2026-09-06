@@ -29,10 +29,11 @@ public:
 
     /**
      * Execute the rendering commands stored in the provided RenderQueue.
+     * The queue is sorted into z order before any of its commands are executed.
      * @param render_queue The RenderQueue containing the commands to execute.
      * @throws std::runtime_error if any command fails to execute.
      */
-    void Execute(const RenderQueue& render_queue) const;
+    void Execute(RenderQueue& render_queue) const;
 
 private:
     /**

@@ -33,8 +33,10 @@ RenderQueueExecutor::RenderQueueExecutor(
     }
 }
 
-void RenderQueueExecutor::Execute(const RenderQueue& render_queue) const
+void RenderQueueExecutor::Execute(RenderQueue& render_queue) const
 {
+    render_queue.SortByZOrder();
+
     // Iterate through each command and cast it to the appropriate type, then execute it.
     for (const auto& command : render_queue.commands) {
         if (const auto* clear = std::get_if<RenderQueue::ClearCommand>(&command)) {
