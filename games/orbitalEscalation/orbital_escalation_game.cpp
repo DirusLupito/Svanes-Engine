@@ -2,6 +2,7 @@
 
 #include <svanes/attractor_system.hpp>
 #include <svanes/camera2d.hpp>
+#include <svanes/collision_system.hpp>
 #include <svanes/input.hpp>
 #include <svanes/kinematic_system.hpp>
 #include <svanes/registry.hpp>
@@ -80,6 +81,7 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext& context)
 
     // first time setup in the middle of the screen
     square_entity = context.world.CreateEntity();
+    context.world.AddComponent<svanes::Collider2D>(square_entity);
     context.world.AddComponent<svanes::Kinematic2D>(square_entity);
     context.world.AddComponent<svanes::PointAttractor2D>(
         square_entity, svanes::PointAttractor2D{.accelerationField = AttractionField}
@@ -98,6 +100,7 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext& context)
     );
 
     attractor_entity = context.world.CreateEntity();
+    context.world.AddComponent<svanes::Collider2D>(attractor_entity);
     context.world.AddComponent<svanes::Transform>(
         attractor_entity, svanes::Transform{
             view.x + view.width * 0.25F - square_size * 0.5F,
@@ -158,6 +161,22 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
     motion.angular_acceleration = 100.0F * (
         frame.input.IsDown(svanes::Key::E) - frame.input.IsDown(svanes::Key::Q)
     );
+
+    svanes::Kinematic2D& attractor_motion = frame.world.GetComponent<svanes::Kinematic2D>(attractor_entity);
+    attractor_motion.acceleration_x = 0.0F;
+    attractor_motion.acceleration_y = 0.0F;
+
+    const auto collision = svanes::DetectCollision(
+        frame.world.GetComponent<svanes::Transform>(square_entity),
+        frame.world.GetComponent<svanes::Transform>(attractor_entity)
+    );
+    if (collision) {
+        const svanes::Vector2D acceleration = collision->normal * 10000.0F;
+        motion.acceleration_x += acceleration.x;
+        motion.acceleration_y += acceleration.y;
+        attractor_motion.acceleration_x -= acceleration.x;
+        attractor_motion.acceleration_y -= acceleration.y;
+    }
 
 }
 

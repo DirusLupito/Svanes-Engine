@@ -1,6 +1,6 @@
 #pragma once
 
-#include <svanes/render/basic_render_types.hpp>
+#include <svanes/vector2d.hpp>
 
 #include <optional>
 
@@ -16,14 +16,34 @@ struct Collider2D {
 };
 
 /**
- * Calculates the amount of overlap between two rectangular entities, a and b.
- * Returns the rectangular area of the overlap, or null if there is no overlap.
+ * Structure describing the result of a collision detection between two 2D shapes.
+ * Represents the direction needed to minimally separate the first shape from the second,
+ * and the distance along that direction to reach a non-penetrating state.
  *
- * @param a The first entity being checked for overlap
- * @param b The second entity being checked for overlap
- * 
- * @return std::optional<Rectangle> The rectangular area of the overlap, or null if there is no overlap
+ * FIELDS:
+ * - normal: Unit direction in which to move the first shape out of the second.
+ * - penetration_depth: World-space distance along normal needed to reach touching.
+ *   Zero means the shapes already touch without penetrating.
  */
-std::optional<Rectangle> GetOverlap(const Transform& a, const Transform& b);
+struct Collision2D {
+    Vector2D normal;
+    float penetration_depth = 0.0F;
+};
+
+/**
+ * Detects contact between rectangles. Describes the nature or lack thereof of
+ * the contact as both a normal and a penetration depth. 
+ *
+ * @param a The first rectangle's transform.
+ * @param b The second rectangle's transform.
+ * 
+ * @return Contact information, or std::nullopt when separated. 
+ * In the case that two different axes yield the same penetration depth,
+ * the first axis encountered is the one returned.
+ * 
+ * @throws std::invalid_argument for non-finite transforms, nonpositive dimensions,
+ * or rectangle edges that cannot be represented with a finite, positive length.
+ */
+std::optional<Collision2D> DetectCollision(const Transform& a, const Transform& b);
 
 } // namespace svanes
