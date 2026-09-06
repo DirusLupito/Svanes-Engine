@@ -1,5 +1,6 @@
 #include <svanes/collision_system.hpp>
 
+#include <svanes/circle_geometry.hpp>
 #include <svanes/rectangle_geometry.hpp>
 #include <svanes/triangle_geometry.hpp>
 #include <svanes/render/render_system.hpp>
@@ -51,47 +52,32 @@ static std::array<Vector2D, 4> RectangleVertices(const Rectangle2D& rectangle, c
 }
 
 /**
- * Tests convex polygons with at least three vertices ordered around each boundary.
- * Convexity is assumed, not checked. 
- * 
- * All vertices and edge lengths must be finite and edges nonzero.
- * 
- * Vertices must be passed in consecutive order, e.g. clockwise or counterclockwise
- * around the polygon. The first and last vertices need not be the same.
- * 
- * The result describes moving a, leaving b fixed.
- * 
- * @param a The first convex polygon's vertices.
- * @param b The second convex polygon's vertices.
- * 
- * @return Contact information, or std::nullopt when separated.
- * 
- * @throws std::invalid_argument for non-finite vertices or edges with non-positive lengths.
- * 
- * Reference: https://dyn4j.org/2010/01/sat/
+ * Projects a convex polygon's vertices onto a given axis and returns the
+ * minimum and maximum scalar projections along that axis.
+ *
+ * @param vertices The vertices of the convex polygon to project.
+ * @param axis The unit vector representing the axis onto which to project.
+ *
+ * @return std::pair<float, float> A pair containing the minimum and maximum scalar projections.
  */
-static std::optional<Collision2D> DetectConvexCollision(
-    std::span<const Vector2D> a, std::span<const Vector2D> b
-)
+static std::pair<float, float> ProjectPolygon(std::span<const Vector2D> vertices, Vector2D axis)
 {
-    Collision2D collision{{}, std::numeric_limits<float>::infinity()};
-
     // How do we solve the problem of detecting contact between two convex polygons?
     // The Separating Axis Theorem (SAT) says that if a line exists that separates
     // the two polygons, they do not intersect. If no such line exists, they do intersect.
     // How do we find such a line? Well actually we don't need to find one if we can prove
-    // that it does/does not exist. 
+    // that it does/does not exist.
     //
-    // I recommend following along with this with either MS Paint or pen and paper. 
-    // 
+    // I recommend following along with this with either MS Paint or pen and paper.
+    //
     // First, reduce the two-dimensional question to a one-dimensional question.
     // Choose a line through the origin, pointing along a unit vector n.
-    // For each vertex v, draw a line through v perpendicular to n. 
+    // For each vertex v, draw a line through v perpendicular to n.
     // Where that line meets the axis is the projected point.
     //
-    // To find the scalar projection of a vertex onto an axis, 
+    // To find the scalar projection of a vertex onto an axis,
     // let a vertex v be distance r from the origin at angle phi.
-    // Let the axis n have angle theta. Then the coordinates of the 
+    // Let the axis n have angle theta. Then the coordinates of the
     // vertex and axis are:
     //
     //     v = (r cos(phi), r sin(phi))
@@ -104,7 +90,7 @@ static std::optional<Collision2D> DetectConvexCollision(
     // How do we compute p? Well as we said, its the signed distance along the axis
     // to the projected point, which if we're looking at things from the angle
     // defined by the axis and the line from the origin to the vertex, is the
-    // length of the adjacent side of the triangle. So we can use the cah 
+    // length of the adjacent side of the triangle. So we can use the cah
     // part of soh cah toa to get p = r cos(phi - theta) as r is the hypotenuse
     // and phi - theta is the angle between the hypotenuse and the adjacent side.
     // Simplifying we see:
@@ -115,23 +101,23 @@ static std::optional<Collision2D> DetectConvexCollision(
     //       = v dot n
     //
     // So it can be a negative distance if the projected point is in the opposite
-    // direction of the axis. 
+    // direction of the axis.
     //
     // Along an edge of our polygon defined by the line segment from v0 to v1,
     // we can parameterize any point on that edge as
-    // 
+    //
     //     v(t) = (1-t)*v0 + t*v1, where 0 <= t <= 1
-    // 
+    //
     // Now as we explored previously, for those vertices v0 and v1, we can compute
     // their projections p0 and p1 onto the axis n. So we can then turn our
     // weighted average of the vertices into a weighted average of the projections:
-    // 
+    //
     //     p(t) = (1-t)*p0 + t*p1,
-    // 
-    // Interior points of a convex polygon are weighted averages of its vertices. 
-    // No point can project past the smallest or largest vertex projection. 
+    //
+    // Interior points of a convex polygon are weighted averages of its vertices.
+    // No point can project past the smallest or largest vertex projection.
     // Thus two numbers describe the whole projection.
-    // 
+    //
     // So we do not need to project every point along every edge
     // or every point inside the polygon. Projecting just the vertices
     // is enough to find the smallest and largest projected coordinates.
@@ -143,26 +129,120 @@ static std::optional<Collision2D> DetectConvexCollision(
     // Calling this function for both polygons gives two intervals on the
     // same axis. We can then check whether those intervals have a gap.
     // A gap proves the polygons are separated along this direction.
-    
-    /**
-     * Projects a convex polygon's vertices onto a given axis and returns the
-     * minimum and maximum scalar projections along that axis.
-     * 
-     * @param vertices The vertices of the convex polygon to project.
-     * @param axis The unit vector representing the axis onto which to project.
-     * 
-     * @return std::pair<float, float> A pair containing the minimum and maximum scalar projections.
-     */
-    const auto project = [](std::span<const Vector2D> vertices, Vector2D axis) {
-        float minimum = std::numeric_limits<float>::infinity();
-        float maximum = -std::numeric_limits<float>::infinity();
-        for (Vector2D vertex : vertices) {
-            const float projection = vertex.x * axis.x + vertex.y * axis.y;
-            minimum = std::min(minimum, projection);
-            maximum = std::max(maximum, projection);
-        }
-        return std::pair{minimum, maximum};
-    };
+
+    float minimum = std::numeric_limits<float>::infinity();
+    float maximum = -std::numeric_limits<float>::infinity();
+    for (Vector2D vertex : vertices) {
+        const float projection = vertex.x * axis.x + vertex.y * axis.y;
+        minimum = std::min(minimum, projection);
+        maximum = std::max(maximum, projection);
+    }
+    return std::pair{minimum, maximum};
+}
+
+/**
+ * Updates the collision information based on the projections of two convex polygons or
+ * a convex polygon and a circle onto a given axis.
+ * If the projections overlap, it calculates the penetration depth and updates the collision normal.
+ * 
+ * @param collision The current collision information to update.
+ * @param axis The unit vector representing the axis onto which to project.
+ * @param a_min The minimum scalar projection of the first polygon onto the axis.
+ * @param a_max The maximum scalar projection of the first polygon onto the axis.
+ * @param b_min The minimum scalar projection of the second polygon onto the axis.
+ * @param b_max The maximum scalar projection of the second polygon onto the axis.
+ * 
+ * @return true if the projections overlap (indicating a potential collision), false otherwise.
+ * 
+ * @throws std::invalid_argument if any of the projections are not finite,
+ * or if the penetration depth is not finite.
+ */
+static bool UpdateCollision(
+    Collision2D& collision, Vector2D axis, float a_min, float a_max, float b_min, float b_max
+)
+{
+    if (!std::isfinite(a_min) || !std::isfinite(a_max) || !std::isfinite(b_min) || !std::isfinite(b_max)) {
+        throw std::invalid_argument("Collision projections must be finite.");
+    }
+    // If A's rightmost projection precedes B's leftmost, there is a gap.
+    // The second comparison checks the opposite ordering.
+    // We use strict < to report contact even when the polygons touch
+    // at a single point or along an edge.
+
+    if (a_max < b_min || b_max < a_min) {
+        return false;
+    }
+
+    // The intervals intersect. Find how far A would need to move along
+    // this axis to bring them to touching, while holding B fixed.
+    // Translating a point by t*axis changes its projection by exactly t:
+    //
+    //     (v + t*axis) dot axis = v dot axis + t*(axis dot axis)
+    //                           = p + t, since axis has unit length.
+    //
+    // To exit negatively, A's maximum must reach B's minimum:
+    //     a_max + t = b_min  =>  t = b_min - a_max.
+    // To exit positively, A's minimum must reach B's maximum:
+    //     a_min + t = b_max  =>  t = b_max - a_min.
+    //
+    // Using the intersection's length instead of the exit distance
+    // would fail for containment (like if A is inside B or vice versa).
+    // With A = [1,3] and B = [0,10], their intersection has length 2.
+    // Moving A by -2 gives [-1,1], which still intersects B.
+    // The actual exits are -3, giving [-2,0], or +9, giving [10,12].
+
+    const float negative_depth = a_max - b_min;
+    const float positive_depth = b_max - a_min;
+    const bool move_negative = negative_depth <= positive_depth;
+    const float depth = move_negative ? negative_depth : positive_depth;
+    if (!std::isfinite(depth)) {
+        throw std::invalid_argument("Collision penetration depth must be finite.");
+    }
+
+    // To remove penetration, we only need the projected intervals to stop
+    // penetrating on one axis. So let's choose the axis requiring the least movement.
+    //
+    // (might be an interesting experiment to see what happens if we choose
+    // the axis requiring the most movement instead, or if we just essentially
+    // pick a random axis by choosing the first one we find that has a gap.)
+    //
+    // Moving A by normal * penetration_depth brings the shapes to touching,
+    // anything further along that axis would separate them. The game can
+    // decide what to do.
+    //
+    // Strict < retains the first axis when multiple exits are equally short.
+    if (depth < collision.penetration_depth) {
+        collision.normal = axis * (move_negative ? -1.0F : 1.0F);
+        collision.penetration_depth = depth;
+    }
+    return true;
+}
+
+/**
+ * Tests convex polygons with at least three vertices ordered around each boundary.
+ * Convexity is assumed, not checked.
+ *
+ * All vertices and edge lengths must be finite and edges nonzero.
+ *
+ * Vertices must be passed in consecutive order, e.g. clockwise or counterclockwise
+ * around the polygon. The first and last vertices need not be the same.
+ *
+ * The result describes moving a, leaving b fixed.
+ *
+ * @param a The first convex polygon's vertices.
+ * @param b The second convex polygon's vertices.
+ *
+ * @return Contact information, or std::nullopt when separated.
+ *
+ * @throws std::invalid_argument for non-finite vertices or edges with non-positive lengths.
+ *
+ * Reference: https://dyn4j.org/2010/01/sat/
+ */
+static std::optional<Collision2D> DetectConvexCollision(
+    std::span<const Vector2D> a, std::span<const Vector2D> b
+)
+{
+    Collision2D collision{{}, std::numeric_limits<float>::infinity()};
 
     // Hold any questions for a bit, and try to understand the next three paragraphs.
     // 
@@ -299,61 +379,220 @@ static std::optional<Collision2D> DetectConvexCollision(
             // between axes from differently sized edges would give the wrong answer.
 
             const Vector2D axis = Vector2D{-edge.y, edge.x} / length;
-            const auto [a_min, a_max] = project(a, axis);
-            const auto [b_min, b_max] = project(b, axis);
+            const auto [a_min, a_max] = ProjectPolygon(a, axis);
+            const auto [b_min, b_max] = ProjectPolygon(b, axis);
 
-            // If A's rightmost projection precedes B's leftmost, there is a gap.
-            // The second comparison checks the opposite ordering.
-            // We use strict < to report contact even when the polygons touch
-            // at a single point or along an edge. 
-
-            if (a_max < b_min || b_max < a_min) {
+            if (!UpdateCollision(collision, axis, a_min, a_max, b_min, b_max)) {
                 return std::nullopt;
-            }
-
-            // The intervals intersect. Find how far A would need to move along
-            // this axis to bring them to touching, while holding B fixed.
-            // Translating a point by t*axis changes its projection by exactly t:
-            //
-            //     (v + t*axis) dot axis = v dot axis + t*(axis dot axis)
-            //                           = p + t, since axis has unit length.
-            //
-            // To exit negatively, A's maximum must reach B's minimum:
-            //     a_max + t = b_min  =>  t = b_min - a_max.
-            // To exit positively, A's minimum must reach B's maximum:
-            //     a_min + t = b_max  =>  t = b_max - a_min.
-            //
-            // Using the intersection's length instead of the exit distance
-            // would fail for containment (like if A is inside B or vice versa).
-            // With A = [1,3] and B = [0,10], their intersection has length 2.
-            // Moving A by -2 gives [-1,1], which still intersects B.
-            // The actual exits are -3, giving [-2,0], or +9, giving [10,12].
-
-            const float negative_depth = a_max - b_min;
-            const float positive_depth = b_max - a_min;
-            const bool move_negative = negative_depth <= positive_depth;
-            const float depth = move_negative ? negative_depth : positive_depth;
-
-            // To remove penetration, we only need the projected intervals to stop
-            // penetrating on one axis. So let's choose the axis requiring the least movement.
-            // 
-            // (might be an interesting experiment to see what happens if we choose
-            // the axis requiring the most movement instead, or if we just essentially
-            // pick a random axis by choosing the first one we find that has a gap.)
-            // 
-            // Moving A by normal * penetration_depth brings the shapes to touching,
-            // anything further along that axis would separate them. The game can 
-            // decide what to do.
-            // 
-            // Strict < retains the first axis when multiple exits are equally short.
-            if (depth < collision.penetration_depth) {
-                collision.normal = axis * (move_negative ? -1.0F : 1.0F);
-                collision.penetration_depth = depth;
             }
         }
     }
 
     // At this point, we have checked every edge of both polygons. No gaps were found.
+    return collision;
+}
+
+/**
+ * Tests a circle against a convex polygon along a given axis.
+ * The circle is projected onto the axis as an interval centered at its projection
+ * with a length equal to its diameter. The polygon is projected onto the axis
+ * as an interval defined by its minimum and maximum projections. If the intervals
+ * overlap, the collision information is updated with the penetration depth and normal.
+ * 
+ * @param circle The circle to test against the polygon.
+ * @param polygon The vertices of the convex polygon to test against the circle.
+ * @param axis The unit vector representing the axis onto which to project.
+ * @param collision The current collision information to update.
+ * 
+ * @return true if the projections overlap (indicating a potential collision), false otherwise.
+ * 
+ * @throws std::invalid_argument if any of the projections are not finite,
+ * or if the penetration depth is not finite.
+ */
+static bool TestCircleAxis(
+    const Circle2D& circle, std::span<const Vector2D> polygon, Vector2D axis, Collision2D& collision
+)
+{
+
+    // The projection of a circle along any axis is an interval centered at
+    // the projection of its center, with a length equal to its diameter.
+
+    const float projection = circle.x * axis.x + circle.y * axis.y;
+    const auto [minimum, maximum] = ProjectPolygon(polygon, axis);
+    return UpdateCollision(collision, axis, projection - circle.radius, projection + circle.radius, minimum, maximum);
+}
+
+/**
+ * Detects collision between a circle and a convex polygon using the Separating Axis Theorem.
+ * If a collision is found, it calculates the penetration depth and normal of the collision.
+ * 
+ * @param circle The circle to test against the polygon.
+ * @param polygon The vertices of the convex polygon to test against the circle.
+ * 
+ * @return std::optional<Collision2D> The collision information if a collision is detected,
+ * or std::nullopt if no collision is detected.
+ * 
+ * @throws std::invalid_argument if any of the projections are not finite,
+ * or if the penetration depth is not finite.
+ */
+static std::optional<Collision2D> DetectCirclePolygonCollision(
+    const Circle2D& circle, std::span<const Vector2D> polygon
+)
+{
+    Collision2D collision{{}, std::numeric_limits<float>::infinity()};
+    const Vector2D center{circle.x, circle.y};
+    Vector2D closest;
+    float closest_distance = std::numeric_limits<float>::infinity();
+
+    // With the polygon-to-polygon SAT test, we only needed to check the
+    // edge normals of the polygons. But a circle has no edges, or perhaps
+    // infinitely many edges. So we cannot rely on the circle's edges to provide axes to test.
+    // 
+    // Instead, we can rely on the combination of the polygon's edge normals and one more:
+    // an axis defined by the vector from the circle's center to the closest point on the polygon.
+    // 
+    // As for why, let's start with the earlier Minkowski difference argument I explained
+    // for polygon-to-polygon collisions. Every point in a circle can be represented
+    // as a 2D vector from the circle's center to a point on its boundary.
+    // 
+    // Let:
+    // c - the circle's center as a 2D vector
+    // r - the radius of the circle
+    // p - a point anywhere in our convex polygon
+    // 
+    // Then what I am saying is that every point in the circle can be represented as:
+    //
+    //     c + u, ||u|| <= r
+    //
+    // Every difference between our arbitrary polygon point p and a point in the circle is then:
+    //
+    //     p - (c + u) = p - c - u
+    // 
+    // and so our set of points in the Minkowski difference is:
+    //
+    //     { p - c - u | p in polygon, ||u|| <= r }
+    //
+    // c is just some constant representing the circle's center, meaning that this shape is just
+    // a translation of the shape given by
+    //
+    //    { p - u | p in polygon, ||u|| <= r }
+    //
+    // which is just the polygon minus a circle of radius r centered at the origin.
+    // Notice that ||u|| <= r is satisfied by both +u and -u, so we can also write this as
+    //
+    //    { p + u | p in polygon, ||u|| <= r }
+    //
+    // So our set of points in the Minkowski difference is just every single point in the polygon
+    // expanded by a circle of radius r. You can visualize this in your head by imagining taking
+    // your polygon and a big marker with a circular tip whose radius is r, and tracing the outline
+    // of the polygon with that marker, then filling in the interior. Edges will be expanded outward
+    // by a distance of r, and corners will turn into circular arcs of radius r.
+    // Call this our Minkowski sum of the polygon and a circle of radius r.
+    // 
+    // Now, getting back to the SAT argument, recall that the shapes intersect if and only if the origin
+    // is contained in the Minkowski difference. That means we need to check if 0 is in the set given by
+    // 
+    //     { p + u | p in polygon, ||u|| <= r } - c
+    //
+    // which is equivalent to checking if c is in our Minkowski sum. How can we check if c is in the Minkowski sum? 
+    // Well, rather than check if it is, suppose we assume it is not, i.e. the circle and polygon do not intersect.
+    // Call:
+    // q - the closest point in the polygon to c
+    //
+    // Then define
+    // 
+    //     d = ||c - q||,
+    //     n = (c - q) / d
+    // 
+    // Now n is a unit vector pointing from the closest point on the polygon to the circle's center.
+    // We also know that d > r because we assumed the circle and polygon do not intersect. 
+    // 
+    // Now we will show that a line through q perpendicular to n separates the two shapes.
+    // Choose any other point p in the polygon. Convexity guarantees that every point given by
+    // 
+    //     q + t*(p - q), 0 <= t <= 1
+    // 
+    // is also in the polygon. Now since q is the closest point to c, we know that moving
+    // from p to q cannot bring us any closer to c. So we can write the squared distance
+    // from c to any point on the line segment from p to q as:
+    //
+    //     ||c - (q + t*(p - q))||^2 = ||(c - q) - t*(p - q)||^2
+    //                               = ||c - q||^2 - 2*t*(c - q) dot (p - q) + t^2*||p - q||^2
+    // 
+    // If the term (c - q) dot (p - q) were positive, then for small t, 
+    // the squared distance would be less than ||c - q||^2, meaning we would have found a point on the polygon
+    // closer to c than q, contradicting the assumption that q is the closest point. Therefore,
+    // we must have (c - q) dot (p - q) <= 0. If we then divide by d > 0, we have
+    //
+    //     n dot (p - q) <= 0
+    //
+    // which can be rewritten as
+    //
+    //     n dot p <= n dot q
+    //
+    // which holds for our arbitrary point p in the polygon. So the projection of the polygon onto the axis defined by n
+    // attains its maximum at q dot n. Projecting the circle onto the same axis gives an interval centered at c dot n
+    // with a length of 2*r. Solving our definition of n for c tells us that c = q + d*n, so
+    // 
+    //     c dot n - r = q dot n + d*n dot n - r = q dot n + d - r
+    // 
+    // Since the shapes do not intersect, we have d - r > 0, and so we know that
+    // 
+    //     c dot n - r > q dot n
+    // 
+    // So the circle's projection onto the axis defined by n lies entirely to the right of the polygon's projection.
+    // Now how do we know if our axes comprised of the polygon's edge normals and the axis pointing from the circle's
+    // center to the closest vertex of the polygon are sufficient to detect all collisions? Well we have a few cases:
+    // 
+    // 1. The circle center is inside the polygon. Then on every axis, the polygon's projection contains the circle's
+    //   projection.
+    // 2. The circle center is outside the polygon.
+    //     a. The closest point on the polygon is a vertex. Then the axis from the circle's center to that vertex separates
+    //        them according to the argument above.
+    //     b. The closest point on the polygon is along an edge. Then we're already testing the edge's normal, and according
+    //        to the argument above, that axis separates them.
+    // 
+    // So no matter what, all we have to do is check the polygon's edge normals and the axis from the circle's center to
+    // the closest point on the polygon. If any of those axes separate the shapes, we know they do not intersect.
+    // Otherwise, they must intersect.
+
+
+    // Iterate over each vertex of the polygon to find the closest point to the circle's center.
+    for (std::size_t i = 0; i < polygon.size(); ++i) {
+
+        const Vector2D offset = polygon[i] - center;
+        const float distance = std::hypot(offset.x, offset.y);
+
+        if (!std::isfinite(distance)) {
+            throw std::invalid_argument("Circle-to-polygon distances must be finite.");
+        }
+
+        if (distance < closest_distance) {
+            closest = offset;
+            closest_distance = distance;
+        }
+
+        // While we're already iterating over the polygon's vertices, we can also
+        // build the edge normals during the same loop (after all, the number
+        // of edges is equal to the number of vertices for a polygon).
+        const Vector2D edge = polygon[(i + 1) % polygon.size()] - polygon[i];
+        const float length = std::hypot(edge.x, edge.y);
+
+        if (!std::isfinite(length) || length <= 0.0F) {
+            throw std::invalid_argument("Collision polygon edges require finite, positive lengths.");
+        }
+
+        if (!TestCircleAxis(circle, polygon, Vector2D{-edge.y, edge.x} / length, collision)) {
+            return std::nullopt;
+        }
+    }
+
+    // At this point, no edge normals separated the shapes. All that's left is to check the axis from the circle's
+    // center to the closest point on the polygon. If that axis separates them, we know they do not intersect.
+    if (closest_distance > 0.0F && !TestCircleAxis(circle, polygon, closest / closest_distance, collision)) {
+        return std::nullopt;
+    }
+
     return collision;
 }
 
@@ -395,6 +634,81 @@ std::optional<Collision2D> DetectCollision(
     const auto corners_a = RectangleVertices(a, transform_a);
     const auto world_b = TransformTriangle(b, transform_b);
     return DetectConvexCollision(corners_a, world_b.vertices);
+}
+
+std::optional<Collision2D> DetectCollision(
+    const Circle2D& a, const Transform& transform_a,
+    const Circle2D& b, const Transform& transform_b
+)
+{
+    // Circle to circle collision detection is extremely simple. 
+    // Just check if the sum of the radii is greater than the 
+    // distance between the centers.
+
+    const Circle2D world_a = TransformCircle(a, transform_a);
+    const Circle2D world_b = TransformCircle(b, transform_b);
+
+    const Vector2D offset{world_a.x - world_b.x, world_a.y - world_b.y};
+
+    const float distance = std::hypot(offset.x, offset.y);
+    const float radii = world_a.radius + world_b.radius;
+
+    if (!std::isfinite(distance) || !std::isfinite(radii)) {
+        throw std::invalid_argument("Circle collision distances must be finite.");
+    }
+
+    if (distance > radii) {
+        return std::nullopt;
+    }
+
+    // As for the normal, we can just use the vector from the center of b to the center of a, normalized.
+    // And the penetration depth is the sum of the radii minus the distance between the centers.
+
+    return Collision2D{distance > 0.0F ? offset / distance : Vector2D{1.0F, 0.0F}, radii - distance};
+}
+
+std::optional<Collision2D> DetectCollision(
+    const Circle2D& a, const Transform& transform_a,
+    const Rectangle2D& b, const Transform& transform_b
+)
+{
+    const Circle2D circle = TransformCircle(a, transform_a);
+    const auto polygon = RectangleVertices(b, transform_b);
+    return DetectCirclePolygonCollision(circle, polygon);
+}
+
+std::optional<Collision2D> DetectCollision(
+    const Rectangle2D& a, const Transform& transform_a,
+    const Circle2D& b, const Transform& transform_b
+)
+{
+    auto collision = DetectCollision(b, transform_b, a, transform_a);
+    if (collision) {
+        collision->normal = collision->normal * -1.0F;
+    }
+    return collision;
+}
+
+std::optional<Collision2D> DetectCollision(
+    const Circle2D& a, const Transform& transform_a,
+    const Triangle2D& b, const Transform& transform_b
+)
+{
+    const Circle2D circle = TransformCircle(a, transform_a);
+    const auto polygon = TransformTriangle(b, transform_b);
+    return DetectCirclePolygonCollision(circle, polygon.vertices);
+}
+
+std::optional<Collision2D> DetectCollision(
+    const Triangle2D& a, const Transform& transform_a,
+    const Circle2D& b, const Transform& transform_b
+)
+{
+    auto collision = DetectCollision(b, transform_b, a, transform_a);
+    if (collision) {
+        collision->normal = collision->normal * -1.0F;
+    }
+    return collision;
 }
 
 } // namespace svanes
