@@ -10,16 +10,16 @@
 namespace svanes {
 
 /**
- * Validates that the zoom factor is finite and greater than zero.
- * If the zoom factor is invalid, an std::invalid_argument exception is thrown.
- * @param zoom The zoom factor to validate.
- * 
- * @throws std::invalid_argument if the zoom factor is not finite or is less than or equal to zero.
+ * Validates that a factor (zoom or scale) is finite and greater than zero.
+ * If it is not, an std::invalid_argument exception is thrown.
+ * @param factor The factor to validate.
+ *
+ * @throws std::invalid_argument if the factor is not finite or is less than or equal to zero.
  */
-static void ValidateZoom(float zoom)
+static void ValidateFactor(float factor)
 {
-    if (!std::isfinite(zoom) || zoom <= 0.0F) {
-        throw std::invalid_argument("Camera zoom must be finite and greater than zero.");
+    if (!std::isfinite(factor) || factor <= 0.0F) {
+        throw std::invalid_argument("Camera factor must be finite and greater than zero.");
     }
 }
 
@@ -41,7 +41,7 @@ static bool IsOutsideOutput(const Rectangle2D& bounds, std::int32_t output_width
 
 void Camera2D::SetZoomAt(float new_zoom, Vector2D screen_position)
 {
-    ValidateZoom(new_zoom);
+    ValidateFactor(new_zoom);
     if (new_zoom == zoom) {
         return;
     }
@@ -90,7 +90,7 @@ void Camera2D::SetZoomAt(float new_zoom, Vector2D screen_position)
 
 Rectangle2D Camera2D::WorldToScreen(Rectangle2D world) const
 {
-    ValidateZoom(zoom);
+    ValidateFactor(zoom);
     world.x = (world.x - x) * zoom;
     world.y = (world.y - y) * zoom;
     world.width *= zoom;
@@ -100,7 +100,7 @@ Rectangle2D Camera2D::WorldToScreen(Rectangle2D world) const
 
 Rectangle2D Camera2D::ScreenToWorld(Rectangle2D screen) const
 {
-    ValidateZoom(zoom);
+    ValidateFactor(zoom);
     screen.x = screen.x / zoom + x;
     screen.y = screen.y / zoom + y;
     screen.width /= zoom;
@@ -113,8 +113,8 @@ std::optional<Triangle2D> Camera2D::PrepareForRendering(
     std::int32_t output_width, std::int32_t output_height, float scale, Vector2D offset
 ) const
 {
-    ValidateZoom(scale);
-    ValidateZoom(zoom);
+    ValidateFactor(scale);
+    ValidateFactor(zoom);
 
     if (output_width <= 0 || output_height <= 0) {
         return std::nullopt;
@@ -138,8 +138,8 @@ std::optional<Rectangle2D> Camera2D::PrepareForRendering(
     std::int32_t output_width, std::int32_t output_height, float scale, Vector2D offset
 ) const
 {
-    ValidateZoom(scale);
-    ValidateZoom(zoom);
+    ValidateFactor(scale);
+    ValidateFactor(zoom);
 
     // If the rectangle is infinitely small, or the output is infinitely small, we can skip rendering it.
     if (output_width <= 0 || output_height <= 0 || rectangle.width <= 0.0F || rectangle.height <= 0.0F) {
