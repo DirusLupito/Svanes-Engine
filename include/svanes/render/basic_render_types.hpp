@@ -1,6 +1,6 @@
 /**
  * Basic data types used for rendering.
- * Includes structs for colors (Color), rectangles (Rectangle),
+ * Includes structs for colors (Color),
  * texture handles (TextureHandle), and image data (ImageData).
  * @file basic_render_types.hpp
  */
@@ -28,23 +28,6 @@ struct Color {
     std::uint8_t green = 0;
     std::uint8_t blue = 0;
     std::uint8_t alpha = 255;
-};
-
-/**
- * Represents a rectangle defined by its top-left corner (x, y) and its dimensions (width, height).
- * All values are floating-point numbers. Units may not necessarily be pixels.
- *
- * FIELDS:
- * - x: The x-coordinate of the rectangle's top-left corner.
- * - y: The y-coordinate of the rectangle's top-left corner.
- * - width: The width of the rectangle.
- * - height: The height of the rectangle.
- */
-struct Rectangle {
-    float x = 0.0F;
-    float y = 0.0F;
-    float width = 0.0F;
-    float height = 0.0F;
 };
 
 /**

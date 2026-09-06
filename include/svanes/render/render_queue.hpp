@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <svanes/geometry.hpp>
 #include <svanes/render/basic_render_types.hpp>
 
 #include <optional>
@@ -37,7 +38,7 @@ public:
      * @param color The color of the rectangle.
      * @param rotation The rotation angle in radians (default is 0.0F).
      */
-    void DrawRectangle(Rectangle destination, Color color, float rotation = 0.0F);
+    void DrawRectangle(Rectangle2D destination, Color color, float rotation = 0.0F);
 
     /**
      * Adds a command to draw a texture to the render queue.
@@ -46,7 +47,7 @@ public:
      * @param destination The destination rectangle where the texture will be drawn.
      * @param rotation The rotation angle in radians (default is 0.0F).
      */
-    void DrawTexture(TextureHandle texture, Rectangle destination, float rotation = 0.0F);
+    void DrawTexture(TextureHandle texture, Rectangle2D destination, float rotation = 0.0F);
 
     /**
      * Adds a command to draw a texture to the render queue with a specified source rectangle.
@@ -56,7 +57,7 @@ public:
      * @param destination The destination rectangle where the texture will be drawn.
      * @param rotation The rotation angle in radians (default is 0.0F).
      */
-    void DrawTexture(TextureHandle texture, Rectangle source, Rectangle destination, float rotation = 0.0F);
+    void DrawTexture(TextureHandle texture, Rectangle2D source, Rectangle2D destination, float rotation = 0.0F);
 
     /**
      * Resets the render queue by clearing all commands.
@@ -84,7 +85,7 @@ private:
      * - rotation: The rotation angle in radians for the rectangle.
      */
     struct RectangleCommand {
-        Rectangle destination;
+        Rectangle2D destination;
         Color color;
         float rotation;
     };
@@ -101,8 +102,8 @@ private:
      */
     struct TextureCommand {
         TextureHandle texture;
-        std::optional<Rectangle> source;
-        Rectangle destination;
+        std::optional<Rectangle2D> source;
+        Rectangle2D destination;
         float rotation;
     };
 

@@ -15,17 +15,17 @@ void RenderQueue::Clear(Color color)
     commands.emplace_back(ClearCommand{color});
 }
 
-void RenderQueue::DrawRectangle(Rectangle destination, Color color, float rotation)
+void RenderQueue::DrawRectangle(Rectangle2D destination, Color color, float rotation)
 {
     commands.emplace_back(RectangleCommand{destination, color, rotation});
 }
 
-void RenderQueue::DrawTexture(TextureHandle texture, Rectangle destination, float rotation)
+void RenderQueue::DrawTexture(TextureHandle texture, Rectangle2D destination, float rotation)
 {
     commands.emplace_back(TextureCommand{texture, std::nullopt, destination, rotation});
 }
 
-void RenderQueue::DrawTexture(TextureHandle texture, Rectangle source, Rectangle destination, float rotation)
+void RenderQueue::DrawTexture(TextureHandle texture, Rectangle2D source, Rectangle2D destination, float rotation)
 {
     commands.emplace_back(TextureCommand{texture, source, destination, rotation});
 }

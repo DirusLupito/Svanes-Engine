@@ -1,5 +1,6 @@
 #pragma once
 
+#include <svanes/geometry.hpp>
 #include <svanes/render/basic_render_types.hpp>
 
 #include <cstdint>
@@ -57,7 +58,7 @@ struct Transform {
  */
 struct Sprite {
     TextureHandle texture;
-    std::optional<Rectangle> source;
+    std::optional<Rectangle2D> source;
 };
 
 /**

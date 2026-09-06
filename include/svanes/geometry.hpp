@@ -1,11 +1,27 @@
 #pragma once
 
-#include <svanes/render/basic_render_types.hpp>
 #include <svanes/vector2d.hpp>
 
 #include <array>
 
 namespace svanes {
+
+/**
+ * Represents a rectangle defined by its top-left corner (x, y) and its dimensions (width, height).
+ * All values are floating-point numbers. Units may not necessarily be pixels.
+ *
+ * FIELDS:
+ * - x: The x-coordinate of the rectangle's top-left corner.
+ * - y: The y-coordinate of the rectangle's top-left corner.
+ * - width: The width of the rectangle.
+ * - height: The height of the rectangle.
+ */
+struct Rectangle2D {
+    float x = 0.0F;
+    float y = 0.0F;
+    float width = 0.0F;
+    float height = 0.0F;
+};
 
 /**
  * Represents a triangle defined by its three vertices in 2D space.
@@ -29,7 +45,7 @@ public:
      * 
      * @param rectangle The rectangle to be represented by this geometry.
      */
-    RectangleGeometry(Rectangle rectangle, float rotation);
+    RectangleGeometry(Rectangle2D rectangle, float rotation);
 
     /**
      * Calculates the axis-aligned bounding box of the rectangle after applying the rotation.
@@ -40,10 +56,10 @@ public:
      * Or alternatively, its top two corners differ only in the x-coordinate and 
      * its bottom two corners differ only in the x-coordinate.
      * 
-     * @return A Rectangle representing the axis-aligned bounding box of the rotated rectangle.
+     * @return A Rectangle2D representing the axis-aligned bounding box of the rotated rectangle.
      * 
      */
-    Rectangle Bounds() const;
+    Rectangle2D Bounds() const;
 
     /**
      * Returns the four corners of the rectangle after applying the rotation.

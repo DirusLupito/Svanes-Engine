@@ -4,7 +4,7 @@
 
 namespace svanes {
 
-RectangleGeometry::RectangleGeometry(Rectangle rectangle, float rotation)
+RectangleGeometry::RectangleGeometry(Rectangle2D rectangle, float rotation)
     : half_width(rectangle.width * 0.5F),
       half_height(rectangle.height * 0.5F),
       center_x(rectangle.x + half_width),
@@ -14,7 +14,7 @@ RectangleGeometry::RectangleGeometry(Rectangle rectangle, float rotation)
 {
 }
 
-Rectangle RectangleGeometry::Bounds() const
+Rectangle2D RectangleGeometry::Bounds() const
 {
 
     // theta = the rotation of the rectangle

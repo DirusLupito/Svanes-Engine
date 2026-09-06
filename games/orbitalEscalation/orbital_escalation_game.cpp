@@ -66,7 +66,7 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext& context)
 {
     const svanes::TextureHandle gradient_texture = context.assets.CreateTexture(CreateGradientImage());
     constexpr float square_size = static_cast<float>(kSquarePixels);
-    const svanes::Rectangle view = context.camera.ScreenToWorld({
+    const svanes::Rectangle2D view = context.camera.ScreenToWorld({
         0.0F, 0.0F, static_cast<float>(context.output_width), static_cast<float>(context.output_height)
     });
 
@@ -142,7 +142,7 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
         frame.input.IsDown(svanes::Key::Down) - frame.input.IsDown(svanes::Key::Up)
     );
 
-    const svanes::Rectangle view = frame.camera.ScreenToWorld({
+    const svanes::Rectangle2D view = frame.camera.ScreenToWorld({
         0.0F, 0.0F, static_cast<float>(frame.output_width), static_cast<float>(frame.output_height)
     });
     svanes::Transform& background = frame.world.GetComponent<svanes::Transform>(background_entity);

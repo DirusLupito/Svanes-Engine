@@ -65,13 +65,13 @@ void Camera2D::SetZoomAt(float new_zoom, Vector2D screen_position)
     // new_x = anchor.x - (screen_x / new_zoom)
     // new_y = anchor.y - (screen_y / new_zoom)
 
-    const Rectangle anchor = ScreenToWorld({screen_position.x, screen_position.y, 0.0F, 0.0F});
+    const Rectangle2D anchor = ScreenToWorld({screen_position.x, screen_position.y, 0.0F, 0.0F});
     zoom = new_zoom;
     x = anchor.x - screen_position.x / zoom;
     y = anchor.y - screen_position.y / zoom;
 }
 
-Rectangle Camera2D::WorldToScreen(Rectangle world) const
+Rectangle2D Camera2D::WorldToScreen(Rectangle2D world) const
 {
     ValidateZoom(zoom);
     world.x = (world.x - x) * zoom;
@@ -81,7 +81,7 @@ Rectangle Camera2D::WorldToScreen(Rectangle world) const
     return world;
 }
 
-Rectangle Camera2D::ScreenToWorld(Rectangle screen) const
+Rectangle2D Camera2D::ScreenToWorld(Rectangle2D screen) const
 {
     ValidateZoom(zoom);
     screen.x = screen.x / zoom + x;
@@ -91,7 +91,7 @@ Rectangle Camera2D::ScreenToWorld(Rectangle screen) const
     return screen;
 }
 
-std::optional<Rectangle> Camera2D::PrepareForRendering(
+std::optional<Rectangle2D> Camera2D::PrepareForRendering(
     const Transform& transform, std::int32_t output_width, std::int32_t output_height, float scale, Vector2D offset
 ) const
 {
@@ -102,7 +102,7 @@ std::optional<Rectangle> Camera2D::PrepareForRendering(
         return std::nullopt;
     }
 
-    Rectangle destination = WorldToScreen({transform.x, transform.y, transform.width, transform.height});
+    Rectangle2D destination = WorldToScreen({transform.x, transform.y, transform.width, transform.height});
     destination.x *= scale;
     destination.y *= scale;
     destination.width *= scale;
@@ -113,7 +113,7 @@ std::optional<Rectangle> Camera2D::PrepareForRendering(
 
     // Next, we need to check if the rectangle is within the bounds of the rendering output.
 
-    const Rectangle bounds = RectangleGeometry(destination, transform.rotation).Bounds();
+    const Rectangle2D bounds = RectangleGeometry(destination, transform.rotation).Bounds();
 
     // If it is not, we can again skip rendering it.
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <svanes/render/basic_render_types.hpp>
+#include <svanes/geometry.hpp>
 #include <svanes/vector2d.hpp>
 
 #include <cstdint>
@@ -40,7 +40,7 @@ public:
      * 
      * @return The rectangle in screen coordinates.
      */
-    Rectangle WorldToScreen(Rectangle world) const;
+    Rectangle2D WorldToScreen(Rectangle2D world) const;
 
     /**
      * Converts a rectangle from screen coordinates to world coordinates.
@@ -51,7 +51,7 @@ public:
      * 
      * @throws std::invalid_argument if the zoom factor is not finite or is less than or equal to zero.
      */
-    Rectangle ScreenToWorld(Rectangle screen) const;
+    Rectangle2D ScreenToWorld(Rectangle2D screen) const;
 
     /**
      * Prepares a rectangle for rendering by converting its world coordinates to screen coordinates
@@ -64,12 +64,12 @@ public:
      * @param scale The scale factor depending on screen size.
      * @param offset The correction distance to center the world display when the player's screen is not 16:9.
      *
-     * @return An optional Rectangle representing the destination rectangle in screen coordinates,
+     * @return An optional Rectangle2D representing the destination rectangle in screen coordinates,
      * or std::nullopt if the rectangle is outside the bounds of the rendering output.
      *
      * @throws std::invalid_argument if the zoom factor or scale is not finite or is less than or equal to zero.
      */
-    std::optional<Rectangle> PrepareForRendering(
+    std::optional<Rectangle2D> PrepareForRendering(
         const Transform& transform, std::int32_t output_width, std::int32_t output_height, float scale, Vector2D offset
     ) const;
 };
