@@ -68,7 +68,8 @@ target_sources(
         src/collision_system.cpp
         src/input.cpp
         src/kinematic_system.cpp
-        src/geometry.cpp
+        src/rectangle_geometry.cpp
+        src/triangle_geometry.cpp
         src/input_manager_internal.hpp
         src/render/render_queue.cpp
         src/render/render_queue_executor.cpp
@@ -90,7 +91,8 @@ target_sources(
             include/svanes/game.hpp
             include/svanes/input.hpp
             include/svanes/kinematic_system.hpp
-            include/svanes/geometry.hpp
+            include/svanes/rectangle_geometry.hpp
+            include/svanes/triangle_geometry.hpp
             include/svanes/render/basic_render_types.hpp
             include/svanes/render/render_queue.hpp
             include/svanes/render/render_system.hpp
@@ -152,7 +154,8 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/game.hpp
     include/svanes/input.hpp
     include/svanes/kinematic_system.hpp
-    include/svanes/geometry.hpp
+    include/svanes/rectangle_geometry.hpp
+    include/svanes/triangle_geometry.hpp
     include/svanes/render/basic_render_types.hpp
     include/svanes/render/render_queue.hpp
     include/svanes/render/render_system.hpp
@@ -168,7 +171,8 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/collision_system.cpp
     src/input.cpp
     src/kinematic_system.cpp
-    src/geometry.cpp
+    src/rectangle_geometry.cpp
+    src/triangle_geometry.cpp
     src/input_manager_internal.hpp
     src/render/render_queue.cpp
     src/render/render_queue_executor.cpp

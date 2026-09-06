@@ -6,7 +6,8 @@
 
 #pragma once
 
-#include <svanes/geometry.hpp>
+#include <svanes/rectangle_geometry.hpp>
+#include <svanes/triangle_geometry.hpp>
 #include <svanes/render/basic_render_types.hpp>
 
 #include <optional>
@@ -39,6 +40,13 @@ public:
      * @param rotation The rotation angle in radians (default is 0.0F).
      */
     void DrawRectangle(Rectangle2D destination, Color color, float rotation = 0.0F);
+
+    /**
+     * Adds a command to draw a triangle to the render queue.
+     * @param destination The triangle to be drawn.
+     * @param color The color of the triangle.
+     */
+    void DrawTriangle(Triangle2D destination, Color color);
 
     /**
      * Adds a command to draw a texture to the render queue.
@@ -91,6 +99,18 @@ private:
     };
 
     /**
+     * Represents a command to draw a triangle with a specific color.
+     *
+     * FIELDS:
+     * - destination: The triangle to be drawn.
+     * - color: The fill color of the triangle.
+     */
+    struct TriangleCommand {
+        Triangle2D destination;
+        Color color;
+    };
+
+    /**
      * Represents a command to draw a texture, optionally specifying a source rectangle.
      * If the source rectangle is not provided, the entire texture will be drawn.
      *
@@ -108,7 +128,7 @@ private:
     };
 
     // union but safe
-    using Command = std::variant<ClearCommand, RectangleCommand, TextureCommand>;
+    using Command = std::variant<ClearCommand, RectangleCommand, TriangleCommand, TextureCommand>;
 
     // The backend data structure for storing the rendering commands.
     std::vector<Command> commands;

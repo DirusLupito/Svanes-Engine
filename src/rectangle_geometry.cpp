@@ -1,4 +1,4 @@
-#include <svanes/geometry.hpp>
+#include <svanes/rectangle_geometry.hpp>
 
 #include <svanes/render/render_system.hpp>
 

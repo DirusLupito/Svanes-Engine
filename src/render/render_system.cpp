@@ -69,9 +69,9 @@ void SubmitRectangles(
 {
     const float scale = ComputeScale(mode, output_width, output_height);
     const Vector2D offset = ComputeOffset(mode, scale, output_width, output_height);
-    world.ForEach<Transform, Rectangle2D, SolidRectangle>(
+    world.ForEach<Transform, Rectangle2D, SolidColor>(
         // Dont need the entity but the ForEach template will pass it in
-        [&](Entity /*entity*/, const Transform& transform, const Rectangle2D& geometry, const SolidRectangle& rectangle) {
+        [&](Entity /*entity*/, const Transform& transform, const Rectangle2D& geometry, const SolidColor& rectangle) {
             const auto destination = camera.PrepareForRendering(transform, geometry, output_width, output_height, scale, offset);
             if (!destination) {
                 return;
@@ -81,6 +81,23 @@ void SubmitRectangles(
                 rectangle.color,
                 transform.rotation
             );
+        }
+    );
+}
+
+void SubmitTriangles(
+    const Registry& world, RenderQueue& render_queue, const Camera2D& camera,
+    std::int32_t output_width, std::int32_t output_height, ScaleMode mode
+)
+{
+    const float scale = ComputeScale(mode, output_width, output_height);
+    const Vector2D offset = ComputeOffset(mode, scale, output_width, output_height);
+    world.ForEach<Transform, Triangle2D, SolidColor>(
+        [&](Entity, const Transform& transform, const Triangle2D& geometry, const SolidColor& fill) {
+            const auto destination = camera.PrepareForRendering(transform, geometry, output_width, output_height, scale, offset);
+            if (destination) {
+                render_queue.DrawTriangle(*destination, fill.color);
+            }
         }
     );
 }

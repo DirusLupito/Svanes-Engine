@@ -1,7 +1,8 @@
 #include <svanes/camera2d.hpp>
 
 #include <svanes/render/render_system.hpp>
-#include <svanes/geometry.hpp>
+#include <svanes/rectangle_geometry.hpp>
+#include <svanes/triangle_geometry.hpp>
 
 #include <cmath>
 #include <stdexcept>
@@ -20,6 +21,22 @@ static void ValidateZoom(float zoom)
     if (!std::isfinite(zoom) || zoom <= 0.0F) {
         throw std::invalid_argument("Camera zoom must be finite and greater than zero.");
     }
+}
+
+/**
+ * Checks if a rectangle is outside the bounds of the rendering output.
+ * 
+ * @param bounds The rectangle to check, in screen coordinates.
+ * @param output_width The width of the rendering output.
+ * @param output_height The height of the rendering output.
+ * 
+ * @return true if the rectangle is outside the bounds of the rendering output, false otherwise.
+ */
+static bool IsOutsideOutput(const Rectangle2D& bounds, std::int32_t output_width, std::int32_t output_height)
+{
+    return bounds.x + bounds.width * 0.5F <= 0.0F || bounds.y + bounds.height * 0.5F <= 0.0F ||
+        bounds.x - bounds.width * 0.5F >= static_cast<float>(output_width) ||
+        bounds.y - bounds.height * 0.5F >= static_cast<float>(output_height);
 }
 
 void Camera2D::SetZoomAt(float new_zoom, Vector2D screen_position)
@@ -91,12 +108,38 @@ Rectangle2D Camera2D::ScreenToWorld(Rectangle2D screen) const
     return screen;
 }
 
+std::optional<Triangle2D> Camera2D::PrepareForRendering(
+    const Transform& transform, const Triangle2D& triangle,
+    std::int32_t output_width, std::int32_t output_height, float scale, Vector2D offset
+) const
+{
+    ValidateZoom(scale);
+    ValidateZoom(zoom);
+
+    if (output_width <= 0 || output_height <= 0) {
+        return std::nullopt;
+    }
+
+    Triangle2D destination = TransformTriangle(triangle, transform);
+    for (Vector2D& vertex : destination.vertices) {
+        vertex.x = (vertex.x - x) * zoom * scale + offset.x;
+        vertex.y = (vertex.y - y) * zoom * scale + offset.y;
+    }
+
+    if (IsOutsideOutput(TriangleGeometry(destination).Bounds(), output_width, output_height)) {
+        return std::nullopt;
+    }
+
+    return destination;
+}
+
 std::optional<Rectangle2D> Camera2D::PrepareForRendering(
     const Transform& transform, const Rectangle2D& rectangle,
     std::int32_t output_width, std::int32_t output_height, float scale, Vector2D offset
 ) const
 {
     ValidateZoom(scale);
+    ValidateZoom(zoom);
 
     // If the rectangle is infinitely small, or the output is infinitely small, we can skip rendering it.
     if (output_width <= 0 || output_height <= 0 || rectangle.width <= 0.0F || rectangle.height <= 0.0F) {
@@ -118,9 +161,7 @@ std::optional<Rectangle2D> Camera2D::PrepareForRendering(
 
     // If it is not, we can again skip rendering it.
 
-    if (bounds.x + bounds.width * 0.5F <= 0.0F || bounds.y + bounds.height * 0.5F <= 0.0F ||
-        bounds.x - bounds.width * 0.5F >= static_cast<float>(output_width) ||
-        bounds.y - bounds.height * 0.5F >= static_cast<float>(output_height)) {
+    if (IsOutsideOutput(bounds, output_width, output_height)) {
         return std::nullopt;
     }
 

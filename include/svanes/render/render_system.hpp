@@ -1,6 +1,7 @@
 #pragma once
 
-#include <svanes/geometry.hpp>
+#include <svanes/rectangle_geometry.hpp>
+#include <svanes/triangle_geometry.hpp>
 #include <svanes/render/basic_render_types.hpp>
 
 #include <cstdint>
@@ -58,20 +59,18 @@ struct Sprite {
 };
 
 /**
- * Represents a solid rectangle component that can be attached to an entity for rendering.
- * This component holds a color that defines the fill color of the rectangle.
- * Note that the rectangle's position is determined by the Transform component of the entity,
- * while the size is determined by the Rectangle2D component of the entity.
+ * Represents a solid color component that can be attached to an entity for rendering.
+ * This component holds a color value that will be used to fill the entity's geometry.
  * 
  * FIELDS:
- * - color: The color of the rectangle to be rendered.
+ * - color: The color value used to fill the entity's geometry.
  */
-struct SolidRectangle {
+struct SolidColor {
     Color color;
 };
 
 /**
- * Submits all entities with Transform, Rectangle2D and SolidRectangle components to the render queue for rendering.
+ * Submits all entities with Transform, Rectangle2D and SolidColor components to the render queue for rendering.
  * 
  * @param world The registry containing all entities and their components.
  * @param render_queue The render queue to which the rendering commands will be submitted.
@@ -81,6 +80,21 @@ struct SolidRectangle {
  * @param mode Controls how entity sizes and positions are scaled relative to the current window size.
  */
 void SubmitRectangles(
+    const Registry& world, RenderQueue& render_queue, const Camera2D& camera,
+    std::int32_t output_width, std::int32_t output_height, ScaleMode mode
+);
+
+/**
+ * Submits all entities with Transform, Triangle2D and SolidColor components to the render queue for rendering.
+ * 
+ * @param world The registry containing all entities and their components.
+ * @param render_queue The render queue to which the rendering commands will be submitted.
+ * @param camera The camera used to convert world coordinates to screen coordinates.
+ * @param output_width The width of the rendering output.
+ * @param output_height The height of the rendering output.
+ * @param mode Controls how entity sizes and positions are scaled relative to the current window size.
+ */
+void SubmitTriangles(
     const Registry& world, RenderQueue& render_queue, const Camera2D& camera,
     std::int32_t output_width, std::int32_t output_height, ScaleMode mode
 );

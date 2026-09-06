@@ -9,7 +9,7 @@
 
 #include "texture_manager_internal.hpp"
 
-#include <svanes/geometry.hpp>
+#include <svanes/rectangle_geometry.hpp>
 
 #include <SDL3/SDL.h>
 
@@ -44,6 +44,11 @@ void RenderQueueExecutor::Execute(const RenderQueue& render_queue) const
 
         if (const auto* rectangle = std::get_if<RenderQueue::RectangleCommand>(&command)) {
             Execute(*rectangle);
+            continue;
+        }
+
+        if (const auto* triangle = std::get_if<RenderQueue::TriangleCommand>(&command)) {
+            Execute(*triangle);
             continue;
         }
 
@@ -106,6 +111,27 @@ void RenderQueueExecutor::Execute(const RenderQueue::RectangleCommand& command) 
         }
     } else if (!SDL_RenderFillRect(renderer, &destination)) {
         throw std::runtime_error("Could not draw a rectangle: " + std::string{SDL_GetError()});
+    }
+}
+
+void RenderQueueExecutor::Execute(const RenderQueue::TriangleCommand& command) const
+{
+    const SDL_FColor color{
+        command.color.red / 255.0F,
+        command.color.green / 255.0F,
+        command.color.blue / 255.0F,
+        command.color.alpha / 255.0F,
+    };
+
+    SDL_Vertex vertices[3]{};
+
+    for (std::size_t i = 0; i < command.destination.vertices.size(); ++i) {
+        const Vector2D point = command.destination.vertices[i];
+        vertices[i] = {{point.x, point.y}, color, {}};
+    }
+
+    if (!SDL_RenderGeometry(renderer, nullptr, vertices, 3, nullptr, 0)) {
+        throw std::runtime_error("Could not draw a triangle: " + std::string{SDL_GetError()});
     }
 }
 

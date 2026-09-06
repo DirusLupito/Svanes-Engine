@@ -20,7 +20,19 @@ namespace svanes {
 */
 class Registry final {
 public:
+
+    /**
+     * Creates a new entity and returns its unique identifier.
+     * 
+     * @return The unique identifier of the newly created entity.
+     */
     Entity CreateEntity();
+
+    /**
+     * Destroys the specified entity and removes all its associated components.
+     * 
+     * @param entity The unique identifier of the entity to destroy.
+     */
     void DestroyEntity(Entity entity);
 
     /**

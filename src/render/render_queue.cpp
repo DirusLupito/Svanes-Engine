@@ -20,6 +20,11 @@ void RenderQueue::DrawRectangle(Rectangle2D destination, Color color, float rota
     commands.emplace_back(RectangleCommand{destination, color, rotation});
 }
 
+void RenderQueue::DrawTriangle(Triangle2D destination, Color color)
+{
+    commands.emplace_back(TriangleCommand{destination, color});
+}
+
 void RenderQueue::DrawTexture(TextureHandle texture, Rectangle2D destination, float rotation)
 {
     commands.emplace_back(TextureCommand{texture, std::nullopt, destination, rotation});

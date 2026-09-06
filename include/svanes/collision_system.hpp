@@ -67,7 +67,10 @@ std::optional<Collision2D> DetectCollision(
  *
  * @throws std::invalid_argument for triangle edges that cannot be represented with a finite, positive length.
  */
-std::optional<Collision2D> DetectCollision(const Triangle2D& a, const Triangle2D& b);
+std::optional<Collision2D> DetectCollision(
+    const Triangle2D& a, const Transform& transform_a,
+    const Triangle2D& b, const Transform& transform_b
+);
 
 /**
  * Detects contact between a triangle and a rectangle. Describes the nature or lack thereof of
@@ -84,7 +87,10 @@ std::optional<Collision2D> DetectCollision(const Triangle2D& a, const Triangle2D
  * @throws std::invalid_argument for non-finite transforms, nonpositive dimensions,
  * or triangle edges that cannot be represented with a finite, positive length.
  */
-std::optional<Collision2D> DetectCollision(const Triangle2D& a, const Rectangle2D& b, const Transform& transform_b);
+std::optional<Collision2D> DetectCollision(
+    const Triangle2D& a, const Transform& transform_a,
+    const Rectangle2D& b, const Transform& transform_b
+);
 
 /**
  * Detects contact between a rectangle and a triangle. Describes the nature or lack thereof of
@@ -101,6 +107,9 @@ std::optional<Collision2D> DetectCollision(const Triangle2D& a, const Rectangle2
  * @throws std::invalid_argument for non-finite transforms, nonpositive dimensions,
  * or triangle edges that cannot be represented with a finite, positive length.
  */
-std::optional<Collision2D> DetectCollision(const Rectangle2D& a, const Transform& transform_a, const Triangle2D& b);
+std::optional<Collision2D> DetectCollision(
+    const Rectangle2D& a, const Transform& transform_a,
+    const Triangle2D& b, const Transform& transform_b
+);
 
 } // namespace svanes

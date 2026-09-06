@@ -78,9 +78,9 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext& context)
     context.world.AddComponent<svanes::Rectangle2D>(
         background_entity, svanes::Rectangle2D{0.0F, 0.0F, view.width, view.height}
     );
-    context.world.AddComponent<svanes::SolidRectangle>(
+    context.world.AddComponent<svanes::SolidColor>(
         background_entity,
-        svanes::SolidRectangle{svanes::Color{17, 24, 39, 255}}
+        svanes::SolidColor{svanes::Color{17, 24, 39, 255}}
     );
 
     // first time setup in the middle of the screen
@@ -112,8 +112,8 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext& context)
     context.world.AddComponent<svanes::Rectangle2D>(
         attractor_entity, svanes::Rectangle2D{0.0F, 0.0F, square_size, square_size}
     );
-    context.world.AddComponent<svanes::SolidRectangle>(
-        attractor_entity, svanes::SolidRectangle{svanes::Color{240, 160, 40, 255}}
+    context.world.AddComponent<svanes::SolidColor>(
+        attractor_entity, svanes::SolidColor{svanes::Color{240, 160, 40, 255}}
     );
     context.world.AddComponent<svanes::Kinematic2D>(attractor_entity);
 
@@ -122,6 +122,27 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext& context)
     context.world.AddComponent<svanes::PointAttractor2D>(
         attractor_entity, svanes::PointAttractor2D{.accelerationField = AttractionField}
     );
+
+    triangle_entity = context.world.CreateEntity();
+    context.world.AddComponent<svanes::Transform>(
+        triangle_entity, svanes::Transform{view.x + view.width * 0.25F, view.y, 0.4F}
+    );
+    context.world.AddComponent<svanes::Triangle2D>(
+        triangle_entity, svanes::Triangle2D{{{
+            {-square_size * 0.5F, square_size / 3.0F},
+            {square_size * 0.5F, square_size / 3.0F},
+            {0.0F, -square_size * 2.0F / 3.0F},
+        }}}
+    );
+    context.world.AddComponent<svanes::SolidColor>(
+        triangle_entity, svanes::SolidColor{svanes::Color{80, 200, 120, 255}}
+    );
+    context.world.AddComponent<svanes::Kinematic2D>(triangle_entity);
+    context.world.AddComponent<svanes::PointAttractor2D>(
+        triangle_entity, svanes::PointAttractor2D{.accelerationField = AttractionField}
+    );
+    context.world.AddComponent<svanes::Collider2D>(triangle_entity);
+    context.world.GetComponent<svanes::Kinematic2D>(triangle_entity).angular_velocity = -0.5F;
 }
 
 void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
@@ -172,6 +193,10 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
     attractor_motion.acceleration_x = 0.0F;
     attractor_motion.acceleration_y = 0.0F;
 
+    svanes::Kinematic2D& triangle_motion = frame.world.GetComponent<svanes::Kinematic2D>(triangle_entity);
+    triangle_motion.acceleration_x = 0.0F;
+    triangle_motion.acceleration_y = 0.0F;
+
     const auto collision = svanes::DetectCollision(
         frame.world.GetComponent<svanes::Rectangle2D>(square_entity),
         frame.world.GetComponent<svanes::Transform>(square_entity),
@@ -185,6 +210,35 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
         attractor_motion.acceleration_x -= acceleration.x;
         attractor_motion.acceleration_y -= acceleration.y;
     }
+
+    const auto collision_triangle_attractor = svanes::DetectCollision(
+        frame.world.GetComponent<svanes::Triangle2D>(triangle_entity),
+        frame.world.GetComponent<svanes::Transform>(triangle_entity),
+        frame.world.GetComponent<svanes::Rectangle2D>(attractor_entity),
+        frame.world.GetComponent<svanes::Transform>(attractor_entity)
+    );
+    if (collision_triangle_attractor) {
+        const svanes::Vector2D acceleration = collision_triangle_attractor->normal * 10000.0F;
+        triangle_motion.acceleration_x += acceleration.x;
+        triangle_motion.acceleration_y += acceleration.y;
+        attractor_motion.acceleration_x -= acceleration.x;
+        attractor_motion.acceleration_y -= acceleration.y;
+    }
+
+    const auto collision_triangle_square = svanes::DetectCollision(
+        frame.world.GetComponent<svanes::Triangle2D>(triangle_entity),
+        frame.world.GetComponent<svanes::Transform>(triangle_entity),
+        frame.world.GetComponent<svanes::Rectangle2D>(square_entity),
+        frame.world.GetComponent<svanes::Transform>(square_entity)
+    );
+    if (collision_triangle_square) {
+        const svanes::Vector2D acceleration = collision_triangle_square->normal * 10000.0F;
+        triangle_motion.acceleration_x += acceleration.x;
+        triangle_motion.acceleration_y += acceleration.y;
+        motion.acceleration_x -= acceleration.x;
+        motion.acceleration_y -= acceleration.y;
+    }
+
 
 }
 

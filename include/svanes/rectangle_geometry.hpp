@@ -40,18 +40,6 @@ struct Rectangle2D {
  */
 Rectangle2D TransformRectangle(Rectangle2D rectangle, const Transform& transform);
 
-/**
- * Represents a triangle defined by its three vertices in 2D space.
- * Each vertex is represented as a Vector2D (x, y).
- * The three vertices must not be collinear to form a valid triangle.
- *
- * FIELDS:
- * - vertices: An array of three Vector2D objects representing the triangle's vertices.
- */
-struct Triangle2D {
-    std::array<Vector2D, 3> vertices;
-};
-
 class RectangleGeometry final {
 public:
 
@@ -91,11 +79,19 @@ private:
     // Half the width of the rotated rectangle.
     float half_width;
 
-    
+    // Half the height of the rotated rectangle.
     float half_height;
+
+    // The x-coordinate of the center of the rectangle.
     float center_x;
+
+    // The y-coordinate of the center of the rectangle.
     float center_y;
+
+    // The cosine of the rotation angle.
     float cosine;
+
+    // The sine of the rotation angle.
     float sine;
 };
 

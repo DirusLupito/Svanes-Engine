@@ -50,6 +50,13 @@ private:
     void Execute(const RenderQueue::RectangleCommand& command) const;
 
     /**
+     * Executes a single TriangleCommand, which draws a triangle with a specific color.
+     * @param command The TriangleCommand to execute.
+     * @throws std::runtime_error if the triangle cannot be drawn.
+     */
+    void Execute(const RenderQueue::TriangleCommand& command) const;
+
+    /**
      * Executes a single TextureCommand, which draws a texture, 
      * optionally specifying a source rectangle.
      * @param command The TextureCommand to execute.
