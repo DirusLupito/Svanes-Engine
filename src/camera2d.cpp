@@ -92,15 +92,21 @@ Rectangle Camera2D::ScreenToWorld(Rectangle screen) const
 }
 
 std::optional<Rectangle> Camera2D::PrepareForRendering(
-    const Transform& transform, std::int32_t output_width, std::int32_t output_height
+    const Transform& transform, std::int32_t output_width, std::int32_t output_height, float scale
 ) const
 {
+    ValidateZoom(scale);
+
     // If the rectangle is infinitely small, or the output is infinitely small, we can skip rendering it.
     if (output_width <= 0 || output_height <= 0 || transform.width <= 0.0F || transform.height <= 0.0F) {
         return std::nullopt;
     }
 
-    const Rectangle destination = WorldToScreen({transform.x, transform.y, transform.width, transform.height});
+    Rectangle destination = WorldToScreen({transform.x, transform.y, transform.width, transform.height});
+    destination.x *= scale;
+    destination.y *= scale;
+    destination.width *= scale;
+    destination.height *= scale;
 
 
     // Next, we need to check if the rectangle is within the bounds of the rendering output.

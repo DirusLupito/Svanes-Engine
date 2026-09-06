@@ -2,6 +2,7 @@
 
 #include <svanes/render/basic_render_types.hpp>
 
+#include <cstdint>
 #include <optional>
 
 namespace svanes {
@@ -9,6 +10,11 @@ namespace svanes {
 class Camera2D;
 class Registry;
 class RenderQueue;
+
+enum class ScaleMode : std::uint8_t {
+    Constant,
+    Proportional,
+};
 
 /**
  * Represents the transformation and size of an entity in 2D space.
@@ -68,7 +74,7 @@ struct SolidRectangle {
  */
 void SubmitRectangles(
     const Registry& world, RenderQueue& render_queue, const Camera2D& camera,
-    std::int32_t output_width, std::int32_t output_height
+    std::int32_t output_width, std::int32_t output_height, ScaleMode mode
 );
 
 /**
@@ -82,7 +88,7 @@ void SubmitRectangles(
  */
 void SubmitSprites(
     const Registry& world, RenderQueue& render_queue, const Camera2D& camera,
-    std::int32_t output_width, std::int32_t output_height
+    std::int32_t output_width, std::int32_t output_height, ScaleMode mode
 );
 
 }

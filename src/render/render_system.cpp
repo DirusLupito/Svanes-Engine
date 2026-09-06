@@ -4,17 +4,34 @@
 #include <svanes/registry.hpp>
 #include <svanes/render/render_queue.hpp>
 
+#include <algorithm>
+
 namespace svanes {
+
+constexpr std::int32_t kDesignWidth = 1920;
+constexpr std::int32_t kDesignHeight = 1080;
+
+static float ComputeScale(ScaleMode mode, std::int32_t output_width, std::int32_t output_height)
+{
+    if (mode == ScaleMode::Constant) {
+        return 1.0F;
+    }
+
+    const float width_ratio = static_cast<float>(output_width) / static_cast<float>(kDesignWidth);
+    const float height_ratio = static_cast<float>(output_height) / static_cast<float>(kDesignHeight);
+    return std::min(width_ratio, height_ratio);
+}
 
 void SubmitRectangles(
     const Registry& world, RenderQueue& render_queue, const Camera2D& camera,
-    std::int32_t output_width, std::int32_t output_height
+    std::int32_t output_width, std::int32_t output_height, ScaleMode mode
 )
 {
+    const float scale = ComputeScale(mode, output_width, output_height);
     world.ForEach<Transform, SolidRectangle>(
         // Dont need the entity but the ForEach template will pass it in
         [&](Entity /*entity*/, const Transform& transform, const SolidRectangle& rectangle) {
-            const auto destination = camera.PrepareForRendering(transform, output_width, output_height);
+            const auto destination = camera.PrepareForRendering(transform, output_width, output_height, scale);
             if (!destination) {
                 return;
             }
@@ -29,13 +46,14 @@ void SubmitRectangles(
 
 void SubmitSprites(
     const Registry& world, RenderQueue& render_queue, const Camera2D& camera,
-    std::int32_t output_width, std::int32_t output_height
+    std::int32_t output_width, std::int32_t output_height, ScaleMode mode
 )
 {
+    const float scale = ComputeScale(mode, output_width, output_height);
     world.ForEach<Transform, Sprite>(
         // Again don't need the entity but the ForEach template will pass it in
         [&](Entity /*entity*/, const Transform& transform, const Sprite& sprite) {
-            const auto destination = camera.PrepareForRendering(transform, output_width, output_height);
+            const auto destination = camera.PrepareForRendering(transform, output_width, output_height, scale);
             if (!destination) {
                 return;
             }

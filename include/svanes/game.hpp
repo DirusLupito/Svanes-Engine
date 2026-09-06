@@ -8,6 +8,7 @@ class Camera2D;
 class InputManager;
 class Registry;
 class TextureManager;
+enum class ScaleMode : std::uint8_t;
 
 /**
  * Defines relevant context for a game. 
@@ -27,6 +28,7 @@ struct GameContext {
     Camera2D& camera;
     std::int32_t output_width;
     std::int32_t output_height;
+    ScaleMode& scale_mode;
 };
 
 /**
@@ -52,6 +54,7 @@ struct FrameContext {
     std::int32_t output_width;
     std::int32_t output_height;
     Camera2D& camera;
+    ScaleMode& scale_mode;
 };
 
 /**
