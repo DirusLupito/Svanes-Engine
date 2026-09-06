@@ -1,14 +1,34 @@
 #include <svanes/geometry.hpp>
 
+#include <svanes/render/render_system.hpp>
+
 #include <cmath>
 
 namespace svanes {
 
+Rectangle2D TransformRectangle(Rectangle2D rectangle, const Transform& transform)
+{
+    const float cosine = std::cos(transform.rotation);
+    const float sine = std::sin(transform.rotation);
+
+    const Vector2D center{rectangle.x, rectangle.y};
+
+    // If the rectangle's geometry is such that is is centered at its own origin,
+    // then this simplies to just tx + cx and ty + cy.
+
+    // x = tx + cx cos(theta) - cy sin(theta)
+    rectangle.x = transform.x + center.x * cosine - center.y * sine;
+
+    // y' = ty + cx sin(theta) + cy cos(theta)
+    rectangle.y = transform.y + center.x * sine + center.y * cosine;
+    return rectangle;
+}
+
 RectangleGeometry::RectangleGeometry(Rectangle2D rectangle, float rotation)
     : half_width(rectangle.width * 0.5F),
       half_height(rectangle.height * 0.5F),
-      center_x(rectangle.x + half_width),
-      center_y(rectangle.y + half_height),
+      center_x(rectangle.x),
+      center_y(rectangle.y),
       cosine(std::cos(rotation)),
       sine(std::sin(rotation))
 {
@@ -60,7 +80,7 @@ Rectangle2D RectangleGeometry::Bounds() const
 
     const float extent_x = half_width * std::abs(cosine) + half_height * std::abs(sine);
     const float extent_y = half_width * std::abs(sine) + half_height * std::abs(cosine);
-    return {center_x - extent_x, center_y - extent_y, extent_x * 2.0F, extent_y * 2.0F};
+    return {center_x, center_y, extent_x * 2.0F, extent_y * 2.0F};
 }
 
 std::array<Vector2D, 4> RectangleGeometry::Corners() const

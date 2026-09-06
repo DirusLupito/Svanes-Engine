@@ -9,7 +9,10 @@
 
 namespace svanes {
 
+// Reference width for scaling and centering the game world on different output sizes.
 constexpr std::int32_t kDesignWidth = 1920;
+
+// Reference height for scaling and centering the game world on different output sizes.
 constexpr std::int32_t kDesignHeight = 1080;
 
 /**
@@ -66,10 +69,10 @@ void SubmitRectangles(
 {
     const float scale = ComputeScale(mode, output_width, output_height);
     const Vector2D offset = ComputeOffset(mode, scale, output_width, output_height);
-    world.ForEach<Transform, SolidRectangle>(
+    world.ForEach<Transform, Rectangle2D, SolidRectangle>(
         // Dont need the entity but the ForEach template will pass it in
-        [&](Entity /*entity*/, const Transform& transform, const SolidRectangle& rectangle) {
-            const auto destination = camera.PrepareForRendering(transform, output_width, output_height, scale, offset);
+        [&](Entity /*entity*/, const Transform& transform, const Rectangle2D& geometry, const SolidRectangle& rectangle) {
+            const auto destination = camera.PrepareForRendering(transform, geometry, output_width, output_height, scale, offset);
             if (!destination) {
                 return;
             }
@@ -89,10 +92,10 @@ void SubmitSprites(
 {
     const float scale = ComputeScale(mode, output_width, output_height);
     const Vector2D offset = ComputeOffset(mode, scale, output_width, output_height);
-    world.ForEach<Transform, Sprite>(
+    world.ForEach<Transform, Rectangle2D, Sprite>(
         // Again don't need the entity but the ForEach template will pass it in
-        [&](Entity /*entity*/, const Transform& transform, const Sprite& sprite) {
-            const auto destination = camera.PrepareForRendering(transform, output_width, output_height, scale, offset);
+        [&](Entity /*entity*/, const Transform& transform, const Rectangle2D& geometry, const Sprite& sprite) {
+            const auto destination = camera.PrepareForRendering(transform, geometry, output_width, output_height, scale, offset);
             if (!destination) {
                 return;
             }

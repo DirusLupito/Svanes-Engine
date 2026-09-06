@@ -27,21 +27,17 @@ enum class ScaleMode : std::uint8_t {
 };
 
 /**
- * Represents the transformation and size of an entity in 2D space.
- * This component is used to determine where and how large an entity should be rendered.
+ * Represents the position and rotation of an entity's local origin in 2D space.
+ * This component is used to determine where to place the entity's geometry in the world.
  * 
  * FIELDS:
  * - x: The x-coordinate of the entity's position.
  * - y: The y-coordinate of the entity's position.
- * - width: The width of the entity.
- * - height: The height of the entity.
  * - rotation: The rotation in radians.
  */
 struct Transform {
     float x = 0.0F;
     float y = 0.0F;
-    float width = 0.0F;
-    float height = 0.0F;
     float rotation = 0.0F;
 };
 
@@ -64,7 +60,8 @@ struct Sprite {
 /**
  * Represents a solid rectangle component that can be attached to an entity for rendering.
  * This component holds a color that defines the fill color of the rectangle.
- * Note that the rectangle's position and size are determined by the Transform component of the entity.
+ * Note that the rectangle's position is determined by the Transform component of the entity,
+ * while the size is determined by the Rectangle2D component of the entity.
  * 
  * FIELDS:
  * - color: The color of the rectangle to be rendered.
@@ -74,7 +71,7 @@ struct SolidRectangle {
 };
 
 /**
- * Submits all entities with a Transform and SolidRectangle component to the render queue for rendering.
+ * Submits all entities with Transform, Rectangle2D and SolidRectangle components to the render queue for rendering.
  * 
  * @param world The registry containing all entities and their components.
  * @param render_queue The render queue to which the rendering commands will be submitted.
@@ -89,7 +86,7 @@ void SubmitRectangles(
 );
 
 /**
- * Submits all entities with a Transform and Sprite component to the render queue for rendering.
+ * Submits all entities with Transform, Rectangle2D and Sprite components to the render queue for rendering.
  * 
  * @param world The registry containing all entities and their components.
  * @param render_queue The render queue to which the rendering commands will be submitted.

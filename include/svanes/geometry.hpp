@@ -6,13 +6,15 @@
 
 namespace svanes {
 
+struct Transform;
+
 /**
- * Represents a rectangle defined by its top-left corner (x, y) and its dimensions (width, height).
+ * Represents a rectangle defined by its center (x, y) and its dimensions (width, height).
  * All values are floating-point numbers. Units may not necessarily be pixels.
  *
  * FIELDS:
- * - x: The x-coordinate of the rectangle's top-left corner.
- * - y: The y-coordinate of the rectangle's top-left corner.
+ * - x: The x-coordinate of the rectangle's center.
+ * - y: The y-coordinate of the rectangle's center.
  * - width: The width of the rectangle.
  * - height: The height of the rectangle.
  */
@@ -22,6 +24,21 @@ struct Rectangle2D {
     float width = 0.0F;
     float height = 0.0F;
 };
+
+/**
+ * Transforms a rectangle from its local coordinates to world coordinates
+ * by applying a translation and rotation defined by a Transform.
+ * 
+ * The rectangle specifies its center (x, y) and dimensions (width, height). 
+ * The transform specifies where the rectangle's center should be placed in
+ * world coordinates and how it should be rotated around that center.
+ * 
+ * @param rectangle The rectangle to be transformed, defined by its center and dimensions.
+ * @param transform The Transform specifying the translation and rotation to apply.
+ * 
+ * @return The rectangle in world coordinates.
+ */
+Rectangle2D TransformRectangle(Rectangle2D rectangle, const Transform& transform);
 
 /**
  * Represents a triangle defined by its three vertices in 2D space.
@@ -40,7 +57,7 @@ public:
 
     /**
      * Constructs a RectangleGeometry object from a rectangle and a rotation angle.
-     * The rectangle is defined by its top-left corner (x, y), width, and height.
+     * The rectangle is defined by its center (x, y), width, and height.
      * The rotation angle is specified in radians and is applied around the center of the rectangle.
      * 
      * @param rectangle The rectangle to be represented by this geometry.

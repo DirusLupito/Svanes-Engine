@@ -54,11 +54,12 @@ public:
     Rectangle2D ScreenToWorld(Rectangle2D screen) const;
 
     /**
-     * Prepares a rectangle for rendering by converting its world coordinates to screen coordinates
+     * Prepares a rectangular entity for rendering by converting its world coordinates to screen coordinates
      * and checking if it is within the bounds of the rendering output.
      * If the rectangle is outside the bounds, std::nullopt is returned.
      * 
      * @param transform The Transform component of the entity to be rendered.
+     * @param rectangle The Rectangle2D component of the entity to be rendered.
      * @param output_width The width of the rendering output.
      * @param output_height The height of the rendering output.
      * @param scale The scale factor depending on screen size.
@@ -70,7 +71,8 @@ public:
      * @throws std::invalid_argument if the zoom factor or scale is not finite or is less than or equal to zero.
      */
     std::optional<Rectangle2D> PrepareForRendering(
-        const Transform& transform, std::int32_t output_width, std::int32_t output_height, float scale, Vector2D offset
+        const Transform& transform, const Rectangle2D& rectangle,
+        std::int32_t output_width, std::int32_t output_height, float scale, Vector2D offset
     ) const;
 };
 

@@ -35,8 +35,8 @@ void AdvanceSpriteAnimations(Registry& registry, float delta_seconds)
         // Update the sprite's source rectangle to reflect the current frame of the animation
         // so that in the next execution of SubmitSprites(), the correct frame of the sprite sheet is drawn.
         sprite.source = Rectangle2D{
-            static_cast<float>(animation.current_frame * animation.frame_width),
-            0.0F,
+            static_cast<float>(animation.current_frame * animation.frame_width) + animation.frame_width * 0.5F,
+            animation.frame_height * 0.5F,
             static_cast<float>(animation.frame_width),
             static_cast<float>(animation.frame_height),
         };

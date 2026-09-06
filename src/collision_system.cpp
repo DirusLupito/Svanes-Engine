@@ -16,15 +16,17 @@ namespace svanes {
 /**
  * Validates that a rectangle's transform has finite values and positive dimensions.
  * 
+ * @param rectangle The rectangle's geometry to validate.
  * @param transform The rectangle's transform to validate.
  * 
  * @throws std::invalid_argument if the transform has non-finite values or non-positive dimensions.
  */
-static void ValidateRectangle(const Transform& transform)
+static void ValidateRectangle(const Rectangle2D& rectangle, const Transform& transform)
 {
     if (!std::isfinite(transform.x) || !std::isfinite(transform.y) ||
-        !std::isfinite(transform.width) || !std::isfinite(transform.height) ||
-        !std::isfinite(transform.rotation) || transform.width <= 0.0F || transform.height <= 0.0F) {
+        !std::isfinite(rectangle.x) || !std::isfinite(rectangle.y) ||
+        !std::isfinite(rectangle.width) || !std::isfinite(rectangle.height) ||
+        !std::isfinite(transform.rotation) || rectangle.width <= 0.0F || rectangle.height <= 0.0F) {
         throw std::invalid_argument("Collision rectangles require finite transforms and positive dimensions.");
     }
 }
@@ -33,16 +35,17 @@ static void ValidateRectangle(const Transform& transform)
  * Validates that a rectangle's transform has finite values and positive dimensions,
  * then returns the four corners in clockwise order starting from the top-left corner.
  * 
+ * @param rectangle The rectangle's geometry to validate and extract corners from.
  * @param transform The rectangle's transform to validate and extract corners from.
  * 
  * @return An array of four Vector2D objects representing the corners of the rectangle
  * in clockwise order starting from the top-left corner.
  */
-static std::array<Vector2D, 4> RectangleVertices(const Transform& transform)
+static std::array<Vector2D, 4> RectangleVertices(const Rectangle2D& rectangle, const Transform& transform)
 {
-    ValidateRectangle(transform);
+    ValidateRectangle(rectangle, transform);
     return RectangleGeometry(
-        {transform.x, transform.y, transform.width, transform.height}, transform.rotation
+        TransformRectangle(rectangle, transform), transform.rotation
     ).Corners();
 }
 
@@ -381,10 +384,13 @@ static std::optional<Collision2D> DetectConvexCollision(
     return collision;
 }
 
-std::optional<Collision2D> DetectCollision(const Transform& a, const Transform& b)
+std::optional<Collision2D> DetectCollision(
+    const Rectangle2D& a, const Transform& transform_a,
+    const Rectangle2D& b, const Transform& transform_b
+)
 {
-    const auto corners_a = RectangleVertices(a);
-    const auto corners_b = RectangleVertices(b);
+    const auto corners_a = RectangleVertices(a, transform_a);
+    const auto corners_b = RectangleVertices(b, transform_b);
     return DetectConvexCollision(corners_a, corners_b);
 }
 
@@ -395,16 +401,16 @@ std::optional<Collision2D> DetectCollision(const Triangle2D& a, const Triangle2D
     return DetectConvexCollision(a.vertices, b.vertices);
 }
 
-std::optional<Collision2D> DetectCollision(const Triangle2D& a, const Transform& b)
+std::optional<Collision2D> DetectCollision(const Triangle2D& a, const Rectangle2D& b, const Transform& transform_b)
 {
     ValidateTriangle(a);
-    const auto corners_b = RectangleVertices(b);
+    const auto corners_b = RectangleVertices(b, transform_b);
     return DetectConvexCollision(a.vertices, corners_b);
 }
 
-std::optional<Collision2D> DetectCollision(const Transform& a, const Triangle2D& b)
+std::optional<Collision2D> DetectCollision(const Rectangle2D& a, const Transform& transform_a, const Triangle2D& b)
 {
-    const auto corners_a = RectangleVertices(a);
+    const auto corners_a = RectangleVertices(a, transform_a);
     ValidateTriangle(b);
     return DetectConvexCollision(corners_a, b.vertices);
 }

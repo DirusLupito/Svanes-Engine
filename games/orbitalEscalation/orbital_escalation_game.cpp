@@ -67,12 +67,16 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext& context)
     const svanes::TextureHandle gradient_texture = context.assets.CreateTexture(CreateGradientImage());
     constexpr float square_size = static_cast<float>(kSquarePixels);
     const svanes::Rectangle2D view = context.camera.ScreenToWorld({
-        0.0F, 0.0F, static_cast<float>(context.output_width), static_cast<float>(context.output_height)
+        context.output_width * 0.5F, context.output_height * 0.5F,
+        static_cast<float>(context.output_width), static_cast<float>(context.output_height)
     });
 
     background_entity = context.world.CreateEntity();
     context.world.AddComponent<svanes::Transform>(
-        background_entity, svanes::Transform{view.x, view.y, view.width, view.height}
+        background_entity, svanes::Transform{view.x, view.y}
+    );
+    context.world.AddComponent<svanes::Rectangle2D>(
+        background_entity, svanes::Rectangle2D{0.0F, 0.0F, view.width, view.height}
     );
     context.world.AddComponent<svanes::SolidRectangle>(
         background_entity,
@@ -88,11 +92,10 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext& context)
     );
     context.world.AddComponent<svanes::Transform>(
         square_entity,
-        svanes::Transform{
-            view.x + (view.width - square_size) * 0.5F,
-            view.y + (view.height - square_size) * 0.5F,
-            square_size, square_size
-        }
+        svanes::Transform{view.x, view.y}
+    );
+    context.world.AddComponent<svanes::Rectangle2D>(
+        square_entity, svanes::Rectangle2D{0.0F, 0.0F, square_size, square_size}
     );
     context.world.AddComponent<svanes::Sprite>(
         square_entity,
@@ -103,10 +106,11 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext& context)
     context.world.AddComponent<svanes::Collider2D>(attractor_entity);
     context.world.AddComponent<svanes::Transform>(
         attractor_entity, svanes::Transform{
-            view.x + view.width * 0.25F - square_size * 0.5F,
-            view.y + (view.height - square_size) * 0.5F,
-            square_size, square_size
+            view.x - view.width * 0.25F, view.y
         }
+    );
+    context.world.AddComponent<svanes::Rectangle2D>(
+        attractor_entity, svanes::Rectangle2D{0.0F, 0.0F, square_size, square_size}
     );
     context.world.AddComponent<svanes::SolidRectangle>(
         attractor_entity, svanes::SolidRectangle{svanes::Color{240, 160, 40, 255}}
@@ -143,13 +147,15 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
     );
 
     const svanes::Rectangle2D view = frame.camera.ScreenToWorld({
-        0.0F, 0.0F, static_cast<float>(frame.output_width), static_cast<float>(frame.output_height)
+        frame.output_width * 0.5F, frame.output_height * 0.5F,
+        static_cast<float>(frame.output_width), static_cast<float>(frame.output_height)
     });
     svanes::Transform& background = frame.world.GetComponent<svanes::Transform>(background_entity);
     background.x = view.x;
     background.y = view.y;
-    background.width = view.width;
-    background.height = view.height;
+    svanes::Rectangle2D& background_rectangle = frame.world.GetComponent<svanes::Rectangle2D>(background_entity);
+    background_rectangle.width = view.width;
+    background_rectangle.height = view.height;
 
     svanes::Kinematic2D& motion = frame.world.GetComponent<svanes::Kinematic2D>(square_entity);
     motion.acceleration_x = static_cast<float>(
@@ -167,7 +173,9 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
     attractor_motion.acceleration_y = 0.0F;
 
     const auto collision = svanes::DetectCollision(
+        frame.world.GetComponent<svanes::Rectangle2D>(square_entity),
         frame.world.GetComponent<svanes::Transform>(square_entity),
+        frame.world.GetComponent<svanes::Rectangle2D>(attractor_entity),
         frame.world.GetComponent<svanes::Transform>(attractor_entity)
     );
     if (collision) {

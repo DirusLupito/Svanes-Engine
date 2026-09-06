@@ -63,9 +63,12 @@ void RenderQueueExecutor::Execute(const RenderQueue::ClearCommand& command) cons
 void RenderQueueExecutor::Execute(const RenderQueue::RectangleCommand& command) const
 {
     SetDrawColor(command.color);
+
+    // Convert center-based rectangle coordinates to SDL's top-left-based rectangle coordinates.
+
     const SDL_FRect destination{
-        command.destination.x,
-        command.destination.y,
+        command.destination.x - command.destination.width * 0.5F,
+        command.destination.y - command.destination.height * 0.5F,
         command.destination.width,
         command.destination.height,
     };
@@ -112,9 +115,11 @@ void RenderQueueExecutor::Execute(const RenderQueue::TextureCommand& command) co
 
     SDL_Texture* resolved_texture = TextureManagerInternal::Resolve(texture_manager, command.texture);
 
+    // Convert center-based rectangle coordinates to SDL's top-left-based rectangle coordinates.
+
     const SDL_FRect destination{
-        command.destination.x,
-        command.destination.y,
+        command.destination.x - command.destination.width * 0.5F,
+        command.destination.y - command.destination.height * 0.5F,
         command.destination.width,
         command.destination.height,
     };
@@ -126,8 +131,8 @@ void RenderQueueExecutor::Execute(const RenderQueue::TextureCommand& command) co
 
     if (command.source.has_value()) {
         source = SDL_FRect{
-            command.source->x,
-            command.source->y,
+            command.source->x - command.source->width * 0.5F,
+            command.source->y - command.source->height * 0.5F,
             command.source->width,
             command.source->height,
         };
