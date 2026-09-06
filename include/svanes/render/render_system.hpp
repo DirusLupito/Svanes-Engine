@@ -11,6 +11,15 @@ class Camera2D;
 class Registry;
 class RenderQueue;
 
+/**
+ * Controls how entity sizes and positions are interpreted relative to the
+ * current window size.
+ *
+ * MEMBERS:
+ * - Constant: Pixel values are used verbatim, regardless of window size.
+ * - Proportional: Pixel values are rescaled so their proportion of the
+ *   screen stays constant across window sizes.
+ */
 enum class ScaleMode : std::uint8_t {
     Constant,
     Proportional,
@@ -71,6 +80,7 @@ struct SolidRectangle {
  * @param camera The camera used to convert world coordinates to screen coordinates.
  * @param output_width The width of the rendering output.
  * @param output_height The height of the rendering output.
+ * @param mode Controls how entity sizes and positions are scaled relative to the current window size.
  */
 void SubmitRectangles(
     const Registry& world, RenderQueue& render_queue, const Camera2D& camera,
@@ -85,6 +95,7 @@ void SubmitRectangles(
  * @param camera The camera used to convert world coordinates to screen coordinates.
  * @param output_width The width of the rendering output.
  * @param output_height The height of the rendering output.
+ * @param mode Controls how entity sizes and positions are scaled relative to the current window size.
  */
 void SubmitSprites(
     const Registry& world, RenderQueue& render_queue, const Camera2D& camera,

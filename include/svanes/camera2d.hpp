@@ -61,11 +61,13 @@ public:
      * @param transform The Transform component of the entity to be rendered.
      * @param output_width The width of the rendering output.
      * @param output_height The height of the rendering output.
-     * 
+     * @param scale The scale factor depending on screen size.
+     * @param offset The correction distance to center the world display when the player's screen is not 16:9.
+     *
      * @return An optional Rectangle representing the destination rectangle in screen coordinates,
      * or std::nullopt if the rectangle is outside the bounds of the rendering output.
-     * 
-     * @throws std::invalid_argument if the zoom factor is not finite or is less than or equal to zero.
+     *
+     * @throws std::invalid_argument if the zoom factor or scale is not finite or is less than or equal to zero.
      */
     std::optional<Rectangle> PrepareForRendering(
         const Transform& transform, std::int32_t output_width, std::int32_t output_height, float scale, Vector2D offset

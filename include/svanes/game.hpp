@@ -21,6 +21,7 @@ enum class ScaleMode : std::uint8_t;
  * - camera: The engine owned camera used to convert between screen and world coordinates.
  * - output_width: The current width of the rendering output.
  * - output_height: The current height of the rendering output.
+ * - scale_mode: The engine owned scale mode controlling how entity sizes and positions are scaled relative to the current window size.
  */
 struct GameContext {
     Registry& world;
@@ -46,6 +47,7 @@ struct GameContext {
  * - output_width: The current width of the rendering output.
  * - output_height: The current height of the rendering output.
  * - camera: The engine owned camera used to convert between screen and world coordinates.
+ * - scale_mode: The engine owned scale mode controlling how entity sizes and positions are scaled relative to the current window size.
  */
 struct FrameContext {
     Registry& world;

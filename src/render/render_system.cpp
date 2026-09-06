@@ -12,6 +12,18 @@ namespace svanes {
 constexpr std::int32_t kDesignWidth = 1920;
 constexpr std::int32_t kDesignHeight = 1080;
 
+/**
+ * Computes the factor by which entity sizes and positions should be scaled
+ * to fit the current output size, based on the given scale mode.
+ *
+ * @param mode The current scale mode.
+ * @param output_width The width of the rendering output.
+ * @param output_height The height of the rendering output.
+ *
+ * @return 1.0 under ScaleMode::Constant. Under ScaleMode::Proportional, the
+ * ratio of output size to the design resolution on whichever axis is more
+ * constrained, so scaling stays uniform on both axes.
+ */
 static float ComputeScale(ScaleMode mode, std::int32_t output_width, std::int32_t output_height)
 {
     if (mode == ScaleMode::Constant) {
@@ -23,6 +35,19 @@ static float ComputeScale(ScaleMode mode, std::int32_t output_width, std::int32_
     return std::min(width_ratio, height_ratio);
 }
 
+/**
+ * Computes the offset needed to center the scaled design resolution within
+ * the current output size, so that under ScaleMode::Proportional the
+ * leftover space on whichever axis isn't the constraining one is split
+ * evenly on both sides, rather than left entirely on one side.
+ *
+ * @param mode The current scale mode.
+ * @param scale The scale factor computed by ComputeScale.
+ * @param output_width The width of the rendering output.
+ * @param output_height The height of the rendering output.
+ *
+ * @return A zero offset under ScaleMode::Constant, or the centering offset under ScaleMode::Proportional.
+ */
 static Vector2D ComputeOffset(ScaleMode mode, float scale, std::int32_t output_width, std::int32_t output_height)
 {
     if (mode == ScaleMode::Constant) {
