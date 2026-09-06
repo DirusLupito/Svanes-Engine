@@ -10,6 +10,15 @@
 
 void ErikGame::Initialize(svanes::GameContext& context)
 {
+    const svanes::Entity background = context.world.CreateEntity();
+    context.world.AddComponent<svanes::Transform>(background, svanes::Transform{
+        .width = 1920.0F,
+        .height = 1080.0F,
+    });
+    context.world.AddComponent<svanes::SolidRectangle>(background, svanes::SolidRectangle{
+        .color = svanes::Color{.blue = 255},
+    });
+
     const svanes::TextureHandle orb_texture =
         context.assets.LoadTexture(std::string{ERIK_GAME_ASSETS_DIR} + "/darkworld_spawn_swirlingorb_idle.png");
 

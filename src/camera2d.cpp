@@ -92,7 +92,7 @@ Rectangle Camera2D::ScreenToWorld(Rectangle screen) const
 }
 
 std::optional<Rectangle> Camera2D::PrepareForRendering(
-    const Transform& transform, std::int32_t output_width, std::int32_t output_height, float scale
+    const Transform& transform, std::int32_t output_width, std::int32_t output_height, float scale, Vector2D offset
 ) const
 {
     ValidateZoom(scale);
@@ -107,6 +107,8 @@ std::optional<Rectangle> Camera2D::PrepareForRendering(
     destination.y *= scale;
     destination.width *= scale;
     destination.height *= scale;
+    destination.x += offset.x;
+    destination.y += offset.y;
 
 
     // Next, we need to check if the rectangle is within the bounds of the rendering output.

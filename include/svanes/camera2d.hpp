@@ -68,7 +68,7 @@ public:
      * @throws std::invalid_argument if the zoom factor is not finite or is less than or equal to zero.
      */
     std::optional<Rectangle> PrepareForRendering(
-        const Transform& transform, std::int32_t output_width, std::int32_t output_height, float scale
+        const Transform& transform, std::int32_t output_width, std::int32_t output_height, float scale, Vector2D offset
     ) const;
 };
 
