@@ -16,17 +16,14 @@
 
 constexpr std::int32_t kSquarePixels = 96;
 
-static svanes::Acceleration2D AttractionField(float offset_to_source_x, float offset_to_source_y)
+static svanes::Vector2D AttractionField(svanes::Vector2D offset_to_source)
 {
-    const float distance = std::hypot(offset_to_source_x, offset_to_source_y);
+    const float distance = std::hypot(offset_to_source.x, offset_to_source.y);
     if (distance == 0.0F) {
         return {};
     }
     const float strength = 1000.0F / ((distance / 100.0F) * (distance / 100.0F));
-    return {
-        (offset_to_source_x / distance) * strength,
-        (offset_to_source_y / distance) * strength,
-    };
+    return offset_to_source / distance * strength;
 }
 
 svanes::ImageData CreateGradientImage()
@@ -132,8 +129,7 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
     const float zoom = std::clamp(
         frame.camera.zoom * std::pow(1.1F, frame.input.MouseWheelThisFrame().y), 0.1F, 10.0F
     );
-    const svanes::InputVector mouse = frame.input.MousePosition();
-    frame.camera.SetZoomAt(zoom, mouse.x, mouse.y);
+    frame.camera.SetZoomAt(zoom, frame.input.MousePosition());
 
     constexpr float camera_speed = 300.0F;
     frame.camera.x += camera_speed * frame.delta_seconds * (

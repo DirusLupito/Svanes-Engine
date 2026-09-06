@@ -63,7 +63,7 @@ Rectangle RectangleGeometry::Bounds() const
     return {center_x - extent_x, center_y - extent_y, extent_x * 2.0F, extent_y * 2.0F};
 }
 
-std::array<Point2D, 4> RectangleGeometry::Corners() const
+std::array<Vector2D, 4> RectangleGeometry::Corners() const
 {
     // The rectangle's center stays in the same place
     // at (center_x, center_y) while the four corners
@@ -72,7 +72,7 @@ std::array<Point2D, 4> RectangleGeometry::Corners() const
     // We initialize the vertices as relative positions
     // to the center of the rectangle.
 
-    std::array<Point2D, 4> vertices{{
+    std::array<Vector2D, 4> vertices{{
         // Top left
         {-half_width, -half_height},
 
@@ -86,8 +86,8 @@ std::array<Point2D, 4> RectangleGeometry::Corners() const
         {-half_width, half_height},
     }};
 
-    for (Point2D& vertex : vertices) {
-        const Point2D offset = vertex;
+    for (Vector2D& vertex : vertices) {
+        const Vector2D offset = vertex;
 
         // Given our center point (center_x, center_y), the angle of a given
         // vertex from the center will be given by atan2(offset.y, offset.x)

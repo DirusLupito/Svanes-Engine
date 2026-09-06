@@ -97,6 +97,7 @@ target_sources(
             include/svanes/render/texture_manager.hpp
             include/svanes/registry.hpp
             include/svanes/sprite_animation_system.hpp
+            include/svanes/vector2d.hpp
 )
 
 target_compile_features(svanes_engine PUBLIC cxx_std_23)
@@ -158,6 +159,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/render/texture_manager.hpp
     include/svanes/registry.hpp
     include/svanes/sprite_animation_system.hpp
+    include/svanes/vector2d.hpp
 )
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/application.cpp

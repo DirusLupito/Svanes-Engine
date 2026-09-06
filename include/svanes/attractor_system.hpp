@@ -1,6 +1,7 @@
 #pragma once
 
 #include <svanes/entity.hpp>
+#include <svanes/vector2d.hpp>
 
 #include <functional>
 #include <optional>
@@ -9,18 +10,6 @@
 namespace svanes {
 
 class Registry;
-
-/**
- * Represents a 2D acceleration vector, typically used to represent the acceleration of an entity in a 2D space.
- * 
- * FIELDS:
- * - x: The acceleration along the x-axis.
- * - y: The acceleration along the y-axis.
- */
-struct Acceleration2D {
-    float x = 0.0F;
-    float y = 0.0F;
-};
 
 /**
  * Represents a point attractor in a 2D space,
@@ -34,12 +23,10 @@ struct Acceleration2D {
  * - accelerationField: The acceleration field function. Implemented by the user to define how the attractor
  *          influences other entities based on their relative position to the attractor.
  *          
- *          @param offset_to_source_x: The x-offset from the attractor to the target entity.
- *                                     Measured as (attractor_position.x - target_position.x).
- *          @param offset_to_source_y: The y-offset from the attractor to the target entity.
- *                                     Measured as (attractor_position.y - target_position.y).
+ *          @param offset_to_source: The offset from the target entity to the attractor.
+ *                                   Measured as (attractor_position - target_position).
  * 
- *          @return Acceleration2D: The acceleration vector to apply to the target entity.
+ *          @return Vector2D: The acceleration vector to apply to the target entity.
  * 
  * =======
  * 
@@ -48,7 +35,7 @@ struct Acceleration2D {
  *                  this radius, the attractor will have no effect on that entity.
  */
 struct PointAttractor2D {
-    std::function<Acceleration2D(float offset_to_source_x, float offset_to_source_y)> accelerationField;
+    std::function<Vector2D(Vector2D offset_to_source)> accelerationField;
     std::optional<float> cutoff_radius;
 };
 
@@ -60,6 +47,6 @@ struct PointAttractor2D {
  * 
  * @return A map of entities to their resulting acceleration vectors.
  */
-std::unordered_map<Entity, Acceleration2D> EvaluateAttractors(const Registry& world);
+std::unordered_map<Entity, Vector2D> EvaluateAttractors(const Registry& world);
 
 }

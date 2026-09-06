@@ -1,6 +1,7 @@
 #pragma once
 
 #include <svanes/render/basic_render_types.hpp>
+#include <svanes/vector2d.hpp>
 
 #include <cstdint>
 #include <optional>
@@ -26,12 +27,11 @@ public:
      * anchored to the same world coordinates.
      * 
      * @param new_zoom The new zoom factor to set. Must be finite and greater than zero.
-     * @param screen_x The x-coordinate in screen space to anchor.
-     * @param screen_y The y-coordinate in screen space to anchor.
+     * @param screen_position The position in screen space to anchor.
      * 
      * @throws std::invalid_argument if the new zoom factor is not finite or is less than or equal to zero.
      */
-    void SetZoomAt(float new_zoom, float screen_x, float screen_y);
+    void SetZoomAt(float new_zoom, Vector2D screen_position);
 
     /**
      * Converts a rectangle from world coordinates to screen coordinates.

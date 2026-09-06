@@ -52,17 +52,17 @@ bool InputManager::WasMouseButtonReleased(MouseButton button) const
 
 // POJO slop... but in C++ 
 
-InputVector InputManager::MousePosition() const
+Vector2D InputManager::MousePosition() const
 {
     return mouse_position;
 }
 
-InputVector InputManager::MouseDeltaThisFrame() const
+Vector2D InputManager::MouseDeltaThisFrame() const
 {
     return mouse_delta_this_frame;
 }
 
-InputVector InputManager::MouseWheelThisFrame() const
+Vector2D InputManager::MouseWheelThisFrame() const
 {
     return mouse_wheel_this_frame;
 }
@@ -120,16 +120,14 @@ void internal::InputManagerInternal::HandleEvent(InputManager& input, const SDL_
     }
     case SDL_EVENT_MOUSE_MOTION:
         input.mouse_position = {event.motion.x, event.motion.y};
-        input.mouse_delta_this_frame.x += event.motion.xrel;
-        input.mouse_delta_this_frame.y += event.motion.yrel;
+        input.mouse_delta_this_frame += {event.motion.xrel, event.motion.yrel};
         break;
     // SDL_EVENT_MOUSE_WHEEL supports two axes of scrolling with a mouse wheel.
     // But typically mice typically only produce vertical scrolling, 
     // since typical mice only have a single wheel that either scrolls up or down.
     // This would correspond to the y-axis of scrolling. 
     case SDL_EVENT_MOUSE_WHEEL:
-        input.mouse_wheel_this_frame.x += event.wheel.x;
-        input.mouse_wheel_this_frame.y += event.wheel.y;
+        input.mouse_wheel_this_frame += {event.wheel.x, event.wheel.y};
         break;
     case SDL_EVENT_WINDOW_FOCUS_LOST:
         input.current.fill(false);

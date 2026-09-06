@@ -9,7 +9,7 @@
 
 namespace svanes {
 
-std::unordered_map<Entity, Acceleration2D> EvaluateAttractors(const Registry& world)
+std::unordered_map<Entity, Vector2D> EvaluateAttractors(const Registry& world)
 {
 
     // Rather than take in an entity and iterate over all other entities to find attractors
@@ -27,7 +27,7 @@ std::unordered_map<Entity, Acceleration2D> EvaluateAttractors(const Registry& wo
     // Of course, we could just implement both ways and have the engine check
     // if N or A is larger and choose the more efficient method.
 
-    std::unordered_map<Entity, Acceleration2D> accelerations;
+    std::unordered_map<Entity, Vector2D> accelerations;
 
     world.ForEach<Transform, PointAttractor2D>(
         [&](Entity source_entity, const Transform& source, const PointAttractor2D& attractor) {
@@ -53,26 +53,23 @@ std::unordered_map<Entity, Acceleration2D> EvaluateAttractors(const Registry& wo
 
                     // Our chosen convention is that the offset is measured as (attractor_position - target_position).
 
-                    const float offset_to_source_x = source.x - target.x;
-                    const float offset_to_source_y = source.y - target.y;
+                    const Vector2D offset_to_source = Vector2D{source.x, source.y} - Vector2D{target.x, target.y};
 
 
                     // nullopt cutoff radius means the attractor affects all entities, regardless of distance.
                     if (attractor.cutoff_radius &&
-                        std::hypot(offset_to_source_x, offset_to_source_y) >= *attractor.cutoff_radius) {
+                        std::hypot(offset_to_source.x, offset_to_source.y) >= *attractor.cutoff_radius) {
                         return;
                     }
 
-                    const Acceleration2D acceleration = attractor.accelerationField(offset_to_source_x, offset_to_source_y);
+                    const Vector2D acceleration = attractor.accelerationField(offset_to_source);
 
                     // With user defined functions, error checking should be far more strict.
                     if (!std::isfinite(acceleration.x) || !std::isfinite(acceleration.y)) {
                         throw std::runtime_error("PointAttractor2D accelerationField returned non-finite acceleration.");
                     }
 
-                    Acceleration2D& total = accelerations[target_entity];
-                    total.x += acceleration.x;
-                    total.y += acceleration.y;
+                    accelerations[target_entity] += acceleration;
                 }
             );
         }

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <svanes/vector2d.hpp>
+
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -301,19 +303,6 @@ enum class MouseButton : std::uint8_t {
 };
 
 /**
- * Struct representing a 2D vector for input purposes, 
- * such as mouse position, delta, and wheel movement.
- *
- * FIELDS:
- * - x: The horizontal component of the input vector.
- * - y: The vertical component of the input vector.
- */
-struct InputVector {
-    float x = 0.0F;
-    float y = 0.0F;
-};
-
-/**
  * Class that manages input state for keys and mouse buttons,
  * as well as mouse position, delta, and wheel movement.
  * Mostly a wrapper around SDL's input handling.
@@ -367,21 +356,21 @@ public:
     /**
      * Gets the current mouse position.
      * Measured relative to the window, with (0, 0) being the top-left corner of the window.
-     * @return The current mouse position as an InputVector.
+     * @return The current mouse position as a Vector2D.
      */
-    InputVector MousePosition() const;
+    Vector2D MousePosition() const;
 
     /**
      * Gets the mouse movement delta (change in position) for this frame.
-     * @return The mouse delta for this frame as an InputVector.
+     * @return The mouse delta for this frame as a Vector2D.
      */
-    InputVector MouseDeltaThisFrame() const;
+    Vector2D MouseDeltaThisFrame() const;
 
     /**
      * Gets the mouse wheel movement for this frame.
-     * @return The mouse wheel movement for this frame as an InputVector.
+     * @return The mouse wheel movement for this frame as a Vector2D.
      */
-    InputVector MouseWheelThisFrame() const;
+    Vector2D MouseWheelThisFrame() const;
 
     /**
      * Requests to start text input mode.
@@ -434,15 +423,15 @@ private:
     std::array<bool, kMouseButtonCount> mouse_previous{};
 
     // Current mouse position relative to the window, with (0, 0) being the top-left corner of the window.
-    InputVector mouse_position{};
+    Vector2D mouse_position{};
 
     // Mouse movement delta (change in position) for this frame.
     // This should be reset to (0, 0) at the start of each frame.
-    InputVector mouse_delta_this_frame{};
+    Vector2D mouse_delta_this_frame{};
 
     // Mouse wheel movement for this frame.
     // This should be reset to (0, 0) at the start of each frame.
-    InputVector mouse_wheel_this_frame{};
+    Vector2D mouse_wheel_this_frame{};
 
     // Tracks whether text input has been requested for this frame.
     bool text_input_requested = false;

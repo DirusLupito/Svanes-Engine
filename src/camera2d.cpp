@@ -22,7 +22,7 @@ static void ValidateZoom(float zoom)
     }
 }
 
-void Camera2D::SetZoomAt(float new_zoom, float screen_x, float screen_y)
+void Camera2D::SetZoomAt(float new_zoom, Vector2D screen_position)
 {
     ValidateZoom(new_zoom);
     if (new_zoom == zoom) {
@@ -65,10 +65,10 @@ void Camera2D::SetZoomAt(float new_zoom, float screen_x, float screen_y)
     // new_x = anchor.x - (screen_x / new_zoom)
     // new_y = anchor.y - (screen_y / new_zoom)
 
-    const Rectangle anchor = ScreenToWorld({screen_x, screen_y, 0.0F, 0.0F});
+    const Rectangle anchor = ScreenToWorld({screen_position.x, screen_position.y, 0.0F, 0.0F});
     zoom = new_zoom;
-    x = anchor.x - screen_x / zoom;
-    y = anchor.y - screen_y / zoom;
+    x = anchor.x - screen_position.x / zoom;
+    y = anchor.y - screen_position.y / zoom;
 }
 
 Rectangle Camera2D::WorldToScreen(Rectangle world) const

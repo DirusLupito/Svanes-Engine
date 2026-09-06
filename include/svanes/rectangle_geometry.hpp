@@ -1,22 +1,11 @@
 #pragma once
 
 #include <svanes/render/basic_render_types.hpp>
+#include <svanes/vector2d.hpp>
 
 #include <array>
 
 namespace svanes {
-
-/**
- * Represents a point in 2D space.
- * 
- * FIELDS:
- * - x: The x-coordinate of the point.
- * - y: The y-coordinate of the point.
- */
-struct Point2D {
-    float x = 0.0F;
-    float y = 0.0F;
-};
 
 class RectangleGeometry final {
 public:
@@ -48,9 +37,9 @@ public:
      * Returns the four corners of the rectangle after applying the rotation.
      * The corners are returned in the following order: top-left, top-right, bottom-right, bottom-left.
      * 
-     * @return An array of four Point2D objects representing the corners of the rectangle.
+     * @return An array of four Vector2D objects representing the corners of the rectangle.
      */
-    std::array<Point2D, 4> Corners() const;
+    std::array<Vector2D, 4> Corners() const;
 
 private:
 
