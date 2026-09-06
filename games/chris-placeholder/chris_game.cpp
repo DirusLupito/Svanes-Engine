@@ -216,6 +216,9 @@ void ChrisGame::Update(const svanes::FrameContext& frame)
     platform.width = kPlatformWidth;
     platform.height = kPlatformHeight;
 
+    svanes::Transform& character = frame.world.GetComponent<svanes::Transform>(character_entity);
+    character.y = std::clamp(character.y, 0.0F, static_cast<float>(frame.output_height) - character.height);
+
     ResolveCharacterVertical(frame.world);
 
     const float available_width = std::max(0.0F, static_cast<float>(frame.output_width) - kSquareSize);
@@ -233,7 +236,6 @@ void ChrisGame::Update(const svanes::FrameContext& frame)
         horizontal_input += 1.0F;
     }
 
-    svanes::Transform& character = frame.world.GetComponent<svanes::Transform>(character_entity);
     character.x += horizontal_input * kCharacterMoveSpeed * frame.delta_seconds;
     character.x = std::clamp(character.x, 0.0F, static_cast<float>(frame.output_width) - character.width);
 
