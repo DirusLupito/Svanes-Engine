@@ -9,7 +9,7 @@
 
 #include "texture_manager_internal.hpp"
 
-#include <svanes/rectangle_geometry.hpp>
+#include <svanes/geometry.hpp>
 
 #include <SDL3/SDL.h>
 

@@ -7,6 +7,7 @@
 namespace svanes {
 
 struct Transform;
+struct Triangle2D;
 
 /**
  * Component for 2D entity collision detection.
@@ -45,5 +46,52 @@ struct Collision2D {
  * or rectangle edges that cannot be represented with a finite, positive length.
  */
 std::optional<Collision2D> DetectCollision(const Transform& a, const Transform& b);
+
+/**
+ * Detects contact between triangles. Describes the nature or lack thereof of
+ * the contact as both a normal and a penetration depth.
+ * 
+ * @param a The first triangle's vertices.
+ * @param b The second triangle's vertices.
+ * 
+ * @return Contact information, or std::nullopt when separated. 
+ * In the case that two different axes yield the same penetration depth,
+ * the first axis encountered is the one returned.
+ *
+ * @throws std::invalid_argument for triangle edges that cannot be represented with a finite, positive length.
+ */
+std::optional<Collision2D> DetectCollision(const Triangle2D& a, const Triangle2D& b);
+
+/**
+ * Detects contact between a triangle and a rectangle. Describes the nature or lack thereof of
+ * the contact as both a normal and a penetration depth. 
+ *
+ * @param a The triangle's vertices.
+ * @param b The rectangle's transform.
+ * 
+ * @return Contact information, or std::nullopt when separated. 
+ * In the case that two different axes yield the same penetration depth,
+ * the first axis encountered is the one returned.
+ * 
+ * @throws std::invalid_argument for non-finite transforms, nonpositive dimensions,
+ * or triangle edges that cannot be represented with a finite, positive length.
+ */
+std::optional<Collision2D> DetectCollision(const Triangle2D& a, const Transform& b);
+
+/**
+ * Detects contact between a rectangle and a triangle. Describes the nature or lack thereof of
+ * the contact as both a normal and a penetration depth. 
+ *
+ * @param a The rectangle's transform.
+ * @param b The triangle's vertices.
+ * 
+ * @return Contact information, or std::nullopt when separated. 
+ * In the case that two different axes yield the same penetration depth,
+ * the first axis encountered is the one returned.
+ * 
+ * @throws std::invalid_argument for non-finite transforms, nonpositive dimensions,
+ * or triangle edges that cannot be represented with a finite, positive length.
+ */
+std::optional<Collision2D> DetectCollision(const Transform& a, const Triangle2D& b);
 
 } // namespace svanes

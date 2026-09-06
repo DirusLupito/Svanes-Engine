@@ -7,6 +7,18 @@
 
 namespace svanes {
 
+/**
+ * Represents a triangle defined by its three vertices in 2D space.
+ * Each vertex is represented as a Vector2D (x, y).
+ * The three vertices must not be collinear to form a valid triangle.
+ *
+ * FIELDS:
+ * - vertices: An array of three Vector2D objects representing the triangle's vertices.
+ */
+struct Triangle2D {
+    std::array<Vector2D, 3> vertices;
+};
+
 class RectangleGeometry final {
 public:
 

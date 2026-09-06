@@ -1,6 +1,6 @@
 #include <svanes/collision_system.hpp>
 
-#include <svanes/rectangle_geometry.hpp>
+#include <svanes/geometry.hpp>
 #include <svanes/render/render_system.hpp>
 
 #include <algorithm>
@@ -26,6 +26,51 @@ static void ValidateRectangle(const Transform& transform)
         !std::isfinite(transform.width) || !std::isfinite(transform.height) ||
         !std::isfinite(transform.rotation) || transform.width <= 0.0F || transform.height <= 0.0F) {
         throw std::invalid_argument("Collision rectangles require finite transforms and positive dimensions.");
+    }
+}
+
+/**
+ * Validates that a rectangle's transform has finite values and positive dimensions,
+ * then returns the four corners in clockwise order starting from the top-left corner.
+ * 
+ * @param transform The rectangle's transform to validate and extract corners from.
+ * 
+ * @return An array of four Vector2D objects representing the corners of the rectangle
+ * in clockwise order starting from the top-left corner.
+ */
+static std::array<Vector2D, 4> RectangleVertices(const Transform& transform)
+{
+    ValidateRectangle(transform);
+    return RectangleGeometry(
+        {transform.x, transform.y, transform.width, transform.height}, transform.rotation
+    ).Corners();
+}
+
+/**
+ * Validates that a triangle's vertices are finite and non-collinear.
+ * 
+ * @param triangle The triangle to validate.
+ * 
+ * @throws std::invalid_argument if any vertex is non-finite or if the vertices are collinear.
+ */
+static void ValidateTriangle(const Triangle2D& triangle)
+{
+    for (Vector2D vertex : triangle.vertices) {
+        if (!std::isfinite(vertex.x) || !std::isfinite(vertex.y)) {
+            throw std::invalid_argument("Collision triangles require finite vertices.");
+        }
+    }
+
+    const auto& vertices = triangle.vertices;
+
+    // a really big triangle can have massive machine epsilon with floats so
+    // we use doubles to compute the area and check for collinearity.
+    const double ab_x = static_cast<double>(vertices[1].x) - vertices[0].x;
+    const double ab_y = static_cast<double>(vertices[1].y) - vertices[0].y;
+    const double ac_x = static_cast<double>(vertices[2].x) - vertices[0].x;
+    const double ac_y = static_cast<double>(vertices[2].y) - vertices[0].y;
+    if (ab_x * ac_y - ab_y * ac_x == 0.0) {
+        throw std::invalid_argument("Collision triangles require three non-collinear vertices.");
     }
 }
 
@@ -338,11 +383,30 @@ static std::optional<Collision2D> DetectConvexCollision(
 
 std::optional<Collision2D> DetectCollision(const Transform& a, const Transform& b)
 {
-    ValidateRectangle(a);
-    ValidateRectangle(b);
-    const auto corners_a = RectangleGeometry({a.x, a.y, a.width, a.height}, a.rotation).Corners();
-    const auto corners_b = RectangleGeometry({b.x, b.y, b.width, b.height}, b.rotation).Corners();
+    const auto corners_a = RectangleVertices(a);
+    const auto corners_b = RectangleVertices(b);
     return DetectConvexCollision(corners_a, corners_b);
+}
+
+std::optional<Collision2D> DetectCollision(const Triangle2D& a, const Triangle2D& b)
+{
+    ValidateTriangle(a);
+    ValidateTriangle(b);
+    return DetectConvexCollision(a.vertices, b.vertices);
+}
+
+std::optional<Collision2D> DetectCollision(const Triangle2D& a, const Transform& b)
+{
+    ValidateTriangle(a);
+    const auto corners_b = RectangleVertices(b);
+    return DetectConvexCollision(a.vertices, corners_b);
+}
+
+std::optional<Collision2D> DetectCollision(const Transform& a, const Triangle2D& b)
+{
+    const auto corners_a = RectangleVertices(a);
+    ValidateTriangle(b);
+    return DetectConvexCollision(corners_a, b.vertices);
 }
 
 } // namespace svanes

@@ -1,4 +1,4 @@
-#include <svanes/rectangle_geometry.hpp>
+#include <svanes/geometry.hpp>
 
 #include <cmath>
 
@@ -130,4 +130,3 @@ std::array<Vector2D, 4> RectangleGeometry::Corners() const
 }
 
 }
-
