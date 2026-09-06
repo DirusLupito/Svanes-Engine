@@ -134,8 +134,7 @@ void ChrisGame::ResolveCharacterHorizontal(svanes::Registry& world)
     svanes::Kinematic2D& character_motion = world.GetComponent<svanes::Kinematic2D>(character_entity);
 
     for (std::int32_t iteration = 0; iteration < kMaxResolutionIterations; ++iteration) {
-        const svanes::Transform* deepest_static_transform = nullptr;
-        float deepest_overlap_width = 0.0F;
+        std::optional<svanes::Collision2D> deepest_collision;
 
         world.ForEach<svanes::Transform, svanes::Collider2D>(
             [&](svanes::Entity candidate_entity, const svanes::Transform& static_transform, const svanes::Collider2D&) {
@@ -143,24 +142,22 @@ void ChrisGame::ResolveCharacterHorizontal(svanes::Registry& world)
                     return;
                 }
 
-                const std::optional<svanes::Rectangle> overlap = svanes::GetOverlap(character, static_transform);
-                if (overlap.has_value() && overlap->width > deepest_overlap_width) {
-                    deepest_overlap_width = overlap->width;
-                    deepest_static_transform = &static_transform;
+                const std::optional<svanes::Collision2D> collision = svanes::DetectCollision(character, static_transform);
+                if (!collision.has_value() || collision->normal.y != 0.0F) {
+                    return;
+                }
+
+                if (!deepest_collision.has_value() || collision->penetration_depth > deepest_collision->penetration_depth) {
+                    deepest_collision = collision;
                 }
             }
         );
 
-        if (deepest_static_transform == nullptr) {
+        if (!deepest_collision.has_value()) {
             break;
         }
 
-        if (character.x < deepest_static_transform->x) {
-            character.x = deepest_static_transform->x - character.width;
-        } else {
-            character.x = deepest_static_transform->x + deepest_static_transform->width;
-        }
-
+        character.x += deepest_collision->normal.x * deepest_collision->penetration_depth;
         character_motion.velocity_x = 0.0F;
     }
 }
@@ -171,8 +168,7 @@ void ChrisGame::ResolveCharacterVertical(svanes::Registry& world)
     svanes::Kinematic2D& character_motion = world.GetComponent<svanes::Kinematic2D>(character_entity);
 
     for (std::int32_t iteration = 0; iteration < kMaxResolutionIterations; ++iteration) {
-        const svanes::Transform* deepest_static_transform = nullptr;
-        float deepest_overlap_height = 0.0F;
+        std::optional<svanes::Collision2D> deepest_collision;
 
         world.ForEach<svanes::Transform, svanes::Collider2D>(
             [&](svanes::Entity candidate_entity, const svanes::Transform& static_transform, const svanes::Collider2D&) {
@@ -180,24 +176,22 @@ void ChrisGame::ResolveCharacterVertical(svanes::Registry& world)
                     return;
                 }
 
-                const std::optional<svanes::Rectangle> overlap = svanes::GetOverlap(character, static_transform);
-                if (overlap.has_value() && overlap->height > deepest_overlap_height) {
-                    deepest_overlap_height = overlap->height;
-                    deepest_static_transform = &static_transform;
+                const std::optional<svanes::Collision2D> collision = svanes::DetectCollision(character, static_transform);
+                if (!collision.has_value() || collision->normal.x != 0.0F) {
+                    return;
+                }
+
+                if (!deepest_collision.has_value() || collision->penetration_depth > deepest_collision->penetration_depth) {
+                    deepest_collision = collision;
                 }
             }
         );
 
-        if (deepest_static_transform == nullptr) {
+        if (!deepest_collision.has_value()) {
             break;
         }
 
-        if (character_motion.velocity_y >= 0.0F) {
-            character.y = deepest_static_transform->y - character.height;
-        } else {
-            character.y = deepest_static_transform->y + deepest_static_transform->height;
-        }
-
+        character.y += deepest_collision->normal.y * deepest_collision->penetration_depth;
         character_motion.velocity_y = 0.0F;
     }
 }
