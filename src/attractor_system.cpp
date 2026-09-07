@@ -2,7 +2,7 @@
 
 #include <svanes/kinematic_system.hpp>
 #include <svanes/registry.hpp>
-#include <svanes/render/render_system.hpp>
+#include <svanes/geometry.hpp>
 
 #include <cmath>
 #include <stdexcept>

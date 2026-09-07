@@ -91,6 +91,7 @@ target_sources(
             include/svanes/collision_system.hpp
             include/svanes/entity.hpp
             include/svanes/game.hpp
+            include/svanes/geometry.hpp
             include/svanes/input.hpp
             include/svanes/kinematic_system.hpp
             include/svanes/rectangle_geometry.hpp
@@ -155,6 +156,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/collision_system.hpp
     include/svanes/entity.hpp
     include/svanes/game.hpp
+    include/svanes/geometry.hpp
     include/svanes/input.hpp
     include/svanes/kinematic_system.hpp
     include/svanes/rectangle_geometry.hpp

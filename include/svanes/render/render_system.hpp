@@ -1,9 +1,6 @@
 #pragma once
 
-#include <svanes/circle_geometry.hpp>
-
-#include <svanes/rectangle_geometry.hpp>
-#include <svanes/triangle_geometry.hpp>
+#include <svanes/geometry.hpp>
 #include <svanes/render/basic_render_types.hpp>
 
 #include <cstdint>
@@ -27,21 +24,6 @@ class RenderQueue;
 enum class ScaleMode : std::uint8_t {
     Constant,
     Proportional,
-};
-
-/**
- * Represents the position and rotation of an entity's local origin in 2D space.
- * This component is used to determine where to place the entity's geometry in the world.
- * 
- * FIELDS:
- * - x: The x-coordinate of the entity's position.
- * - y: The y-coordinate of the entity's position.
- * - rotation: The rotation in radians.
- */
-struct Transform {
-    float x = 0.0F;
-    float y = 0.0F;
-    float rotation = 0.0F;
 };
 
 /**
