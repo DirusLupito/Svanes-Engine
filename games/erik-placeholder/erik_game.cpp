@@ -8,6 +8,27 @@
 
 #include <string>
 
+class Goose {
+    
+
+    const svanes::TextureHandle goose_walk_texture =
+        context.assets.LoadTexture(std::string{ERIK_GAME_ASSETS_DIR} + "/goose.png");
+    svanes::Entity goose = context.world.CreateEntity();
+    context.world.AddComponent<svanes::Transform>(goose, svanes::Transform{
+        .x = 960.0F,
+        .y = 700.0F,
+    });
+    context.world.AddComponent<svanes::Sprite>(goose, svanes::Sprite{
+        .texture = goose_walk_texture,
+        .geometry = svanes::Rectangle2D{
+            .width = 29.F,
+            .height = 27.F,
+        },
+    });
+    // context.worldAddComponent<svanes::SpriteAnimation
+
+}
+
 void ErikGame::Initialize(svanes::GameContext& context)
 {
     const svanes::Entity background = context.world.CreateEntity();
@@ -15,12 +36,12 @@ void ErikGame::Initialize(svanes::GameContext& context)
         .x = 960.0F,
         .y = 540.0F,
     });
-    context.world.AddComponent<svanes::Rectangle2D>(background, svanes::Rectangle2D{
-        .width = 1920.0F,
-        .height = 1080.0F,
-    });
-    context.world.AddComponent<svanes::SolidColor>(background, svanes::SolidColor{
+    context.world.AddComponent<svanes::SolidShape>(background, svanes::SolidShape{
         .color = svanes::Color{.blue = 255},
+        .geometry = svanes::Rectangle2D{
+            .width = 1920.0F,
+            .height = 1080.0F,
+        },
     });
 
     const svanes::TextureHandle orb_texture =
@@ -31,12 +52,12 @@ void ErikGame::Initialize(svanes::GameContext& context)
         .x = 960.0F,
         .y = 540.0F,
     });
-    context.world.AddComponent<svanes::Rectangle2D>(orb, svanes::Rectangle2D{
-        .width = 128.0F,
-        .height = 128.0F,
-    });
     context.world.AddComponent<svanes::Sprite>(orb, svanes::Sprite{
         .texture = orb_texture,
+        .geometry = svanes::Rectangle2D{
+            .width = 128.0F,
+            .height = 128.0F,
+        },
     });
     context.world.AddComponent<svanes::SpriteAnimation>(orb, svanes::SpriteAnimation{
         .frame_width = 128,
