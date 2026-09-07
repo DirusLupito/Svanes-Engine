@@ -13,9 +13,10 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <vector>
+#include <random>
+#include <numbers>
 
-constexpr std::int32_t kSquarePixels = 96;
+constexpr std::int32_t kSquarePixels = 300;
 constexpr float kPlanetRadius = 4200.0F;
 
 static svanes::Vector2D AttractionField(svanes::Vector2D offset_to_source)
@@ -34,7 +35,11 @@ static void ApplyCollisionAcceleration(svanes::Registry& world, svanes::Entity a
         world.GetComponent<svanes::Collider2D>(a).geometry, world.GetComponent<svanes::Transform>(a),
         world.GetComponent<svanes::Collider2D>(b).geometry, world.GetComponent<svanes::Transform>(b)
     );
+
+    
     for (const svanes::Collision2D& collision : collisions) {
+        const bool a_is_planet = world.HasComponent<svanes::PointAttractor2D>(a);
+        const bool b_is_planet = world.HasComponent<svanes::PointAttractor2D>(b);
         const svanes::Vector2D acceleration = collision.normal * 10000.0F;
         if (world.HasComponent<svanes::Kinematic2D>(a)) {
             auto& motion = world.GetComponent<svanes::Kinematic2D>(a);
@@ -46,6 +51,8 @@ static void ApplyCollisionAcceleration(svanes::Registry& world, svanes::Entity a
             motion.acceleration_x -= acceleration.x;
             motion.acceleration_y -= acceleration.y;
         }
+
+
     }
 }
 
@@ -104,6 +111,96 @@ static svanes::Entity CreatePlanetLayer(svanes::Registry& world, float radius, s
     return entity;
 }
 
+void OrbitalEscalationGame::CreateNonPlayerNonPlanetEntities(svanes::Registry& world)
+{
+    std::random_device rd;
+    std::mt19937 gen(rd());
+
+    // Uniformly distribute the NPC entities at any radian angle around the planet.
+
+    std::uniform_real_distribution<float> angle_dist(0.0F, 2.0F * static_cast<float>(std::numbers::pi));
+
+    // Uniformly distribute the NPC entities at any distance from the planet's surface,
+    // between minimum_distance_of_npc_entities_from_planet and maximum_distance_of_npc_entities_from_planet,
+    // measured from the surface of the planet to the center of the NPC entity.
+    std::uniform_real_distribution<float> distance_dist(
+        minimum_distance_of_npc_entities_from_planet, maximum_distance_of_npc_entities_from_planet
+    );
+
+    // Uniformly distribute the magnitude of the initial velocity of the NPC entities,
+    // as given by the magnitude of the tangent to the vector from the planet to the NPC entity when it is first spawned, 
+    // between minimum_magnitude_of_npc_entity_initial_velocity
+    // and maximum_magnitude_of_npc_entity_initial_velocity.
+    std::uniform_real_distribution<float> velocity_dist(
+        minimum_magnitude_of_npc_entity_initial_velocity, maximum_magnitude_of_npc_entity_initial_velocity
+    );
+
+    // Uniformly distribute the angular velocity of the NPC entities,
+    // between minimum_angular_velocity_of_npc_entities and maximum_angular_velocity_of_npc_entities, measured in radians per second.
+    std::uniform_real_distribution<float> angular_velocity_dist(
+        minimum_angular_velocity_of_npc_entities, maximum_angular_velocity_of_npc_entities
+    );
+
+    for (uint32_t i = 0; i < num_npc_entities_to_spawn; ++i) {
+        const float angle = angle_dist(gen);
+        const float distance = distance_dist(gen);
+        const float velocity_magnitude = velocity_dist(gen);
+        const float angular_velocity = angular_velocity_dist(gen);
+
+        // Calculate the position of the entity based on the angle and distance from the planet's surface.
+        const float x = std::cos(angle) * (kPlanetRadius + distance);
+        const float y = std::sin(angle) * (kPlanetRadius + distance);
+
+        svanes::Entity entity = world.CreateEntity();
+        world.AddComponent<svanes::Transform>(entity, svanes::Transform{x, y});
+        world.AddComponent<svanes::Kinematic2D>(entity);
+
+        // Set the initial velocity tangent to the vector from the planet to the entity
+
+        // Every other entity will have a clockwise initial velocity, while the others will have a counter-clockwise initial velocity.
+        if (i % 2 == 0) {
+            world.GetComponent<svanes::Kinematic2D>(entity).velocity_x = -std::sin(angle) * velocity_magnitude;
+            world.GetComponent<svanes::Kinematic2D>(entity).velocity_y = std::cos(angle) * velocity_magnitude;
+        } else {
+            world.GetComponent<svanes::Kinematic2D>(entity).velocity_x = std::sin(angle) * velocity_magnitude;
+            world.GetComponent<svanes::Kinematic2D>(entity).velocity_y = -std::cos(angle) * velocity_magnitude;
+        }
+
+        world.GetComponent<svanes::Kinematic2D>(entity).angular_velocity = angular_velocity;
+
+        // Determine the color uniformly along all three channels, with the alpha channel being fully opaque.
+        std::uniform_int_distribution<std::uint16_t> color_dist(0, 255);
+        const svanes::Color color{
+            static_cast<std::uint8_t>(color_dist(gen)),
+            static_cast<std::uint8_t>(color_dist(gen)),
+            static_cast<std::uint8_t>(color_dist(gen)),
+            255
+        };
+
+        // Cycle through shapes: box, circle, triangle
+        if (i % 3 == 0) {
+            svanes::Rectangle2D rectangle_geometry{0.0F, 0.0F, 100.0F, 100.0F};
+            world.AddComponent<svanes::Collider2D>(entity, svanes::Collider2D{rectangle_geometry});
+            world.AddComponent<svanes::SolidShape>(entity, svanes::SolidShape{color, rectangle_geometry});
+        } else if (i % 3 == 1) {
+            svanes::Circle2D circle_geometry{0.0F, 0.0F, 100.0F};
+            world.AddComponent<svanes::Collider2D>(entity, svanes::Collider2D{circle_geometry});
+            world.AddComponent<svanes::SolidShape>(entity, svanes::SolidShape{color, circle_geometry});
+        } else {
+            svanes::Triangle2D triangle_geometry{
+                .vertices = {
+                    svanes::Vector2D{0.0F, 100.0F},
+                    svanes::Vector2D{-50.0F, -50.0F},
+                    svanes::Vector2D{50.0F, -50.0F}
+                }
+            };
+            world.AddComponent<svanes::Collider2D>(entity, svanes::Collider2D{triangle_geometry});
+            world.AddComponent<svanes::SolidShape>(entity, svanes::SolidShape{color, triangle_geometry});
+        }
+        non_planet_non_player_entities.push_back(entity);
+    }
+}
+
 void OrbitalEscalationGame::Initialize(svanes::GameContext& context)
 {
     const svanes::TextureHandle gradient_texture = context.assets.CreateTexture(CreateGradientImage());
@@ -152,8 +249,14 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext& context)
         planet_entity, svanes::Collider2D{svanes::Circle2D{0.0F, 0.0F, kPlanetRadius}}
     );
     context.world.AddComponent<svanes::PointAttractor2D>(
-        inner_layer, svanes::PointAttractor2D{.accelerationField = AttractionField, .cutoff_radius = std::nullopt}
+        planet_entity, svanes::PointAttractor2D{.accelerationField = AttractionField, .cutoff_radius = std::nullopt}
     );
+
+    CreateNonPlayerNonPlanetEntities(context.world);
+
+    collidable_entities.push_back(square_entity);
+    collidable_entities.push_back(planet_entity);
+    collidable_entities.insert(collidable_entities.end(), non_planet_non_player_entities.begin(), non_planet_non_player_entities.end());
 }
 
 void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
@@ -177,15 +280,20 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
     const float zoom = std::clamp(
         frame.camera.zoom * std::pow(1.1F, frame.input.MouseWheelThisFrame().y), 0.01F, 100.0F
     );
-    frame.camera.SetZoomAt(zoom, frame.input.MousePosition(), layout.scale, layout.offset);
+    frame.camera.zoom = zoom;
 
-    constexpr float camera_speed = 300.0F;
-    frame.camera.x += camera_speed * frame.delta_seconds * (
-        frame.input.IsDown(svanes::Key::Right) - frame.input.IsDown(svanes::Key::Left)
-    );
-    frame.camera.y += camera_speed * frame.delta_seconds * (
-        frame.input.IsDown(svanes::Key::Down) - frame.input.IsDown(svanes::Key::Up)
-    );
+
+    // constexpr float camera_speed = 300.0F;
+    // frame.camera.x += camera_speed * frame.delta_seconds * (
+    //     frame.input.IsDown(svanes::Key::Right) - frame.input.IsDown(svanes::Key::Left)
+    // );
+    // frame.camera.y += camera_speed * frame.delta_seconds * (
+    //     frame.input.IsDown(svanes::Key::Down) - frame.input.IsDown(svanes::Key::Up)
+    // );
+
+    // Camera follows the player, centered on the screen.
+    frame.camera.x = frame.world.GetComponent<svanes::Transform>(square_entity).x - (frame.output_width * 0.5F - layout.offset.x) / layout.scale / frame.camera.zoom;
+    frame.camera.y = frame.world.GetComponent<svanes::Transform>(square_entity).y - (frame.output_height * 0.25F - layout.offset.y) / layout.scale / frame.camera.zoom;
 
     const svanes::Rectangle2D view = frame.camera.ScreenToWorld(layout.viewport, layout.scale, layout.offset);
     svanes::Transform& background = frame.world.GetComponent<svanes::Transform>(background_entity);
@@ -197,16 +305,27 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
 
     svanes::Kinematic2D& motion = frame.world.GetComponent<svanes::Kinematic2D>(square_entity);
     motion.acceleration_x = static_cast<float>(
-        100.0f * (frame.input.IsDown(svanes::Key::D) - frame.input.IsDown(svanes::Key::A))
+        1000.0f * (frame.input.IsDown(svanes::Key::D) - frame.input.IsDown(svanes::Key::A))
     );
     motion.acceleration_y = static_cast<float>(
-        100.0f * (frame.input.IsDown(svanes::Key::S) - frame.input.IsDown(svanes::Key::W))
+        1000.0f * (frame.input.IsDown(svanes::Key::S) - frame.input.IsDown(svanes::Key::W))
     );
     motion.angular_acceleration = 100.0F * (
         frame.input.IsDown(svanes::Key::E) - frame.input.IsDown(svanes::Key::Q)
     );
 
-    ApplyCollisionAcceleration(frame.world, {square_entity, planet_entity});
+    // Reset the acceleration of all non-player, non-planet entities to zero before applying collision acceleration.
+    for (svanes::Entity entity : non_planet_non_player_entities) {
+        if (frame.world.HasComponent<svanes::Kinematic2D>(entity)) {
+            auto& motion = frame.world.GetComponent<svanes::Kinematic2D>(entity);
+            motion.acceleration_x = 0.0F;
+            motion.acceleration_y = 0.0F;
+            motion.angular_acceleration = 0.0F;
+        }
+    }
+
+    // ApplyCollisionAcceleration(frame.world, {square_entity, planet_entity}); 
+    ApplyCollisionAcceleration(frame.world, collidable_entities);
 
 }
 
