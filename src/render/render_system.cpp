@@ -63,6 +63,21 @@ static Vector2D ComputeOffset(ScaleMode mode, float scale, std::int32_t output_w
     return {offset_x, offset_y};
 }
 
+RenderLayout ComputeRenderLayout(ScaleMode mode, std::int32_t output_width, std::int32_t output_height)
+{
+    if (output_width <= 0 || output_height <= 0) {
+        return {1.0F, {}, {}};
+    }
+
+    const float scale = ComputeScale(mode, output_width, output_height);
+    const Vector2D offset = ComputeOffset(mode, scale, output_width, output_height);
+
+    return {scale, offset, {
+        output_width * 0.5F, output_height * 0.5F,
+        output_width - 2.0F * offset.x, output_height - 2.0F * offset.y,
+    }};
+}
+
 /**
  * Reads the z order an entity is drawn at. The ZOrder component is optional,
  * so an entity without one is drawn at z order 0.
@@ -249,8 +264,9 @@ void SubmitShapes(
     std::int32_t output_width, std::int32_t output_height, ScaleMode mode
 )
 {
-    const float scale = ComputeScale(mode, output_width, output_height);
-    const Vector2D offset = ComputeOffset(mode, scale, output_width, output_height);
+    const RenderLayout layout = ComputeRenderLayout(mode, output_width, output_height);
+    const float scale = layout.scale;
+    const Vector2D offset = layout.offset;
     world.ForEach<Transform, SolidShape>(
         [&](Entity entity, const Transform& transform, const SolidShape& visual) {
             const std::int32_t z_order = ZOrderOf(world, entity);
@@ -273,8 +289,9 @@ void SubmitSprites(
     std::int32_t output_width, std::int32_t output_height, ScaleMode mode
 )
 {
-    const float scale = ComputeScale(mode, output_width, output_height);
-    const Vector2D offset = ComputeOffset(mode, scale, output_width, output_height);
+    const RenderLayout layout = ComputeRenderLayout(mode, output_width, output_height);
+    const float scale = layout.scale;
+    const Vector2D offset = layout.offset;
     world.ForEach<Transform, Sprite>(
         [&](Entity entity, const Transform& transform, const Sprite& sprite) {
             const auto destination = camera.PrepareForRendering(transform, sprite.geometry, output_width, output_height, scale, offset);

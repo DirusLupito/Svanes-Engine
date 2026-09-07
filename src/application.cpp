@@ -124,9 +124,20 @@ void RunGameLoop(IGame& game, SDL_Window* window, SDL_Renderer* renderer, Regist
 
         render_queue.Clear(Color{});
 
+        // This will add entities to the rendering queue, but will not actually render them.
+        // Actual rendering takes place in the executor.
+
         SubmitShapes(world, render_queue, camera, output_width, output_height, scale_mode);
         SubmitSprites(world, render_queue, camera, output_width, output_height, scale_mode);
-        render_queue_executor.Execute(render_queue);
+
+        // Based on the renderer layout, we may want to clip the rendering output to a specific viewport
+        // (e.g., when using proportional scaling).
+        const RenderLayout layout = ComputeRenderLayout(scale_mode, output_width, output_height);
+
+        render_queue_executor.Execute(render_queue,
+            // Our clip rectangle is only relevant when we are in proportional scaling mode.
+            scale_mode == ScaleMode::Proportional ? std::optional{layout.viewport} : std::nullopt);
+
         SDL_RenderPresent(renderer);
 
         // Implicit limit to 1000 FPS to avoid essentially just busy waiting

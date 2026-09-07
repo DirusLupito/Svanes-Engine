@@ -33,7 +33,7 @@ public:
      * @param render_queue The RenderQueue containing the commands to execute.
      * @throws std::runtime_error if any command fails to execute.
      */
-    void Execute(RenderQueue& render_queue) const;
+    void Execute(RenderQueue& render_queue, std::optional<Rectangle2D> clip = std::nullopt) const;
 
 private:
 
