@@ -19,6 +19,8 @@ struct Solid {};
 struct GooseIntent {
     svanes::Vector2D move;
     bool jump = false;
+    bool fire = false;
+    svanes::Vector2D aim_point;
 };
 
 enum class GooseState : std::uint8_t {
@@ -49,4 +51,5 @@ private:
     float speed = 300.0F;
     float jump_speed = 900.0F;
     float max_fall_speed = 1500.0F;
+    float fire_cooldown = 0.0F;
 };

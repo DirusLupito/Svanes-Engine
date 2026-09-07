@@ -121,7 +121,13 @@ else()
     target_compile_options(svanes_engine PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
-add_executable(svanes_game_erik games/erik-placeholder/main.cpp games/erik-placeholder/erik_game.cpp)
+add_executable(
+    svanes_game_erik
+    games/erik-placeholder/main.cpp
+    games/erik-placeholder/erik_game.cpp
+    games/erik-placeholder/goose.cpp
+    games/erik-placeholder/bullets.cpp
+)
 target_link_libraries(svanes_game_erik PRIVATE Svanes::Engine)
 target_compile_definitions(svanes_game_erik PRIVATE
     ERIK_GAME_ASSETS_DIR="${CMAKE_SOURCE_DIR}/games/erik-placeholder/assets"

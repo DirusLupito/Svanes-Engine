@@ -2,6 +2,7 @@
 
 #include <svanes/geometry.hpp>
 #include <svanes/render/basic_render_types.hpp>
+#include <svanes/vector2d.hpp>
 
 #include <cstdint>
 #include <optional>
@@ -104,6 +105,11 @@ struct SolidShape {
 struct ZOrder {
     std::int32_t value = 0;
 };
+
+Vector2D ScreenToWorldPoint(
+    const Camera2D& camera, Vector2D screen_point,
+    std::int32_t output_width, std::int32_t output_height, ScaleMode mode
+);
 
 /**
  * Submits all entities with Transform and SolidShape components to the render queue for rendering.
