@@ -168,6 +168,32 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext& context)
         circle_entity, svanes::PointAttractor2D{.accelerationField = AttractionField}
     );
     context.world.AddComponent<svanes::Collider2D>(circle_entity, svanes::Collider2D{circle_geometry});
+
+    const float half_height = square_size * 0.5F;
+    const float half_width = square_size * 1.5F;
+    const svanes::CompositeShape2D composite_geometry{{
+        {svanes::Rectangle2D{0.0F, 0.0F, square_size * 3.0F, square_size}, {}},
+        {circle_geometry, svanes::Transform{-half_width, 0.0F}},
+        {svanes::Triangle2D{{{
+            {0.0F, -half_height},
+            {half_height, 0.0F},
+            {0.0F, half_height},
+        }}}, svanes::Transform{half_width, 0.0F}},
+    }};
+    composite_entity = context.world.CreateEntity();
+    context.world.AddComponent<svanes::Transform>(
+        composite_entity, svanes::Transform{view.x, view.y - view.height * 0.25F}
+    );
+    context.world.AddComponent<svanes::SolidShape>(
+        composite_entity, svanes::SolidShape{svanes::Color{180, 100, 240, 255}, composite_geometry}
+    );
+    context.world.AddComponent<svanes::Collider2D>(
+        composite_entity, svanes::Collider2D{composite_geometry}
+    );
+    context.world.AddComponent<svanes::Kinematic2D>(composite_entity);
+    context.world.AddComponent<svanes::PointAttractor2D>(
+        composite_entity, svanes::PointAttractor2D{.accelerationField = AttractionField}
+    );
 }
 
 void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
@@ -214,7 +240,7 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
         frame.input.IsDown(svanes::Key::E) - frame.input.IsDown(svanes::Key::Q)
     );
 
-    for (svanes::Entity entity : {attractor_entity, triangle_entity, circle_entity}) {
+    for (svanes::Entity entity : {attractor_entity, triangle_entity, circle_entity, composite_entity}) {
         auto& other_motion = frame.world.GetComponent<svanes::Kinematic2D>(entity);
         other_motion.acceleration_x = 0.0F;
         other_motion.acceleration_y = 0.0F;
@@ -226,6 +252,9 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
     ApplyCollisionAcceleration(frame.world, circle_entity, square_entity);
     ApplyCollisionAcceleration(frame.world, circle_entity, attractor_entity);
     ApplyCollisionAcceleration(frame.world, circle_entity, triangle_entity);
+    for (svanes::Entity entity : {square_entity, attractor_entity, triangle_entity, circle_entity}) {
+        ApplyCollisionAcceleration(frame.world, composite_entity, entity);
+    }
 
 }
 
