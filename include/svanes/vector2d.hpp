@@ -68,6 +68,42 @@ struct Vector2D {
         *this = *this + other;
         return *this;
     }
+
+    /**
+     * Subtracts another Vector2D from this instance and returns the result.
+     * 
+     * @param other The other Vector2D to subtract.
+     * @return Vector2D& A reference to this instance after subtraction.
+     */
+    Vector2D& operator-=(Vector2D other)
+    {
+        *this = *this - other;
+        return *this;
+    }
+
+    /**
+     * Multiplies this instance by a scalar and returns the result.
+     * 
+     * @param scalar The scalar to multiply by.
+     * @return Vector2D& A reference to this instance after multiplication.
+     */
+    Vector2D& operator*=(float scalar)
+    {
+        *this = *this * scalar;
+        return *this;
+    }
+
+    /**
+     * Divides this instance by a scalar and returns the result.
+     * 
+     * @param scalar The scalar to divide by.
+     * @return Vector2D& A reference to this instance after division.
+     */
+    Vector2D& operator/=(float scalar)
+    {
+        *this = *this / scalar;
+        return *this;
+    }
 };
 
 }
