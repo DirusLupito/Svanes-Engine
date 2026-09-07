@@ -45,6 +45,15 @@ static void ApplyCollisionAcceleration(svanes::Registry& world, svanes::Entity a
     }
 }
 
+static void ApplyCollisionAcceleration(svanes::Registry& world, const std::vector<svanes::Entity>& entities)
+{
+    for (std::size_t i = 0; i < entities.size(); ++i) {
+        for (std::size_t j = i + 1; j < entities.size(); ++j) {
+            ApplyCollisionAcceleration(world, entities[i], entities[j]);
+        }
+    }
+}
+
 svanes::ImageData CreateGradientImage()
 {
     svanes::ImageData image{
@@ -296,21 +305,10 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
         other_motion.acceleration_y = 0.0F;
     }
 
-    ApplyCollisionAcceleration(frame.world, square_entity, attractor_entity);
-    ApplyCollisionAcceleration(frame.world, triangle_entity, attractor_entity);
-    ApplyCollisionAcceleration(frame.world, triangle_entity, square_entity);
-    ApplyCollisionAcceleration(frame.world, circle_entity, square_entity);
-    ApplyCollisionAcceleration(frame.world, circle_entity, attractor_entity);
-    ApplyCollisionAcceleration(frame.world, circle_entity, triangle_entity);
-    for (svanes::Entity entity : {square_entity, attractor_entity, triangle_entity, circle_entity}) {
-        ApplyCollisionAcceleration(frame.world, composite_entity, entity);
-    }
-    for (svanes::Entity entity : {square_entity, attractor_entity, triangle_entity, circle_entity, composite_entity}) {
-        ApplyCollisionAcceleration(frame.world, polygon_entity, entity);
-    }
-    for (svanes::Entity entity : {square_entity, attractor_entity, triangle_entity, circle_entity, composite_entity, polygon_entity}) {
-        ApplyCollisionAcceleration(frame.world, concave_entity, entity);
-    }
+    ApplyCollisionAcceleration(frame.world, {
+        square_entity, attractor_entity, triangle_entity, circle_entity,
+        composite_entity, polygon_entity, concave_entity,
+    });
 
 }
 
