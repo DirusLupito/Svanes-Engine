@@ -4,14 +4,9 @@
 
 #include <svanes/vector2d.hpp>
 
-#include <optional>
+#include <vector>
 
 namespace svanes {
-
-struct Transform;
-struct Rectangle2D;
-struct Triangle2D;
-struct Circle2D;
 
 /**
  * Component for 2D entity collision detection.
@@ -39,188 +34,20 @@ struct Collision2D {
 };
 
 /**
- * Detects contact between rectangles. Describes the nature or lack thereof of
- * the contact as both a normal and a penetration depth. 
- *
- * @param a The first rectangle's geometry.
- * @param transform_a The first rectangle's transform.
- * @param b The second rectangle's geometry.
- * @param transform_b The second rectangle's transform.
+ * Detects all collisions between two generic 2D geometries, which may be primitive shapes or composite shapes.
+ * The function uses the Separating Axis Theorem to determine if the shapes intersect and calculates the
+ * penetration depth and normal of the collision if they do.
  * 
+ * @param a The first geometry to test for collisions.
+ * @param transform_a The transform to apply to the first geometry.
+ * @param b The second geometry to test for collisions.
+ * @param transform_b The transform to apply to the second geometry.
  * 
- * @return Contact information, or std::nullopt when separated. 
- * In the case that two different axes yield the same penetration depth,
- * the first axis encountered is the one returned.
- * 
- * @throws std::invalid_argument for non-finite transforms, nonpositive dimensions,
- * or rectangle edges that cannot be represented with a finite, positive length.
+ * @return A vector of Collision2D objects representing the detected collisions. If no collisions are detected, the vector will be empty.
  */
-std::optional<Collision2D> DetectCollision(
-    const Rectangle2D& a, const Transform& transform_a,
-    const Rectangle2D& b, const Transform& transform_b
-);
-
-/**
- * Detects contact between triangles. Describes the nature or lack thereof of
- * the contact as both a normal and a penetration depth.
- * 
- * @param a The first triangle's vertices.
- * @param b The second triangle's vertices.
- * 
- * @return Contact information, or std::nullopt when separated. 
- * In the case that two different axes yield the same penetration depth,
- * the first axis encountered is the one returned.
- *
- * @throws std::invalid_argument for triangle edges that cannot be represented with a finite, positive length.
- */
-std::optional<Collision2D> DetectCollision(
-    const Triangle2D& a, const Transform& transform_a,
-    const Triangle2D& b, const Transform& transform_b
-);
-
-/**
- * Detects contact between a triangle and a rectangle. Describes the nature or lack thereof of
- * the contact as both a normal and a penetration depth. 
- *
- * @param a The triangle's vertices.
- * @param b The rectangle's geometry.
- * @param transform_b The rectangle's transform.
- * 
- * @return Contact information, or std::nullopt when separated. 
- * In the case that two different axes yield the same penetration depth,
- * the first axis encountered is the one returned.
- * 
- * @throws std::invalid_argument for non-finite transforms, nonpositive dimensions,
- * or triangle edges that cannot be represented with a finite, positive length.
- */
-std::optional<Collision2D> DetectCollision(
-    const Triangle2D& a, const Transform& transform_a,
-    const Rectangle2D& b, const Transform& transform_b
-);
-
-/**
- * Detects contact between a rectangle and a triangle. Describes the nature or lack thereof of
- * the contact as both a normal and a penetration depth. 
- *
- * @param a The rectangle's geometry.
- * @param transform_a The rectangle's transform.
- * @param b The triangle's vertices.
- * 
- * @return Contact information, or std::nullopt when separated. 
- * In the case that two different axes yield the same penetration depth,
- * the first axis encountered is the one returned.
- * 
- * @throws std::invalid_argument for non-finite transforms, nonpositive dimensions,
- * or triangle edges that cannot be represented with a finite, positive length.
- */
-std::optional<Collision2D> DetectCollision(
-    const Rectangle2D& a, const Transform& transform_a,
-    const Triangle2D& b, const Transform& transform_b
-);
-
-/**
- * Detects contact between two circles. Describes the nature or lack thereof of
- * the contact as both a normal and a penetration depth.
- *
- * @param a The first circle's geometry.
- * @param transform_a The first circle's transform.
- * @param b The second circle's geometry.
- * @param transform_b The second circle's transform.
- *
- * @return Contact information, or std::nullopt when separated.
- * In the case that two different axes yield the same penetration depth,
- * the first axis encountered is the one returned.
- *
- * @throws std::invalid_argument for non-finite transforms or non-positive radii.
- */
-std::optional<Collision2D> DetectCollision(
-    const Circle2D& a, const Transform& transform_a,
-    const Circle2D& b, const Transform& transform_b
-);
-
-/**
- * Detects contact between a circle and a rectangle. Describes the nature or lack thereof of
- * the contact as both a normal and a penetration depth.
- *
- * @param a The circle's geometry.
- * @param transform_a The circle's transform.
- * @param b The rectangle's geometry.
- * @param transform_b The rectangle's transform.
- *
- * @return Contact information, or std::nullopt when separated.
- * In the case that two different axes yield the same penetration depth,
- * the first axis encountered is the one returned.
- *
- * @throws std::invalid_argument for non-finite transforms, nonpositive dimensions,
- * or non-positive radii.
- */
-std::optional<Collision2D> DetectCollision(
-    const Circle2D& a, const Transform& transform_a,
-    const Rectangle2D& b, const Transform& transform_b
-);
-
-/**
- * Detects contact between a rectangle and a circle. Describes the nature or lack thereof of
- * the contact as both a normal and a penetration depth.
- *
- * @param a The rectangle's geometry.
- * @param transform_a The rectangle's transform.
- * @param b The circle's geometry.
- * @param transform_b The circle's transform.
- *
- * @return Contact information, or std::nullopt when separated.
- * In the case that two different axes yield the same penetration depth,
- * the first axis encountered is the one returned.
- *
- * @throws std::invalid_argument for non-finite transforms, nonpositive dimensions,
- * or non-positive radii.
- */
-std::optional<Collision2D> DetectCollision(
-    const Rectangle2D& a, const Transform& transform_a,
-    const Circle2D& b, const Transform& transform_b
-);
-
-
-/**
- * Detects contact between a circle and a triangle. Describes the nature or lack thereof of
- * the contact as both a normal and a penetration depth.
- *
- * @param a The circle's geometry.
- * @param transform_a The circle's transform.
- * @param b The triangle's vertices.
- * @param transform_b The triangle's transform.
- *
- * @return Contact information, or std::nullopt when separated.
- * In the case that two different axes yield the same penetration depth,
- * the first axis encountered is the one returned.
- *
- * @throws std::invalid_argument for non-finite transforms, non-positive radii,
- * or triangle edges that cannot be represented with a finite, positive length.
- */
-std::optional<Collision2D> DetectCollision(
-    const Circle2D& a, const Transform& transform_a,
-    const Triangle2D& b, const Transform& transform_b
-);
-
-/**
- * Detects contact between a triangle and a circle. Describes the nature or lack thereof of
- * the contact as both a normal and a penetration depth.
- *
- * @param a The triangle's vertices.
- * @param transform_a The triangle's transform.
- * @param b The circle's geometry.
- * @param transform_b The circle's transform.
- *
- * @return Contact information, or std::nullopt when separated.
- * In the case that two different axes yield the same penetration depth,
- * the first axis encountered is the one returned.
- *
- * @throws std::invalid_argument for non-finite transforms, non-positive radii,
- * or triangle edges that cannot be represented with a finite, positive length.
- */
-std::optional<Collision2D> DetectCollision(
-    const Triangle2D& a, const Transform& transform_a,
-    const Circle2D& b, const Transform& transform_b
+std::vector<Collision2D> DetectCollisions(
+    const Geometry2D& a, const Transform& transform_a,
+    const Geometry2D& b, const Transform& transform_b
 );
 
 } // namespace svanes

@@ -27,15 +27,14 @@ static svanes::Vector2D AttractionField(svanes::Vector2D offset_to_source)
     return offset_to_source / distance * strength;
 }
 
-template<typename ShapeA, typename ShapeB>
 static void ApplyCollisionAcceleration(svanes::Registry& world, svanes::Entity a, svanes::Entity b)
 {
-    const auto collision = svanes::DetectCollision(
-        std::get<ShapeA>(world.GetComponent<svanes::Collider2D>(a).geometry), world.GetComponent<svanes::Transform>(a),
-        std::get<ShapeB>(world.GetComponent<svanes::Collider2D>(b).geometry), world.GetComponent<svanes::Transform>(b)
+    const auto collisions = svanes::DetectCollisions(
+        world.GetComponent<svanes::Collider2D>(a).geometry, world.GetComponent<svanes::Transform>(a),
+        world.GetComponent<svanes::Collider2D>(b).geometry, world.GetComponent<svanes::Transform>(b)
     );
-    if (collision) {
-        const svanes::Vector2D acceleration = collision->normal * 10000.0F;
+    for (const svanes::Collision2D& collision : collisions) {
+        const svanes::Vector2D acceleration = collision.normal * 10000.0F;
         auto& motion_a = world.GetComponent<svanes::Kinematic2D>(a);
         auto& motion_b = world.GetComponent<svanes::Kinematic2D>(b);
         motion_a.acceleration_x += acceleration.x;
@@ -221,12 +220,12 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
         other_motion.acceleration_y = 0.0F;
     }
 
-    ApplyCollisionAcceleration<svanes::Rectangle2D, svanes::Rectangle2D>(frame.world, square_entity, attractor_entity);
-    ApplyCollisionAcceleration<svanes::Triangle2D, svanes::Rectangle2D>(frame.world, triangle_entity, attractor_entity);
-    ApplyCollisionAcceleration<svanes::Triangle2D, svanes::Rectangle2D>(frame.world, triangle_entity, square_entity);
-    ApplyCollisionAcceleration<svanes::Circle2D, svanes::Rectangle2D>(frame.world, circle_entity, square_entity);
-    ApplyCollisionAcceleration<svanes::Circle2D, svanes::Rectangle2D>(frame.world, circle_entity, attractor_entity);
-    ApplyCollisionAcceleration<svanes::Circle2D, svanes::Triangle2D>(frame.world, circle_entity, triangle_entity);
+    ApplyCollisionAcceleration(frame.world, square_entity, attractor_entity);
+    ApplyCollisionAcceleration(frame.world, triangle_entity, attractor_entity);
+    ApplyCollisionAcceleration(frame.world, triangle_entity, square_entity);
+    ApplyCollisionAcceleration(frame.world, circle_entity, square_entity);
+    ApplyCollisionAcceleration(frame.world, circle_entity, attractor_entity);
+    ApplyCollisionAcceleration(frame.world, circle_entity, triangle_entity);
 
 }
 
