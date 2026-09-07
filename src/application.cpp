@@ -90,8 +90,18 @@ void RunGameLoop(IGame& game, SDL_Window* window, SDL_Renderer* renderer, Regist
         }
 
         const FrameContext frame_context{world, input, delta_seconds, output_width, output_height, camera, scale_mode};
-        game.Update(frame_context);
+
+        // Here we should advance the kinematics of all entities before updating the game state.
+		// This allows us to first update the positions of all entities based on their velocities 
+        // and accelerations, and then allow the game logic to respond to those new positions.
+		// Fixes the broken behavior where the game logic was responding to the previous frame's positions,
+		// which could lead to incorrect behavior likely around collisions.
+        //
+        // This does however mean that there is now one frame of input latency, so we can talk about
+        // whether this is the best approach or not.
         AdvanceKinematics(world, delta_seconds);
+        game.Update(frame_context);
+        
         InputManagerInternal::SynchronizeTextInput(input, window);
         AdvanceSpriteAnimations(world, delta_seconds);
 
