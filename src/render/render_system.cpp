@@ -6,6 +6,8 @@
 #include <svanes/vector2d.hpp>
 
 #include <algorithm>
+#include <cmath>
+#include <stdexcept>
 #include <variant>
 
 namespace svanes {
@@ -61,6 +63,27 @@ static Vector2D ComputeOffset(ScaleMode mode, float scale, std::int32_t output_w
     const float offset_x = (static_cast<float>(output_width) - static_cast<float>(kDesignWidth) * scale) * 0.5F;
     const float offset_y = (static_cast<float>(output_height) - static_cast<float>(kDesignHeight) * scale) * 0.5F;
     return {offset_x, offset_y};
+}
+
+Vector2D ScreenToWorldPoint(
+    const Camera2D& camera, Vector2D screen_point,
+    std::int32_t output_width, std::int32_t output_height, ScaleMode mode
+)
+{
+    const float scale = ComputeScale(mode, output_width, output_height);
+    if (!std::isfinite(scale) || scale <= 0.0F) {
+        throw std::invalid_argument("ScreenToWorldPoint requires a finite and positive scale factor.");
+    }
+
+    const Vector2D offset = ComputeOffset(mode, scale, output_width, output_height);
+    const Rectangle2D world = camera.ScreenToWorld({
+        (screen_point.x - offset.x) / scale,
+        (screen_point.y - offset.y) / scale,
+        0.0F,
+        0.0F,
+    });
+
+    return {world.x, world.y};
 }
 
 /**
