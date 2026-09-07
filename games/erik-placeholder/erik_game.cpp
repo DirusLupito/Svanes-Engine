@@ -8,29 +8,10 @@
 
 #include <string>
 
-class Goose {
-    
-
-    const svanes::TextureHandle goose_walk_texture =
-        context.assets.LoadTexture(std::string{ERIK_GAME_ASSETS_DIR} + "/goose.png");
-    svanes::Entity goose = context.world.CreateEntity();
-    context.world.AddComponent<svanes::Transform>(goose, svanes::Transform{
-        .x = 960.0F,
-        .y = 700.0F,
-    });
-    context.world.AddComponent<svanes::Sprite>(goose, svanes::Sprite{
-        .texture = goose_walk_texture,
-        .geometry = svanes::Rectangle2D{
-            .width = 29.F,
-            .height = 27.F,
-        },
-    });
-    // context.worldAddComponent<svanes::SpriteAnimation
-
-}
-
 void ErikGame::Initialize(svanes::GameContext& context)
 {
+    context.gravity = {0.0F, 2000.0F};
+
     const svanes::Entity background = context.world.CreateEntity();
     context.world.AddComponent<svanes::Transform>(background, svanes::Transform{
         .x = 960.0F,

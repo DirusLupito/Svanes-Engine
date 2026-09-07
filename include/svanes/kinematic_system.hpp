@@ -1,5 +1,7 @@
 #pragma once
 
+#include <svanes/vector2d.hpp>
+
 #include <optional>
 
 namespace svanes {
@@ -47,15 +49,25 @@ struct Kinematic2D {
     std::optional<float> max_angular_acceleration;
 };
 
+/**
+ * Represents a gravity force applied to entities that have both the Kinematic2D and
+ * Gravity components. Default is set to {0, 0}.
+ * 
+ * Since we're in screen and world space, positive y is downwards. The gravity vector 
+ * is applied to the acceleration of entities with Kinematic2D and Gravity components.
+ */
+struct Gravity {};
+
 
 /**
  * Advances the kinematic state of all entities in the provided registry by the specified time delta.
  * 
  * @param world The registry containing all entities and their components.
  * @param delta_seconds The time delta in seconds to advance the kinematic state.
+ * @param gravity The gravity vector to apply to entities with Kinematic2D and Gravity components.
  * 
  * @throws std::invalid_argument if delta_seconds is not finite or is negative.
  */
-void AdvanceKinematics(Registry& world, float delta_seconds);
+void AdvanceKinematics(Registry& world, float delta_seconds, Vector2D gravity);
 
 }

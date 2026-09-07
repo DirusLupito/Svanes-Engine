@@ -64,10 +64,14 @@ static void ClampMagnitude(float& value, std::optional<float> limit)
     }
 }
 
-void AdvanceKinematics(Registry& world, float delta_seconds)
+void AdvanceKinematics(Registry& world, float delta_seconds, Vector2D gravity)
 {
     if (!std::isfinite(delta_seconds) || delta_seconds < 0.0F) {
         throw std::invalid_argument("Kinematics delta_seconds must be finite and nonnegative.");
+    }
+
+    if (!std::isfinite(gravity.x) || !std::isfinite(gravity.y)) {
+        throw std::invalid_argument("Kinematics gravity must be finite.");
     }
 
     // Map of entity to the total acceleration applied to that entity by all attractors.
@@ -95,8 +99,10 @@ void AdvanceKinematics(Registry& world, float delta_seconds)
             // Contributions from global acceleration fields
             //
 
-            // TODO: Implement global acceleration fields, 
-            // like a downward gravitational field.
+            if (world.HasComponent<Gravity>(entity)) {
+                acceleration_x += gravity.x;
+                acceleration_y += gravity.y;
+            }
 
             //
             // Clamp accelerations
