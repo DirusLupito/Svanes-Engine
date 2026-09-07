@@ -32,5 +32,7 @@ private:
     svanes::Entity triangle_entity = 0;
     svanes::Entity circle_entity = 0;
     svanes::Entity composite_entity = 0;
+    svanes::Entity polygon_entity = 0;
+    svanes::Entity concave_entity = 0;
     bool should_quit = false;
 };

@@ -181,6 +181,37 @@ static void SubmitShape(
 }
 
 /**
+ * Submits a convex polygonal entity to the render queue for rendering. The polygon's world coordinates
+ * are converted to screen coordinates using the camera, and if the polygon is outside the bounds
+ * of the rendering output, it is not submitted for rendering.
+ * 
+ * @param shape The ConvexPolygon2D component of the entity to be rendered.
+ * @param transform The Transform component of the entity to be rendered.
+ * @param color The color to render the polygon with.
+ * @param z_order The z order to draw the polygon at.
+ * @param render_queue The render queue to which the rendering commands will be submitted.
+ * @param camera The camera used to convert world coordinates to screen coordinates.
+ * @param output_width The width of the rendering output.
+ * @param output_height The height of the rendering output.
+ * @param scale The scale factor depending on screen size.
+ * @param offset The correction distance to center the world display when the player's screen is not 16:9.
+ */
+static void SubmitShape(
+    const ConvexPolygon2D& shape, const Transform& transform, Color color, std::int32_t z_order,
+    RenderQueue& render_queue, const Camera2D& camera,
+    std::int32_t output_width, std::int32_t output_height, float scale, Vector2D offset
+)
+{
+    const auto destination = camera.PrepareForRendering(
+        transform, shape, output_width, output_height, scale, offset
+    );
+    if (!destination) {
+        return;
+    }
+    render_queue.DrawConvexPolygon(*destination, color, z_order);
+}
+
+/**
  * Recursively submits all parts of a composite shape to the render queue for rendering.
  * Each part's transform is composed with the parent transform to determine its final position and rotation.
  * 

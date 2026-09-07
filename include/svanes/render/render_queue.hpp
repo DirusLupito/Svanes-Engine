@@ -7,6 +7,7 @@
 #pragma once
 
 #include <svanes/circle_geometry.hpp>
+#include <svanes/convex_polygon_geometry.hpp>
 
 #include <svanes/rectangle_geometry.hpp>
 #include <svanes/triangle_geometry.hpp>
@@ -91,6 +92,8 @@ public:
      */
     void Reset() noexcept;
 
+    void DrawConvexPolygon(const ConvexPolygon2D& destination, Color color, std::int32_t z_order = 0);
+
 private:
 
     /**
@@ -166,8 +169,22 @@ private:
         std::int32_t z_order;
     };
 
+    /**
+     * Represents a command to draw a convex polygon with a specific color.
+     * 
+     * FIELDS:
+     * - destination: The convex polygon to be drawn.
+     * - color: The fill color of the convex polygon.
+     * - z_order: The z order the convex polygon is drawn at.
+     */
+    struct ConvexPolygonCommand {
+        ConvexPolygon2D destination;
+        Color color;
+        std::int32_t z_order;
+    };
+
     // union but safe
-    using Command = std::variant<ClearCommand, RectangleCommand, TriangleCommand, CircleCommand, TextureCommand>;
+    using Command = std::variant<ClearCommand, RectangleCommand, TriangleCommand, CircleCommand, ConvexPolygonCommand, TextureCommand>;
 
     /**
      * Stably sorts the queued commands into ascending z order, so that commands

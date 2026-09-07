@@ -862,6 +862,152 @@ static std::optional<Collision2D> DetectCollision(
  * @param transform_b The transform to apply to the second shape.
  * @param collisions A vector to store the detected collisions.
  */
+static std::optional<Collision2D> DetectCollision(
+    const ConvexPolygon2D& a, const Transform& transform_a,
+    const Rectangle2D& b, const Transform& transform_b
+)
+{
+    const auto world_a = TransformConvexPolygon(a, transform_a);
+    const auto world_b = RectangleVertices(b, transform_b);
+    return DetectConvexCollision(world_a.Vertices(), world_b);
+}
+
+/**
+ * Detects all collisions between two primitive 2D shapes, which may be of different types (e.g., circle, rectangle, triangle).
+ * The function uses std::visit to handle the different shape types and calls the appropriate collision detection function for
+ * for each pair of shapes. If a collision is detected, it is added to the collisions vector.
+ * 
+ * @param a The first primitive shape to test for collisions.
+ * @param transform_a The transform to apply to the first shape.
+ * @param b The second primitive shape to test for collisions.
+ * @param transform_b The transform to apply to the second shape.
+ * @param collisions A vector to store the detected collisions.
+ */
+static std::optional<Collision2D> DetectCollision(
+    const ConvexPolygon2D& a, const Transform& transform_a,
+    const Triangle2D& b, const Transform& transform_b
+)
+{
+    const auto world_a = TransformConvexPolygon(a, transform_a);
+    const auto world_b = TransformTriangle(b, transform_b);
+    return DetectConvexCollision(world_a.Vertices(), world_b.vertices);
+}
+
+/**
+ * Detects all collisions between two primitive 2D shapes, which may be of different types (e.g., circle, rectangle, triangle).
+ * The function uses std::visit to handle the different shape types and calls the appropriate collision detection function for
+ * for each pair of shapes. If a collision is detected, it is added to the collisions vector.
+ * 
+ * @param a The first primitive shape to test for collisions.
+ * @param transform_a The transform to apply to the first shape.
+ * @param b The second primitive shape to test for collisions.
+ * @param transform_b The transform to apply to the second shape.
+ * @param collisions A vector to store the detected collisions.
+ */
+static std::optional<Collision2D> DetectCollision(
+    const ConvexPolygon2D& a, const Transform& transform_a,
+    const ConvexPolygon2D& b, const Transform& transform_b
+)
+{
+    const auto world_a = TransformConvexPolygon(a, transform_a);
+    const auto world_b = TransformConvexPolygon(b, transform_b);
+    return DetectConvexCollision(world_a.Vertices(), world_b.Vertices());
+}
+
+/**
+ * Detects all collisions between a circle and a convex polygon. The function transforms both shapes into world space
+ * using their respective transforms and then calls the DetectCirclePolygonCollision function to check for collisions.
+ * 
+ * @param a The circle to test for collisions.
+ * @param transform_a The transform to apply to the circle.
+ * @param b The convex polygon to test for collisions.
+ * @param transform_b The transform to apply to the convex polygon.
+ * 
+ * @return std::optional<Collision2D> The collision information if a collision is detected,
+ * or std::nullopt if no collision is detected.
+ */
+static std::optional<Collision2D> DetectCollision(
+    const Circle2D& a, const Transform& transform_a,
+    const ConvexPolygon2D& b, const Transform& transform_b
+)
+{
+    const auto circle = TransformCircle(a, transform_a);
+    const auto polygon = TransformConvexPolygon(b, transform_b);
+    return DetectCirclePolygonCollision(circle, polygon.Vertices());
+}
+
+/**
+ * Detects all collisions between a rectangle and a convex polygon. The function transforms both shapes into world space
+ * using their respective transforms and then calls the DetectConvexCollision function to check for collisions.
+ * 
+ * @param a The rectangle to test for collisions.
+ * @param transform_a The transform to apply to the rectangle.
+ * @param b The convex polygon to test for collisions.
+ * @param transform_b The transform to apply to the convex polygon.
+ * 
+ * @return std::optional<Collision2D> The collision information if a collision is detected,
+ * or std::nullopt if no collision is detected.
+ */
+static std::optional<Collision2D> DetectCollision(
+    const Rectangle2D& a, const Transform& transform_a,
+    const ConvexPolygon2D& b, const Transform& transform_b
+)
+{
+    auto collision = DetectCollision(b, transform_b, a, transform_a);
+    if (collision) {
+        collision->normal = collision->normal * -1.0F;
+    }
+    return collision;
+}
+
+/**
+ * Detects all collisions between a triangle and a convex polygon. The function transforms both shapes into world space
+ * using their respective transforms and then calls the DetectConvexCollision function to check for collisions.
+ * 
+ * @param a The triangle to test for collisions.
+ * @param transform_a The transform to apply to the triangle.
+ * @param b The convex polygon to test for collisions.
+ * @param transform_b The transform to apply to the convex polygon.
+ * 
+ * @return std::optional<Collision2D> The collision information if a collision is detected,
+ * or std::nullopt if no collision is detected.
+ */
+static std::optional<Collision2D> DetectCollision(
+    const Triangle2D& a, const Transform& transform_a,
+    const ConvexPolygon2D& b, const Transform& transform_b
+)
+{
+    auto collision = DetectCollision(b, transform_b, a, transform_a);
+    if (collision) {
+        collision->normal = collision->normal * -1.0F;
+    }
+    return collision;
+}
+
+/**
+ * Detects all collisions between a convex polygon and a circle. The function transforms both shapes into world space
+ * using their respective transforms and then calls the DetectCirclePolygonCollision function to check for collisions.
+ * 
+ * @param a The convex polygon to test for collisions.
+ * @param transform_a The transform to apply to the convex polygon.
+ * @param b The circle to test for collisions.
+ * @param transform_b The transform to apply to the circle.
+ * 
+ * @return std::optional<Collision2D> The collision information if a collision is detected,
+ * or std::nullopt if no collision is detected.
+ */
+static std::optional<Collision2D> DetectCollision(
+    const ConvexPolygon2D& a, const Transform& transform_a,
+    const Circle2D& b, const Transform& transform_b
+)
+{
+    auto collision = DetectCollision(b, transform_b, a, transform_a);
+    if (collision) {
+        collision->normal = collision->normal * -1.0F;
+    }
+    return collision;
+}
+
 static void AppendCollisions(
     const Primitive2D& a, const Transform& transform_a,
     const Primitive2D& b, const Transform& transform_b,

@@ -33,6 +33,11 @@ void RenderQueue::DrawCircle(Circle2D destination, Color color, std::int32_t z_o
     commands.emplace_back(CircleCommand{destination, color, z_order});
 }
 
+void RenderQueue::DrawConvexPolygon(const ConvexPolygon2D& destination, Color color, std::int32_t z_order)
+{
+    commands.emplace_back(ConvexPolygonCommand{destination, color, z_order});
+}
+
 void RenderQueue::DrawTexture(TextureHandle texture, Rectangle2D destination, float rotation, std::int32_t z_order)
 {
     commands.emplace_back(TextureCommand{texture, std::nullopt, destination, rotation, z_order});
@@ -69,6 +74,10 @@ void RenderQueue::SortByZOrder()
 
         if (const auto* circle = std::get_if<CircleCommand>(&command)) {
             return circle->z_order;
+        }
+
+        if (const auto* polygon = std::get_if<ConvexPolygonCommand>(&command)) {
+            return polygon->z_order;
         }
 
         return std::get<TextureCommand>(command).z_order;

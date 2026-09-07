@@ -13,6 +13,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <numbers>
 #include <vector>
 
 constexpr std::int32_t kSquarePixels = 96;
@@ -194,6 +195,55 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext& context)
     context.world.AddComponent<svanes::PointAttractor2D>(
         composite_entity, svanes::PointAttractor2D{.accelerationField = AttractionField}
     );
+
+    const svanes::ConvexPolygon2D polygon_geometry{{
+        {-64.8F, -4.6F}, {-57.0F, -30.6F}, {-47.4F, -39.8F},
+        {-25.7F, -45.6F}, {-4.7F, -48.7F}, {0.5F, -47.5F},
+        {24.1F, -37.7F}, {32.3F, -34.1F}, {56.0F, -10.3F},
+        {59.4F, -2.4F}, {63.1F, 17.7F}, {59.3F, 32.9F},
+        {53.0F, 37.8F}, {30.5F, 53.4F}, {-6.0F, 49.5F},
+        {-46.5F, 15.7F}, {-64.7F, -0.8F},
+    }};
+    polygon_entity = context.world.CreateEntity();
+    context.world.AddComponent<svanes::Transform>(
+        polygon_entity, svanes::Transform{view.x - view.width * 0.25F, view.y + view.height * 0.25F}
+    );
+    context.world.AddComponent<svanes::SolidShape>(
+        polygon_entity, svanes::SolidShape{svanes::Color{255, 255, 0, 255}, polygon_geometry}
+    );
+    context.world.AddComponent<svanes::Collider2D>(
+        polygon_entity, svanes::Collider2D{polygon_geometry}
+    );
+    context.world.AddComponent<svanes::Kinematic2D>(polygon_entity);
+    context.world.GetComponent<svanes::Kinematic2D>(polygon_entity).angular_velocity = 0.3F;
+    context.world.AddComponent<svanes::PointAttractor2D>(
+        polygon_entity, svanes::PointAttractor2D{.accelerationField = AttractionField}
+    );
+
+    const svanes::Rectangle2D arm{0.0F, 0.0F, square_size * 1.5F, square_size * 0.25F};
+    const float arm_offset = arm.width * 0.5F / std::sqrt(2.0F);
+    const float arm_angle = std::numbers::pi_v<float> * 0.25F;
+    const svanes::CompositeShape2D concave_geometry{{
+        {arm, svanes::Transform{-arm_offset, -arm_offset, arm_angle}},
+        {arm, svanes::Transform{arm_offset, -arm_offset, -arm_angle}},
+    }};
+    concave_entity = context.world.CreateEntity();
+    context.world.AddComponent<svanes::Transform>(
+        concave_entity, svanes::Transform{
+            view.x + view.width * 0.25F, view.y + view.height * 0.25F + square_size * 0.5F
+        }
+    );
+    context.world.AddComponent<svanes::SolidShape>(
+        concave_entity, svanes::SolidShape{svanes::Color{0, 220, 240, 255}, concave_geometry}
+    );
+    context.world.AddComponent<svanes::Collider2D>(
+        concave_entity, svanes::Collider2D{concave_geometry}
+    );
+    context.world.AddComponent<svanes::Kinematic2D>(concave_entity);
+    context.world.GetComponent<svanes::Kinematic2D>(concave_entity).angular_velocity = -0.3F;
+    context.world.AddComponent<svanes::PointAttractor2D>(
+        concave_entity, svanes::PointAttractor2D{.accelerationField = AttractionField}
+    );
 }
 
 void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
@@ -240,7 +290,7 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
         frame.input.IsDown(svanes::Key::E) - frame.input.IsDown(svanes::Key::Q)
     );
 
-    for (svanes::Entity entity : {attractor_entity, triangle_entity, circle_entity, composite_entity}) {
+    for (svanes::Entity entity : {attractor_entity, triangle_entity, circle_entity, composite_entity, polygon_entity, concave_entity}) {
         auto& other_motion = frame.world.GetComponent<svanes::Kinematic2D>(entity);
         other_motion.acceleration_x = 0.0F;
         other_motion.acceleration_y = 0.0F;
@@ -254,6 +304,12 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
     ApplyCollisionAcceleration(frame.world, circle_entity, triangle_entity);
     for (svanes::Entity entity : {square_entity, attractor_entity, triangle_entity, circle_entity}) {
         ApplyCollisionAcceleration(frame.world, composite_entity, entity);
+    }
+    for (svanes::Entity entity : {square_entity, attractor_entity, triangle_entity, circle_entity, composite_entity}) {
+        ApplyCollisionAcceleration(frame.world, polygon_entity, entity);
+    }
+    for (svanes::Entity entity : {square_entity, attractor_entity, triangle_entity, circle_entity, composite_entity, polygon_entity}) {
+        ApplyCollisionAcceleration(frame.world, concave_entity, entity);
     }
 
 }

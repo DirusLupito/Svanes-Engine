@@ -36,6 +36,14 @@ public:
     void Execute(RenderQueue& render_queue) const;
 
 private:
+
+    /**
+     * Executes a single ConvexPolygonCommand, which draws a convex polygon with a specific color.
+     * @param command The ConvexPolygonCommand to execute.
+     * @throws std::runtime_error if the polygon cannot be drawn.
+     */
+    void Execute(const RenderQueue::ConvexPolygonCommand& command) const;
+
     /**
      * Executes a single ClearCommand, which clears the screen with a specific color.
      * @param command The ClearCommand to execute.

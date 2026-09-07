@@ -66,6 +66,7 @@ target_sources(
         src/attractor_system.cpp
         src/camera2d.cpp
         src/circle_geometry.cpp
+        src/convex_polygon_geometry.cpp
         src/collision_system.cpp
         src/geometry.cpp
         src/input.cpp
@@ -89,6 +90,7 @@ target_sources(
             include/svanes/attractor_system.hpp
             include/svanes/camera2d.hpp
             include/svanes/circle_geometry.hpp
+            include/svanes/convex_polygon_geometry.hpp
             include/svanes/collision_system.hpp
             include/svanes/entity.hpp
             include/svanes/game.hpp
@@ -154,6 +156,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/attractor_system.hpp
     include/svanes/camera2d.hpp
     include/svanes/circle_geometry.hpp
+    include/svanes/convex_polygon_geometry.hpp
     include/svanes/collision_system.hpp
     include/svanes/entity.hpp
     include/svanes/game.hpp
@@ -175,6 +178,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/attractor_system.cpp
     src/camera2d.cpp
     src/circle_geometry.cpp
+    src/convex_polygon_geometry.cpp
     src/collision_system.cpp
     src/geometry.cpp
     src/input.cpp

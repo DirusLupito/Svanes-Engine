@@ -18,6 +18,8 @@
 #include <cmath>
 #include <cstdint>
 #include <numbers>
+#include <limits>
+#include <vector>
 #include <stdexcept>
 #include <string>
 
@@ -58,6 +60,11 @@ void RenderQueueExecutor::Execute(RenderQueue& render_queue) const
 
         if (const auto* circle = std::get_if<RenderQueue::CircleCommand>(&command)) {
             Execute(*circle);
+            continue;
+        }
+
+        if (const auto* polygon = std::get_if<RenderQueue::ConvexPolygonCommand>(&command)) {
+            Execute(*polygon);
             continue;
         }
 
@@ -190,6 +197,43 @@ void RenderQueueExecutor::Execute(const RenderQueue::CircleCommand& command) con
 
     if (!SDL_RenderGeometry(renderer, nullptr, vertices.data(), segments + 1, indices.data(), segments * 3)) {
         throw std::runtime_error("Could not draw a circle: " + std::string{SDL_GetError()});
+    }
+}
+
+void RenderQueueExecutor::Execute(const RenderQueue::ConvexPolygonCommand& command) const
+{
+    const auto& points = command.destination.Vertices();
+
+    if (points.size() > static_cast<std::size_t>(std::numeric_limits<std::int32_t>::max() / 3) + 2) {
+        throw std::length_error("Convex polygon has too many vertices to render.");
+    }
+
+    const SDL_FColor color{
+        command.color.red / 255.0F,
+        command.color.green / 255.0F,
+        command.color.blue / 255.0F,
+        command.color.alpha / 255.0F,
+    };
+
+    std::vector<SDL_Vertex> vertices;
+
+    vertices.reserve(points.size());
+    for (Vector2D point : points) {
+        vertices.push_back({{point.x, point.y}, color, {}});
+    }
+
+    std::vector<std::int32_t> indices;
+    indices.reserve((points.size() - 2) * 3);
+
+    for (std::int32_t i = 1; i < static_cast<std::int32_t>(points.size()) - 1; ++i) {
+        indices.push_back(0);
+        indices.push_back(i);
+        indices.push_back(i + 1);
+    }
+
+    if (!SDL_RenderGeometry(renderer, nullptr, vertices.data(), static_cast<std::int32_t>(vertices.size()),
+        indices.data(), static_cast<std::int32_t>(indices.size()))) {
+        throw std::runtime_error("Could not draw a convex polygon: " + std::string{SDL_GetError()});
     }
 }
 

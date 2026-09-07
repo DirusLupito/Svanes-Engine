@@ -1,6 +1,7 @@
 #pragma once
 
 #include <svanes/circle_geometry.hpp>
+#include <svanes/convex_polygon_geometry.hpp>
 
 #include <svanes/rectangle_geometry.hpp>
 #include <svanes/triangle_geometry.hpp>
@@ -119,6 +120,28 @@ public:
      */
     std::optional<Circle2D> PrepareForRendering(
         const Transform& transform, const Circle2D& circle,
+        std::int32_t output_width, std::int32_t output_height, float scale, Vector2D offset
+    ) const;
+
+    /**
+     * Prepares a convex polygon entity for rendering by converting its world coordinates to screen coordinates
+     * and checking if it is within the bounds of the rendering output.
+     * If the polygon is outside the bounds, std::nullopt is returned.
+     * 
+     * @param transform The Transform component of the entity to be rendered.
+     * @param polygon The ConvexPolygon2D component of the entity to be rendered.
+     * @param output_width The width of the rendering output.
+     * @param output_height The height of the rendering output.
+     * @param scale The scale factor depending on screen size.
+     * @param offset The correction distance to center the world display when the player's screen is not 16:9.
+     * 
+     * @return An optional ConvexPolygon2D representing the destination polygon in screen coordinates,
+     * or std::nullopt if the polygon is outside the bounds of the rendering output.
+     * 
+     * @throws std::invalid_argument if the zoom factor or scale is not finite or is less than or equal to zero.
+     */
+    std::optional<ConvexPolygon2D> PrepareForRendering(
+        const Transform& transform, const ConvexPolygon2D& polygon,
         std::int32_t output_width, std::int32_t output_height, float scale, Vector2D offset
     ) const;
 };

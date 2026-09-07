@@ -213,4 +213,31 @@ std::optional<Rectangle2D> Camera2D::PrepareForRendering(
     return destination;
 }
 
+std::optional<ConvexPolygon2D> Camera2D::PrepareForRendering(
+    const Transform& transform, const ConvexPolygon2D& polygon,
+    std::int32_t output_width, std::int32_t output_height, float scale, Vector2D offset
+) const
+{
+    ValidateFactor(scale);
+    ValidateFactor(zoom);
+
+    if (output_width <= 0 || output_height <= 0) {
+        return std::nullopt;
+    }
+
+    const Transform screen_transform{
+        (transform.x - x) * zoom * scale + offset.x,
+        (transform.y - y) * zoom * scale + offset.y,
+        transform.rotation,
+    };
+
+    auto destination = TransformConvexPolygon(polygon, screen_transform, zoom * scale);
+
+    if (IsOutsideOutput(destination.Bounds(), output_width, output_height)) {
+        return std::nullopt;
+    }
+
+    return destination;
+}
+
 }
