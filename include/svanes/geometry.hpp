@@ -24,6 +24,17 @@ struct Transform {
     float rotation = 0.0F;
 };
 
+/**
+ * Composes two transforms, applying the local transform relative to the parent transform.
+ * The resulting transform represents the combined effect of both transforms.
+ * 
+ * @param parent The parent transform, representing the position and rotation of the parent entity.
+ * @param local The local transform, representing the position and rotation of the child entity relative to the parent.
+ * 
+ * @return The composed transform, representing the position and rotation of the child entity in world coordinates.
+ */
+Transform ComposeTransforms(const Transform& parent, const Transform& local);
+
 // The basic geometric primitives that can be immediately rendered or used for collision detection
 // without needing to decompose them into simpler shapes. 
 using Primitive2D = std::variant<Rectangle2D, Triangle2D, Circle2D>;

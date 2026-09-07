@@ -67,6 +67,7 @@ target_sources(
         src/camera2d.cpp
         src/circle_geometry.cpp
         src/collision_system.cpp
+        src/geometry.cpp
         src/input.cpp
         src/kinematic_system.cpp
         src/rectangle_geometry.cpp
@@ -175,6 +176,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/camera2d.cpp
     src/circle_geometry.cpp
     src/collision_system.cpp
+    src/geometry.cpp
     src/input.cpp
     src/kinematic_system.cpp
     src/rectangle_geometry.cpp

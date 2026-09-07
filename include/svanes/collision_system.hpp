@@ -1,5 +1,7 @@
 #pragma once
 
+#include <svanes/geometry.hpp>
+
 #include <svanes/vector2d.hpp>
 
 #include <optional>
@@ -14,8 +16,11 @@ struct Circle2D;
 /**
  * Component for 2D entity collision detection.
  * 
+ * FIELDS:
+ * - geometry: The geometric shape of the entity used for collision detection.
  */
 struct Collider2D {
+    Geometry2D geometry;
 };
 
 /**

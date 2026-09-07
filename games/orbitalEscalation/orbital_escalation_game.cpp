@@ -31,8 +31,8 @@ template<typename ShapeA, typename ShapeB>
 static void ApplyCollisionAcceleration(svanes::Registry& world, svanes::Entity a, svanes::Entity b)
 {
     const auto collision = svanes::DetectCollision(
-        world.GetComponent<ShapeA>(a), world.GetComponent<svanes::Transform>(a),
-        world.GetComponent<ShapeB>(b), world.GetComponent<svanes::Transform>(b)
+        std::get<ShapeA>(world.GetComponent<svanes::Collider2D>(a).geometry), world.GetComponent<svanes::Transform>(a),
+        std::get<ShapeB>(world.GetComponent<svanes::Collider2D>(b).geometry), world.GetComponent<svanes::Transform>(b)
     );
     if (collision) {
         const svanes::Vector2D acceleration = collision->normal * 10000.0F;
@@ -84,6 +84,13 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext& context)
 {
     const svanes::TextureHandle gradient_texture = context.assets.CreateTexture(CreateGradientImage());
     constexpr float square_size = static_cast<float>(kSquarePixels);
+    const svanes::Rectangle2D square_geometry{0.0F, 0.0F, square_size, square_size};
+    const svanes::Triangle2D triangle_geometry{{{
+        {-square_size * 0.5F, square_size / 3.0F},
+        {square_size * 0.5F, square_size / 3.0F},
+        {0.0F, -square_size * 2.0F / 3.0F},
+    }}};
+    const svanes::Circle2D circle_geometry{0.0F, 0.0F, square_size * 0.5F};
     const svanes::Rectangle2D view = context.camera.ScreenToWorld({
         context.output_width * 0.5F, context.output_height * 0.5F,
         static_cast<float>(context.output_width), static_cast<float>(context.output_height)
@@ -93,12 +100,10 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext& context)
     context.world.AddComponent<svanes::Transform>(
         background_entity, svanes::Transform{view.x, view.y}
     );
-    context.world.AddComponent<svanes::Rectangle2D>(
-        background_entity, svanes::Rectangle2D{0.0F, 0.0F, view.width, view.height}
-    );
-    context.world.AddComponent<svanes::SolidColor>(
+    context.world.AddComponent<svanes::SolidShape>(
         background_entity,
-        svanes::SolidColor{svanes::Color{17, 24, 39, 255}}
+        svanes::SolidShape{svanes::Color{17, 24, 39, 255},
+            svanes::Rectangle2D{0.0F, 0.0F, view.width, view.height}}
     );
     context.world.AddComponent<svanes::ZOrder>(
         background_entity, svanes::ZOrder{-100}
@@ -106,7 +111,7 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext& context)
 
     // first time setup in the middle of the screen
     square_entity = context.world.CreateEntity();
-    context.world.AddComponent<svanes::Collider2D>(square_entity);
+    context.world.AddComponent<svanes::Collider2D>(square_entity, svanes::Collider2D{square_geometry});
     context.world.AddComponent<svanes::Kinematic2D>(square_entity);
     context.world.AddComponent<svanes::PointAttractor2D>(
         square_entity, svanes::PointAttractor2D{.accelerationField = AttractionField}
@@ -115,26 +120,20 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext& context)
         square_entity,
         svanes::Transform{view.x, view.y}
     );
-    context.world.AddComponent<svanes::Rectangle2D>(
-        square_entity, svanes::Rectangle2D{0.0F, 0.0F, square_size, square_size}
-    );
     context.world.AddComponent<svanes::Sprite>(
         square_entity,
-        svanes::Sprite{.texture = gradient_texture}
+        svanes::Sprite{.texture = gradient_texture, .geometry = square_geometry}
     );
 
     attractor_entity = context.world.CreateEntity();
-    context.world.AddComponent<svanes::Collider2D>(attractor_entity);
+    context.world.AddComponent<svanes::Collider2D>(attractor_entity, svanes::Collider2D{square_geometry});
     context.world.AddComponent<svanes::Transform>(
         attractor_entity, svanes::Transform{
             view.x - view.width * 0.25F, view.y
         }
     );
-    context.world.AddComponent<svanes::Rectangle2D>(
-        attractor_entity, svanes::Rectangle2D{0.0F, 0.0F, square_size, square_size}
-    );
-    context.world.AddComponent<svanes::SolidColor>(
-        attractor_entity, svanes::SolidColor{svanes::Color{240, 160, 40, 255}}
+    context.world.AddComponent<svanes::SolidShape>(
+        attractor_entity, svanes::SolidShape{svanes::Color{240, 160, 40, 255}, square_geometry}
     );
     context.world.AddComponent<svanes::Kinematic2D>(attractor_entity);
 
@@ -148,38 +147,28 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext& context)
     context.world.AddComponent<svanes::Transform>(
         triangle_entity, svanes::Transform{view.x + view.width * 0.25F, view.y, 0.4F}
     );
-    context.world.AddComponent<svanes::Triangle2D>(
-        triangle_entity, svanes::Triangle2D{{{
-            {-square_size * 0.5F, square_size / 3.0F},
-            {square_size * 0.5F, square_size / 3.0F},
-            {0.0F, -square_size * 2.0F / 3.0F},
-        }}}
-    );
-    context.world.AddComponent<svanes::SolidColor>(
-        triangle_entity, svanes::SolidColor{svanes::Color{80, 200, 120, 255}}
+    context.world.AddComponent<svanes::SolidShape>(
+        triangle_entity, svanes::SolidShape{svanes::Color{80, 200, 120, 255}, triangle_geometry}
     );
     context.world.AddComponent<svanes::Kinematic2D>(triangle_entity);
     context.world.AddComponent<svanes::PointAttractor2D>(
         triangle_entity, svanes::PointAttractor2D{.accelerationField = AttractionField}
     );
-    context.world.AddComponent<svanes::Collider2D>(triangle_entity);
+    context.world.AddComponent<svanes::Collider2D>(triangle_entity, svanes::Collider2D{triangle_geometry});
     context.world.GetComponent<svanes::Kinematic2D>(triangle_entity).angular_velocity = -0.5F;
 
     circle_entity = context.world.CreateEntity();
     context.world.AddComponent<svanes::Transform>(
         circle_entity, svanes::Transform{view.x, view.y + view.height * 0.25F}
     );
-    context.world.AddComponent<svanes::Circle2D>(
-        circle_entity, svanes::Circle2D{0.0F, 0.0F, square_size * 0.5F}
-    );
-    context.world.AddComponent<svanes::SolidColor>(
-        circle_entity, svanes::SolidColor{svanes::Color{255, 0, 0, 255}}
+    context.world.AddComponent<svanes::SolidShape>(
+        circle_entity, svanes::SolidShape{svanes::Color{255, 0, 0, 255}, circle_geometry}
     );
     context.world.AddComponent<svanes::Kinematic2D>(circle_entity);
     context.world.AddComponent<svanes::PointAttractor2D>(
         circle_entity, svanes::PointAttractor2D{.accelerationField = AttractionField}
     );
-    context.world.AddComponent<svanes::Collider2D>(circle_entity);
+    context.world.AddComponent<svanes::Collider2D>(circle_entity, svanes::Collider2D{circle_geometry});
 }
 
 void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
@@ -211,7 +200,7 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
     svanes::Transform& background = frame.world.GetComponent<svanes::Transform>(background_entity);
     background.x = view.x;
     background.y = view.y;
-    svanes::Rectangle2D& background_rectangle = frame.world.GetComponent<svanes::Rectangle2D>(background_entity);
+    svanes::Rectangle2D& background_rectangle = std::get<svanes::Rectangle2D>(frame.world.GetComponent<svanes::SolidShape>(background_entity).geometry);
     background_rectangle.width = view.width;
     background_rectangle.height = view.height;
 

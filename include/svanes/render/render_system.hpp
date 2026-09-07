@@ -30,27 +30,33 @@ enum class ScaleMode : std::uint8_t {
  * Represents a sprite component that can be attached to an entity for rendering.
  * This component holds a reference to a texture and an optional source rectangle that defines
  * which part of the texture to render. If the source rectangle is not provided, 
- * the entire texture will be rendered.
+ * the entire texture will be rendered. The geometry field defines the rectangle
+ * on the screen where the sprite will be drawn.
  * 
  * FIELDS:
  * - texture: A handle to the texture resource to be rendered.
  * - source: An optional rectangle defining the portion of the texture to render. 
  * If not provided, the entire texture will be used.
+ * - geometry: The rectangle onto which the sprite source will be drawn.
  */
 struct Sprite {
     TextureHandle texture;
     std::optional<Rectangle2D> source;
+    Rectangle2D geometry;
 };
 
 /**
- * Represents a solid color component that can be attached to an entity for rendering.
- * This component holds a color value that will be used to fill the entity's geometry.
+ * Represents both the color and geometry of an entity to be rendered. 
+ * This component is used to define simple solid shapes that can be drawn
+ * directly to the screen without the need for a texture.
  *
  * FIELDS:
  * - color: The color value used to fill the entity's geometry.
+ * - geometry: The geometric shape of the entity to be rendered.
  */
-struct SolidColor {
+struct SolidShape {
     Color color;
+    Geometry2D geometry;
 };
 
 /**
@@ -69,7 +75,7 @@ struct ZOrder {
 };
 
 /**
- * Submits all entities with Transform, Rectangle2D and SolidColor components to the render queue for rendering.
+ * Submits all entities with Transform and SolidShape components to the render queue for rendering.
  * 
  * @param world The registry containing all entities and their components.
  * @param render_queue The render queue to which the rendering commands will be submitted.
@@ -78,43 +84,13 @@ struct ZOrder {
  * @param output_height The height of the rendering output.
  * @param mode Controls how entity sizes and positions are scaled relative to the current window size.
  */
-void SubmitRectangles(
+void SubmitShapes(
     const Registry& world, RenderQueue& render_queue, const Camera2D& camera,
     std::int32_t output_width, std::int32_t output_height, ScaleMode mode
 );
 
 /**
- * Submits all entities with Transform, Triangle2D and SolidColor components to the render queue for rendering.
- * 
- * @param world The registry containing all entities and their components.
- * @param render_queue The render queue to which the rendering commands will be submitted.
- * @param camera The camera used to convert world coordinates to screen coordinates.
- * @param output_width The width of the rendering output.
- * @param output_height The height of the rendering output.
- * @param mode Controls how entity sizes and positions are scaled relative to the current window size.
- */
-void SubmitTriangles(
-    const Registry& world, RenderQueue& render_queue, const Camera2D& camera,
-    std::int32_t output_width, std::int32_t output_height, ScaleMode mode
-);
-
-/**
- * Submits all entities with Transform, Circle2D and SolidColor components to the render queue for rendering.
- * 
- * @param world The registry containing all entities and their components.
- * @param render_queue The render queue to which the rendering commands will be submitted.
- * @param camera The camera used to convert world coordinates to screen coordinates.
- * @param output_width The width of the rendering output.
- * @param output_height The height of the rendering output.
- * @param mode Controls how entity sizes and positions are scaled relative to the current window size.
- */
-void SubmitCircles(
-    const Registry& world, RenderQueue& render_queue, const Camera2D& camera,
-    std::int32_t output_width, std::int32_t output_height, ScaleMode mode
-);
-
-/**
- * Submits all entities with Transform, Rectangle2D and Sprite components to the render queue for rendering.
+ * Submits all entities with Transform and Sprite components to the render queue for rendering.
  * 
  * @param world The registry containing all entities and their components.
  * @param render_queue The render queue to which the rendering commands will be submitted.
