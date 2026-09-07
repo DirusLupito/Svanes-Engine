@@ -4,6 +4,7 @@
 #include <svanes/rectangle_geometry.hpp>
 #include <svanes/triangle_geometry.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
 
@@ -37,6 +38,26 @@ static bool IsOutsideOutput(const Rectangle2D& bounds, std::int32_t output_width
     return bounds.x + bounds.width * 0.5F <= 0.0F || bounds.y + bounds.height * 0.5F <= 0.0F ||
         bounds.x - bounds.width * 0.5F >= static_cast<float>(output_width) ||
         bounds.y - bounds.height * 0.5F >= static_cast<float>(output_height);
+}
+
+/**
+ * Checks if a circle is outside the bounds of the rendering output.
+ * 
+ * @param circle The circle to check, in screen coordinates.
+ * @param output_width The width of the rendering output.
+ * @param output_height The height of the rendering output.
+ * 
+ * @return true if the circle is outside the bounds of the rendering output, false otherwise.
+ */
+static bool IsOutsideOutput(const Circle2D& circle, std::int32_t output_width, std::int32_t output_height)
+{
+    // Find the closest point on the rectangle defined by the output dimensions to the center of the circle.
+    const float closest_x = std::clamp(circle.x, 0.0F, static_cast<float>(output_width));
+    const float closest_y = std::clamp(circle.y, 0.0F, static_cast<float>(output_height));
+
+    // If the distance from the circle's center to this closest point is greater than or equal to the radius,
+    // then the circle is outside the bounds of the output.
+    return std::hypot(circle.x - closest_x, circle.y - closest_y) >= circle.radius;
 }
 
 void Camera2D::SetZoomAt(float new_zoom, Vector2D screen_position)
@@ -106,6 +127,30 @@ Rectangle2D Camera2D::ScreenToWorld(Rectangle2D screen) const
     screen.width /= zoom;
     screen.height /= zoom;
     return screen;
+}
+
+std::optional<Circle2D> Camera2D::PrepareForRendering(
+    const Transform& transform, const Circle2D& circle,
+    std::int32_t output_width, std::int32_t output_height, float scale, Vector2D offset
+) const
+{
+    ValidateFactor(scale);
+    ValidateFactor(zoom);
+
+    if (output_width <= 0 || output_height <= 0) {
+        return std::nullopt;
+    }
+
+    Circle2D destination = TransformCircle(circle, transform);
+    destination.x = (destination.x - x) * zoom * scale + offset.x;
+    destination.y = (destination.y - y) * zoom * scale + offset.y;
+    destination.radius *= zoom * scale;
+
+    if (IsOutsideOutput(destination, output_width, output_height)) {
+        return std::nullopt;
+    }
+
+    return destination;
 }
 
 std::optional<Triangle2D> Camera2D::PrepareForRendering(

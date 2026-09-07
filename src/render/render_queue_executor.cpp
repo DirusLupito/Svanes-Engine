@@ -14,6 +14,8 @@
 #include <SDL3/SDL.h>
 
 #include <cstddef>
+#include <array>
+#include <cmath>
 #include <cstdint>
 #include <numbers>
 #include <stdexcept>
@@ -51,6 +53,11 @@ void RenderQueueExecutor::Execute(RenderQueue& render_queue) const
 
         if (const auto* triangle = std::get_if<RenderQueue::TriangleCommand>(&command)) {
             Execute(*triangle);
+            continue;
+        }
+
+        if (const auto* circle = std::get_if<RenderQueue::CircleCommand>(&command)) {
+            Execute(*circle);
             continue;
         }
 
@@ -134,6 +141,55 @@ void RenderQueueExecutor::Execute(const RenderQueue::TriangleCommand& command) c
 
     if (!SDL_RenderGeometry(renderer, nullptr, vertices, 3, nullptr, 0)) {
         throw std::runtime_error("Could not draw a triangle: " + std::string{SDL_GetError()});
+    }
+}
+
+void RenderQueueExecutor::Execute(const RenderQueue::CircleCommand& command) const
+{
+    // How many triangles we should use in a fan to approximate the circle. 
+    constexpr std::int32_t segments = 64;
+
+    const SDL_FColor color{
+        command.color.red / 255.0F,
+        command.color.green / 255.0F,
+        command.color.blue / 255.0F,
+        command.color.alpha / 255.0F,
+    };
+
+    std::array<SDL_Vertex, segments + 1> vertices{};
+
+    // Need 3 indices per triangle, and we have segments many triangles in the fan.
+    std::array<std::int32_t, segments * 3> indices{};
+
+    // The first vertex is the center of the circle, and the rest are the points on the circumference.
+    vertices[0] = {{command.destination.x, command.destination.y}, color, {}};
+
+    // For each triangle, we need to calculate the angle and the corresponding point on the circumference
+    // of the circle. Then we set up indices so that each triple of indices[i*3], indices[i*3 + 1], indices[i*3 + 2]
+    // forms a triangle in the fan. The first index is always 0 (the center), and the other two are the current point
+    // and the next point (wrapping around to the first point after the last).
+    for (std::int32_t i = 0; i < segments; ++i) {
+
+        // 2 pi * i / segments gives us the angle in radians for the current segment.
+        const float angle = 2.0F * std::numbers::pi_v<float> * i / segments;
+
+        vertices[i + 1] = {{
+            command.destination.x + command.destination.radius * std::cos(angle),
+            command.destination.y + command.destination.radius * std::sin(angle),
+        }, color, {}};
+
+        // Center
+        indices[i * 3] = 0;
+
+        // Current point on the circumference
+        indices[i * 3 + 1] = i + 1;
+
+        // Next point on the circumference, wrapping around to the first point after the last.
+        indices[i * 3 + 2] = (i + 1) % segments + 1;
+    }
+
+    if (!SDL_RenderGeometry(renderer, nullptr, vertices.data(), segments + 1, indices.data(), segments * 3)) {
+        throw std::runtime_error("Could not draw a circle: " + std::string{SDL_GetError()});
     }
 }
 

@@ -114,6 +114,7 @@ void RunGameLoop(IGame& game, SDL_Window* window, SDL_Renderer* renderer, Regist
 
         SubmitRectangles(world, render_queue, camera, output_width, output_height, scale_mode);
         SubmitTriangles(world, render_queue, camera, output_width, output_height, scale_mode);
+        SubmitCircles(world, render_queue, camera, output_width, output_height, scale_mode);
         SubmitSprites(world, render_queue, camera, output_width, output_height, scale_mode);
         render_queue_executor.Execute(render_queue);
         SDL_RenderPresent(renderer);

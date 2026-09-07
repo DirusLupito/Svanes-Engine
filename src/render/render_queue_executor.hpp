@@ -58,6 +58,15 @@ private:
     void Execute(const RenderQueue::TriangleCommand& command) const;
 
     /**
+     * Executes a single CircleCommand, which draws a circle with a specific color.
+     * Circles will be approximated using a polygon with a fixed number of segments.
+     * 
+     * @param command The CircleCommand to execute.
+     * @throws std::runtime_error if the circle cannot be drawn.
+     */
+    void Execute(const RenderQueue::CircleCommand& command) const;
+
+    /**
      * Executes a single TextureCommand, which draws a texture, 
      * optionally specifying a source rectangle.
      * @param command The TextureCommand to execute.

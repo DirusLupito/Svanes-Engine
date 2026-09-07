@@ -28,6 +28,11 @@ void RenderQueue::DrawTriangle(Triangle2D destination, Color color, std::int32_t
     commands.emplace_back(TriangleCommand{destination, color, z_order});
 }
 
+void RenderQueue::DrawCircle(Circle2D destination, Color color, std::int32_t z_order)
+{
+    commands.emplace_back(CircleCommand{destination, color, z_order});
+}
+
 void RenderQueue::DrawTexture(TextureHandle texture, Rectangle2D destination, float rotation, std::int32_t z_order)
 {
     commands.emplace_back(TextureCommand{texture, std::nullopt, destination, rotation, z_order});
@@ -60,6 +65,10 @@ void RenderQueue::SortByZOrder()
 
         if (const auto* triangle = std::get_if<TriangleCommand>(&command)) {
             return triangle->z_order;
+        }
+
+        if (const auto* circle = std::get_if<CircleCommand>(&command)) {
+            return circle->z_order;
         }
 
         return std::get<TextureCommand>(command).z_order;

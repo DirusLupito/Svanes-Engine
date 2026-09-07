@@ -40,6 +40,11 @@ struct Rectangle2D {
  */
 Rectangle2D TransformRectangle(Rectangle2D rectangle, const Transform& transform);
 
+/**
+ * Represents a rectangle in 2D space and provides methods to compute its corners and bounding box.
+ * The rectangle is defined by its center (x, y), width, height, and rotation angle.
+ * The rotation is applied around the center of the rectangle.
+ */
 class RectangleGeometry final {
 public:
 

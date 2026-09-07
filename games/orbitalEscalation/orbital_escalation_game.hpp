@@ -30,5 +30,6 @@ private:
     svanes::Entity square_entity = 0;
     svanes::Entity attractor_entity = 0;
     svanes::Entity triangle_entity = 0;
+    svanes::Entity circle_entity = 0;
     bool should_quit = false;
 };

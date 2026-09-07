@@ -120,6 +120,23 @@ void SubmitTriangles(
     );
 }
 
+void SubmitCircles(
+    const Registry& world, RenderQueue& render_queue, const Camera2D& camera,
+    std::int32_t output_width, std::int32_t output_height, ScaleMode mode
+)
+{
+    const float scale = ComputeScale(mode, output_width, output_height);
+    const Vector2D offset = ComputeOffset(mode, scale, output_width, output_height);
+    world.ForEach<Transform, Circle2D, SolidColor>(
+        [&](Entity entity, const Transform& transform, const Circle2D& geometry, const SolidColor& fill) {
+            const auto destination = camera.PrepareForRendering(transform, geometry, output_width, output_height, scale, offset);
+            if (destination) {
+                render_queue.DrawCircle(*destination, fill.color, ZOrderOf(world, entity));
+            }
+        }
+    );
+}
+
 void SubmitSprites(
     const Registry& world, RenderQueue& render_queue, const Camera2D& camera,
     std::int32_t output_width, std::int32_t output_height, ScaleMode mode

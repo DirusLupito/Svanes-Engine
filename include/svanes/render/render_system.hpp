@@ -1,5 +1,7 @@
 #pragma once
 
+#include <svanes/circle_geometry.hpp>
+
 #include <svanes/rectangle_geometry.hpp>
 #include <svanes/triangle_geometry.hpp>
 #include <svanes/render/basic_render_types.hpp>
@@ -110,6 +112,21 @@ void SubmitRectangles(
  * @param mode Controls how entity sizes and positions are scaled relative to the current window size.
  */
 void SubmitTriangles(
+    const Registry& world, RenderQueue& render_queue, const Camera2D& camera,
+    std::int32_t output_width, std::int32_t output_height, ScaleMode mode
+);
+
+/**
+ * Submits all entities with Transform, Circle2D and SolidColor components to the render queue for rendering.
+ * 
+ * @param world The registry containing all entities and their components.
+ * @param render_queue The render queue to which the rendering commands will be submitted.
+ * @param camera The camera used to convert world coordinates to screen coordinates.
+ * @param output_width The width of the rendering output.
+ * @param output_height The height of the rendering output.
+ * @param mode Controls how entity sizes and positions are scaled relative to the current window size.
+ */
+void SubmitCircles(
     const Registry& world, RenderQueue& render_queue, const Camera2D& camera,
     std::int32_t output_width, std::int32_t output_height, ScaleMode mode
 );

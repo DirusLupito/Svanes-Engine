@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include <svanes/circle_geometry.hpp>
+
 #include <svanes/rectangle_geometry.hpp>
 #include <svanes/triangle_geometry.hpp>
 #include <svanes/render/basic_render_types.hpp>
@@ -50,6 +52,15 @@ public:
      * @param z_order The z order to draw the triangle at (default is 0).
      */
     void DrawTriangle(Triangle2D destination, Color color, std::int32_t z_order = 0);
+
+    /**
+     * Adds a command to draw a circle to the render queue.
+     * 
+     * @param destination The circle to be drawn.
+     * @param color The color of the circle.
+     * @param z_order The z order to draw the circle at (default is 0
+     */
+    void DrawCircle(Circle2D destination, Color color, std::int32_t z_order = 0);
 
     /**
      * Adds a command to draw a texture to the render queue.
@@ -123,6 +134,20 @@ private:
     };
 
     /**
+     * Represents a command to draw a circle with a specific color.
+     *
+     * FIELDS:
+     * - destination: The circle to be drawn.
+     * - color: The fill color of the circle.
+     * - z_order: The z order the circle is drawn at.
+     */
+    struct CircleCommand {
+        Circle2D destination;
+        Color color;
+        std::int32_t z_order;
+    };
+
+    /**
      * Represents a command to draw a texture, optionally specifying a source rectangle.
      * If the source rectangle is not provided, the entire texture will be drawn.
      *
@@ -142,7 +167,7 @@ private:
     };
 
     // union but safe
-    using Command = std::variant<ClearCommand, RectangleCommand, TriangleCommand, TextureCommand>;
+    using Command = std::variant<ClearCommand, RectangleCommand, TriangleCommand, CircleCommand, TextureCommand>;
 
     /**
      * Stably sorts the queued commands into ascending z order, so that commands
