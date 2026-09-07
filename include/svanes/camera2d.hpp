@@ -32,30 +32,36 @@ public:
      * 
      * @param new_zoom The new zoom factor to set. Must be finite and greater than zero.
      * @param screen_position The position in screen space to anchor.
+     * @param scale The scale factor depending on screen size used for proportional scaling. Default is 1.0.
+     * @param offset The correction distance to center the world display when the player's screen is not 16:9. Default is {0.0F, 0.0F}.
      * 
      * @throws std::invalid_argument if the new zoom factor is not finite or is less than or equal to zero.
      */
-    void SetZoomAt(float new_zoom, Vector2D screen_position);
+    void SetZoomAt(float new_zoom, Vector2D screen_position, float scale = 1.0F, Vector2D offset = {});
 
     /**
      * Converts a rectangle from world coordinates to screen coordinates.
      * 
      * @param world The rectangle in world coordinates.
+     * @param scale The scale factor depending on screen size.
+     * @param offset The correction distance to center the world display when the player's screen is not 16:9.
      * 
      * @return The rectangle in screen coordinates.
      */
-    Rectangle2D WorldToScreen(Rectangle2D world) const;
+    Rectangle2D WorldToScreen(Rectangle2D world, float scale = 1.0F, Vector2D offset = {}) const;
 
     /**
      * Converts a rectangle from screen coordinates to world coordinates.
      * 
      * @param screen The rectangle in screen coordinates.
+     * @param scale The scale factor depending on screen size.
+     * @param offset The correction distance to center the world display when the player's screen is not 16:9.
      * 
      * @return The rectangle in world coordinates.
      * 
      * @throws std::invalid_argument if the zoom factor is not finite or is less than or equal to zero.
      */
-    Rectangle2D ScreenToWorld(Rectangle2D screen) const;
+    Rectangle2D ScreenToWorld(Rectangle2D screen, float scale = 1.0F, Vector2D offset = {}) const;
 
     /**
      * Prepares a rectangular entity for rendering by converting its world coordinates to screen coordinates

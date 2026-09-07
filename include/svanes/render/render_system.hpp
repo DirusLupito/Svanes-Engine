@@ -28,6 +28,37 @@ enum class ScaleMode : std::uint8_t {
 };
 
 /**
+ * Represents the layout of the rendering output, including the scale factor,
+ * the offset to center the world display, and the viewport rectangle in screen coordinates.
+ * 
+ * FIELDS:
+ * - scale: The factor by which entity sizes and positions should be scaled to fit the current output size.
+ * - offset: The offset to center the scaled design resolution within the current output size.
+ * - viewport: The rectangle in screen coordinates that defines the area of the output where rendering occurs.
+ */
+struct RenderLayout {
+    float scale;
+    Vector2D offset;
+    Rectangle2D viewport;
+};
+
+/**
+ * Computes the render layout based on the specified scale mode and output dimensions.
+ * This will take in the width and height of the application window as well as the current
+ * scale mode, and return a RenderLayout struct containing the computed scale to apply to
+ * entity sizes and positions, the offset to center the world display, and the viewport rectangle
+ * in screen coordinates. This tells the rendering system how to scale and position entities
+ * appropriately for both constant and proportional scaling modes.
+ *
+ * @param mode The scale mode to use for computing the layout.
+ * @param output_width The width of the rendering output.
+ * @param output_height The height of the rendering output.
+ * 
+ * @return A RenderLayout struct containing the computed scale, offset, and viewport.
+ */
+RenderLayout ComputeRenderLayout(ScaleMode mode, std::int32_t output_width, std::int32_t output_height);
+
+/**
  * Represents a sprite component that can be attached to an entity for rendering.
  * This component holds a reference to a texture and an optional source rectangle that defines
  * which part of the texture to render. If the source rectangle is not provided, 

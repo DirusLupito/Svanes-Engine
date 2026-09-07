@@ -60,9 +60,11 @@ static bool IsOutsideOutput(const Circle2D& circle, std::int32_t output_width, s
     return std::hypot(circle.x - closest_x, circle.y - closest_y) >= circle.radius;
 }
 
-void Camera2D::SetZoomAt(float new_zoom, Vector2D screen_position)
+void Camera2D::SetZoomAt(float new_zoom, Vector2D screen_position, float scale, Vector2D offset)
 {
     ValidateFactor(new_zoom);
+    ValidateFactor(scale);
+
     if (new_zoom == zoom) {
         return;
     }
@@ -80,52 +82,60 @@ void Camera2D::SetZoomAt(float new_zoom, Vector2D screen_position)
     // Let (new_world_x, new_world_y) be the corresponding point in world coordinates after the zoom change.
     // We want (world_x, world_y) to be equal to (new_world_x, new_world_y).
 
+    // Rendering computes screen_x = (world_x - x) * zoom * scale + offset.x,
+    // and likewise for y. ScreenToWorld reverses those operations.
+    // In constant mode, scale is 1 and offset is {0, 0}.
+    //
     // Before the zoom change:
-    // world_x = (screen_x / zoom) + x
-    // world_y = (screen_y / zoom) + y
+    // world_x = ((screen_x - offset.x) / scale / zoom) + x
+    // world_y = ((screen_y - offset.y) / scale / zoom) + y
 
     // After the zoom change:
-    // new_world_x = (screen_x / new_zoom) + new_x
-    // new_world_y = (screen_y / new_zoom) + new_y
+    // new_world_x = ((screen_x - offset.x) / scale / new_zoom) + new_x
+    // new_world_y = ((screen_y - offset.y) / scale / new_zoom) + new_y
 
     // Solve for new_x and new_y:
-    //    (screen_x / zoom) + x = (screen_x / new_zoom) + new_x
-    // -> (screen_x / zoom) + x - (screen_x / new_zoom) = new_x
+    //    ((screen_x - offset.x) / scale / zoom) + x = ((screen_x - offset.x) / scale / new_zoom) + new_x
+    // -> ((screen_x - offset.x) / scale / zoom) + x - ((screen_x - offset.x) / scale / new_zoom) = new_x
     // 
-    //    (screen_y / zoom) + y = (screen_y / new_zoom) + new_y
-    // -> (screen_y / zoom) + y - (screen_y / new_zoom) = new_y
+    //    ((screen_y - offset.y) / scale / zoom) + y = ((screen_y - offset.y) / scale / new_zoom) + new_y
+    // -> ((screen_y - offset.y) / scale / zoom) + y - ((screen_y - offset.y) / scale / new_zoom) = new_y
 
     // Note that 
-    // anchor.x = (screen_x / zoom) + x
-    // anchor.y = (screen_y / zoom) + y
+    // anchor.x = ((screen_x - offset.x) / scale / zoom) + x
+    // anchor.y = ((screen_y - offset.y) / scale / zoom) + y
 
     // So
-    // new_x = anchor.x - (screen_x / new_zoom)
-    // new_y = anchor.y - (screen_y / new_zoom)
+    // new_x = anchor.x - ((screen_x - offset.x) / scale / new_zoom)
+    // new_y = anchor.y - ((screen_y - offset.y) / scale / new_zoom)
 
-    const Rectangle2D anchor = ScreenToWorld({screen_position.x, screen_position.y, 0.0F, 0.0F});
+    const Rectangle2D anchor = ScreenToWorld(
+        {screen_position.x, screen_position.y, 0.0F, 0.0F}, scale, offset
+    );
     zoom = new_zoom;
-    x = anchor.x - screen_position.x / zoom;
-    y = anchor.y - screen_position.y / zoom;
+    x = anchor.x - (screen_position.x - offset.x) / scale / zoom;
+    y = anchor.y - (screen_position.y - offset.y) / scale / zoom;
 }
 
-Rectangle2D Camera2D::WorldToScreen(Rectangle2D world) const
+Rectangle2D Camera2D::WorldToScreen(Rectangle2D world, float scale, Vector2D offset) const
 {
     ValidateFactor(zoom);
-    world.x = (world.x - x) * zoom;
-    world.y = (world.y - y) * zoom;
-    world.width *= zoom;
-    world.height *= zoom;
+    ValidateFactor(scale);
+    world.x = (world.x - x) * zoom * scale + offset.x;
+    world.y = (world.y - y) * zoom * scale + offset.y;
+    world.width *= zoom * scale;
+    world.height *= zoom * scale;
     return world;
 }
 
-Rectangle2D Camera2D::ScreenToWorld(Rectangle2D screen) const
+Rectangle2D Camera2D::ScreenToWorld(Rectangle2D screen, float scale, Vector2D offset) const
 {
     ValidateFactor(zoom);
-    screen.x = screen.x / zoom + x;
-    screen.y = screen.y / zoom + y;
-    screen.width /= zoom;
-    screen.height /= zoom;
+    ValidateFactor(scale);
+    screen.x = (screen.x - offset.x) / scale / zoom + x;
+    screen.y = (screen.y - offset.y) / scale / zoom + y;
+    screen.width /= scale * zoom;
+    screen.height /= scale * zoom;
     return screen;
 }
 
@@ -191,13 +201,7 @@ std::optional<Rectangle2D> Camera2D::PrepareForRendering(
         return std::nullopt;
     }
 
-    Rectangle2D destination = WorldToScreen(TransformRectangle(rectangle, transform));
-    destination.x *= scale;
-    destination.y *= scale;
-    destination.width *= scale;
-    destination.height *= scale;
-    destination.x += offset.x;
-    destination.y += offset.y;
+    Rectangle2D destination = WorldToScreen(TransformRectangle(rectangle, transform), scale, offset);
 
 
     // Next, we need to check if the rectangle is within the bounds of the rendering output.

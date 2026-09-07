@@ -110,13 +110,13 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext& context)
     constexpr float square_size = static_cast<float>(kSquarePixels);
     const svanes::Rectangle2D square_geometry{0.0F, 0.0F, square_size, square_size};
     const svanes::Transform player_start{0.0F, -kPlanetRadius - 800.0F};
+    const svanes::RenderLayout layout = svanes::ComputeRenderLayout(
+        context.scale_mode, context.output_width, context.output_height
+    );
     context.camera.zoom = 0.2F;
-    context.camera.x = player_start.x - context.output_width * 0.5F / context.camera.zoom;
-    context.camera.y = player_start.y - context.output_height * 0.25F / context.camera.zoom;
-    const svanes::Rectangle2D view = context.camera.ScreenToWorld({
-        context.output_width * 0.5F, context.output_height * 0.5F,
-        static_cast<float>(context.output_width), static_cast<float>(context.output_height)
-    });
+    context.camera.x = player_start.x - (context.output_width * 0.5F - layout.offset.x) / layout.scale / context.camera.zoom;
+    context.camera.y = player_start.y - (context.output_height * 0.25F - layout.offset.y) / layout.scale / context.camera.zoom;
+    const svanes::Rectangle2D view = context.camera.ScreenToWorld(layout.viewport, layout.scale, layout.offset);
 
     background_entity = context.world.CreateEntity();
     context.world.AddComponent<svanes::Transform>(
@@ -124,14 +124,14 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext& context)
     );
     context.world.AddComponent<svanes::SolidShape>(
         background_entity,
-        svanes::SolidShape{svanes::Color{0, 0, 0, 255},
+        svanes::SolidShape{svanes::Color{0, 0, 68, 255},
             svanes::Rectangle2D{0.0F, 0.0F, view.width, view.height}}
     );
     context.world.AddComponent<svanes::ZOrder>(
         background_entity, svanes::ZOrder{-100}
     );
 
-    // first time setup in the middle of the screen
+    
     square_entity = context.world.CreateEntity();
     context.world.AddComponent<svanes::Collider2D>(square_entity, svanes::Collider2D{square_geometry});
     context.world.AddComponent<svanes::Kinematic2D>(square_entity);
@@ -162,13 +162,22 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
         should_quit = true;
     }
 
+    if (frame.input.WasPressed(svanes::Key::Tab)) {
+        frame.scale_mode = frame.scale_mode == svanes::ScaleMode::Constant
+            ? svanes::ScaleMode::Proportional : svanes::ScaleMode::Constant;
+    }
+
+    const svanes::RenderLayout layout = svanes::ComputeRenderLayout(
+        frame.scale_mode, frame.output_width, frame.output_height
+    );
+
     // 1.1^delta
     // Rolling harder on the mouse wheel will zoom in and out 
     // faster compared to rolling the same distance slowly.
     const float zoom = std::clamp(
         frame.camera.zoom * std::pow(1.1F, frame.input.MouseWheelThisFrame().y), 0.01F, 100.0F
     );
-    frame.camera.SetZoomAt(zoom, frame.input.MousePosition());
+    frame.camera.SetZoomAt(zoom, frame.input.MousePosition(), layout.scale, layout.offset);
 
     constexpr float camera_speed = 300.0F;
     frame.camera.x += camera_speed * frame.delta_seconds * (
@@ -178,10 +187,7 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
         frame.input.IsDown(svanes::Key::Down) - frame.input.IsDown(svanes::Key::Up)
     );
 
-    const svanes::Rectangle2D view = frame.camera.ScreenToWorld({
-        frame.output_width * 0.5F, frame.output_height * 0.5F,
-        static_cast<float>(frame.output_width), static_cast<float>(frame.output_height)
-    });
+    const svanes::Rectangle2D view = frame.camera.ScreenToWorld(layout.viewport, layout.scale, layout.offset);
     svanes::Transform& background = frame.world.GetComponent<svanes::Transform>(background_entity);
     background.x = view.x;
     background.y = view.y;

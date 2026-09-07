@@ -37,8 +37,20 @@ RenderQueueExecutor::RenderQueueExecutor(
     }
 }
 
-void RenderQueueExecutor::Execute(RenderQueue& render_queue) const
+void RenderQueueExecutor::Execute(RenderQueue& render_queue, std::optional<Rectangle2D> clip) const
 {
+    SDL_Rect clip_rect{};
+    if (clip) {
+        clip_rect.x = static_cast<std::int32_t>(std::round(clip->x - clip->width * 0.5F));
+        clip_rect.y = static_cast<std::int32_t>(std::round(clip->y - clip->height * 0.5F));
+        clip_rect.w = static_cast<std::int32_t>(std::round(clip->x + clip->width * 0.5F)) - clip_rect.x;
+        clip_rect.h = static_cast<std::int32_t>(std::round(clip->y + clip->height * 0.5F)) - clip_rect.y;
+    }
+
+    if (!SDL_SetRenderClipRect(renderer, clip ? &clip_rect : nullptr)) {
+        throw std::runtime_error("Could not set rendering clip rectangle: " + std::string{SDL_GetError()});
+    }
+
     render_queue.SortByZOrder();
 
     // Iterate through each command and cast it to the appropriate type, then execute it.
