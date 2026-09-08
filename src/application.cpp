@@ -3,6 +3,7 @@
 
 #include <svanes/application.hpp>
 
+#include <svanes/audio/audio_manager.hpp>
 #include <svanes/camera2d.hpp>
 #include <svanes/game.hpp>
 #include <svanes/input.hpp>
@@ -12,6 +13,7 @@
 #include <svanes/sprite_animation_system.hpp>
 #include <svanes/vector2d.hpp>
 
+#include "audio/audio_manager_internal.hpp"
 #include "input_manager_internal.hpp"
 #include "render/render_queue_executor.hpp"
 #include "render/texture_manager_internal.hpp"
@@ -42,6 +44,7 @@ void RunGameLoop(IGame& game, SDL_Window* window, SDL_Renderer* renderer, Regist
     // First time setup.
 
     TextureManager texture_manager = TextureManagerInternal::Create(renderer);
+    AudioManager audio_manager = AudioManagerInternal::Create();
     RenderQueueExecutor render_queue_executor{renderer, texture_manager};
     RenderQueue render_queue;
     InputManager input;
@@ -53,7 +56,7 @@ void RunGameLoop(IGame& game, SDL_Window* window, SDL_Renderer* renderer, Regist
     if (!SDL_GetCurrentRenderOutputSize(renderer, &output_width, &output_height)) {
         throw std::runtime_error("Could not get render output dimensions: " + std::string{SDL_GetError()});
     }
-    GameContext game_context{world, texture_manager, camera, output_width, output_height, scale_mode, gravity};
+    GameContext game_context{world, texture_manager, audio_manager, camera, output_width, output_height, scale_mode, gravity};
 
     // Custom initialization of the game. Implemented by the user of the engine.
 
@@ -91,7 +94,7 @@ void RunGameLoop(IGame& game, SDL_Window* window, SDL_Renderer* renderer, Regist
             throw std::runtime_error("Could not get render output dimensions: " + std::string{SDL_GetError()});
         }
 
-        const FrameContext frame_context{world, input, delta_seconds, output_width, output_height, camera, scale_mode, gravity};
+        const FrameContext frame_context{world, input, delta_seconds, output_width, output_height, audio_manager, camera, scale_mode, gravity};
 
         // Here we should advance the kinematics of all entities before updating the game state.
 		// This allows us to first update the positions of all entities based on their velocities 

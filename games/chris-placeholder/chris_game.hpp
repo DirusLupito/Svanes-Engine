@@ -1,5 +1,6 @@
 #pragma once
 
+#include <svanes/audio/audio_manager.hpp>
 #include <svanes/entity.hpp>
 #include <svanes/game.hpp>
 #include <svanes/render/basic_render_types.hpp>
@@ -38,5 +39,6 @@ private:
     svanes::Entity platform_entity = 0;
     svanes::TextureHandle idle_texture{};
     svanes::TextureHandle running_texture{};
+    svanes::SoundHandle jump_sound{};
     bool is_running = false;
 };
