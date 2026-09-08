@@ -19,6 +19,13 @@
 constexpr std::int32_t kSquarePixels = 300;
 constexpr float kPlanetRadius = 4200.0F;
 
+/**
+ * Helper for the planet's gravitational field. 
+ * Returns the acceleration vector at a given offset from the planet's center.
+ * 
+ * @param offset_to_source The offset vector from the planet's center to the point of interest.
+ * @return The acceleration vector at the given offset, pointing towards the planet's center.
+ */
 static svanes::Vector2D AttractionField(svanes::Vector2D offset_to_source)
 {
     const float distance = std::hypot(offset_to_source.x, offset_to_source.y);
@@ -29,6 +36,14 @@ static svanes::Vector2D AttractionField(svanes::Vector2D offset_to_source)
     return offset_to_source / distance * strength;
 }
 
+/**
+ * Applies an acceleration to two entities based on their collision, if they have collided
+ * to slam them apart. The acceleration is applied in the direction of the collision normal.
+ * 
+ * @param world The registry containing the entities.
+ * @param a The first entity.
+ * @param b The second entity.
+ */
 static void ApplyCollisionAcceleration(svanes::Registry& world, svanes::Entity a, svanes::Entity b)
 {
     const auto collisions = svanes::DetectCollisions(
@@ -56,6 +71,12 @@ static void ApplyCollisionAcceleration(svanes::Registry& world, svanes::Entity a
     }
 }
 
+/**
+ * Applies collision acceleration to all pairs of entities in the provided list.
+ * 
+ * @param world The registry containing the entities.
+ * @param entities The list of entities to check for collisions and apply acceleration.
+ */
 static void ApplyCollisionAcceleration(svanes::Registry& world, const std::vector<svanes::Entity>& entities)
 {
     for (std::size_t i = 0; i < entities.size(); ++i) {
@@ -65,6 +86,12 @@ static void ApplyCollisionAcceleration(svanes::Registry& world, const std::vecto
     }
 }
 
+/**
+ * Creates a gradient image of size kSquarePixels x kSquarePixels, where the color transitions
+ * from a light color in the top-left corner to a dark color in the bottom-right corner
+ * 
+ * @return An ImageData object containing the generated gradient image.
+ */
 svanes::ImageData CreateGradientImage()
 {
     svanes::ImageData image{
@@ -100,6 +127,16 @@ svanes::ImageData CreateGradientImage()
     return image;
 }
 
+/**
+ * Creates a desert planet layer with a given radius, color, and z-order in the provided registry.
+ * 
+ * @param world The registry to create the planet layer in.
+ * @param radius The radius of the planet layer.
+ * @param color The color of the planet layer.
+ * @param z_order The z-order of the planet layer for rendering.
+ * 
+ * @return The entity representing the created planet layer.
+ */
 static svanes::Entity CreatePlanetLayer(svanes::Registry& world, float radius, svanes::Color color, std::int32_t z_order)
 {
     const svanes::Entity entity = world.CreateEntity();
