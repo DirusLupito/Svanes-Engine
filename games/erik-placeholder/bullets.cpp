@@ -65,12 +65,13 @@ void SpawnBullet(
     world.AddComponent<Bullet>(bullet, Bullet{.owner = owner});
 }
 
-void UpdateBullets(svanes::Registry& world, const svanes::Rectangle2D& bounds)
+std::vector<BulletHit> UpdateBullets(svanes::Registry& world, const svanes::Rectangle2D& bounds)
 {
     std::vector<svanes::Entity> destroyed;
+    std::vector<BulletHit> hits;
 
-    world.ForEach<Bullet, svanes::Transform, svanes::Collider2D>(
-        [&](svanes::Entity entity, Bullet& bullet, svanes::Transform& transform, svanes::Collider2D& collider) {
+    world.ForEach<Bullet, svanes::Transform, svanes::Collider2D, svanes::Kinematic2D>(
+        [&](svanes::Entity entity, Bullet& bullet, svanes::Transform& transform, svanes::Collider2D& collider, svanes::Kinematic2D& motion) {
             if (IsOutsideBounds(transform, bounds)) {
                 destroyed.push_back(entity);
                 return;
@@ -94,6 +95,11 @@ void UpdateBullets(svanes::Registry& world, const svanes::Rectangle2D& bounds)
 
                     if (!collisions.empty()) {
                         hit = true;
+                        hits.push_back(BulletHit{
+                            .target = other,
+                            .owner = bullet.owner,
+                            .direction = {motion.velocity_x, motion.velocity_y},
+                        });
                     }
                 }
             );
@@ -107,4 +113,6 @@ void UpdateBullets(svanes::Registry& world, const svanes::Rectangle2D& bounds)
     for (const svanes::Entity entity : destroyed) {
         world.DestroyEntity(entity);
     }
+
+    return hits;
 }

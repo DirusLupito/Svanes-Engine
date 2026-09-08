@@ -18,6 +18,7 @@ struct Solid {};
 
 struct GooseIntent {
     svanes::Vector2D move;
+    float dash = 0.0F;
     bool jump = false;
     bool fire = false;
     svanes::Vector2D aim_point;
@@ -26,6 +27,7 @@ struct GooseIntent {
 enum class GooseState : std::uint8_t {
     Idle,
     Walking,
+    Flying,
 };
 
 class Goose final {
@@ -35,6 +37,8 @@ public:
     void Update(const svanes::FrameContext& frame, const GooseIntent& intent);
 
     void SetState(svanes::Registry& world, GooseState next);
+
+    void ApplyKnockback(svanes::Registry& world, svanes::Vector2D direction, float speed);
 
     svanes::Entity GetEntity() const;
 
@@ -51,5 +55,15 @@ private:
     float speed = 300.0F;
     float jump_speed = 900.0F;
     float max_fall_speed = 1500.0F;
+    float fly_rise_speed = 450.0F;
+    float max_fly_seconds = 2.0F;
+    float fly_time_remaining = 0.0F;
+    float dash_speed = 1400.0F;
+    float dash_seconds = 0.15F;
+    float dash_cooldown_seconds = 1.0F;
+    float dash_timer = 0.0F;
+    float dash_cooldown = 0.0F;
     float fire_cooldown = 0.0F;
+    float knockback_timer = 0.0F;
+    float invincible_timer = 0.0F;
 };

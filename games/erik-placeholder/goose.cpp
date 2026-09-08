@@ -12,6 +12,7 @@
 #include <svanes/sprite_animation_system.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -28,6 +29,10 @@ constexpr float kBodyHeight = static_cast<float>(kFrameHeight) * kSpriteScale;
 constexpr float kBulletSpeed = 1200.0F;
 constexpr float kFireInterval = 0.15F;
 constexpr svanes::Color kBulletColor{255, 230, 120, 255};
+constexpr float kKnockbackLockSeconds = 0.25F;
+constexpr float kInvincibleSeconds = 0.8F;
+constexpr float kWalkSecondsPerFrame = 0.1F;
+constexpr float kFlySecondsPerFrame = 0.06F;
 
 }
 
@@ -58,6 +63,7 @@ void Goose::Spawn(svanes::GameContext& context, float x, float y)
     context.world.AddComponent<svanes::Gravity>(entity);
     context.world.AddComponent<svanes::Collider2D>(entity, svanes::Collider2D{body});
 
+    fly_time_remaining = max_fly_seconds;
     spawned = true;
 }
 
@@ -68,15 +74,43 @@ void Goose::Update(const svanes::FrameContext& frame, const GooseIntent& intent)
     }
 
     time_in_state += frame.delta_seconds;
+    knockback_timer = std::max(knockback_timer - frame.delta_seconds, 0.0F);
+    invincible_timer = std::max(invincible_timer - frame.delta_seconds, 0.0F);
+    dash_timer = std::max(dash_timer - frame.delta_seconds, 0.0F);
+    dash_cooldown = std::max(dash_cooldown - frame.delta_seconds, 0.0F);
 
     ResolveCollisions(frame.world);
 
-    svanes::Kinematic2D& motion = frame.world.GetComponent<svanes::Kinematic2D>(entity);
-    motion.velocity_x = intent.move.x * speed;
+    if (grounded) {
+        fly_time_remaining = max_fly_seconds;
+    }
 
-    if (intent.jump && grounded) {
-        motion.velocity_y = -jump_speed;
-        grounded = false;
+    svanes::Kinematic2D& motion = frame.world.GetComponent<svanes::Kinematic2D>(entity);
+
+    bool flying = false;
+
+    if (knockback_timer <= 0.0F) {
+        if (dash_timer <= 0.0F) {
+            motion.velocity_x = intent.move.x * speed;
+        }
+
+        if (intent.dash != 0.0F && dash_cooldown <= 0.0F) {
+            motion.velocity_x = intent.dash * dash_speed;
+            dash_timer = dash_seconds;
+            dash_cooldown = dash_cooldown_seconds;
+        }
+
+        if (intent.jump && grounded) {
+            motion.velocity_y = -jump_speed;
+            grounded = false;
+        }
+
+        flying = intent.jump && !grounded && fly_time_remaining > 0.0F;
+
+        if (flying) {
+            motion.velocity_y = std::min(motion.velocity_y, -fly_rise_speed);
+            fly_time_remaining = std::max(fly_time_remaining - frame.delta_seconds, 0.0F);
+        }
     }
 
     motion.velocity_y = std::min(motion.velocity_y, max_fall_speed);
@@ -94,7 +128,14 @@ void Goose::Update(const svanes::FrameContext& frame, const GooseIntent& intent)
         }
     }
 
-    SetState(frame.world, intent.move.x != 0.0F ? GooseState::Walking : GooseState::Idle);
+    GooseState next = GooseState::Idle;
+    if (flying) {
+        next = GooseState::Flying;
+    } else if (intent.move.x != 0.0F) {
+        next = GooseState::Walking;
+    }
+
+    SetState(frame.world, next);
 }
 
 void Goose::ResolveCollisions(svanes::Registry& world)
@@ -159,10 +200,50 @@ void Goose::SetState(svanes::Registry& world, GooseState next)
             .frame_width = kFrameWidth,
             .frame_height = kFrameHeight,
             .frame_count = kWalkFrameCount,
-            .seconds_per_frame = 0.1F,
+            .seconds_per_frame = kWalkSecondsPerFrame,
+        });
+        break;
+    case GooseState::Flying:
+        sprite.texture = walk_texture;
+        world.AddComponent<svanes::SpriteAnimation>(entity, svanes::SpriteAnimation{
+            .frame_width = kFrameWidth,
+            .frame_height = kFrameHeight,
+            .frame_count = kWalkFrameCount,
+            .seconds_per_frame = kFlySecondsPerFrame,
         });
         break;
     }
+}
+
+void Goose::ApplyKnockback(svanes::Registry& world, svanes::Vector2D direction, float speed)
+{
+    if (!spawned) {
+        throw std::logic_error("Goose::ApplyKnockback called before Goose::Spawn.");
+    }
+
+    if (invincible_timer > 0.0F) {
+        return;
+    }
+
+    const float length = std::hypot(direction.x, direction.y);
+    if (!std::isfinite(length) || length <= 0.0F) {
+        throw std::invalid_argument("Goose::ApplyKnockback requires a finite and nonzero direction.");
+    }
+
+    if (!std::isfinite(speed) || speed <= 0.0F) {
+        throw std::invalid_argument("Goose::ApplyKnockback requires a finite and positive speed.");
+    }
+
+    const svanes::Vector2D velocity = direction / length * speed;
+
+    svanes::Kinematic2D& motion = world.GetComponent<svanes::Kinematic2D>(entity);
+    motion.velocity_x = velocity.x;
+    motion.velocity_y = velocity.y;
+
+    knockback_timer = kKnockbackLockSeconds;
+    invincible_timer = kInvincibleSeconds;
+    dash_timer = 0.0F;
+    grounded = false;
 }
 
 svanes::Entity Goose::GetEntity() const
