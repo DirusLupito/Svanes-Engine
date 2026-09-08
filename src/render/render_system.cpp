@@ -12,94 +12,6 @@
 
 namespace svanes {
 
-// Reference width for scaling and centering the game world on different output sizes.
-constexpr std::int32_t kDesignWidth = 1920;
-
-// Reference height for scaling and centering the game world on different output sizes.
-constexpr std::int32_t kDesignHeight = 1080;
-
-/**
- * Computes the factor by which entity sizes and positions should be scaled
- * to fit the current output size, based on the given scale mode.
- *
- * @param mode The current scale mode.
- * @param output_width The width of the rendering output.
- * @param output_height The height of the rendering output.
- *
- * @return 1.0 under ScaleMode::Constant. Under ScaleMode::Proportional, the
- * ratio of output size to the design resolution on whichever axis is more
- * constrained, so scaling stays uniform on both axes.
- */
-static float ComputeScale(ScaleMode mode, std::int32_t output_width, std::int32_t output_height)
-{
-    if (mode == ScaleMode::Constant) {
-        return 1.0F;
-    }
-
-    const float width_ratio = static_cast<float>(output_width) / static_cast<float>(kDesignWidth);
-    const float height_ratio = static_cast<float>(output_height) / static_cast<float>(kDesignHeight);
-    return std::min(width_ratio, height_ratio);
-}
-
-/**
- * Computes the offset needed to center the scaled design resolution within
- * the current output size, so that under ScaleMode::Proportional the
- * leftover space on whichever axis isn't the constraining one is split
- * evenly on both sides, rather than left entirely on one side.
- *
- * @param mode The current scale mode.
- * @param scale The scale factor computed by ComputeScale.
- * @param output_width The width of the rendering output.
- * @param output_height The height of the rendering output.
- *
- * @return A zero offset under ScaleMode::Constant, or the centering offset under ScaleMode::Proportional.
- */
-static Vector2D ComputeOffset(ScaleMode mode, float scale, std::int32_t output_width, std::int32_t output_height)
-{
-    if (mode == ScaleMode::Constant) {
-        return {0.0F, 0.0F};
-    }
-
-    const float offset_x = (static_cast<float>(output_width) - static_cast<float>(kDesignWidth) * scale) * 0.5F;
-    const float offset_y = (static_cast<float>(output_height) - static_cast<float>(kDesignHeight) * scale) * 0.5F;
-    return {offset_x, offset_y};
-}
-
-RenderLayout ComputeRenderLayout(ScaleMode mode, std::int32_t output_width, std::int32_t output_height)
-{
-    if (output_width <= 0 || output_height <= 0) {
-        return {1.0F, {}, {}};
-    }
-
-    const float scale = ComputeScale(mode, output_width, output_height);
-    const Vector2D offset = ComputeOffset(mode, scale, output_width, output_height);
-
-    return {scale, offset, {
-        output_width * 0.5F, output_height * 0.5F,
-        output_width - 2.0F * offset.x, output_height - 2.0F * offset.y,
-    }};
-}
-
-Vector2D ScreenToWorldPoint(
-    const Camera2D& camera, Vector2D screen_point,
-    std::int32_t output_width, std::int32_t output_height, ScaleMode mode
-)
-{
-    const RenderLayout layout = ComputeRenderLayout(mode, output_width, output_height);
-    if (!std::isfinite(layout.scale) || layout.scale <= 0.0F) {
-        throw std::invalid_argument("ScreenToWorldPoint requires a finite and positive scale factor.");
-    }
-
-    const Rectangle2D world = camera.ScreenToWorld({
-        (screen_point.x - layout.offset.x) / layout.scale,
-        (screen_point.y - layout.offset.y) / layout.scale,
-        0.0F,
-        0.0F,
-    });
-
-    return {world.x, world.y};
-}
-
 /**
  * Reads the z order an entity is drawn at. The ZOrder component is optional,
  * so an entity without one is drawn at z order 0.
@@ -129,20 +41,13 @@ static std::int32_t ZOrderOf(const Registry& world, Entity entity)
  * @param z_order The z order to draw the rectangle at.
  * @param render_queue The render queue to which the rendering commands will be submitted.
  * @param camera The camera used to convert world coordinates to screen coordinates.
- * @param output_width The width of the rendering output.
- * @param output_height The height of the rendering output.
- * @param scale The scale factor depending on screen size.
- * @param offset The correction distance to center the world display when the player's screen is not 16:9.
  */
 static void SubmitShape(
     const Rectangle2D& shape, const Transform& transform, Color color, std::int32_t z_order,
-    RenderQueue& render_queue, const Camera2D& camera,
-    std::int32_t output_width, std::int32_t output_height, float scale, Vector2D offset
+    RenderQueue& render_queue, const Camera2D& camera
 )
 {
-    const auto destination = camera.PrepareForRendering(
-        transform, shape, output_width, output_height, scale, offset
-    );
+    const auto destination = camera.PrepareForRendering(transform, shape);
 
     if (!destination) {
         return;
@@ -162,20 +67,13 @@ static void SubmitShape(
  * @param z_order The z order to draw the triangle at.
  * @param render_queue The render queue to which the rendering commands will be submitted.
  * @param camera The camera used to convert world coordinates to screen coordinates.
- * @param output_width The width of the rendering output.
- * @param output_height The height of the rendering output.
- * @param scale The scale factor depending on screen size.
- * @param offset The correction distance to center the world display when the player's screen is not 16:9.
  */
 static void SubmitShape(
     const Triangle2D& shape, const Transform& transform, Color color, std::int32_t z_order,
-    RenderQueue& render_queue, const Camera2D& camera,
-    std::int32_t output_width, std::int32_t output_height, float scale, Vector2D offset
+    RenderQueue& render_queue, const Camera2D& camera
 )
 {
-    const auto destination = camera.PrepareForRendering(
-        transform, shape, output_width, output_height, scale, offset
-    );
+    const auto destination = camera.PrepareForRendering(transform, shape);
 
     if (!destination) {
         return;
@@ -195,20 +93,13 @@ static void SubmitShape(
  * @param z_order The z order to draw the circle at.
  * @param render_queue The render queue to which the rendering commands will be submitted.
  * @param camera The camera used to convert world coordinates to screen coordinates.
- * @param output_width The width of the rendering output.
- * @param output_height The height of the rendering output.
- * @param scale The scale factor depending on screen size.
- * @param offset The correction distance to center the world display when the player's screen is not 16:9.
  */
 static void SubmitShape(
     const Circle2D& shape, const Transform& transform, Color color, std::int32_t z_order,
-    RenderQueue& render_queue, const Camera2D& camera,
-    std::int32_t output_width, std::int32_t output_height, float scale, Vector2D offset
+    RenderQueue& render_queue, const Camera2D& camera
 )
 {
-    const auto destination = camera.PrepareForRendering(
-        transform, shape, output_width, output_height, scale, offset
-    );
+    const auto destination = camera.PrepareForRendering(transform, shape);
 
     if (!destination) {
         return;
@@ -228,20 +119,13 @@ static void SubmitShape(
  * @param z_order The z order to draw the polygon at.
  * @param render_queue The render queue to which the rendering commands will be submitted.
  * @param camera The camera used to convert world coordinates to screen coordinates.
- * @param output_width The width of the rendering output.
- * @param output_height The height of the rendering output.
- * @param scale The scale factor depending on screen size.
- * @param offset The correction distance to center the world display when the player's screen is not 16:9.
  */
 static void SubmitShape(
     const ConvexPolygon2D& shape, const Transform& transform, Color color, std::int32_t z_order,
-    RenderQueue& render_queue, const Camera2D& camera,
-    std::int32_t output_width, std::int32_t output_height, float scale, Vector2D offset
+    RenderQueue& render_queue, const Camera2D& camera
 )
 {
-    const auto destination = camera.PrepareForRendering(
-        transform, shape, output_width, output_height, scale, offset
-    );
+    const auto destination = camera.PrepareForRendering(transform, shape);
     if (!destination) {
         return;
     }
@@ -258,37 +142,23 @@ static void SubmitShape(
  * @param z_order The z order to draw the composite shape at.
  * @param render_queue The render queue to which the rendering commands will be submitted.
  * @param camera The camera used to convert world coordinates to screen coordinates.
- * @param output_width The width of the rendering output.
- * @param output_height The height of the rendering output.
- * @param scale The scale factor depending on screen size.
- * @param offset The correction distance to center the world display when the player's screen is not 16:9.
  */
 static void SubmitShape(
     const CompositeShape2D& shape, const Transform& transform, Color color, std::int32_t z_order,
-    RenderQueue& render_queue, const Camera2D& camera,
-    std::int32_t output_width, std::int32_t output_height, float scale, Vector2D offset
+    RenderQueue& render_queue, const Camera2D& camera
 )
 {
     for (const GeometryPart2D& part : shape.parts) {
         const Transform pose = ComposeTransforms(transform, part.transform);
 
         std::visit([&](const auto& primitive) {
-            SubmitShape(
-                primitive, pose, color, z_order, render_queue, camera,
-                output_width, output_height, scale, offset
-            );
+            SubmitShape(primitive, pose, color, z_order, render_queue, camera);
         }, part.shape);
     }
 }
 
-void SubmitShapes(
-    const Registry& world, RenderQueue& render_queue, const Camera2D& camera,
-    std::int32_t output_width, std::int32_t output_height, ScaleMode mode
-)
+void SubmitShapes(const Registry& world, RenderQueue& render_queue, const Camera2D& camera)
 {
-    const RenderLayout layout = ComputeRenderLayout(mode, output_width, output_height);
-    const float scale = layout.scale;
-    const Vector2D offset = layout.offset;
     world.ForEach<Transform, SolidShape>(
         [&](Entity entity, const Transform& transform, const SolidShape& visual) {
             const std::int32_t z_order = ZOrderOf(world, entity);
@@ -297,26 +167,17 @@ void SubmitShapes(
             // The visitor function must handle all possible types contained within the variant.
             // If a type is unhandled, the code will fail to compile.
             std::visit([&](const auto& shape) {
-                SubmitShape(
-                    shape, transform, visual.color, z_order, render_queue, camera,
-                    output_width, output_height, scale, offset
-                );
+                SubmitShape(shape, transform, visual.color, z_order, render_queue, camera);
             }, visual.geometry);
         }
     );
 }
 
-void SubmitSprites(
-    const Registry& world, RenderQueue& render_queue, const Camera2D& camera,
-    std::int32_t output_width, std::int32_t output_height, ScaleMode mode
-)
+void SubmitSprites(const Registry& world, RenderQueue& render_queue, const Camera2D& camera)
 {
-    const RenderLayout layout = ComputeRenderLayout(mode, output_width, output_height);
-    const float scale = layout.scale;
-    const Vector2D offset = layout.offset;
     world.ForEach<Transform, Sprite>(
         [&](Entity entity, const Transform& transform, const Sprite& sprite) {
-            const auto destination = camera.PrepareForRendering(transform, sprite.geometry, output_width, output_height, scale, offset);
+            const auto destination = camera.PrepareForRendering(transform, sprite.geometry);
             if (!destination) {
                 return;
             }

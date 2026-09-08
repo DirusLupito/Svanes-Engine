@@ -126,6 +126,7 @@ add_executable(
     games/erik-placeholder/main.cpp
     games/erik-placeholder/erik_game.cpp
     games/erik-placeholder/goose.cpp
+    games/erik-placeholder/enemy.cpp
     games/erik-placeholder/bullets.cpp
 )
 target_link_libraries(svanes_game_erik PRIVATE Svanes::Engine)

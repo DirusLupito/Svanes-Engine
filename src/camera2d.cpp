@@ -10,6 +10,12 @@
 
 namespace svanes {
 
+// Reference width for scaling and centering the game world on different output sizes.
+constexpr std::int32_t kDesignWidth = 1920;
+
+// Reference height for scaling and centering the game world on different output sizes.
+constexpr std::int32_t kDesignHeight = 1080;
+
 /**
  * Validates that a factor (zoom or scale) is finite and greater than zero.
  * If it is not, an std::invalid_argument exception is thrown.
@@ -60,14 +66,67 @@ static bool IsOutsideOutput(const Circle2D& circle, std::int32_t output_width, s
     return std::hypot(circle.x - closest_x, circle.y - closest_y) >= circle.radius;
 }
 
-void Camera2D::SetZoomAt(float new_zoom, Vector2D screen_position, float scale, Vector2D offset)
+void Camera2D::SetOutputSize(std::int32_t width, std::int32_t height)
+{
+    output_width = width;
+    output_height = height;
+}
+
+std::int32_t Camera2D::OutputWidth() const
+{
+    return output_width;
+}
+
+std::int32_t Camera2D::OutputHeight() const
+{
+    return output_height;
+}
+
+float Camera2D::Scale() const
+{
+    if (scale_mode == ScaleMode::Constant || output_width <= 0 || output_height <= 0) {
+        return 1.0F;
+    }
+
+    const float width_ratio = static_cast<float>(output_width) / static_cast<float>(kDesignWidth);
+    const float height_ratio = static_cast<float>(output_height) / static_cast<float>(kDesignHeight);
+    return std::min(width_ratio, height_ratio);
+}
+
+Vector2D Camera2D::Offset() const
+{
+    if (scale_mode == ScaleMode::Constant || output_width <= 0 || output_height <= 0) {
+        return {0.0F, 0.0F};
+    }
+
+    const float scale = Scale();
+    return {
+        (static_cast<float>(output_width) - static_cast<float>(kDesignWidth) * scale) * 0.5F,
+        (static_cast<float>(output_height) - static_cast<float>(kDesignHeight) * scale) * 0.5F,
+    };
+}
+
+Rectangle2D Camera2D::Viewport() const
+{
+    const Vector2D offset = Offset();
+    return {
+        static_cast<float>(output_width) * 0.5F,
+        static_cast<float>(output_height) * 0.5F,
+        static_cast<float>(output_width) - 2.0F * offset.x,
+        static_cast<float>(output_height) - 2.0F * offset.y,
+    };
+}
+
+void Camera2D::SetZoomAt(float new_zoom, Vector2D screen_position)
 {
     ValidateFactor(new_zoom);
-    ValidateFactor(scale);
 
     if (new_zoom == zoom) {
         return;
     }
+
+    const float scale = Scale();
+    const Vector2D offset = Offset();
 
     // We want to keep the world coordinates of the point at (screen_x, screen_y) 
     // the same before and after the zoom change.
@@ -109,18 +168,17 @@ void Camera2D::SetZoomAt(float new_zoom, Vector2D screen_position, float scale, 
     // new_x = anchor.x - ((screen_x - offset.x) / scale / new_zoom)
     // new_y = anchor.y - ((screen_y - offset.y) / scale / new_zoom)
 
-    const Rectangle2D anchor = ScreenToWorld(
-        {screen_position.x, screen_position.y, 0.0F, 0.0F}, scale, offset
-    );
+    const Rectangle2D anchor = ScreenToWorld({screen_position.x, screen_position.y, 0.0F, 0.0F});
     zoom = new_zoom;
     x = anchor.x - (screen_position.x - offset.x) / scale / zoom;
     y = anchor.y - (screen_position.y - offset.y) / scale / zoom;
 }
 
-Rectangle2D Camera2D::WorldToScreen(Rectangle2D world, float scale, Vector2D offset) const
+Rectangle2D Camera2D::WorldToScreen(Rectangle2D world) const
 {
     ValidateFactor(zoom);
-    ValidateFactor(scale);
+    const float scale = Scale();
+    const Vector2D offset = Offset();
     world.x = (world.x - x) * zoom * scale + offset.x;
     world.y = (world.y - y) * zoom * scale + offset.y;
     world.width *= zoom * scale;
@@ -128,10 +186,11 @@ Rectangle2D Camera2D::WorldToScreen(Rectangle2D world, float scale, Vector2D off
     return world;
 }
 
-Rectangle2D Camera2D::ScreenToWorld(Rectangle2D screen, float scale, Vector2D offset) const
+Rectangle2D Camera2D::ScreenToWorld(Rectangle2D screen) const
 {
     ValidateFactor(zoom);
-    ValidateFactor(scale);
+    const float scale = Scale();
+    const Vector2D offset = Offset();
     screen.x = (screen.x - offset.x) / scale / zoom + x;
     screen.y = (screen.y - offset.y) / scale / zoom + y;
     screen.width /= scale * zoom;
@@ -140,16 +199,17 @@ Rectangle2D Camera2D::ScreenToWorld(Rectangle2D screen, float scale, Vector2D of
 }
 
 std::optional<Circle2D> Camera2D::PrepareForRendering(
-    const Transform& transform, const Circle2D& circle,
-    std::int32_t output_width, std::int32_t output_height, float scale, Vector2D offset
+    const Transform& transform, const Circle2D& circle
 ) const
 {
-    ValidateFactor(scale);
     ValidateFactor(zoom);
 
     if (output_width <= 0 || output_height <= 0) {
         return std::nullopt;
     }
+
+    const float scale = Scale();
+    const Vector2D offset = Offset();
 
     Circle2D destination = TransformCircle(circle, transform);
     destination.x = (destination.x - x) * zoom * scale + offset.x;
@@ -164,16 +224,17 @@ std::optional<Circle2D> Camera2D::PrepareForRendering(
 }
 
 std::optional<Triangle2D> Camera2D::PrepareForRendering(
-    const Transform& transform, const Triangle2D& triangle,
-    std::int32_t output_width, std::int32_t output_height, float scale, Vector2D offset
+    const Transform& transform, const Triangle2D& triangle
 ) const
 {
-    ValidateFactor(scale);
     ValidateFactor(zoom);
 
     if (output_width <= 0 || output_height <= 0) {
         return std::nullopt;
     }
+
+    const float scale = Scale();
+    const Vector2D offset = Offset();
 
     Triangle2D destination = TransformTriangle(triangle, transform);
     for (Vector2D& vertex : destination.vertices) {
@@ -189,11 +250,9 @@ std::optional<Triangle2D> Camera2D::PrepareForRendering(
 }
 
 std::optional<Rectangle2D> Camera2D::PrepareForRendering(
-    const Transform& transform, const Rectangle2D& rectangle,
-    std::int32_t output_width, std::int32_t output_height, float scale, Vector2D offset
+    const Transform& transform, const Rectangle2D& rectangle
 ) const
 {
-    ValidateFactor(scale);
     ValidateFactor(zoom);
 
     // If the rectangle is infinitely small, or the output is infinitely small, we can skip rendering it.
@@ -201,7 +260,7 @@ std::optional<Rectangle2D> Camera2D::PrepareForRendering(
         return std::nullopt;
     }
 
-    Rectangle2D destination = WorldToScreen(TransformRectangle(rectangle, transform), scale, offset);
+    Rectangle2D destination = WorldToScreen(TransformRectangle(rectangle, transform));
 
 
     // Next, we need to check if the rectangle is within the bounds of the rendering output.
@@ -218,16 +277,17 @@ std::optional<Rectangle2D> Camera2D::PrepareForRendering(
 }
 
 std::optional<ConvexPolygon2D> Camera2D::PrepareForRendering(
-    const Transform& transform, const ConvexPolygon2D& polygon,
-    std::int32_t output_width, std::int32_t output_height, float scale, Vector2D offset
+    const Transform& transform, const ConvexPolygon2D& polygon
 ) const
 {
-    ValidateFactor(scale);
     ValidateFactor(zoom);
 
     if (output_width <= 0 || output_height <= 0) {
         return std::nullopt;
     }
+
+    const float scale = Scale();
+    const Vector2D offset = Offset();
 
     const Transform screen_transform{
         (transform.x - x) * zoom * scale + offset.x,

@@ -30,9 +30,10 @@ constexpr float kCameraAnchorY = 0.68F;
 constexpr float kDoubleTapWindow = 0.25F;
 
 constexpr svanes::Rectangle2D kBulletBounds{3000.0F, -60.0F, 6600.0F, 2800.0F};
-constexpr svanes::Color kEnemyBulletColor{255, 90, 90, 255};
-constexpr float kEnemyBulletSpeed = 600.0F;
-constexpr float kEnemyFireInterval = 0.8F;
+constexpr float kEnemySize = 120.0F;
+constexpr float kEnemyHealth = 10.0F;
+constexpr float kBulletDamage = 1.0F;
+constexpr float kEnemyAimDistance = 1000.0F;
 constexpr float kEnemyPathCenterX = 1600.0F;
 constexpr float kEnemyPathY = 300.0F;
 constexpr float kEnemyPathRadius = 700.0F;
@@ -131,21 +132,7 @@ void ErikGame::Initialize(svanes::GameContext& context)
         .seconds_per_frame = 0.12F,
     });
 
-    const svanes::Rectangle2D enemy_body{
-        .width = 120.0F,
-        .height = 120.0F,
-    };
-
-    enemy = context.world.CreateEntity();
-    context.world.AddComponent<svanes::Transform>(enemy, svanes::Transform{
-        .x = kEnemyPathCenterX,
-        .y = kEnemyPathY,
-    });
-    context.world.AddComponent<svanes::SolidShape>(enemy, svanes::SolidShape{
-        .color = svanes::Color{.red = 200, .green = 60, .blue = 60},
-        .geometry = enemy_body,
-    });
-    context.world.AddComponent<svanes::Collider2D>(enemy, svanes::Collider2D{enemy_body});
+    enemy.Spawn(context.world, {kEnemyPathCenterX, kEnemyPathY}, kEnemySize, kEnemyHealth);
 
     goose.Spawn(context, 400.0F, 700.0F);
 }
@@ -157,7 +144,7 @@ void ErikGame::Update(const svanes::FrameContext& frame)
     }
 
     if (frame.input.WasPressed(svanes::Key::Tab)) {
-        frame.scale_mode = frame.scale_mode == svanes::ScaleMode::Constant
+        frame.camera.scale_mode = frame.camera.scale_mode == svanes::ScaleMode::Constant
             ? svanes::ScaleMode::Proportional
             : svanes::ScaleMode::Constant;
     }
@@ -192,22 +179,19 @@ void ErikGame::Update(const svanes::FrameContext& frame)
 
     intent.jump = frame.input.IsDown(svanes::Key::Space);
     intent.fire = frame.input.IsMouseButtonDown(svanes::MouseButton::Left);
-    intent.aim_point = svanes::ScreenToWorldPoint(
-        frame.camera, frame.input.MousePosition(),
-        frame.output_width, frame.output_height, frame.scale_mode
-    );
+    const svanes::Vector2D mouse = frame.input.MousePosition();
+    const svanes::Rectangle2D aim = frame.camera.ScreenToWorld({mouse.x, mouse.y, 0.0F, 0.0F});
+    intent.aim_point = {aim.x, aim.y};
 
     goose.Update(frame, intent);
 
     const svanes::Transform& goose_transform = frame.world.GetComponent<svanes::Transform>(goose.GetEntity());
-    const svanes::Vector2D anchor_world = svanes::ScreenToWorldPoint(
-        frame.camera,
-        svanes::Vector2D{frame.output_width * kCameraAnchorX, frame.output_height * kCameraAnchorY},
-        frame.output_width, frame.output_height, frame.scale_mode
+    const svanes::Rectangle2D anchor = frame.camera.ScreenToWorld(
+        {frame.output_width * kCameraAnchorX, frame.output_height * kCameraAnchorY, 0.0F, 0.0F}
     );
 
-    frame.camera.x += goose_transform.x - anchor_world.x;
-    frame.camera.y += goose_transform.y - anchor_world.y;
+    frame.camera.x += goose_transform.x - anchor.x;
+    frame.camera.y += goose_transform.y - anchor.y;
 
     const svanes::Rectangle2D view = frame.camera.ScreenToWorld({
         frame.output_width * 0.5F, frame.output_height * 0.5F,
@@ -226,32 +210,39 @@ void ErikGame::Update(const svanes::FrameContext& frame)
 
     elapsed_seconds += frame.delta_seconds;
 
-    svanes::Transform& enemy_transform = frame.world.GetComponent<svanes::Transform>(enemy);
-    enemy_transform.x = kEnemyPathCenterX + std::sin(elapsed_seconds * kEnemyPathSpeed) * kEnemyPathRadius;
+    if (enemy.IsAlive()) {
+        const svanes::Vector2D enemy_position = enemy.Position(frame.world);
 
-    const svanes::Vector2D enemy_position{enemy_transform.x, enemy_transform.y};
+        EnemyIntent enemy_intent{};
+        enemy_intent.move_to = {
+            kEnemyPathCenterX + std::sin(elapsed_seconds * kEnemyPathSpeed) * kEnemyPathRadius,
+            kEnemyPathY,
+        };
+        enemy_intent.fire = true;
+        enemy_intent.aim_point = {enemy_position.x, enemy_position.y + kEnemyAimDistance};
 
-    enemy_fire_cooldown = std::max(enemy_fire_cooldown - frame.delta_seconds, 0.0F);
-    if (enemy_fire_cooldown <= 0.0F) {
-        SpawnBullet(frame.world, enemy, enemy_position, {0.0F, 1.0F}, kEnemyBulletSpeed, kEnemyBulletColor);
-        enemy_fire_cooldown = kEnemyFireInterval;
+        enemy.Update(frame, enemy_intent);
     }
 
     for (const BulletHit& hit : UpdateBullets(frame.world, kBulletBounds)) {
         if (hit.target == goose.GetEntity()) {
             goose.ApplyKnockback(frame.world, hit.direction, kBulletKnockback);
+        } else if (enemy.IsAlive() && hit.target == enemy.GetEntity()) {
+            enemy.ApplyDamage(frame.world, kBulletDamage);
         }
     }
 
-    const std::vector<svanes::Collision2D> contact = svanes::DetectCollisions(
-        frame.world.GetComponent<svanes::Collider2D>(goose.GetEntity()).geometry,
-        frame.world.GetComponent<svanes::Transform>(goose.GetEntity()),
-        frame.world.GetComponent<svanes::Collider2D>(enemy).geometry,
-        frame.world.GetComponent<svanes::Transform>(enemy)
-    );
+    if (enemy.IsAlive()) {
+        const std::vector<svanes::Collision2D> contact = svanes::DetectCollisions(
+            frame.world.GetComponent<svanes::Collider2D>(goose.GetEntity()).geometry,
+            frame.world.GetComponent<svanes::Transform>(goose.GetEntity()),
+            frame.world.GetComponent<svanes::Collider2D>(enemy.GetEntity()).geometry,
+            frame.world.GetComponent<svanes::Transform>(enemy.GetEntity())
+        );
 
-    if (!contact.empty()) {
-        goose.ApplyKnockback(frame.world, contact[0].normal, kContactKnockback);
+        if (!contact.empty()) {
+            goose.ApplyKnockback(frame.world, contact[0].normal, kContactKnockback);
+        }
     }
 }
 

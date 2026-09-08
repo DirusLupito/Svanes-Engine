@@ -1,5 +1,7 @@
 #pragma once
 
+#include "game_components.hpp"
+
 #include <svanes/entity.hpp>
 #include <svanes/render/basic_render_types.hpp>
 #include <svanes/vector2d.hpp>
@@ -13,8 +15,6 @@ struct FrameContext;
 class Registry;
 
 }
-
-struct Solid {};
 
 struct GooseIntent {
     svanes::Vector2D move;
@@ -55,7 +55,8 @@ private:
     float speed = 300.0F;
     float jump_speed = 900.0F;
     float max_fall_speed = 1500.0F;
-    float fly_rise_speed = 450.0F;
+    float fly_rise_speed = 800.0F;
+    float fly_rise_acceleration = 4600.0F;
     float max_fly_seconds = 2.0F;
     float fly_time_remaining = 0.0F;
     float dash_speed = 1400.0F;

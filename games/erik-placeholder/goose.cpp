@@ -86,6 +86,7 @@ void Goose::Update(const svanes::FrameContext& frame, const GooseIntent& intent)
     }
 
     svanes::Kinematic2D& motion = frame.world.GetComponent<svanes::Kinematic2D>(entity);
+    motion.acceleration_y = 0.0F;
 
     bool flying = false;
 
@@ -108,7 +109,10 @@ void Goose::Update(const svanes::FrameContext& frame, const GooseIntent& intent)
         flying = intent.jump && !grounded && fly_time_remaining > 0.0F;
 
         if (flying) {
-            motion.velocity_y = std::min(motion.velocity_y, -fly_rise_speed);
+            if (motion.velocity_y > -fly_rise_speed) {
+                motion.acceleration_y = -fly_rise_acceleration;
+            }
+
             fly_time_remaining = std::max(fly_time_remaining - frame.delta_seconds, 0.0F);
         }
     }

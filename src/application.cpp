@@ -46,14 +46,14 @@ void RunGameLoop(IGame& game, SDL_Window* window, SDL_Renderer* renderer, Regist
     RenderQueue render_queue;
     InputManager input;
     Camera2D camera;
-    ScaleMode scale_mode = ScaleMode::Constant;
     Vector2D gravity{};
     std::int32_t output_width = 0;
     std::int32_t output_height = 0;
     if (!SDL_GetCurrentRenderOutputSize(renderer, &output_width, &output_height)) {
         throw std::runtime_error("Could not get render output dimensions: " + std::string{SDL_GetError()});
     }
-    GameContext game_context{world, texture_manager, camera, output_width, output_height, scale_mode, gravity};
+    camera.SetOutputSize(output_width, output_height);
+    GameContext game_context{world, texture_manager, camera, output_width, output_height, gravity};
 
     // Custom initialization of the game. Implemented by the user of the engine.
 
@@ -90,8 +90,9 @@ void RunGameLoop(IGame& game, SDL_Window* window, SDL_Renderer* renderer, Regist
         if (!SDL_GetCurrentRenderOutputSize(renderer, &output_width, &output_height)) {
             throw std::runtime_error("Could not get render output dimensions: " + std::string{SDL_GetError()});
         }
+        camera.SetOutputSize(output_width, output_height);
 
-        const FrameContext frame_context{world, input, delta_seconds, output_width, output_height, camera, scale_mode, gravity};
+        const FrameContext frame_context{world, input, delta_seconds, output_width, output_height, camera, gravity};
 
         // Here we should advance the kinematics of all entities before updating the game state.
 		// This allows us to first update the positions of all entities based on their velocities 
@@ -127,16 +128,12 @@ void RunGameLoop(IGame& game, SDL_Window* window, SDL_Renderer* renderer, Regist
         // This will add entities to the rendering queue, but will not actually render them.
         // Actual rendering takes place in the executor.
 
-        SubmitShapes(world, render_queue, camera, output_width, output_height, scale_mode);
-        SubmitSprites(world, render_queue, camera, output_width, output_height, scale_mode);
-
-        // Based on the renderer layout, we may want to clip the rendering output to a specific viewport
-        // (e.g., when using proportional scaling).
-        const RenderLayout layout = ComputeRenderLayout(scale_mode, output_width, output_height);
+        SubmitShapes(world, render_queue, camera);
+        SubmitSprites(world, render_queue, camera);
 
         render_queue_executor.Execute(render_queue,
             // Our clip rectangle is only relevant when we are in proportional scaling mode.
-            scale_mode == ScaleMode::Proportional ? std::optional{layout.viewport} : std::nullopt);
+            camera.scale_mode == ScaleMode::Proportional ? std::optional{camera.Viewport()} : std::nullopt);
 
         SDL_RenderPresent(renderer);
 

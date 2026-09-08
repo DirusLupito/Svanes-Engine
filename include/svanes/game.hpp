@@ -10,7 +10,6 @@ class Camera2D;
 class InputManager;
 class Registry;
 class TextureManager;
-enum class ScaleMode : std::uint8_t;
 
 /**
  * Defines relevant context for a game. 
@@ -23,7 +22,6 @@ enum class ScaleMode : std::uint8_t;
  * - camera: The engine owned camera used to convert between screen and world coordinates.
  * - output_width: The current width of the rendering output.
  * - output_height: The current height of the rendering output.
- * - scale_mode: The engine owned scale mode controlling how entity sizes and positions are scaled relative to the current window size.
  * - gravity: The engine owned gravity vector applied to entities with Kinematic2D and Gravity components.
  */
 struct GameContext {
@@ -32,7 +30,6 @@ struct GameContext {
     Camera2D& camera;
     std::int32_t output_width;
     std::int32_t output_height;
-    ScaleMode& scale_mode;
     Vector2D& gravity;
 };
 
@@ -51,7 +48,6 @@ struct GameContext {
  * - output_width: The current width of the rendering output.
  * - output_height: The current height of the rendering output.
  * - camera: The engine owned camera used to convert between screen and world coordinates.
- * - scale_mode: The engine owned scale mode controlling how entity sizes and positions are scaled relative to the current window size.
  * - gravity: The engine owned gravity vector applied to entities with Kinematic2D and Gravity components.
  */
 struct FrameContext {
@@ -61,7 +57,6 @@ struct FrameContext {
     std::int32_t output_width;
     std::int32_t output_height;
     Camera2D& camera;
-    ScaleMode& scale_mode;
     Vector2D& gravity;
 };
 
