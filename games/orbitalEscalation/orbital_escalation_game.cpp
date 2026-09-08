@@ -25,7 +25,7 @@ static svanes::Vector2D AttractionField(svanes::Vector2D offset_to_source)
     if (distance == 0.0F) {
         return {};
     }
-    const float strength = 1800.0F / (1.0F + distance / kPlanetRadius);
+    const float strength = 18000.0F / (1.0F + distance / kPlanetRadius);
     return offset_to_source / distance * strength;
 }
 
@@ -40,7 +40,7 @@ static void ApplyCollisionAcceleration(svanes::Registry& world, svanes::Entity a
     for (const svanes::Collision2D& collision : collisions) {
         const bool a_is_planet = world.HasComponent<svanes::PointAttractor2D>(a);
         const bool b_is_planet = world.HasComponent<svanes::PointAttractor2D>(b);
-        const svanes::Vector2D acceleration = collision.normal * 10000.0F;
+        const svanes::Vector2D acceleration = collision.normal * 400000.0F;
         if (world.HasComponent<svanes::Kinematic2D>(a)) {
             auto& motion = world.GetComponent<svanes::Kinematic2D>(a);
             motion.acceleration_x += acceleration.x;
@@ -252,6 +252,22 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext& context)
         planet_entity, svanes::PointAttractor2D{.accelerationField = AttractionField, .cutoff_radius = std::nullopt}
     );
 
+    for (const svanes::Rectangle2D wall : {
+        svanes::Rectangle2D{-200000.0F, 0.0F, 100000.0F, 500000.0F},
+        svanes::Rectangle2D{200000.0F, 0.0F, 100000.0F, 500000.0F},
+        svanes::Rectangle2D{0.0F, -200000.0F, 500000.0F, 100000.0F},
+        svanes::Rectangle2D{0.0F, 200000.0F, 500000.0F, 100000.0F}
+    }) {
+        const svanes::Entity entity = context.world.CreateEntity();
+        const svanes::Rectangle2D geometry{0.0F, 0.0F, wall.width, wall.height};
+        context.world.AddComponent<svanes::Transform>(entity, svanes::Transform{wall.x, wall.y});
+        context.world.AddComponent<svanes::Collider2D>(entity, svanes::Collider2D{geometry});
+        context.world.AddComponent<svanes::SolidShape>(
+            entity, svanes::SolidShape{svanes::Color{255, 0, 0, 255}, geometry}
+        );
+        boundary_entities.push_back(entity);
+    }
+
     CreateNonPlayerNonPlanetEntities(context.world);
 
     collidable_entities.push_back(square_entity);
@@ -292,8 +308,10 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
     // );
 
     // Camera follows the player, centered on the screen.
-    frame.camera.x = frame.world.GetComponent<svanes::Transform>(square_entity).x - (frame.output_width * 0.5F - layout.offset.x) / layout.scale / frame.camera.zoom;
-    frame.camera.y = frame.world.GetComponent<svanes::Transform>(square_entity).y - (frame.output_height * 0.25F - layout.offset.y) / layout.scale / frame.camera.zoom;
+    if (frame.world.HasComponent<svanes::Transform>(square_entity)) {
+        frame.camera.x = frame.world.GetComponent<svanes::Transform>(square_entity).x - (frame.output_width * 0.5F - layout.offset.x) / layout.scale / frame.camera.zoom;
+        frame.camera.y = frame.world.GetComponent<svanes::Transform>(square_entity).y - (frame.output_height * 0.5F - layout.offset.y) / layout.scale / frame.camera.zoom;
+    }
 
     const svanes::Rectangle2D view = frame.camera.ScreenToWorld(layout.viewport, layout.scale, layout.offset);
     svanes::Transform& background = frame.world.GetComponent<svanes::Transform>(background_entity);
@@ -303,16 +321,18 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
     background_rectangle.width = view.width;
     background_rectangle.height = view.height;
 
-    svanes::Kinematic2D& motion = frame.world.GetComponent<svanes::Kinematic2D>(square_entity);
-    motion.acceleration_x = static_cast<float>(
-        1000.0f * (frame.input.IsDown(svanes::Key::D) - frame.input.IsDown(svanes::Key::A))
-    );
-    motion.acceleration_y = static_cast<float>(
-        1000.0f * (frame.input.IsDown(svanes::Key::S) - frame.input.IsDown(svanes::Key::W))
-    );
-    motion.angular_acceleration = 100.0F * (
-        frame.input.IsDown(svanes::Key::E) - frame.input.IsDown(svanes::Key::Q)
-    );
+    if (frame.world.HasComponent<svanes::Kinematic2D>(square_entity)) {
+        svanes::Kinematic2D& motion = frame.world.GetComponent<svanes::Kinematic2D>(square_entity);
+        motion.acceleration_x = static_cast<float>(
+            1000.0f * (frame.input.IsDown(svanes::Key::D) - frame.input.IsDown(svanes::Key::A))
+        );
+        motion.acceleration_y = static_cast<float>(
+            1000.0f * (frame.input.IsDown(svanes::Key::S) - frame.input.IsDown(svanes::Key::W))
+        );
+        motion.angular_acceleration = 100.0F * (
+            frame.input.IsDown(svanes::Key::E) - frame.input.IsDown(svanes::Key::Q)
+        );
+    }
 
     // Reset the acceleration of all non-player, non-planet entities to zero before applying collision acceleration.
     for (svanes::Entity entity : non_planet_non_player_entities) {
@@ -325,6 +345,30 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
     }
 
     // ApplyCollisionAcceleration(frame.world, {square_entity, planet_entity}); 
+    std::vector<svanes::Entity> destroyed_entities;
+    frame.world.ForEach<svanes::Transform, svanes::Collider2D>(
+        [&](svanes::Entity entity, const svanes::Transform& transform, const svanes::Collider2D& collider) {
+            if (std::ranges::find(boundary_entities, entity) != boundary_entities.end()) {
+                return;
+            }
+            for (svanes::Entity boundary : boundary_entities) {
+                if (!svanes::DetectCollisions(
+                    collider.geometry, transform,
+                    frame.world.GetComponent<svanes::Collider2D>(boundary).geometry,
+                    frame.world.GetComponent<svanes::Transform>(boundary)
+                ).empty()) {
+                    destroyed_entities.push_back(entity);
+                    break;
+                }
+            }
+        }
+    );
+    for (svanes::Entity entity : destroyed_entities) {
+        frame.world.DestroyEntity(entity);
+        std::erase(collidable_entities, entity);
+        std::erase(non_planet_non_player_entities, entity);
+    }
+
     ApplyCollisionAcceleration(frame.world, collidable_entities);
 
 }

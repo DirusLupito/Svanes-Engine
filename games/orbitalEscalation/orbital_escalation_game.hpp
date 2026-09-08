@@ -31,6 +31,7 @@ private:
     svanes::Entity background_entity = 0;
     svanes::Entity square_entity = 0;
     svanes::Entity planet_entity = 0;
+    std::vector<svanes::Entity> boundary_entities;
 
     // How many NPC entities to spawn in orbit around the planet
     uint32_t num_npc_entities_to_spawn = 120;
