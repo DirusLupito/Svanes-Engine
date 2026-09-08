@@ -56,6 +56,34 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(SDL3_image)
 
+set(SDLMIXER_TESTS OFF CACHE BOOL "")
+set(SDLMIXER_EXAMPLES OFF CACHE BOOL "")
+set(SDLMIXER_DEPS_SHARED OFF CACHE BOOL "")
+set(SDLMIXER_AIFF OFF CACHE BOOL "")
+set(SDLMIXER_VOC OFF CACHE BOOL "")
+set(SDLMIXER_AU OFF CACHE BOOL "")
+set(SDLMIXER_FLAC OFF CACHE BOOL "")
+set(SDLMIXER_MOD OFF CACHE BOOL "")
+set(SDLMIXER_MIDI OFF CACHE BOOL "")
+set(SDLMIXER_OPUS OFF CACHE BOOL "")
+set(SDLMIXER_WAVPACK OFF CACHE BOOL "")
+set(SDLMIXER_WAVE ON CACHE BOOL "")
+set(SDLMIXER_MP3 ON CACHE BOOL "")
+set(SDLMIXER_MP3_DRMP3 ON CACHE BOOL "")
+set(SDLMIXER_MP3_MPG123 OFF CACHE BOOL "")
+set(SDLMIXER_VORBIS_STB ON CACHE BOOL "")
+set(SDLMIXER_VORBIS_VORBISFILE OFF CACHE BOOL "")
+set(SDLMIXER_GME OFF)
+
+FetchContent_Declare(
+    SDL3_mixer
+    URL https://github.com/libsdl-org/SDL_mixer/releases/download/release-3.2.4/SDL3_mixer-3.2.4.tar.gz
+    URL_HASH SHA256=182a07c745375e113dc740d43964ff21b0be29f29f59876c4dbc4db3d32f6901
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    SOURCE_DIR "${CMAKE_SOURCE_DIR}/thirdparty/sdl3_mixer-src"
+)
+FetchContent_MakeAvailable(SDL3_mixer)
+
 add_library(svanes_engine STATIC)
 add_library(Svanes::Engine ALIAS svanes_engine)
 
@@ -64,6 +92,8 @@ target_sources(
     PRIVATE
         src/application.cpp
         src/attractor_system.cpp
+        src/audio/audio_manager.cpp
+        src/audio/audio_manager_internal.hpp
         src/camera2d.cpp
         src/circle_geometry.cpp
         src/convex_polygon_geometry.cpp
@@ -88,6 +118,7 @@ target_sources(
         FILES
             include/svanes/application.hpp
             include/svanes/attractor_system.hpp
+            include/svanes/audio/audio_manager.hpp
             include/svanes/camera2d.hpp
             include/svanes/circle_geometry.hpp
             include/svanes/convex_polygon_geometry.hpp
@@ -112,7 +143,7 @@ target_compile_features(svanes_engine PUBLIC cxx_std_23)
 target_link_libraries(
     svanes_engine
     PUBLIC SDL3::SDL3
-    PRIVATE SDL3_image::SDL3_image
+    PRIVATE SDL3_image::SDL3_image SDL3_mixer::SDL3_mixer
 )
 
 if(MSVC)
@@ -161,6 +192,7 @@ set_target_properties(
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FILES
     include/svanes/application.hpp
     include/svanes/attractor_system.hpp
+    include/svanes/audio/audio_manager.hpp
     include/svanes/camera2d.hpp
     include/svanes/circle_geometry.hpp
     include/svanes/convex_polygon_geometry.hpp
@@ -183,6 +215,8 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/application.cpp
     src/attractor_system.cpp
+    src/audio/audio_manager.cpp
+    src/audio/audio_manager_internal.hpp
     src/camera2d.cpp
     src/circle_geometry.cpp
     src/convex_polygon_geometry.cpp

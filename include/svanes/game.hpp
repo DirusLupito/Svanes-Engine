@@ -6,19 +6,21 @@
 
 namespace svanes {
 
+class AudioManager;
 class Camera2D;
 class InputManager;
 class Registry;
 class TextureManager;
 
 /**
- * Defines relevant context for a game. 
+ * Defines relevant context for a game.
  * For games to have their textures managed by the engine,
  * they must use the TextureManager provided in this context.
  *
  * FIELDS:
  * - world: The engine owned registry containing the game's entities and components.
  * - assets: The engine owned texture manager used to load and create textures.
+ * - audio: The engine owned audio manager used to load and play sounds and music.
  * - camera: The engine owned camera used to convert between screen and world coordinates.
  * - output_width: The current width of the rendering output.
  * - output_height: The current height of the rendering output.
@@ -27,6 +29,7 @@ class TextureManager;
 struct GameContext {
     Registry& world;
     TextureManager& assets;
+    AudioManager& audio;
     Camera2D& camera;
     std::int32_t output_width;
     std::int32_t output_height;
@@ -47,6 +50,7 @@ struct GameContext {
  * - delta_seconds: The elapsed time since the previous frame, in seconds.
  * - output_width: The current width of the rendering output.
  * - output_height: The current height of the rendering output.
+ * - audio: The engine owned audio manager used to load and play sounds and music.
  * - camera: The engine owned camera used to convert between screen and world coordinates.
  * - gravity: The engine owned gravity vector applied to entities with Kinematic2D and Gravity components.
  */
@@ -56,6 +60,7 @@ struct FrameContext {
     float delta_seconds;
     std::int32_t output_width;
     std::int32_t output_height;
+    AudioManager& audio;
     Camera2D& camera;
     Vector2D& gravity;
 };

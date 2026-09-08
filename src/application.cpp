@@ -3,6 +3,7 @@
 
 #include <svanes/application.hpp>
 
+#include <svanes/audio/audio_manager.hpp>
 #include <svanes/camera2d.hpp>
 #include <svanes/game.hpp>
 #include <svanes/input.hpp>
@@ -12,6 +13,7 @@
 #include <svanes/sprite_animation_system.hpp>
 #include <svanes/vector2d.hpp>
 
+#include "audio/audio_manager_internal.hpp"
 #include "input_manager_internal.hpp"
 #include "render/render_queue_executor.hpp"
 #include "render/texture_manager_internal.hpp"
@@ -42,6 +44,7 @@ void RunGameLoop(IGame& game, SDL_Window* window, SDL_Renderer* renderer, Regist
     // First time setup.
 
     TextureManager texture_manager = TextureManagerInternal::Create(renderer);
+    AudioManager audio_manager = AudioManagerInternal::Create();
     RenderQueueExecutor render_queue_executor{renderer, texture_manager};
     RenderQueue render_queue;
     InputManager input;
@@ -53,7 +56,7 @@ void RunGameLoop(IGame& game, SDL_Window* window, SDL_Renderer* renderer, Regist
         throw std::runtime_error("Could not get render output dimensions: " + std::string{SDL_GetError()});
     }
     camera.SetOutputSize(output_width, output_height);
-    GameContext game_context{world, texture_manager, camera, output_width, output_height, gravity};
+    GameContext game_context{world, texture_manager, audio_manager, camera, output_width, output_height, gravity};
 
     // Custom initialization of the game. Implemented by the user of the engine.
 
@@ -92,13 +95,13 @@ void RunGameLoop(IGame& game, SDL_Window* window, SDL_Renderer* renderer, Regist
         }
         camera.SetOutputSize(output_width, output_height);
 
-        const FrameContext frame_context{world, input, delta_seconds, output_width, output_height, camera, gravity};
+        const FrameContext frame_context{world, input, delta_seconds, output_width, output_height, audio_manager, camera, gravity};
 
         // Here we should advance the kinematics of all entities before updating the game state.
-		// This allows us to first update the positions of all entities based on their velocities 
+        // This allows us to first update the positions of all entities based on their velocities 
         // and accelerations, and then allow the game logic to respond to those new positions.
-		// Fixes the broken behavior where the game logic was responding to the previous frame's positions,
-		// which could lead to incorrect behavior likely around collisions.
+        // Fixes the broken behavior where the game logic was responding to the previous frame's positions,
+        // which could lead to incorrect behavior likely around collisions.
         //
         // This does however mean that there is now one frame of input latency, so we can talk about
         // whether this is the best approach or not.
