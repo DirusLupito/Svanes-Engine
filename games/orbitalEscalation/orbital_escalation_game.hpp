@@ -48,11 +48,11 @@ private:
 
     // The maximum distance of the NPC entities from the planet when they are spawned,
     // measured from the surface of the planet to the center of the NPC entity.
-    float maximum_distance_of_npc_entities_from_planet = 2000.0F;
+    float maximum_distance_of_npc_entities_from_planet = 70000.0F;
 
     // The minimum distance of the NPC entities from the planet when they are spawned,
     // measured from the surface of the planet to the center of the NPC entity.
-    float minimum_distance_of_npc_entities_from_planet = 500.0F;
+    float minimum_distance_of_npc_entities_from_planet = 7500.0F;
 
     // The maximum angular velocity of the NPC entities when they are spawned, measured in radians per second.
     float maximum_angular_velocity_of_npc_entities = 1.0F;

@@ -210,7 +210,7 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext& context)
     const svanes::RenderLayout layout = svanes::ComputeRenderLayout(
         context.scale_mode, context.output_width, context.output_height
     );
-    context.camera.zoom = 0.2F;
+    context.camera.zoom = 0.02F;
     context.camera.x = player_start.x - (context.output_width * 0.5F - layout.offset.x) / layout.scale / context.camera.zoom;
     context.camera.y = player_start.y - (context.output_height * 0.25F - layout.offset.y) / layout.scale / context.camera.zoom;
     const svanes::Rectangle2D view = context.camera.ScreenToWorld(layout.viewport, layout.scale, layout.offset);
