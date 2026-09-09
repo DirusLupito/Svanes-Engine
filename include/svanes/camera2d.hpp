@@ -43,16 +43,50 @@ public:
     // how entity sizes and positions are scaled relative to the current window size
     ScaleMode scale_mode = ScaleMode::Constant;
 
+    /**
+     * Sets the size of the rendering output the camera draws into,
+     * which the scale, offset, and viewport are derived from.
+     *
+     * @param width The width of the rendering output.
+     * @param height The height of the rendering output.
+     */
     void SetOutputSize(std::int32_t width, std::int32_t height);
 
+    /**
+     * @return The width of the rendering output.
+     */
     std::int32_t OutputWidth() const;
 
+    /**
+     * @return The height of the rendering output.
+     */
     std::int32_t OutputHeight() const;
 
+    /**
+     * The factor by which entity sizes and positions are scaled to fit the
+     * current output size. In Constant scale mode, or when the output size
+     * is empty, this is always 1.0.
+     *
+     * @return The scale factor applied during rendering.
+     */
     float Scale() const;
 
+    /**
+     * The distance from the edges of the rendering output to the edges of the
+     * scaled game world, used to keep that world centered in the output.
+     * In Constant scale mode, or when the output size is empty,
+     * this is always {0, 0}.
+     *
+     * @return The offset applied during rendering.
+     */
     Vector2D Offset() const;
 
+    /**
+     * The region of the rendering output the game world is drawn into,
+     * centered in the output and shrunk by the offset on each side.
+     *
+     * @return The viewport in screen coordinates.
+     */
     Rectangle2D Viewport() const;
 
     /**
@@ -155,7 +189,10 @@ public:
     ) const;
 
 private:
+    // width of the rendering output the camera draws into
     std::int32_t output_width = 0;
+
+    // height of the rendering output the camera draws into
     std::int32_t output_height = 0;
 };
 
