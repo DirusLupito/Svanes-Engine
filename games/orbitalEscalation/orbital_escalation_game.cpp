@@ -244,13 +244,13 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext& context)
     constexpr float square_size = static_cast<float>(kSquarePixels);
     const svanes::Rectangle2D square_geometry{0.0F, 0.0F, square_size, square_size};
     const svanes::Transform player_start{0.0F, -kPlanetRadius - 800.0F};
-    const svanes::RenderLayout layout = svanes::ComputeRenderLayout(
-        context.scale_mode, context.output_width, context.output_height
-    );
     context.camera.zoom = 0.02F;
-    context.camera.x = player_start.x - (context.output_width * 0.5F - layout.offset.x) / layout.scale / context.camera.zoom;
-    context.camera.y = player_start.y - (context.output_height * 0.25F - layout.offset.y) / layout.scale / context.camera.zoom;
-    const svanes::Rectangle2D view = context.camera.ScreenToWorld(layout.viewport, layout.scale, layout.offset);
+    const svanes::Rectangle2D anchor = context.camera.ScreenToWorld({
+        context.camera.OutputWidth() * 0.5F, context.camera.OutputHeight() * 0.25F, 0.0F, 0.0F
+    });
+    context.camera.x += player_start.x - anchor.x;
+    context.camera.y += player_start.y - anchor.y;
+    const svanes::Rectangle2D view = context.camera.ScreenToWorld(context.camera.Viewport());
 
     background_entity = context.world.CreateEntity();
     context.world.AddComponent<svanes::Transform>(
@@ -319,13 +319,9 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
     }
 
     if (frame.input.WasPressed(svanes::Key::Tab)) {
-        frame.scale_mode = frame.scale_mode == svanes::ScaleMode::Constant
+        frame.camera.scale_mode = frame.camera.scale_mode == svanes::ScaleMode::Constant
             ? svanes::ScaleMode::Proportional : svanes::ScaleMode::Constant;
     }
-
-    const svanes::RenderLayout layout = svanes::ComputeRenderLayout(
-        frame.scale_mode, frame.output_width, frame.output_height
-    );
 
     // 1.1^delta
     // Rolling harder on the mouse wheel will zoom in and out 
@@ -346,11 +342,13 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
 
     // Camera follows the player, centered on the screen.
     if (frame.world.HasComponent<svanes::Transform>(square_entity)) {
-        frame.camera.x = frame.world.GetComponent<svanes::Transform>(square_entity).x - (frame.output_width * 0.5F - layout.offset.x) / layout.scale / frame.camera.zoom;
-        frame.camera.y = frame.world.GetComponent<svanes::Transform>(square_entity).y - (frame.output_height * 0.5F - layout.offset.y) / layout.scale / frame.camera.zoom;
+        const svanes::Transform& player = frame.world.GetComponent<svanes::Transform>(square_entity);
+        const svanes::Rectangle2D view = frame.camera.ScreenToWorld(frame.camera.Viewport());
+        frame.camera.x += player.x - view.x;
+        frame.camera.y += player.y - view.y;
     }
 
-    const svanes::Rectangle2D view = frame.camera.ScreenToWorld(layout.viewport, layout.scale, layout.offset);
+    const svanes::Rectangle2D view = frame.camera.ScreenToWorld(frame.camera.Viewport());
     svanes::Transform& background = frame.world.GetComponent<svanes::Transform>(background_entity);
     background.x = view.x;
     background.y = view.y;
