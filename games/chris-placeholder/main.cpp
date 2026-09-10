@@ -6,7 +6,7 @@
 
 int32_t main(int32_t argc, char** argv)
 {
-    const std::string server_state_address = argc > 1 ? argv[1] : kChrisServerStateConnectEndpoint;
+    const std::string server_host = argc > 1 ? argv[1] : kChrisDefaultServerHost;
 
     svanes::Application application({
         .title = "Chris's Game",
@@ -14,6 +14,6 @@ int32_t main(int32_t argc, char** argv)
         .height = 1080,
     });
 
-    ChrisGame game(server_state_address);
+    ChrisGame game(server_host);
     return application.run(game);
 }

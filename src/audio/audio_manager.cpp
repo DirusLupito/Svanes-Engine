@@ -157,6 +157,46 @@ void AudioManager::SetMusicVolume(float volume)
     }
 }
 
+std::int64_t AudioManager::MusicPositionMilliseconds() const
+{
+    const Sint64 frames = MIX_GetTrackPlaybackPosition(music_track.get());
+    if (frames < 0) {
+        throw std::runtime_error("Could not get music playback position: " + std::string{SDL_GetError()});
+    }
+
+    return static_cast<std::int64_t>(MIX_TrackFramesToMS(music_track.get(), frames));
+}
+
+std::int64_t AudioManager::MusicDurationMilliseconds() const
+{
+    MIX_Audio* audio = MIX_GetTrackAudio(music_track.get());
+    if (audio == nullptr) {
+        throw std::runtime_error("Could not get music duration: no music is assigned to the track.");
+    }
+
+    const Sint64 frames = MIX_GetAudioDuration(audio);
+    if (frames < 0) {
+        throw std::runtime_error("Could not determine music duration: " + std::string{SDL_GetError()});
+    }
+
+    return static_cast<std::int64_t>(MIX_AudioFramesToMS(audio, frames));
+}
+
+void AudioManager::SeekMusic(std::int64_t position_milliseconds)
+{
+    const Sint64 frames = MIX_TrackMSToFrames(music_track.get(), position_milliseconds);
+    if (!MIX_SetTrackPlaybackPosition(music_track.get(), frames)) {
+        throw std::runtime_error("Could not seek music: " + std::string{SDL_GetError()});
+    }
+}
+
+void AudioManager::SetMusicPlaybackRate(float ratio)
+{
+    if (!MIX_SetTrackFrequencyRatio(music_track.get(), ratio)) {
+        throw std::runtime_error("Could not set music playback rate: " + std::string{SDL_GetError()});
+    }
+}
+
 AudioManager internal::AudioManagerInternal::Create()
 {
     return AudioManager{};
