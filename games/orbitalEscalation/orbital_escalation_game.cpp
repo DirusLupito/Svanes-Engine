@@ -32,7 +32,7 @@ static svanes::Vector2D AttractionField(svanes::Vector2D offset_to_source)
     if (distance == 0.0F) {
         return {};
     }
-    const float strength = 18000.0F / (1.0F + distance / kPlanetRadius);
+    const float strength = 180000000.0F / (1.0F + distance * distance / kPlanetRadius);
     return offset_to_source / distance * strength;
 }
 
