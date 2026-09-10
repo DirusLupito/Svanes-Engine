@@ -59,6 +59,9 @@ void Goose::Spawn(svanes::GameContext& context, float x, float y)
         .texture = idle_texture,
         .geometry = body,
     });
+    // TASK 3, physics: these two components are what put the goose under the
+    // engine's physics. Kinematic2D holds its velocity and acceleration, and
+    // Gravity opts it into the world gravity vector set in ErikGame::Initialize
     context.world.AddComponent<svanes::Kinematic2D>(entity);
     context.world.AddComponent<svanes::Gravity>(entity);
     context.world.AddComponent<svanes::Collider2D>(entity, svanes::Collider2D{body});
@@ -142,6 +145,11 @@ void Goose::Update(const svanes::FrameContext& frame, const GooseIntent& intent)
     SetState(frame.world, next);
 }
 
+// TASK 5, collision response: checks the goose against every Solid entity and
+// responds to each overlap by pushing the goose back out along the collision
+// normal, then killing the velocity that drove it into the surface. Landing on
+// something is read off the same normals, so grounded is recalculated here rather
+// than tracked separately
 void Goose::ResolveCollisions(svanes::Registry& world)
 {
     grounded = false;

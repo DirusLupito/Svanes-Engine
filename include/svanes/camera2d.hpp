@@ -30,10 +30,10 @@ enum class ScaleMode : std::uint8_t {
 
 class Camera2D final {
 public:
-    // x axis position of the top-left corner of the camera in world coordinates
+    // x axis position of the center of the camera in world coordinates
     float x = 0.0F;
 
-    // y axis position of the top-left corner of the camera in world coordinates
+    // y axis position of the center of the camera in world coordinates
     float y = 0.0F;
 
     // zoom factor of the camera, where 1.0 means no zoom,
@@ -45,7 +45,7 @@ public:
 
     /**
      * Sets the size of the rendering output the camera draws into,
-     * which the scale, offset, and viewport are derived from.
+     * which the scale and viewport are derived from.
      *
      * @param width The width of the rendering output.
      * @param height The height of the rendering output.
@@ -72,18 +72,8 @@ public:
     float Scale() const;
 
     /**
-     * The distance from the edges of the rendering output to the edges of the
-     * scaled game world, used to keep that world centered in the output.
-     * In Constant scale mode, or when the output size is empty,
-     * this is always {0, 0}.
-     *
-     * @return The offset applied during rendering.
-     */
-    Vector2D Offset() const;
-
-    /**
      * The region of the rendering output the game world is drawn into,
-     * centered in the output and shrunk by the offset on each side.
+     * centered in the output and fitted to the design aspect ratio in Proportional mode.
      *
      * @return The viewport in screen coordinates.
      */
