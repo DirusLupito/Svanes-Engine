@@ -1,6 +1,7 @@
 #include "chris_game.hpp"
 
 #include <svanes/audio/audio_manager.hpp>
+#include <svanes/camera2d.hpp>
 #include <svanes/collision_system.hpp>
 #include <svanes/input.hpp>
 #include <svanes/kinematic_system.hpp>
@@ -233,6 +234,12 @@ void ChrisGame::ResolveCharacterVertical(svanes::Registry& world)
 
 void ChrisGame::Update(const svanes::FrameContext& frame)
 {
+    if (frame.input.WasPressed(svanes::Key::Tab)) {
+        frame.camera.scale_mode = frame.camera.scale_mode == svanes::ScaleMode::Constant
+            ? svanes::ScaleMode::Proportional
+            : svanes::ScaleMode::Constant;
+    }
+
     elapsed_seconds += frame.delta_seconds;
 
     const float output_width = static_cast<float>(frame.output_width);
