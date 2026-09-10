@@ -93,28 +93,20 @@ float Camera2D::Scale() const
     return std::min(width_ratio, height_ratio);
 }
 
-Vector2D Camera2D::Offset() const
-{
-    if (scale_mode == ScaleMode::Constant || output_width <= 0 || output_height <= 0) {
-        return {0.0F, 0.0F};
-    }
-
-    const float scale = Scale();
-    return {
-        (static_cast<float>(output_width) - static_cast<float>(kDesignWidth) * scale) * 0.5F,
-        (static_cast<float>(output_height) - static_cast<float>(kDesignHeight) * scale) * 0.5F,
-    };
-}
-
 Rectangle2D Camera2D::Viewport() const
 {
-    const Vector2D offset = Offset();
-    return {
+    Rectangle2D viewport{
         static_cast<float>(output_width) * 0.5F,
         static_cast<float>(output_height) * 0.5F,
-        static_cast<float>(output_width) - 2.0F * offset.x,
-        static_cast<float>(output_height) - 2.0F * offset.y,
+        static_cast<float>(output_width),
+        static_cast<float>(output_height),
     };
+    if (scale_mode == ScaleMode::Proportional && output_width > 0 && output_height > 0) {
+        const float scale = Scale();
+        viewport.width = static_cast<float>(kDesignWidth) * scale;
+        viewport.height = static_cast<float>(kDesignHeight) * scale;
+    }
+    return viewport;
 }
 
 void Camera2D::SetZoomAt(float new_zoom, Vector2D screen_position)
@@ -126,14 +118,14 @@ void Camera2D::SetZoomAt(float new_zoom, Vector2D screen_position)
     }
 
     const float scale = Scale();
-    const Vector2D offset = Offset();
+    const Rectangle2D viewport = Viewport();
 
     // We want to keep the world coordinates of the point at (screen_x, screen_y) 
     // the same before and after the zoom change.
     // ScreenToWorld of the same point before and after the zoom change 
     // should yield the same world coordinates.
     
-    // So we need to update the top left corner of the camera (x, y)
+    // So we need to update the center of the camera (x, y)
     // to ensure that the world coordinates of the point at (screen_x, screen_y) remain unchanged.
 
     // Let (screen_x, screen_y) be the point in screen coordinates that we want to keep anchored.
@@ -141,46 +133,46 @@ void Camera2D::SetZoomAt(float new_zoom, Vector2D screen_position)
     // Let (new_world_x, new_world_y) be the corresponding point in world coordinates after the zoom change.
     // We want (world_x, world_y) to be equal to (new_world_x, new_world_y).
 
-    // Rendering computes screen_x = (world_x - x) * zoom * scale + offset.x,
+    // Rendering computes screen_x = (world_x - x) * zoom * scale + viewport.x,
     // and likewise for y. ScreenToWorld reverses those operations.
-    // In constant mode, scale is 1 and offset is {0, 0}.
+    // In constant mode, scale is 1. The viewport center is the output center in both modes.
     //
     // Before the zoom change:
-    // world_x = ((screen_x - offset.x) / scale / zoom) + x
-    // world_y = ((screen_y - offset.y) / scale / zoom) + y
+    // world_x = ((screen_x - viewport.x) / scale / zoom) + x
+    // world_y = ((screen_y - viewport.y) / scale / zoom) + y
 
     // After the zoom change:
-    // new_world_x = ((screen_x - offset.x) / scale / new_zoom) + new_x
-    // new_world_y = ((screen_y - offset.y) / scale / new_zoom) + new_y
+    // new_world_x = ((screen_x - viewport.x) / scale / new_zoom) + new_x
+    // new_world_y = ((screen_y - viewport.y) / scale / new_zoom) + new_y
 
     // Solve for new_x and new_y:
-    //    ((screen_x - offset.x) / scale / zoom) + x = ((screen_x - offset.x) / scale / new_zoom) + new_x
-    // -> ((screen_x - offset.x) / scale / zoom) + x - ((screen_x - offset.x) / scale / new_zoom) = new_x
+    //    ((screen_x - viewport.x) / scale / zoom) + x = ((screen_x - viewport.x) / scale / new_zoom) + new_x
+    // -> ((screen_x - viewport.x) / scale / zoom) + x - ((screen_x - viewport.x) / scale / new_zoom) = new_x
     // 
-    //    ((screen_y - offset.y) / scale / zoom) + y = ((screen_y - offset.y) / scale / new_zoom) + new_y
-    // -> ((screen_y - offset.y) / scale / zoom) + y - ((screen_y - offset.y) / scale / new_zoom) = new_y
+    //    ((screen_y - viewport.y) / scale / zoom) + y = ((screen_y - viewport.y) / scale / new_zoom) + new_y
+    // -> ((screen_y - viewport.y) / scale / zoom) + y - ((screen_y - viewport.y) / scale / new_zoom) = new_y
 
     // Note that 
-    // anchor.x = ((screen_x - offset.x) / scale / zoom) + x
-    // anchor.y = ((screen_y - offset.y) / scale / zoom) + y
+    // anchor.x = ((screen_x - viewport.x) / scale / zoom) + x
+    // anchor.y = ((screen_y - viewport.y) / scale / zoom) + y
 
     // So
-    // new_x = anchor.x - ((screen_x - offset.x) / scale / new_zoom)
-    // new_y = anchor.y - ((screen_y - offset.y) / scale / new_zoom)
+    // new_x = anchor.x - ((screen_x - viewport.x) / scale / new_zoom)
+    // new_y = anchor.y - ((screen_y - viewport.y) / scale / new_zoom)
 
     const Rectangle2D anchor = ScreenToWorld({screen_position.x, screen_position.y, 0.0F, 0.0F});
     zoom = new_zoom;
-    x = anchor.x - (screen_position.x - offset.x) / scale / zoom;
-    y = anchor.y - (screen_position.y - offset.y) / scale / zoom;
+    x = anchor.x - (screen_position.x - viewport.x) / scale / zoom;
+    y = anchor.y - (screen_position.y - viewport.y) / scale / zoom;
 }
 
 Rectangle2D Camera2D::WorldToScreen(Rectangle2D world) const
 {
     ValidateFactor(zoom);
     const float scale = Scale();
-    const Vector2D offset = Offset();
-    world.x = (world.x - x) * zoom * scale + offset.x;
-    world.y = (world.y - y) * zoom * scale + offset.y;
+    const Rectangle2D viewport = Viewport();
+    world.x = (world.x - x) * zoom * scale + viewport.x;
+    world.y = (world.y - y) * zoom * scale + viewport.y;
     world.width *= zoom * scale;
     world.height *= zoom * scale;
     return world;
@@ -190,9 +182,9 @@ Rectangle2D Camera2D::ScreenToWorld(Rectangle2D screen) const
 {
     ValidateFactor(zoom);
     const float scale = Scale();
-    const Vector2D offset = Offset();
-    screen.x = (screen.x - offset.x) / scale / zoom + x;
-    screen.y = (screen.y - offset.y) / scale / zoom + y;
+    const Rectangle2D viewport = Viewport();
+    screen.x = (screen.x - viewport.x) / scale / zoom + x;
+    screen.y = (screen.y - viewport.y) / scale / zoom + y;
     screen.width /= scale * zoom;
     screen.height /= scale * zoom;
     return screen;
@@ -209,11 +201,11 @@ std::optional<Circle2D> Camera2D::PrepareForRendering(
     }
 
     const float scale = Scale();
-    const Vector2D offset = Offset();
+    const Rectangle2D viewport = Viewport();
 
     Circle2D destination = TransformCircle(circle, transform);
-    destination.x = (destination.x - x) * zoom * scale + offset.x;
-    destination.y = (destination.y - y) * zoom * scale + offset.y;
+    destination.x = (destination.x - x) * zoom * scale + viewport.x;
+    destination.y = (destination.y - y) * zoom * scale + viewport.y;
     destination.radius *= zoom * scale;
 
     if (IsOutsideOutput(destination, output_width, output_height)) {
@@ -234,12 +226,12 @@ std::optional<Triangle2D> Camera2D::PrepareForRendering(
     }
 
     const float scale = Scale();
-    const Vector2D offset = Offset();
+    const Rectangle2D viewport = Viewport();
 
     Triangle2D destination = TransformTriangle(triangle, transform);
     for (Vector2D& vertex : destination.vertices) {
-        vertex.x = (vertex.x - x) * zoom * scale + offset.x;
-        vertex.y = (vertex.y - y) * zoom * scale + offset.y;
+        vertex.x = (vertex.x - x) * zoom * scale + viewport.x;
+        vertex.y = (vertex.y - y) * zoom * scale + viewport.y;
     }
 
     if (IsOutsideOutput(TriangleGeometry(destination).Bounds(), output_width, output_height)) {
@@ -287,11 +279,11 @@ std::optional<ConvexPolygon2D> Camera2D::PrepareForRendering(
     }
 
     const float scale = Scale();
-    const Vector2D offset = Offset();
+    const Rectangle2D viewport = Viewport();
 
     const Transform screen_transform{
-        (transform.x - x) * zoom * scale + offset.x,
-        (transform.y - y) * zoom * scale + offset.y,
+        (transform.x - x) * zoom * scale + viewport.x,
+        (transform.y - y) * zoom * scale + viewport.y,
         transform.rotation,
     };
 

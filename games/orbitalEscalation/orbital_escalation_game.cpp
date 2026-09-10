@@ -343,9 +343,8 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
     // Camera follows the player, centered on the screen.
     if (frame.world.HasComponent<svanes::Transform>(square_entity)) {
         const svanes::Transform& player = frame.world.GetComponent<svanes::Transform>(square_entity);
-        const svanes::Rectangle2D view = frame.camera.ScreenToWorld(frame.camera.Viewport());
-        frame.camera.x += player.x - view.x;
-        frame.camera.y += player.y - view.y;
+        frame.camera.x = player.x;
+        frame.camera.y = player.y;
     }
 
     const svanes::Rectangle2D view = frame.camera.ScreenToWorld(frame.camera.Viewport());
