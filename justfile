@@ -52,9 +52,9 @@ configure:
 # Download/update third-party dependencies into thirdparty/.
 fetch-deps: configure
 
-# Configure and build. Pass a target (erik, orbitalEscalation, chris) to build only that game; leave blank to build everything.
+# Configure and build. Pass a target (erik, orbitalEscalation, chris, chris-server) to build only that game; leave blank to build everything.
 build target="": (_check-target target) configure
-    {{cmake}} --build --preset {{build-preset-prefix}}-debug --parallel {{ if target == "" { "" } else { "--target " + (if target == "erik" { "svanes_game_erik" } else if target == "orbitalEscalation" { "svanes_game_orbital_escalation" } else { "svanes_game_chris" }) } }}
+    {{cmake}} --build --preset {{build-preset-prefix}}-debug --parallel {{ if target == "" { "" } else { "--target " + (if target == "erik" { "svanes_game_erik" } else if target == "orbitalEscalation" { "svanes_game_orbital_escalation" } else if target == "chris-server" { "svanes_game_chris_server" } else { "svanes_game_chris" }) } }}
 
 # Configure and build all targets in Release mode.
 release: configure
@@ -62,11 +62,11 @@ release: configure
 
 # Fail fast with a clear message if an unknown game target was given.
 _check-target target:
-    @{{ if target == "" { "" } else if target == "erik" { "" } else if target == "orbitalEscalation" { "" } else if target == "chris" { "" } else { error("no game named '" + target + "'. Try: chris, erik, orbitalEscalation, or leave it blank.") } }}
+    @{{ if target == "" { "" } else if target == "erik" { "" } else if target == "orbitalEscalation" { "" } else if target == "chris" { "" } else if target == "chris-server" { "" } else { error("no game named '" + target + "'. Try: chris, chris-server, erik, orbitalEscalation, or leave it blank.") } }}
 
-# Build and launch a game: chris, erik, or orbitalEscalation. Leave blank for Orbital Escalation.
+# Build and launch a game: chris, chris-server, erik, or orbitalEscalation. Leave blank for Orbital Escalation.
 run target="": (_check-target target) (build if target == "" { "orbitalEscalation" } else { target })
-    {{bin-dir}}{{ if target == "" { "svanes_game_orbital_escalation" } else if target == "erik" { "svanes_game_erik" } else if target == "orbitalEscalation" { "svanes_game_orbital_escalation" } else { "svanes_game_chris" } }}{{exe-suffix}}
+    {{bin-dir}}{{ if target == "" { "svanes_game_orbital_escalation" } else if target == "erik" { "svanes_game_erik" } else if target == "orbitalEscalation" { "svanes_game_orbital_escalation" } else if target == "chris-server" { "svanes_game_chris_server" } else { "svanes_game_chris" } }}{{exe-suffix}}
 
 # Remove compiled outputs while retaining the configured build tree.
 clean: configure

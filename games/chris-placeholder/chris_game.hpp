@@ -1,9 +1,15 @@
 #pragma once
 
+#include "network_config.hpp"
+
 #include <svanes/audio/audio_manager.hpp>
 #include <svanes/entity.hpp>
 #include <svanes/game.hpp>
 #include <svanes/render/basic_render_types.hpp>
+
+#include <zmq.hpp>
+
+#include <string>
 
 /**
  * Top level container for Chris's placeholder game.
@@ -12,6 +18,12 @@
  */
 class ChrisGame final : public svanes::IGame {
 public:
+    /**
+     * Constructs the game and connects it to the server's state broadcast socket.
+     * @param server_state_address The ZeroMQ endpoint the server's state socket is bound to.
+     */
+    explicit ChrisGame(std::string server_state_address = kChrisServerStateConnectEndpoint);
+
     /**
      * Initializes the game with the provided context.
      * @param context The context for the game, providing access to the TextureManager.
@@ -28,6 +40,7 @@ public:
 private:
     void ResolveCharacterHorizontal(svanes::Registry& world);
     void ResolveCharacterVertical(svanes::Registry& world);
+    void PollServerState(svanes::Registry& world);
 
 
     // Total time elapsed since the start of the game, in seconds.
@@ -41,4 +54,7 @@ private:
     svanes::TextureHandle running_texture{};
     svanes::SoundHandle jump_sound{};
     bool is_running = false;
+
+    zmq::context_t network_context;
+    zmq::socket_t network_state_socket;
 };

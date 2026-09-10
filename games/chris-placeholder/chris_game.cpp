@@ -10,6 +10,8 @@
 #include <svanes/render/texture_manager.hpp>
 #include <svanes/sprite_animation_system.hpp>
 
+#include <SDL3/SDL.h>
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -57,6 +59,30 @@ constexpr std::int32_t kMaxResolutionIterations = 4;
 constexpr std::int32_t kGroundZOrder = 1;
 constexpr std::int32_t kSquareZOrder = 1;
 constexpr std::int32_t kCharacterZOrder = 2;
+
+ChrisGame::ChrisGame(std::string server_state_address)
+    : network_state_socket(network_context, zmq::socket_type::sub)
+{
+    network_state_socket.set(zmq::sockopt::subscribe, "");
+    network_state_socket.connect(server_state_address);
+    SDL_Log("Networking: connecting to the server's state broadcast at %s.", server_state_address.c_str());
+}
+
+void ChrisGame::PollServerState(svanes::Registry& world)
+{
+    zmq::message_t message;
+    const zmq::recv_result_t result = network_state_socket.recv(message, zmq::recv_flags::dontwait);
+    if (!result.has_value()) {
+        return;
+    }
+
+    if (message.size() != sizeof(svanes::Color)) {
+        SDL_Log("Networking: received unexpected state packet of size %zu.", message.size());
+        return;
+    }
+
+    world.GetComponent<svanes::SolidShape>(background_entity).color = *message.data<svanes::Color>();
+}
 
 void ChrisGame::Initialize(svanes::GameContext& context)
 {
@@ -242,8 +268,13 @@ void ChrisGame::Update(const svanes::FrameContext& frame)
 
     elapsed_seconds += frame.delta_seconds;
 
+    PollServerState(frame.world);
+
     const float output_width = static_cast<float>(frame.output_width);
     const float output_height = static_cast<float>(frame.output_height);
+
+    frame.camera.x = output_width * 0.5F;
+    frame.camera.y = output_height * 0.5F;
 
     svanes::Transform& background = frame.world.GetComponent<svanes::Transform>(background_entity);
     background.x = output_width * 0.5F;

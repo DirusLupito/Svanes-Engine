@@ -212,10 +212,13 @@ target_compile_definitions(svanes_game_chris PRIVATE
     CHRIS_GAME_ASSETS_DIR="${CMAKE_SOURCE_DIR}/games/chris-placeholder/assets"
 )
 
+add_executable(svanes_game_chris_server games/chris-placeholder/server_main.cpp)
+target_link_libraries(svanes_game_chris_server PRIVATE Svanes::Engine)
+
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT svanes_game_orbital_escalation)
 
 set_target_properties(
-    svanes_engine svanes_game_erik svanes_game_orbital_escalation svanes_game_chris
+    svanes_engine svanes_game_erik svanes_game_orbital_escalation svanes_game_chris svanes_game_chris_server
     PROPERTIES
         CXX_EXTENSIONS OFF
         ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/$<CONFIG>"
