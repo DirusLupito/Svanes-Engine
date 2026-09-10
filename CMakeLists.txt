@@ -4,7 +4,7 @@ project(
     SvanesEngine
     VERSION 0.1.0
     DESCRIPTION "A small SDL-based game engine"
-    LANGUAGES CXX
+    LANGUAGES C CXX
 )
 
 include(FetchContent)
@@ -84,6 +84,40 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(SDL3_mixer)
 
+block(SCOPE_FOR VARIABLES)
+    set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+    set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+    set(BUILD_SHARED OFF)
+    set(BUILD_STATIC ON)
+    set(BUILD_TESTS OFF)
+    set(ZMQ_BUILD_TESTS OFF)
+    set(WITH_PERF_TOOL OFF)
+    set(WITH_DOC OFF)
+    set(WITH_DOCS OFF)
+    set(ENABLE_CPACK OFF)
+    set(ENABLE_DRAFTS OFF)
+    set(WITH_LIBBSD OFF)
+    set(CPPZMQ_BUILD_TESTS OFF)
+
+    FetchContent_Declare(
+        ZeroMQ
+        URL https://github.com/zeromq/libzmq/releases/download/v4.3.5/zeromq-4.3.5.tar.gz
+        URL_HASH SHA256=6653ef5910f17954861fe72332e68b03ca6e4d9c7160eb3a8de5a5a913bfab43
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+        SOURCE_DIR "${CMAKE_SOURCE_DIR}/thirdparty/zeromq-src"
+    )
+    FetchContent_MakeAvailable(ZeroMQ)
+
+    FetchContent_Declare(
+        cppzmq
+        URL https://github.com/zeromq/cppzmq/archive/refs/tags/v4.10.0.tar.gz
+        URL_HASH SHA256=c81c81bba8a7644c84932225f018b5088743a22999c6d82a2b5f5cd1e6942b74
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+        SOURCE_DIR "${CMAKE_SOURCE_DIR}/thirdparty/cppzmq-src"
+    )
+    FetchContent_MakeAvailable(cppzmq)
+endblock()
+
 add_library(svanes_engine STATIC)
 add_library(Svanes::Engine ALIAS svanes_engine)
 
@@ -142,7 +176,7 @@ target_sources(
 target_compile_features(svanes_engine PUBLIC cxx_std_23)
 target_link_libraries(
     svanes_engine
-    PUBLIC SDL3::SDL3
+    PUBLIC SDL3::SDL3 cppzmq-static
     PRIVATE SDL3_image::SDL3_image SDL3_mixer::SDL3_mixer
 )
 

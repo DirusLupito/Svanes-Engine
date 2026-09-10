@@ -82,6 +82,17 @@ else
     ok=0
 fi
 
+for dependency in SDL3_mixer:sdl3_mixer-src ZeroMQ:zeromq-src cppzmq:cppzmq-src; do
+    name="${dependency%%:*}"
+    directory="${dependency#*:}"
+    if [ -d "$repo_root/thirdparty/$directory" ]; then
+        echo "  [ok] $name found (thirdparty/$directory)"
+    else
+        echo "  [missing] $name not fetched yet -- run 'just fetch-deps'"
+        ok=0
+    fi
+done
+
 if [ "$ok" -ne 1 ]; then
     exit 1
 fi

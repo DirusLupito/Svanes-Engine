@@ -24,6 +24,9 @@ catch {
 $thirdparty = [ordered] @{
     'SDL3' = Join-Path $repoRoot 'thirdparty\sdl3-src'
     'SDL3_image' = Join-Path $repoRoot 'thirdparty\sdl3_image-src'
+    'SDL3_mixer' = Join-Path $repoRoot 'thirdparty\sdl3_mixer-src'
+    'ZeroMQ' = Join-Path $repoRoot 'thirdparty\zeromq-src'
+    'cppzmq' = Join-Path $repoRoot 'thirdparty\cppzmq-src'
 }
 
 foreach ($name in $thirdparty.Keys) {
