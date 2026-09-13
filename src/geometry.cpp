@@ -4,8 +4,7 @@
 
 namespace svanes {
 
-Transform ComposeTransforms(const Transform& parent, const Transform& local)
-{
+Transform ComposeTransforms(const Transform &parent, const Transform &local) {
     const float cosine = std::cos(parent.rotation);
     const float sine = std::sin(parent.rotation);
     return {
@@ -15,4 +14,4 @@ Transform ComposeTransforms(const Transform& parent, const Transform& local)
     };
 }
 
-}
+} // namespace svanes

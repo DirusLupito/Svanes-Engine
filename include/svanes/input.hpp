@@ -17,7 +17,7 @@ class InputManagerInternal;
 
 /**
  * Enumeration of keys that can be queried from the InputManager.
- * 
+ *
  * MEMBERS:
  * - Escape: The Escape key.
  * - Space: The Spacebar key.
@@ -47,7 +47,7 @@ class InputManagerInternal;
  * - X: The X key.
  * - Y: The Y key.
  * - Z: The Z key.
- * 
+ *
  * - Digit0: The 0 key on the main number row.
  * - Digit1: The 1 key on the main number row.
  * - Digit2: The 2 key on the main number row.
@@ -58,7 +58,7 @@ class InputManagerInternal;
  * - Digit7: The 7 key on the main number row.
  * - Digit8: The 8 key on the main number row.
  * - Digit9: The 9 key on the main number row.
- * 
+ *
  * - Enter: The Enter key.
  * - Backspace: The Backspace key.
  * - Tab: The Tab key.
@@ -74,7 +74,7 @@ class InputManagerInternal;
  * - Period: The Period key.
  * - Slash: The Slash key.
  * - CapsLock: The Caps Lock key.
- * 
+ *
  * - F1: The F1 key.
  * - F2: The F2 key.
  * - F3: The F3 key.
@@ -99,7 +99,7 @@ class InputManagerInternal;
  * - F22: The F22 key.
  * - F23: The F23 key.
  * - F24: The F24 key.
- * 
+ *
  * - PrintScreen: The Print Screen key.
  * - ScrollLock: The Scroll Lock key.
  * - Pause: The Pause key.
@@ -109,12 +109,12 @@ class InputManagerInternal;
  * - Delete: The Delete key.
  * - End: The End key.
  * - PageDown: The Page Down key.
- * 
+ *
  * - Up: The Up Arrow key.
  * - Down: The Down Arrow key.
  * - Left: The Left Arrow key.
  * - Right: The Right Arrow key.
- * 
+ *
  * - NumLock: The Num Lock key (Clear on Mac keyboards).
  * - KeypadDivide: The numeric keypad divide key.
  * - KeypadMultiply: The numeric keypad multiply key.
@@ -133,7 +133,7 @@ class InputManagerInternal;
  * - Keypad9: The numeric keypad 9 key.
  * - KeypadPeriod: The numeric keypad decimal point key.
  * - KeypadEquals: The numeric keypad equals key.
- * 
+ *
  * - LeftControl: The Left Control key.
  * - LeftShift: The Left Shift key.
  * - LeftAlt: The left Alt key (Option on Mac keyboards).
@@ -145,8 +145,8 @@ class InputManagerInternal;
  * - Menu: The context menu key.
  * - NonUsHash: The non-US hash key used by some ISO keyboards.
  * - NonUsBackslash: The additional ISO key between Left Shift and Z.
- * 
- * - Count: A fake key used to get the number of keys in the enum. 
+ *
+ * - Count: A fake key used to get the number of keys in the enum.
  *   Used to size the arrays in InputManager.
  */
 enum class Key : std::uint8_t {
@@ -283,14 +283,14 @@ enum class Key : std::uint8_t {
 
 /**
  * Enumeration of mouse buttons that can be queried from the InputManager.
- * 
+ *
  * MEMBERS:
  * - Left: The left mouse button.
  * - Middle: The middle mouse button.
  * - Right: The right mouse button.
  * - Mouse4: The fourth mouse button (typically the back side button).
  * - Mouse5: The fifth mouse button (typically the forward side button).
- * - Count: A fake button used to get the number of buttons in the enum. 
+ * - Count: A fake button used to get the number of buttons in the enum.
  *   Used to size the arrays in InputManager.
  */
 enum class MouseButton : std::uint8_t {
@@ -308,8 +308,7 @@ enum class MouseButton : std::uint8_t {
  * Mostly a wrapper around SDL's input handling.
  */
 class InputManager final {
-public:
-
+  public:
     /**
      * Checks if a specific key is currently pressed down.
      * @param key The key to check.
@@ -348,14 +347,16 @@ public:
     /**
      * Checks if a specific mouse button was released in the current frame.
      * @param button The mouse button to check.
-     * @return True if the mouse button was released this frame, false otherwise.
+     * @return True if the mouse button was released this frame, false
+     * otherwise.
      */
     bool WasMouseButtonReleased(MouseButton button) const;
 
 
     /**
      * Gets the current mouse position.
-     * Measured relative to the window, with (0, 0) being the top-left corner of the window.
+     * Measured relative to the window, with (0, 0) being the top-left corner of
+     * the window.
      * @return The current mouse position as a Vector2D.
      */
     Vector2D MousePosition() const;
@@ -374,7 +375,8 @@ public:
 
     /**
      * Requests to start text input mode.
-     * This will enable SDL's text input handling, allowing for text input events.
+     * This will enable SDL's text input handling, allowing for text input
+     * events.
      */
     void StartTextInput();
 
@@ -394,35 +396,42 @@ public:
      * Gets the text input received during this frame.
      * @return A string containing the text input for this frame.
      */
-    const std::string& TextInputThisFrame() const;
+    const std::string &TextInputThisFrame() const;
 
-private:
+  private:
+    // Constants for the number of keys and mouse buttons, used to size the
+    // arrays.
 
-    // Constants for the number of keys and mouse buttons, used to size the arrays.
+    static constexpr std::size_t kKeyCount =
+        static_cast<std::size_t>(Key::Count);
 
-    static constexpr std::size_t kKeyCount = static_cast<std::size_t>(Key::Count);
-    static constexpr std::size_t kMouseButtonCount = static_cast<std::size_t>(MouseButton::Count);
+    static constexpr std::size_t kMouseButtonCount =
+        static_cast<std::size_t>(MouseButton::Count);
 
-    // The previous array will be 1 frame behind the current array. 
+    // The previous array will be 1 frame behind the current array.
     // For both keys and mouse buttons.
 
-    // Tracks the current state of keys. This array is indexed by the Key enum values.
-    // true means the key is currently down, false means it is up.
+    // Tracks the current state of keys. This array is indexed by the Key enum
+    // values. true means the key is currently down, false means it is up.
     std::array<bool, kKeyCount> current{};
 
-    // Tracks the previous state of keys. This array is indexed by the Key enum values.
-    // true means the key was down in the previous frame, false means it was up.
+    // Tracks the previous state of keys. This array is indexed by the Key enum
+    // values. true means the key was down in the previous frame, false means it
+    // was up.
     std::array<bool, kKeyCount> previous{};
 
-    // Tracks the current state of mouse buttons. This array is indexed by the MouseButton enum values.
-    // true means the mouse button is currently down, false means it is up.
+    // Tracks the current state of mouse buttons. This array is indexed by the
+    // MouseButton enum values. true means the mouse button is currently down,
+    // false means it is up.
     std::array<bool, kMouseButtonCount> mouse_current{};
 
-    // Tracks the previous state of mouse buttons. This array is indexed by the MouseButton enum values.
-    // true means the mouse button was down in the previous frame, false means it was up
+    // Tracks the previous state of mouse buttons. This array is indexed by the
+    // MouseButton enum values. true means the mouse button was down in the
+    // previous frame, false means it was up
     std::array<bool, kMouseButtonCount> mouse_previous{};
 
-    // Current mouse position relative to the window, with (0, 0) being the top-left corner of the window.
+    // Current mouse position relative to the window, with (0, 0) being the
+    // top-left corner of the window.
     Vector2D mouse_position{};
 
     // Mouse movement delta (change in position) for this frame.
@@ -444,7 +453,8 @@ private:
     std::string text_input_this_frame;
 
 
-    // Expose the private members to the internal InputManagerInternal class for managing input state.
+    // Expose the private members to the internal InputManagerInternal class for
+    // managing input state.
     friend class internal::InputManagerInternal;
 };
 

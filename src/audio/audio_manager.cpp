@@ -11,42 +11,41 @@
 
 namespace svanes {
 
-void AudioManager::MixerDeleter::operator()(MIX_Mixer* mixer) const
-{
+void AudioManager::MixerDeleter::operator()(MIX_Mixer *mixer) const {
     MIX_DestroyMixer(mixer);
 }
 
-void AudioManager::AudioDeleter::operator()(MIX_Audio* audio) const
-{
+void AudioManager::AudioDeleter::operator()(MIX_Audio *audio) const {
     MIX_DestroyAudio(audio);
 }
 
-void AudioManager::TrackDeleter::operator()(MIX_Track* track) const
-{
+void AudioManager::TrackDeleter::operator()(MIX_Track *track) const {
     MIX_DestroyTrack(track);
 }
 
-AudioManager::AudioManager()
-{
+AudioManager::AudioManager() {
     if (!MIX_Init()) {
-        throw std::runtime_error("Could not initialize SDL_mixer: " + std::string{SDL_GetError()});
+        throw std::runtime_error("Could not initialize SDL_mixer: " +
+                                 std::string{SDL_GetError()});
     }
 
-    MIX_Mixer* raw_mixer = MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, nullptr);
+    MIX_Mixer *raw_mixer =
+        MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, nullptr);
     if (raw_mixer == nullptr) {
-        throw std::runtime_error("Could not create audio mixer: " + std::string{SDL_GetError()});
+        throw std::runtime_error("Could not create audio mixer: " +
+                                 std::string{SDL_GetError()});
     }
     mixer = MixerPointer{raw_mixer};
 
-    MIX_Track* raw_track = MIX_CreateTrack(mixer.get());
+    MIX_Track *raw_track = MIX_CreateTrack(mixer.get());
     if (raw_track == nullptr) {
-        throw std::runtime_error("Could not create music track: " + std::string{SDL_GetError()});
+        throw std::runtime_error("Could not create music track: " +
+                                 std::string{SDL_GetError()});
     }
     music_track = TrackPointer{raw_track};
 }
 
-AudioManager::~AudioManager()
-{
+AudioManager::~AudioManager() {
     music_tracks.clear();
     sounds.clear();
     music_track.reset();
@@ -54,8 +53,7 @@ AudioManager::~AudioManager()
     MIX_Quit();
 }
 
-SoundHandle AudioManager::StoreSound(AudioPointer audio)
-{
+SoundHandle AudioManager::StoreSound(AudioPointer audio) {
     if (next_sound_id == 0) {
         throw std::runtime_error("Sound handle space is exhausted.");
     }
@@ -65,8 +63,7 @@ SoundHandle AudioManager::StoreSound(AudioPointer audio)
     return handle;
 }
 
-MusicHandle AudioManager::StoreMusic(AudioPointer audio)
-{
+MusicHandle AudioManager::StoreMusic(AudioPointer audio) {
     if (next_music_id == 0) {
         throw std::runtime_error("Music handle space is exhausted.");
     }
@@ -76,8 +73,7 @@ MusicHandle AudioManager::StoreMusic(AudioPointer audio)
     return handle;
 }
 
-SoundHandle AudioManager::LoadSound(std::string_view path)
-{
+SoundHandle AudioManager::LoadSound(std::string_view path) {
     if (path.empty()) {
         throw std::invalid_argument("Sound path cannot be empty.");
     }
@@ -85,14 +81,14 @@ SoundHandle AudioManager::LoadSound(std::string_view path)
     const std::string path_string{path};
     AudioPointer audio{MIX_LoadAudio(mixer.get(), path_string.c_str(), true)};
     if (audio == nullptr) {
-        throw std::runtime_error("Could not load sound '" + path_string + "': " + SDL_GetError());
+        throw std::runtime_error("Could not load sound '" + path_string +
+                                 "': " + SDL_GetError());
     }
 
     return StoreSound(std::move(audio));
 }
 
-MusicHandle AudioManager::LoadMusic(std::string_view path)
-{
+MusicHandle AudioManager::LoadMusic(std::string_view path) {
     if (path.empty()) {
         throw std::invalid_argument("Music path cannot be empty.");
     }
@@ -100,38 +96,40 @@ MusicHandle AudioManager::LoadMusic(std::string_view path)
     const std::string path_string{path};
     AudioPointer audio{MIX_LoadAudio(mixer.get(), path_string.c_str(), false)};
     if (audio == nullptr) {
-        throw std::runtime_error("Could not load music '" + path_string + "': " + SDL_GetError());
+        throw std::runtime_error("Could not load music '" + path_string +
+                                 "': " + SDL_GetError());
     }
 
     return StoreMusic(std::move(audio));
 }
 
-void AudioManager::PlaySound(SoundHandle sound)
-{
+void AudioManager::PlaySound(SoundHandle sound) {
     const auto entry = sounds.find(sound.id);
     if (entry == sounds.end()) {
         throw std::invalid_argument("Sound handle does not exist.");
     }
 
     if (!MIX_PlayAudio(mixer.get(), entry->second.get())) {
-        throw std::runtime_error("Could not play sound: " + std::string{SDL_GetError()});
+        throw std::runtime_error("Could not play sound: " +
+                                 std::string{SDL_GetError()});
     }
 }
 
-void AudioManager::PlayMusic(MusicHandle music, bool loop)
-{
+void AudioManager::PlayMusic(MusicHandle music, bool loop) {
     const auto entry = music_tracks.find(music.id);
     if (entry == music_tracks.end()) {
         throw std::invalid_argument("Music handle does not exist.");
     }
 
     if (!MIX_SetTrackAudio(music_track.get(), entry->second.get())) {
-        throw std::runtime_error("Could not assign music track: " + std::string{SDL_GetError()});
+        throw std::runtime_error("Could not assign music track: " +
+                                 std::string{SDL_GetError()});
     }
 
     const SDL_PropertiesID options = SDL_CreateProperties();
     if (options == 0) {
-        throw std::runtime_error("Could not create music playback options: " + std::string{SDL_GetError()});
+        throw std::runtime_error("Could not create music playback options: " +
+                                 std::string{SDL_GetError()});
     }
 
     SDL_SetNumberProperty(options, MIX_PROP_PLAY_LOOPS_NUMBER, loop ? -1 : 0);
@@ -139,67 +137,68 @@ void AudioManager::PlayMusic(MusicHandle music, bool loop)
     SDL_DestroyProperties(options);
 
     if (!played) {
-        throw std::runtime_error("Could not play music: " + std::string{SDL_GetError()});
+        throw std::runtime_error("Could not play music: " +
+                                 std::string{SDL_GetError()});
     }
 }
 
-void AudioManager::StopMusic()
-{
+void AudioManager::StopMusic() {
     if (!MIX_StopTrack(music_track.get(), 0)) {
-        throw std::runtime_error("Could not stop music: " + std::string{SDL_GetError()});
+        throw std::runtime_error("Could not stop music: " +
+                                 std::string{SDL_GetError()});
     }
 }
 
-void AudioManager::SetMusicVolume(float volume)
-{
+void AudioManager::SetMusicVolume(float volume) {
     if (!MIX_SetTrackGain(music_track.get(), volume)) {
-        throw std::runtime_error("Could not set music volume: " + std::string{SDL_GetError()});
+        throw std::runtime_error("Could not set music volume: " +
+                                 std::string{SDL_GetError()});
     }
 }
 
-std::int64_t AudioManager::MusicPositionMilliseconds() const
-{
+std::int64_t AudioManager::MusicPositionMilliseconds() const {
     const Sint64 frames = MIX_GetTrackPlaybackPosition(music_track.get());
     if (frames < 0) {
-        throw std::runtime_error("Could not get music playback position: " + std::string{SDL_GetError()});
+        throw std::runtime_error("Could not get music playback position: " +
+                                 std::string{SDL_GetError()});
     }
 
-    return static_cast<std::int64_t>(MIX_TrackFramesToMS(music_track.get(), frames));
+    return static_cast<std::int64_t>(
+        MIX_TrackFramesToMS(music_track.get(), frames));
 }
 
-std::int64_t AudioManager::MusicDurationMilliseconds() const
-{
-    MIX_Audio* audio = MIX_GetTrackAudio(music_track.get());
+std::int64_t AudioManager::MusicDurationMilliseconds() const {
+    MIX_Audio *audio = MIX_GetTrackAudio(music_track.get());
     if (audio == nullptr) {
-        throw std::runtime_error("Could not get music duration: no music is assigned to the track.");
+        throw std::runtime_error(
+            "Could not get music duration: no music is assigned to the track.");
     }
 
     const Sint64 frames = MIX_GetAudioDuration(audio);
     if (frames < 0) {
-        throw std::runtime_error("Could not determine music duration: " + std::string{SDL_GetError()});
+        throw std::runtime_error("Could not determine music duration: " +
+                                 std::string{SDL_GetError()});
     }
 
     return static_cast<std::int64_t>(MIX_AudioFramesToMS(audio, frames));
 }
 
-void AudioManager::SeekMusic(std::int64_t position_milliseconds)
-{
-    const Sint64 frames = MIX_TrackMSToFrames(music_track.get(), position_milliseconds);
+void AudioManager::SeekMusic(std::int64_t position_milliseconds) {
+    const Sint64 frames =
+        MIX_TrackMSToFrames(music_track.get(), position_milliseconds);
     if (!MIX_SetTrackPlaybackPosition(music_track.get(), frames)) {
-        throw std::runtime_error("Could not seek music: " + std::string{SDL_GetError()});
+        throw std::runtime_error("Could not seek music: " +
+                                 std::string{SDL_GetError()});
     }
 }
 
-void AudioManager::SetMusicPlaybackRate(float ratio)
-{
+void AudioManager::SetMusicPlaybackRate(float ratio) {
     if (!MIX_SetTrackFrequencyRatio(music_track.get(), ratio)) {
-        throw std::runtime_error("Could not set music playback rate: " + std::string{SDL_GetError()});
+        throw std::runtime_error("Could not set music playback rate: " +
+                                 std::string{SDL_GetError()});
     }
 }
 
-AudioManager internal::AudioManagerInternal::Create()
-{
-    return AudioManager{};
-}
+AudioManager internal::AudioManagerInternal::Create() { return AudioManager{}; }
 
-}
+} // namespace svanes

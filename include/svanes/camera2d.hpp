@@ -29,7 +29,7 @@ enum class ScaleMode : std::uint8_t {
 };
 
 class Camera2D final {
-public:
+  public:
     // x axis position of the center of the camera in world coordinates
     float x = 0.0F;
 
@@ -40,7 +40,8 @@ public:
     // > 1.0 means zoomed in, and < 1.0 means zoomed out
     float zoom = 1.0F;
 
-    // how entity sizes and positions are scaled relative to the current window size
+    // how entity sizes and positions are scaled relative to the current window
+    // size
     ScaleMode scale_mode = ScaleMode::Constant;
 
     /**
@@ -73,26 +74,29 @@ public:
 
     /**
      * The region of the rendering output the game world is drawn into,
-     * centered in the output and fitted to the design aspect ratio in Proportional mode.
+     * centered in the output and fitted to the design aspect ratio in
+     * Proportional mode.
      *
      * @return The viewport in screen coordinates.
      */
     Rectangle2D Viewport() const;
 
     /**
-     * Sets the zoom factor of the camera, keeping the specified screen coordinates
-     * anchored to the same world coordinates.
-     * 
-     * @param new_zoom The new zoom factor to set. Must be finite and greater than zero.
+     * Sets the zoom factor of the camera, keeping the specified screen
+     * coordinates anchored to the same world coordinates.
+     *
+     * @param new_zoom The new zoom factor to set. Must be finite and greater
+     * than zero.
      * @param screen_position The position in screen space to anchor.
      *
-     * @throws std::invalid_argument if the new zoom factor is not finite or is less than or equal to zero.
+     * @throws std::invalid_argument if the new zoom factor is not finite or is
+     * less than or equal to zero.
      */
     void SetZoomAt(float new_zoom, Vector2D screen_position);
 
     /**
      * Converts a rectangle from world coordinates to screen coordinates.
-     * 
+     *
      * @param world The rectangle in world coordinates.
      *
      * @return The rectangle in screen coordinates.
@@ -101,84 +105,97 @@ public:
 
     /**
      * Converts a rectangle from screen coordinates to world coordinates.
-     * 
+     *
      * @param screen The rectangle in screen coordinates.
      *
      * @return The rectangle in world coordinates.
-     * 
-     * @throws std::invalid_argument if the zoom factor is not finite or is less than or equal to zero.
+     *
+     * @throws std::invalid_argument if the zoom factor is not finite or is less
+     * than or equal to zero.
      */
     Rectangle2D ScreenToWorld(Rectangle2D screen) const;
 
     /**
-     * Prepares a rectangular entity for rendering by converting its world coordinates to screen coordinates
-     * and checking if it is within the bounds of the rendering output.
-     * If the rectangle is outside the bounds, std::nullopt is returned.
-     * 
+     * Prepares a rectangular entity for rendering by converting its world
+     * coordinates to screen coordinates and checking if it is within the bounds
+     * of the rendering output. If the rectangle is outside the bounds,
+     * std::nullopt is returned.
+     *
      * @param transform The Transform component of the entity to be rendered.
      * @param rectangle The Rectangle2D component of the entity to be rendered.
      *
-     * @return An optional Rectangle2D representing the destination rectangle in screen coordinates,
-     * or std::nullopt if the rectangle is outside the bounds of the rendering output.
+     * @return An optional Rectangle2D representing the destination rectangle in
+     * screen coordinates, or std::nullopt if the rectangle is outside the
+     * bounds of the rendering output.
      *
-     * @throws std::invalid_argument if the zoom factor or scale is not finite or is less than or equal to zero.
+     * @throws std::invalid_argument if the zoom factor or scale is not finite
+     * or is less than or equal to zero.
      */
-    std::optional<Rectangle2D> PrepareForRendering(
-        const Transform& transform, const Rectangle2D& rectangle
-    ) const;
+    std::optional<Rectangle2D>
+    PrepareForRendering(const Transform &transform,
+                        const Rectangle2D &rectangle) const;
 
     /**
-     * Prepares a triangular entity for rendering by converting its world coordinates to screen coordinates
-     * and checking if it is within the bounds of the rendering output.
-     * If the triangle is outside the bounds, std::nullopt is returned.
-     * 
+     * Prepares a triangular entity for rendering by converting its world
+     * coordinates to screen coordinates and checking if it is within the bounds
+     * of the rendering output. If the triangle is outside the bounds,
+     * std::nullopt is returned.
+     *
      * @param transform The Transform component of the entity to be rendered.
      * @param triangle The Triangle2D component of the entity to be rendered.
      *
-     * @return An optional Triangle2D representing the destination triangle in screen coordinates,
-     * or std::nullopt if the triangle is outside the bounds of the rendering output.
-     * 
-     * @throws std::invalid_argument if the zoom factor or scale is not finite or is less than or equal to zero.
+     * @return An optional Triangle2D representing the destination triangle in
+     * screen coordinates, or std::nullopt if the triangle is outside the bounds
+     * of the rendering output.
+     *
+     * @throws std::invalid_argument if the zoom factor or scale is not finite
+     * or is less than or equal to zero.
      */
-    std::optional<Triangle2D> PrepareForRendering(
-        const Transform& transform, const Triangle2D& triangle
-    ) const;
+    std::optional<Triangle2D>
+    PrepareForRendering(const Transform &transform,
+                        const Triangle2D &triangle) const;
 
     /**
-     * Prepares a circular entity for rendering by converting its world coordinates to screen coordinates
-     * and checking if it is within the bounds of the rendering output.
-     * If the circle is outside the bounds, std::nullopt is returned.
-     * 
+     * Prepares a circular entity for rendering by converting its world
+     * coordinates to screen coordinates and checking if it is within the bounds
+     * of the rendering output. If the circle is outside the bounds,
+     * std::nullopt is returned.
+     *
      * @param transform The Transform component of the entity to be rendered.
      * @param circle The Circle2D component of the entity to be rendered.
      *
-     * @return An optional Circle2D representing the destination circle in screen coordinates,
-     * or std::nullopt if the circle is outside the bounds of the rendering output.
-     * 
-     * @throws std::invalid_argument if the zoom factor or scale is not finite or is less than or equal to zero.
+     * @return An optional Circle2D representing the destination circle in
+     * screen coordinates, or std::nullopt if the circle is outside the bounds
+     * of the rendering output.
+     *
+     * @throws std::invalid_argument if the zoom factor or scale is not finite
+     * or is less than or equal to zero.
      */
-    std::optional<Circle2D> PrepareForRendering(
-        const Transform& transform, const Circle2D& circle
-    ) const;
+    std::optional<Circle2D> PrepareForRendering(const Transform &transform,
+                                                const Circle2D &circle) const;
 
     /**
-     * Prepares a convex polygon entity for rendering by converting its world coordinates to screen coordinates
-     * and checking if it is within the bounds of the rendering output.
-     * If the polygon is outside the bounds, std::nullopt is returned.
-     * 
-     * @param transform The Transform component of the entity to be rendered.
-     * @param polygon The ConvexPolygon2D component of the entity to be rendered.
+     * Prepares a convex polygon entity for rendering by converting its world
+     * coordinates to screen coordinates and checking if it is within the bounds
+     * of the rendering output. If the polygon is outside the bounds,
+     * std::nullopt is returned.
      *
-     * @return An optional ConvexPolygon2D representing the destination polygon in screen coordinates,
-     * or std::nullopt if the polygon is outside the bounds of the rendering output.
-     * 
-     * @throws std::invalid_argument if the zoom factor or scale is not finite or is less than or equal to zero.
+     * @param transform The Transform component of the entity to be rendered.
+     * @param polygon The ConvexPolygon2D component of the entity to be
+     * rendered.
+     *
+     * @return An optional ConvexPolygon2D representing the destination polygon
+     * in screen coordinates, or std::nullopt if the polygon is outside the
+     * bounds of the rendering output.
+     *
+     * @throws std::invalid_argument if the zoom factor or scale is not finite
+     * or is less than or equal to zero.
      */
-    std::optional<ConvexPolygon2D> PrepareForRendering(
-        const Transform& transform, const ConvexPolygon2D& polygon
-    ) const;
+    std::optional<ConvexPolygon2D>
+    PrepareForRendering(const Transform &transform,
+                        const ConvexPolygon2D &polygon) const;
 
-private:
+  private:
     // width of the rendering output the camera draws into
     std::int32_t output_width = 0;
 
@@ -186,4 +203,4 @@ private:
     std::int32_t output_height = 0;
 };
 
-}
+} // namespace svanes

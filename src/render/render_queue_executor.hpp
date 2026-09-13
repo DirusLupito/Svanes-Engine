@@ -1,6 +1,6 @@
 /**
  * Internal interface for executing rendering commands
- * stored in a RenderQueue. 
+ * stored in a RenderQueue.
  * @file render_queue_executor.hpp
  */
 
@@ -17,15 +17,16 @@ namespace svanes::internal {
  * Executes rendering commands stored in a RenderQueue.
  */
 class RenderQueueExecutor final {
-public:
-
+  public:
     /**
-     * Constructs a RenderQueueExecutor with the specified SDL_Renderer and TextureManager.
+     * Constructs a RenderQueueExecutor with the specified SDL_Renderer and
+     * TextureManager.
      * @param renderer The SDL_Renderer used for rendering.
      * @param texture_manager The TextureManager used for managing textures.
      * @throws std::invalid_argument if the renderer is null.
      */
-    RenderQueueExecutor(SDL_Renderer* renderer, const TextureManager& texture_manager);
+    RenderQueueExecutor(SDL_Renderer *renderer,
+                        const TextureManager &texture_manager);
 
     /**
      * Execute the rendering commands stored in the provided RenderQueue.
@@ -33,59 +34,64 @@ public:
      * @param render_queue The RenderQueue containing the commands to execute.
      * @throws std::runtime_error if any command fails to execute.
      */
-    void Execute(RenderQueue& render_queue, std::optional<Rectangle2D> clip = std::nullopt) const;
+    void Execute(RenderQueue &render_queue,
+                 std::optional<Rectangle2D> clip = std::nullopt) const;
 
-private:
-
+  private:
     /**
-     * Executes a single ConvexPolygonCommand, which draws a convex polygon with a specific color.
+     * Executes a single ConvexPolygonCommand, which draws a convex polygon with
+     * a specific color.
      * @param command The ConvexPolygonCommand to execute.
      * @throws std::runtime_error if the polygon cannot be drawn,
      * std::invalid_argument if the blend mode is unknown.
      */
-    void Execute(const RenderQueue::ConvexPolygonCommand& command) const;
+    void Execute(const RenderQueue::ConvexPolygonCommand &command) const;
 
     /**
-     * Executes a single ClearCommand, which clears the screen with a specific color.
+     * Executes a single ClearCommand, which clears the screen with a specific
+     * color.
      * @param command The ClearCommand to execute.
      * @throws std::runtime_error if the renderer cannot be cleared.
      */
-    void Execute(const RenderQueue::ClearCommand& command) const;
+    void Execute(const RenderQueue::ClearCommand &command) const;
 
     /**
-     * Executes a single RectangleCommand, which draws a rectangle with a specific color.
+     * Executes a single RectangleCommand, which draws a rectangle with a
+     * specific color.
      * @param command The RectangleCommand to execute.
      * @throws std::runtime_error if the rectangle cannot be drawn.
      * std::invalid_argument if the blend mode is unknown.
      */
-    void Execute(const RenderQueue::RectangleCommand& command) const;
+    void Execute(const RenderQueue::RectangleCommand &command) const;
 
     /**
-     * Executes a single TriangleCommand, which draws a triangle with a specific color.
+     * Executes a single TriangleCommand, which draws a triangle with a specific
+     * color.
      * @param command The TriangleCommand to execute.
      * @throws std::runtime_error if the triangle cannot be drawn,
      * std::invalid_argument if the blend mode is unknown.
      */
-    void Execute(const RenderQueue::TriangleCommand& command) const;
+    void Execute(const RenderQueue::TriangleCommand &command) const;
 
     /**
-     * Executes a single CircleCommand, which draws a circle with a specific color.
-     * Circles will be approximated using a polygon with a fixed number of segments.
-     * 
+     * Executes a single CircleCommand, which draws a circle with a specific
+     * color. Circles will be approximated using a polygon with a fixed number
+     * of segments.
+     *
      * @param command The CircleCommand to execute.
      * @throws std::runtime_error if the circle cannot be drawn,
      * std::invalid_argument if the blend mode is unknown.
      */
-    void Execute(const RenderQueue::CircleCommand& command) const;
+    void Execute(const RenderQueue::CircleCommand &command) const;
 
     /**
-     * Executes a single TextureCommand, which draws a texture, 
+     * Executes a single TextureCommand, which draws a texture,
      * optionally specifying a source rectangle.
      * @param command The TextureCommand to execute.
      * @throws std::runtime_error if the texture cannot be drawn,
      * std::invalid_argument if the blend mode is unknown.
      */
-    void Execute(const RenderQueue::TextureCommand& command) const;
+    void Execute(const RenderQueue::TextureCommand &command) const;
 
     /**
      * Sets the draw color for the SDL_Renderer based on the provided Color.
@@ -98,14 +104,14 @@ private:
      * The SDL_Renderer used for rendering.
      * This will handle the actual drawing operations to the screen.
      */
-    SDL_Renderer* renderer;
+    SDL_Renderer *renderer;
 
     /**
      * The TextureManager used for managing textures.
      * This will hold the datastructure containing
      * all the textures and their corresponding handles.
      */
-    const TextureManager& texture_manager;
+    const TextureManager &texture_manager;
 };
 
-}
+} // namespace svanes::internal

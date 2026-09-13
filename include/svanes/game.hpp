@@ -18,22 +18,26 @@ class TextureManager;
  * they must use the TextureManager provided in this context.
  *
  * FIELDS:
- * - world: The engine owned registry containing the game's entities and components.
+ * - world: The engine owned registry containing the game's entities and
+ * components.
  * - assets: The engine owned texture manager used to load and create textures.
- * - audio: The engine owned audio manager used to load and play sounds and music.
- * - camera: The engine owned camera used to convert between screen and world coordinates.
+ * - audio: The engine owned audio manager used to load and play sounds and
+ * music.
+ * - camera: The engine owned camera used to convert between screen and world
+ * coordinates.
  * - output_width: The current width of the rendering output.
  * - output_height: The current height of the rendering output.
- * - gravity: The engine owned gravity vector applied to entities with Kinematic2D and Gravity components.
+ * - gravity: The engine owned gravity vector applied to entities with
+ * Kinematic2D and Gravity components.
  */
 struct GameContext {
-    Registry& world;
-    TextureManager& assets;
-    AudioManager& audio;
-    Camera2D& camera;
+    Registry &world;
+    TextureManager &assets;
+    AudioManager &audio;
+    Camera2D &camera;
     std::int32_t output_width;
     std::int32_t output_height;
-    Vector2D& gravity;
+    Vector2D &gravity;
 };
 
 /**
@@ -45,53 +49,60 @@ struct GameContext {
  * to update its state accordingly.
  *
  * FIELDS:
- * - world: The engine owned registry containing the game's entities and components.
+ * - world: The engine owned registry containing the game's entities and
+ * components.
  * - input: The input state for the current frame.
  * - delta_seconds: The elapsed time since the previous frame, in seconds.
  * - output_width: The current width of the rendering output.
  * - output_height: The current height of the rendering output.
- * - audio: The engine owned audio manager used to load and play sounds and music.
- * - camera: The engine owned camera used to convert between screen and world coordinates.
- * - gravity: The engine owned gravity vector applied to entities with Kinematic2D and Gravity components.
+ * - audio: The engine owned audio manager used to load and play sounds and
+ * music.
+ * - camera: The engine owned camera used to convert between screen and world
+ * coordinates.
+ * - gravity: The engine owned gravity vector applied to entities with
+ * Kinematic2D and Gravity components.
  */
 struct FrameContext {
-    Registry& world;
-    InputManager& input;
+    Registry &world;
+    InputManager &input;
     float delta_seconds;
     std::int32_t output_width;
     std::int32_t output_height;
-    AudioManager& audio;
-    Camera2D& camera;
-    Vector2D& gravity;
+    AudioManager &audio;
+    Camera2D &camera;
+    Vector2D &gravity;
 };
 
 /**
  * Any game that is to be run by the engine must implement this interface.
  * It provides a bridge between the engine and the game, allowing the engine
- * to manage the game loop and rendering while the game implements its own logic.
+ * to manage the game loop and rendering while the game implements its own
+ * logic.
  */
 class IGame {
-public:
+  public:
     virtual ~IGame() = default;
 
     /**
      * Initializes the game with the provided context.
      * This method is called once at the start of the game.
-     * @param context The context for the game, providing access to the TextureManager.
+     * @param context The context for the game, providing access to the
+     * TextureManager.
      */
-    virtual void Initialize(GameContext& context) = 0;
+    virtual void Initialize(GameContext &context) = 0;
 
     /**
      * Updates the game state based on the provided frame context.
-     * This method is called once per frame, allowing the game to process input and update its state.
-     * @param frame The context for the current frame, providing access to the 
+     * This method is called once per frame, allowing the game to process input
+     * and update its state.
+     * @param frame The context for the current frame, providing access to the
      * InputManager and the time elapsed since the last frame.
      */
-    virtual void Update(const FrameContext& frame) = 0;
+    virtual void Update(const FrameContext &frame) = 0;
 
     /**
      * Determines whether the game should quit on the next
-     * iteration of the game loop. 
+     * iteration of the game loop.
      * @return True if the game should quit, false otherwise.
      */
     virtual bool ShouldQuit() const { return false; }

@@ -32,29 +32,34 @@ struct ApplicationSettings {
  * game indicates that it should quit.
  */
 class Application final {
-public:
+  public:
     /**
      * Constructs an Application with the specified settings.
-     * @param settings The settings for the application, including the window title and dimensions.
+     * @param settings The settings for the application, including the window
+     * title and dimensions.
      */
     explicit Application(ApplicationSettings settings = {});
 
     /**
-     * Runs the application with the provided game instance. This method initializes SDL,
-     * creates the window and renderer, and enters the game loop until the game indicates
-     * that it should quit. It returns an integer status code, where 0 indicates success
-     * and any non-zero value indicates an error.
-     * 
+     * Runs the application with the provided game instance. This method
+     * initializes SDL, creates the window and renderer, and enters the game
+     * loop until the game indicates that it should quit. It returns an integer
+     * status code, where 0 indicates success and any non-zero value indicates
+     * an error.
+     *
      * @param game The game instance to run within the application.
-     * @return An integer status code indicating the result of the application run.
+     * @return An integer status code indicating the result of the application
+     * run.
      */
-    int32_t run(IGame& game);
+    int32_t run(IGame &game);
 
-private:
-    // The settings for the application, including the window title and dimensions.
+  private:
+    // The settings for the application, including the window title and
+    // dimensions.
     ApplicationSettings settings;
 
-    // The registry that holds all entities and their components in the game world.
+    // The registry that holds all entities and their components in the game
+    // world.
     Registry world;
 };
 

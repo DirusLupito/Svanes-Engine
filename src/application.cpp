@@ -29,17 +29,18 @@ namespace svanes {
 namespace internal {
 
 /**
- * Internal helper function that runs the main game loop. 
+ * Internal helper function that runs the main game loop.
  * This should not be exposed to the user of the engine.
  * This function shall handle input processing, calculating delta time,
- * updating the game state, and building and executing the render queue for each frame.
+ * updating the game state, and building and executing the render queue for each
+ * frame.
  * @param game The game instance to run within the application.
  * @param window The SDL_Window used for input.
  * @param renderer The SDL_Renderer used for rendering.
  * @param world The registry containing all entities and their components.
  */
-void RunGameLoop(IGame& game, SDL_Window* window, SDL_Renderer* renderer, Registry& world)
-{
+void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
+                 Registry &world) {
 
     // First time setup.
 
@@ -52,11 +53,15 @@ void RunGameLoop(IGame& game, SDL_Window* window, SDL_Renderer* renderer, Regist
     Vector2D gravity{};
     std::int32_t output_width = 0;
     std::int32_t output_height = 0;
-    if (!SDL_GetCurrentRenderOutputSize(renderer, &output_width, &output_height)) {
-        throw std::runtime_error("Could not get render output dimensions: " + std::string{SDL_GetError()});
+    if (!SDL_GetCurrentRenderOutputSize(renderer, &output_width,
+                                        &output_height)) {
+        throw std::runtime_error("Could not get render output dimensions: " +
+                                 std::string{SDL_GetError()});
     }
     camera.SetOutputSize(output_width, output_height);
-    GameContext game_context{world, texture_manager, audio_manager, camera, output_width, output_height, gravity};
+    GameContext game_context{world,  texture_manager, audio_manager,
+                             camera, output_width,    output_height,
+                             gravity};
 
     // Custom initialization of the game. Implemented by the user of the engine.
 
@@ -82,7 +87,8 @@ void RunGameLoop(IGame& game, SDL_Window* window, SDL_Renderer* renderer, Regist
         }
 
         const Uint64 current_ticks = SDL_GetTicks();
-        const float delta_seconds = static_cast<float>(current_ticks - previous_ticks) / 1000.0F;
+        const float delta_seconds =
+            static_cast<float>(current_ticks - previous_ticks) / 1000.0F;
         previous_ticks = current_ticks;
 
 
@@ -90,24 +96,31 @@ void RunGameLoop(IGame& game, SDL_Window* window, SDL_Renderer* renderer, Regist
         // GAME STATE UPDATE
         //
 
-        if (!SDL_GetCurrentRenderOutputSize(renderer, &output_width, &output_height)) {
-            throw std::runtime_error("Could not get render output dimensions: " + std::string{SDL_GetError()});
+        if (!SDL_GetCurrentRenderOutputSize(renderer, &output_width,
+                                            &output_height)) {
+            throw std::runtime_error(
+                "Could not get render output dimensions: " +
+                std::string{SDL_GetError()});
         }
         camera.SetOutputSize(output_width, output_height);
 
-        const FrameContext frame_context{world, input, delta_seconds, output_width, output_height, audio_manager, camera, gravity};
+        const FrameContext frame_context{
+            world,         input,         delta_seconds, output_width,
+            output_height, audio_manager, camera,        gravity};
 
-        // Here we should advance the kinematics of all entities before updating the game state.
-        // This allows us to first update the positions of all entities based on their velocities 
-        // and accelerations, and then allow the game logic to respond to those new positions.
-        // Fixes the broken behavior where the game logic was responding to the previous frame's positions,
-        // which could lead to incorrect behavior likely around collisions.
+        // Here we should advance the kinematics of all entities before updating
+        // the game state. This allows us to first update the positions of all
+        // entities based on their velocities and accelerations, and then allow
+        // the game logic to respond to those new positions. Fixes the broken
+        // behavior where the game logic was responding to the previous frame's
+        // positions, which could lead to incorrect behavior likely around
+        // collisions.
         //
-        // This does however mean that there is now one frame of input latency, so we can talk about
-        // whether this is the best approach or not.
+        // This does however mean that there is now one frame of input latency,
+        // so we can talk about whether this is the best approach or not.
         AdvanceKinematics(world, delta_seconds, gravity);
         game.Update(frame_context);
-        
+
         InputManagerInternal::SynchronizeTextInput(input, window);
         AdvanceSpriteAnimations(world, delta_seconds);
 
@@ -124,20 +137,24 @@ void RunGameLoop(IGame& game, SDL_Window* window, SDL_Renderer* renderer, Regist
         // Clear the screen to black before submitting any
         // rendering commands to the render queue.
         // Note that we may want to change this in the future to allow
-        // games to retain the previous frame's rendering. 
+        // games to retain the previous frame's rendering.
 
         render_queue.Clear(Color{});
 
-        // This will add entities to the rendering queue, but will not actually render them.
-        // Actual rendering takes place in the executor.
+        // This will add entities to the rendering queue, but will not actually
+        // render them. Actual rendering takes place in the executor.
 
         SubmitShapes(world, render_queue, camera);
         SubmitSprites(world, render_queue, camera);
         SubmitRadialGradients(world, render_queue, camera);
 
-        render_queue_executor.Execute(render_queue,
-            // Our clip rectangle is only relevant when we are in proportional scaling mode.
-            camera.scale_mode == ScaleMode::Proportional ? std::optional{camera.Viewport()} : std::nullopt);
+        render_queue_executor.Execute(
+            render_queue,
+            // Our clip rectangle is only relevant when we are in proportional
+            // scaling mode.
+            camera.scale_mode == ScaleMode::Proportional
+                ? std::optional{camera.Viewport()}
+                : std::nullopt);
 
         SDL_RenderPresent(renderer);
 
@@ -147,15 +164,12 @@ void RunGameLoop(IGame& game, SDL_Window* window, SDL_Renderer* renderer, Regist
     }
 }
 
-}
+} // namespace internal
 
 Application::Application(ApplicationSettings settings)
-    : settings(std::move(settings))
-{
-}
+    : settings(std::move(settings)) {}
 
-int32_t Application::run(IGame& game)
-{
+int32_t Application::run(IGame &game) {
 
     // SDL initialization and window/renderer creation.
 
@@ -164,17 +178,12 @@ int32_t Application::run(IGame& game)
         return 1;
     }
 
-    SDL_Window* window = nullptr;
-    SDL_Renderer* renderer = nullptr;
+    SDL_Window *window = nullptr;
+    SDL_Renderer *renderer = nullptr;
 
     const bool created = SDL_CreateWindowAndRenderer(
-        settings.title.c_str(),
-        settings.width,
-        settings.height,
-        SDL_WINDOW_RESIZABLE,
-        &window,
-        &renderer
-    );
+        settings.title.c_str(), settings.width, settings.height,
+        SDL_WINDOW_RESIZABLE, &window, &renderer);
 
     if (!created) {
         SDL_Log("Could not create the window and renderer: %s", SDL_GetError());

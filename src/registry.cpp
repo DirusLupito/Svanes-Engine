@@ -2,14 +2,8 @@
 
 namespace svanes {
 
-Entity Registry::CreateEntity()
-{
-    return next_entity++;
-}
+Entity Registry::CreateEntity() { return next_entity++; }
 
-void Registry::DestroyEntity(Entity entity)
-{
-    components.erase(entity);
-}
+void Registry::DestroyEntity(Entity entity) { components.erase(entity); }
 
 } // namespace svanes

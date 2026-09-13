@@ -26,6 +26,6 @@ struct Circle2D {
  * @param transform The transform to apply.
  * @return The circle in world coordinates.
  */
-Circle2D TransformCircle(Circle2D circle, const Transform& transform);
+Circle2D TransformCircle(Circle2D circle, const Transform &transform);
 
-}
+} // namespace svanes

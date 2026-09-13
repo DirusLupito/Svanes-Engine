@@ -2,8 +2,7 @@
 
 #include <svanes/application.hpp>
 
-int32_t main()
-{
+int32_t main() {
     svanes::Application application({
         .title = "Orbital Escalation",
         .width = 1920,

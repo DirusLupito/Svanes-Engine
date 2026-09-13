@@ -54,9 +54,10 @@ struct Color {
 
 /**
  * Represents a handle to a texture resource
- * The 'id' is a unique identifier for the texture, assigned by the rendering system.
- * The texture manager shall return a valid TextureHandle when a texture is loaded.
- * Internally, this should be uniquely associated with an SDL_Texture* or similar resource.
+ * The 'id' is a unique identifier for the texture, assigned by the rendering
+ * system. The texture manager shall return a valid TextureHandle when a texture
+ * is loaded. Internally, this should be uniquely associated with an
+ * SDL_Texture* or similar resource.
  *
  * FIELDS:
  * - id: The unique identifier assigned to the texture resource.
@@ -66,9 +67,9 @@ struct TextureHandle {
 };
 
 /**
- * Represents image data, including its dimensions and pixel data in RGBA format.
- * The pixel data is stored as a vector of 8-bit unsigned integers.
- * May be used to create textures or manipulate images before rendering.
+ * Represents image data, including its dimensions and pixel data in RGBA
+ * format. The pixel data is stored as a vector of 8-bit unsigned integers. May
+ * be used to create textures or manipulate images before rendering.
  *
  * FIELDS:
  * - width: The width of the image in pixels.
@@ -81,4 +82,4 @@ struct ImageData {
     std::vector<std::uint8_t> rgba_pixels;
 };
 
-}
+} // namespace svanes

@@ -6,15 +6,15 @@
 
 namespace svanes {
 
-Rectangle2D TransformRectangle(Rectangle2D rectangle, const Transform& transform)
-{
+Rectangle2D TransformRectangle(Rectangle2D rectangle,
+                               const Transform &transform) {
     const float cosine = std::cos(transform.rotation);
     const float sine = std::sin(transform.rotation);
 
     const Vector2D center{rectangle.x, rectangle.y};
 
-    // If the rectangle's geometry is such that is is centered at its own origin,
-    // then this simplies to just tx + cx and ty + cy.
+    // If the rectangle's geometry is such that is is centered at its own
+    // origin, then this simplies to just tx + cx and ty + cy.
 
     // x = tx + cx cos(theta) - cy sin(theta)
     rectangle.x = transform.x + center.x * cosine - center.y * sine;
@@ -25,17 +25,11 @@ Rectangle2D TransformRectangle(Rectangle2D rectangle, const Transform& transform
 }
 
 RectangleGeometry::RectangleGeometry(Rectangle2D rectangle, float rotation)
-    : half_width(rectangle.width * 0.5F),
-      half_height(rectangle.height * 0.5F),
-      center_x(rectangle.x),
-      center_y(rectangle.y),
-      cosine(std::cos(rotation)),
-      sine(std::sin(rotation))
-{
-}
+    : half_width(rectangle.width * 0.5F), half_height(rectangle.height * 0.5F),
+      center_x(rectangle.x), center_y(rectangle.y), cosine(std::cos(rotation)),
+      sine(std::sin(rotation)) {}
 
-Rectangle2D RectangleGeometry::Bounds() const
-{
+Rectangle2D RectangleGeometry::Bounds() const {
 
     // theta = the rotation of the rectangle
     // a = rectangle's heigh
@@ -54,37 +48,40 @@ Rectangle2D RectangleGeometry::Bounds() const
     // soh cah toa to figure out what to add.
 
     // Instead, we can still do some soh cah toa, but a
-    // lesser amount. We solve for the half width and half height of the bounding box
-    // then since we know the center of the rectangle is the same as the center of the
-    // bounding box, we can just subtract the half width and half height from the center
-    // to get the top left corner of the bounding box.
+    // lesser amount. We solve for the half width and half height of the
+    // bounding box then since we know the center of the rectangle is the same
+    // as the center of the bounding box, we can just subtract the half width
+    // and half height from the center to get the top left corner of the
+    // bounding box.
 
-    // So this only leaves unsolved the half width and half height of the bounding box.
-    // The reader is recommended to draw a diagram of a rectangle and its bounding box 
-    // to understand the following:
+    // So this only leaves unsolved the half width and half height of the
+    // bounding box. The reader is recommended to draw a diagram of a rectangle
+    // and its bounding box to understand the following:
 
     // The height of the bounding box is given by
     // x = b sin theta + a cos theta
     // The width of the bounding box is given by
     // y = b cos theta + a sin theta
 
-    // Now we can take the half height and half width and add them to the center of the rectangle
-    // to get the top left corner of the bounding box.
+    // Now we can take the half height and half width and add them to the center
+    // of the rectangle to get the top left corner of the bounding box.
 
-    // Another simpler idea is to use a bounding circle. For mostly circular shapes/
-    // rectangles that are mostly square, this will be pretty good. But for long thin rectangles,
-    // it would be far more conservative about what is being culled.
-    // A benefit of the bounding circle is that once the bound is computed, it need not be recomputed for different rotations,
-    // since the bounding circle is rotation invariant.
+    // Another simpler idea is to use a bounding circle. For mostly circular
+    // shapes/ rectangles that are mostly square, this will be pretty good. But
+    // for long thin rectangles, it would be far more conservative about what is
+    // being culled. A benefit of the bounding circle is that once the bound is
+    // computed, it need not be recomputed for different rotations, since the
+    // bounding circle is rotation invariant.
 
 
-    const float extent_x = half_width * std::abs(cosine) + half_height * std::abs(sine);
-    const float extent_y = half_width * std::abs(sine) + half_height * std::abs(cosine);
+    const float extent_x =
+        half_width * std::abs(cosine) + half_height * std::abs(sine);
+    const float extent_y =
+        half_width * std::abs(sine) + half_height * std::abs(cosine);
     return {center_x, center_y, extent_x * 2.0F, extent_y * 2.0F};
 }
 
-std::array<Vector2D, 4> RectangleGeometry::Corners() const
-{
+std::array<Vector2D, 4> RectangleGeometry::Corners() const {
     // The rectangle's center stays in the same place
     // at (center_x, center_y) while the four corners
     // are rotated around that center point.
@@ -106,7 +103,7 @@ std::array<Vector2D, 4> RectangleGeometry::Corners() const
         {-half_width, half_height},
     }};
 
-    for (Vector2D& vertex : vertices) {
+    for (Vector2D &vertex : vertices) {
         const Vector2D offset = vertex;
 
         // Given our center point (center_x, center_y), the angle of a given
@@ -138,7 +135,8 @@ std::array<Vector2D, 4> RectangleGeometry::Corners() const
         //    = r * (sin(phi)cos(theta) + cos(phi)sin(theta))
         //    = x * sin(theta) + y * cos(theta)
 
-        // We can then just add the center point back to get the final position of the vertex.
+        // We can then just add the center point back to get the final position
+        // of the vertex.
 
         vertex = {
             center_x + offset.x * cosine - offset.y * sine,
@@ -149,4 +147,4 @@ std::array<Vector2D, 4> RectangleGeometry::Corners() const
     return vertices;
 }
 
-}
+} // namespace svanes

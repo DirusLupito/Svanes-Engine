@@ -9,29 +9,31 @@ namespace svanes {
 class Registry;
 
 /**
- * Motion integrated into an entity's Transform. Acceleration persists until changed.
- * Limits must be finite and nonnegative; std::nullopt means unlimited.
+ * Motion integrated into an entity's Transform. Acceleration persists until
+ * changed. Limits must be finite and nonnegative; std::nullopt means unlimited.
  *
  * FIELDS:
  * - velocity_x: Horizontal velocity in world units per second.
  * - velocity_y: Vertical velocity in world units per second.
- * 
+ *
  * ====
- * 
+ *
  * - acceleration_x: Horizontal acceleration in world units per second squared.
  * - acceleration_y: Vertical acceleration in world units per second squared.
- * 
+ *
  * ====
- * 
+ *
  * - angular_velocity: Angular velocity in radians per second.
  * - angular_acceleration: Angular acceleration in radians per second squared.
- * 
+ *
  * ====
- * 
+ *
  * - max_speed: Optional limit on the 2-norm magnitude of linear velocity.
- * - max_acceleration: Optional limit on the 2-norm magnitude of linear acceleration.
+ * - max_acceleration: Optional limit on the 2-norm magnitude of linear
+ * acceleration.
  * - max_angular_speed: Optional limit on the absolute angular velocity.
- * - max_angular_acceleration: Optional limit on the absolute angular acceleration.
+ * - max_angular_acceleration: Optional limit on the absolute angular
+ * acceleration.
  */
 struct Kinematic2D {
     float velocity_x = 0.0F;
@@ -50,24 +52,28 @@ struct Kinematic2D {
 };
 
 /**
- * Represents a gravity force applied to entities that have both the Kinematic2D and
- * Gravity components. Default is set to {0, 0}.
- * 
- * Since we're in screen and world space, positive y is downwards. The gravity vector 
- * is applied to the acceleration of entities with Kinematic2D and Gravity components.
+ * Represents a gravity force applied to entities that have both the Kinematic2D
+ * and Gravity components. Default is set to {0, 0}.
+ *
+ * Since we're in screen and world space, positive y is downwards. The gravity
+ * vector is applied to the acceleration of entities with Kinematic2D and
+ * Gravity components.
  */
 struct Gravity {};
 
 
 /**
- * Advances the kinematic state of all entities in the provided registry by the specified time delta.
- * 
+ * Advances the kinematic state of all entities in the provided registry by the
+ * specified time delta.
+ *
  * @param world The registry containing all entities and their components.
- * @param delta_seconds The time delta in seconds to advance the kinematic state.
- * @param gravity The gravity vector to apply to entities with Kinematic2D and Gravity components.
- * 
+ * @param delta_seconds The time delta in seconds to advance the kinematic
+ * state.
+ * @param gravity The gravity vector to apply to entities with Kinematic2D and
+ * Gravity components.
+ *
  * @throws std::invalid_argument if delta_seconds is not finite or is negative.
  */
-void AdvanceKinematics(Registry& world, float delta_seconds, Vector2D gravity);
+void AdvanceKinematics(Registry &world, float delta_seconds, Vector2D gravity);
 
-}
+} // namespace svanes

@@ -25,7 +25,7 @@ class AudioManagerInternal;
 
 /**
  * Lookup key for a game sound
- * 
+ *
  * - id: This game sounds unique ID
  */
 struct SoundHandle {
@@ -34,7 +34,7 @@ struct SoundHandle {
 
 /**
  * Lookup key for game music
- * 
+ *
  * - id: This musics unique ID
  */
 struct MusicHandle {
@@ -42,12 +42,13 @@ struct MusicHandle {
 };
 
 class AudioManager final {
-public:
+  public:
     ~AudioManager();
 
     /**
      * Loads a game sound from a file and stores it in the manager
-     * Throws an exception if the path is empty or if the audio cannot be loaded.
+     * Throws an exception if the path is empty or if the audio cannot be
+     * loaded.
      * @param path The file path to the sound audio.
      * @return A SoundHandle that can be used to reference the loaded sound.
      * @throws std::invalid_argument if the path is empty.
@@ -55,9 +56,10 @@ public:
      */
     SoundHandle LoadSound(std::string_view path);
 
-     /**
+    /**
      * Loads game music from a file and stores it in the manager
-     * Throws an exception if the path is empty or if the audio cannot be loaded.
+     * Throws an exception if the path is empty or if the audio cannot be
+     * loaded.
      * @param path The file path to the music audio.
      * @return A MusicHandle that can be used to reference the loaded music.
      * @throws std::invalid_argument if the path is empty.
@@ -87,9 +89,10 @@ public:
     void SetMusicVolume(float volume);
 
     /**
-     * Reports how far into the currently assigned music track playback has progressed.
-     * A stopped or paused track reports the position it halted at. For a looping track,
-     * this is the position within the current loop, not the cumulative time played.
+     * Reports how far into the currently assigned music track playback has
+     * progressed. A stopped or paused track reports the position it halted at.
+     * For a looping track, this is the position within the current loop, not
+     * the cumulative time played.
      * @return The playback position, in milliseconds.
      * @throws std::runtime_error if the position cannot be determined.
      */
@@ -98,36 +101,38 @@ public:
     /**
      * Reports the length of the currently assigned music track.
      * @return The track's duration, in milliseconds.
-     * @throws std::runtime_error if no music is assigned, or its duration cannot be determined.
+     * @throws std::runtime_error if no music is assigned, or its duration
+     * cannot be determined.
      */
     std::int64_t MusicDurationMilliseconds() const;
 
     /**
-     * Seeks the currently assigned music track to the given position. Requires an audio
-     * format that supports seeking; not all formats do.
+     * Seeks the currently assigned music track to the given position. Requires
+     * an audio format that supports seeking; not all formats do.
      * @param position_milliseconds The position to seek to, in milliseconds.
      * @throws std::runtime_error if the seek fails.
      */
     void SeekMusic(std::int64_t position_milliseconds);
 
     /**
-     * Sets the playback speed of the currently assigned music track as a ratio against its
-     * normal speed. Values above/below 1.0 speed the track up/down and raise/lower its pitch
-     * to match, the same way changing a record player's speed would.
+     * Sets the playback speed of the currently assigned music track as a ratio
+     * against its normal speed. Values above/below 1.0 speed the track up/down
+     * and raise/lower its pitch to match, the same way changing a record
+     * player's speed would.
      * @param ratio The playback speed ratio. Must be between 0.01 and 100.
      * @throws std::runtime_error if the ratio cannot be set.
      */
     void SetMusicPlaybackRate(float ratio);
 
-private:
+  private:
     struct MixerDeleter {
-        void operator()(MIX_Mixer* mixer) const;
+        void operator()(MIX_Mixer *mixer) const;
     };
     struct AudioDeleter {
-        void operator()(MIX_Audio* audio) const;
+        void operator()(MIX_Audio *audio) const;
     };
     struct TrackDeleter {
-        void operator()(MIX_Track* track) const;
+        void operator()(MIX_Track *track) const;
     };
 
     using MixerPointer = std::unique_ptr<MIX_Mixer, MixerDeleter>;
@@ -149,4 +154,4 @@ private:
     friend class internal::AudioManagerInternal;
 };
 
-}
+} // namespace svanes
