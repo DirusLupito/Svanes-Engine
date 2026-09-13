@@ -43,16 +43,22 @@ public:
      * @param color The color of the rectangle.
      * @param rotation The rotation angle in radians (default is 0.0F).
      * @param z_order The z order to draw the rectangle at (default is 0).
+    * @param blend_mode The blending mode used to combine the rectangle with
+    * the existing screen color (default is BlendMode::Alpha).
      */
-    void DrawRectangle(Rectangle2D destination, Color color, float rotation = 0.0F, std::int32_t z_order = 0);
+    void DrawRectangle(Rectangle2D destination, Color color, float rotation = 0.0F,
+                   std::int32_t z_order = 0, BlendMode blend_mode = BlendMode::Alpha);
 
     /**
      * Adds a command to draw a triangle to the render queue.
      * @param destination The triangle to be drawn.
      * @param color The color of the triangle.
      * @param z_order The z order to draw the triangle at (default is 0).
+    * @param blend_mode The blending mode used to combine the triangle with
+    * the existing screen color (default is BlendMode::Alpha).
      */
-    void DrawTriangle(Triangle2D destination, Color color, std::int32_t z_order = 0);
+    void DrawTriangle(Triangle2D destination, Color color, std::int32_t z_order = 0,
+                  BlendMode blend_mode = BlendMode::Alpha);
 
     /**
      * Adds a command to draw a circle to the render queue.
@@ -60,8 +66,11 @@ public:
      * @param destination The circle to be drawn.
      * @param color The color of the circle.
      * @param z_order The z order to draw the circle at (default is 0
+    * @param blend_mode The blending mode used to combine the circle with
+    * the existing screen color (default is BlendMode::Alpha).
      */
-    void DrawCircle(Circle2D destination, Color color, std::int32_t z_order = 0);
+    void DrawCircle(Circle2D destination, Color color, std::int32_t z_order = 0,
+                BlendMode blend_mode = BlendMode::Alpha);
 
     /**
      * Adds a command to draw a texture to the render queue.
@@ -70,8 +79,11 @@ public:
      * @param destination The destination rectangle where the texture will be drawn.
      * @param rotation The rotation angle in radians (default is 0.0F).
      * @param z_order The z order to draw the texture at (default is 0).
+    * @param blend_mode The blending mode used to combine the texture with the
+    * existing screen color (default is BlendMode::Alpha).
      */
-    void DrawTexture(TextureHandle texture, Rectangle2D destination, float rotation = 0.0F, std::int32_t z_order = 0);
+    void DrawTexture(TextureHandle texture, Rectangle2D destination, float rotation = 0.0F,
+                 std::int32_t z_order = 0, BlendMode blend_mode = BlendMode::Alpha);
 
     /**
      * Adds a command to draw a texture to the render queue with a specified source rectangle.
@@ -81,10 +93,13 @@ public:
      * @param destination The destination rectangle where the texture will be drawn.
      * @param rotation The rotation angle in radians (default is 0.0F).
      * @param z_order The z order to draw the texture at (default is 0).
+      * @param blend_mode The blending mode used to combine the texture with the
+      * existing screen color (default is BlendMode::Alpha).
      */
     void DrawTexture(
         TextureHandle texture, Rectangle2D source, Rectangle2D destination,
-        float rotation = 0.0F, std::int32_t z_order = 0
+          float rotation = 0.0F, std::int32_t z_order = 0,
+          BlendMode blend_mode = BlendMode::Alpha
     );
 
     /**
@@ -92,7 +107,17 @@ public:
      */
     void Reset() noexcept;
 
-    void DrawConvexPolygon(const ConvexPolygon2D& destination, Color color, std::int32_t z_order = 0);
+    /**
+     * Adds a command to draw a convex polygon to the render queue.
+     * @param destination The convex polygon to be drawn.
+     * @param color The color of the polygon.
+     * @param z_order The z order to draw the polygon at (default is 0).
+     * @param blend_mode The blending mode used to combine the polygon with
+     * the existing screen color (default is BlendMode::Alpha).
+     */
+    void DrawConvexPolygon(const ConvexPolygon2D& destination, Color color,
+                           std::int32_t z_order = 0,
+                           BlendMode blend_mode = BlendMode::Alpha);
 
 private:
 
@@ -114,12 +139,14 @@ private:
      * - color: The fill color of the rectangle.
      * - rotation: The rotation angle in radians for the rectangle.
      * - z_order: The z order the rectangle is drawn at.
+     * - blend_mode: The blending mode used to combine the rectangle with the existing screen color.
      */
     struct RectangleCommand {
         Rectangle2D destination;
         Color color;
         float rotation;
         std::int32_t z_order;
+        BlendMode blend_mode;
     };
 
     /**
@@ -129,11 +156,13 @@ private:
      * - destination: The triangle to be drawn.
      * - color: The fill color of the triangle.
      * - z_order: The z order the triangle is drawn at.
+     * - blend_mode: The blending mode used to combine the triangle with the existing screen color.
      */
     struct TriangleCommand {
         Triangle2D destination;
         Color color;
         std::int32_t z_order;
+        BlendMode blend_mode;
     };
 
     /**
@@ -143,11 +172,13 @@ private:
      * - destination: The circle to be drawn.
      * - color: The fill color of the circle.
      * - z_order: The z order the circle is drawn at.
+     * - blend_mode: The blending mode used to combine the circle with the existing screen color.
      */
     struct CircleCommand {
         Circle2D destination;
         Color color;
         std::int32_t z_order;
+        BlendMode blend_mode;
     };
 
     /**
@@ -160,6 +191,7 @@ private:
      * - destination: The screen region where the texture is drawn.
      * - rotation: The rotation angle in radians for the texture.
      * - z_order: The z order the texture is drawn at.
+     * - blend_mode: The blending mode used to combine the texture with the existing screen color.
      */
     struct TextureCommand {
         TextureHandle texture;
@@ -167,6 +199,7 @@ private:
         Rectangle2D destination;
         float rotation;
         std::int32_t z_order;
+        BlendMode blend_mode;
     };
 
     /**
@@ -176,11 +209,13 @@ private:
      * - destination: The convex polygon to be drawn.
      * - color: The fill color of the convex polygon.
      * - z_order: The z order the convex polygon is drawn at.
+     * - blend_mode: The blending mode used to combine the convex polygon with the existing screen color.
      */
     struct ConvexPolygonCommand {
         ConvexPolygon2D destination;
         Color color;
         std::int32_t z_order;
+        BlendMode blend_mode;
     };
 
     // union but safe

@@ -25,11 +25,13 @@ class RenderQueue;
  * - source: An optional rectangle defining the portion of the texture to render. 
  * If not provided, the entire texture will be used.
  * - geometry: The rectangle onto which the sprite source will be drawn.
+ * - blend_mode: The blending mode used to combine the sprite with the existing screen color.
  */
 struct Sprite {
     TextureHandle texture;
     std::optional<Rectangle2D> source;
     Rectangle2D geometry;
+    BlendMode blend_mode = BlendMode::Alpha;
 };
 
 /**
@@ -40,10 +42,12 @@ struct Sprite {
  * FIELDS:
  * - color: The color value used to fill the entity's geometry.
  * - geometry: The geometric shape of the entity to be rendered.
+ * - blend_mode: The blending mode used to combine the shape with the existing screen color.
  */
 struct SolidShape {
     Color color;
     Geometry2D geometry;
+    BlendMode blend_mode = BlendMode::Alpha;
 };
 
 /**

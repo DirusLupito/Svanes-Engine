@@ -40,7 +40,8 @@ private:
     /**
      * Executes a single ConvexPolygonCommand, which draws a convex polygon with a specific color.
      * @param command The ConvexPolygonCommand to execute.
-     * @throws std::runtime_error if the polygon cannot be drawn.
+     * @throws std::runtime_error if the polygon cannot be drawn,
+     * std::invalid_argument if the blend mode is unknown.
      */
     void Execute(const RenderQueue::ConvexPolygonCommand& command) const;
 
@@ -55,13 +56,15 @@ private:
      * Executes a single RectangleCommand, which draws a rectangle with a specific color.
      * @param command The RectangleCommand to execute.
      * @throws std::runtime_error if the rectangle cannot be drawn.
+     * std::invalid_argument if the blend mode is unknown.
      */
     void Execute(const RenderQueue::RectangleCommand& command) const;
 
     /**
      * Executes a single TriangleCommand, which draws a triangle with a specific color.
      * @param command The TriangleCommand to execute.
-     * @throws std::runtime_error if the triangle cannot be drawn.
+     * @throws std::runtime_error if the triangle cannot be drawn,
+     * std::invalid_argument if the blend mode is unknown.
      */
     void Execute(const RenderQueue::TriangleCommand& command) const;
 
@@ -70,7 +73,8 @@ private:
      * Circles will be approximated using a polygon with a fixed number of segments.
      * 
      * @param command The CircleCommand to execute.
-     * @throws std::runtime_error if the circle cannot be drawn.
+     * @throws std::runtime_error if the circle cannot be drawn,
+     * std::invalid_argument if the blend mode is unknown.
      */
     void Execute(const RenderQueue::CircleCommand& command) const;
 
@@ -78,7 +82,8 @@ private:
      * Executes a single TextureCommand, which draws a texture, 
      * optionally specifying a source rectangle.
      * @param command The TextureCommand to execute.
-     * @throws std::runtime_error if the texture cannot be drawn.
+     * @throws std::runtime_error if the texture cannot be drawn,
+     * std::invalid_argument if the blend mode is unknown.
      */
     void Execute(const RenderQueue::TextureCommand& command) const;
 

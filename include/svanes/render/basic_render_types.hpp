@@ -13,6 +13,28 @@
 namespace svanes {
 
 /**
+ * Represents the rule used to combine a rendered color with the color already
+ * present at the same location on the screen.
+ *
+ * Alpha blending uses the alpha component of the rendered color as its opacity.
+ * A color with alpha = 0 is completely transparent, so the color already on
+ * the screen remains visible. A color with alpha = 255 is completely opaque,
+ * so it covers the color already on the screen. Values between these extremes
+ * produce a mixture of the rendered color and the existing color. This is the
+ * usual mode for sprites, shapes, and other objects that should appear in
+ * front of the scene without completely hiding it.
+ *
+ * Additive blending adds the rendered color to the color already on the
+ * screen. The alpha component controls how much color is added, but the
+ * existing color is not made darker or hidden. This is useful for effects that
+ * represent light or energy, such as glows, fire, sparks, laser beams, etc.
+ */
+enum class BlendMode : std::uint8_t {
+    Alpha,
+    Additive,
+};
+
+/**
  * Represents a color with red, green, blue, and alpha components.
  * Each component is an 8-bit unsigned integer (0-255).
  * The default color is black with full opacity (alpha = 255).

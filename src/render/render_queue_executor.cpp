@@ -25,6 +25,24 @@
 
 namespace svanes::internal {
 
+/** 
+ * Converts a BlendMode enum value to the corresponding SDL_BlendMode value.
+ * @param mode The BlendMode value to convert.
+ * @return The corresponding SDL_BlendMode value.
+ * @throws std::invalid_argument if the BlendMode value is unknown.
+*/
+static SDL_BlendMode ToSDLBlendMode(BlendMode mode)
+{
+    switch (mode) {
+    case BlendMode::Alpha:
+        return SDL_BLENDMODE_BLEND;
+    case BlendMode::Additive:
+        return SDL_BLENDMODE_ADD;
+    }
+
+    throw std::invalid_argument("Unknown blend mode.");
+}
+
 RenderQueueExecutor::RenderQueueExecutor(
     SDL_Renderer* renderer,
     const TextureManager& texture_manager
@@ -95,6 +113,10 @@ void RenderQueueExecutor::Execute(const RenderQueue::ClearCommand& command) cons
 
 void RenderQueueExecutor::Execute(const RenderQueue::RectangleCommand& command) const
 {
+    if (!SDL_SetRenderDrawBlendMode(renderer, ToSDLBlendMode(command.blend_mode))) {
+        throw std::runtime_error("Could not set shape blending: " + std::string{SDL_GetError()});
+    }
+
     SetDrawColor(command.color);
 
     // Convert center-based rectangle coordinates to SDL's top-left-based rectangle coordinates.
@@ -144,6 +166,10 @@ void RenderQueueExecutor::Execute(const RenderQueue::RectangleCommand& command) 
 
 void RenderQueueExecutor::Execute(const RenderQueue::TriangleCommand& command) const
 {
+    if (!SDL_SetRenderDrawBlendMode(renderer, ToSDLBlendMode(command.blend_mode))) {
+        throw std::runtime_error("Could not set shape blending: " + std::string{SDL_GetError()});
+    }
+
     const SDL_FColor color{
         command.color.red / 255.0F,
         command.color.green / 255.0F,
@@ -165,6 +191,10 @@ void RenderQueueExecutor::Execute(const RenderQueue::TriangleCommand& command) c
 
 void RenderQueueExecutor::Execute(const RenderQueue::CircleCommand& command) const
 {
+    if (!SDL_SetRenderDrawBlendMode(renderer, ToSDLBlendMode(command.blend_mode))) {
+        throw std::runtime_error("Could not set shape blending: " + std::string{SDL_GetError()});
+    }
+
     // How many triangles we should use in a fan to approximate the circle. 
     constexpr std::int32_t segments = 64;
 
@@ -214,6 +244,10 @@ void RenderQueueExecutor::Execute(const RenderQueue::CircleCommand& command) con
 
 void RenderQueueExecutor::Execute(const RenderQueue::ConvexPolygonCommand& command) const
 {
+    if (!SDL_SetRenderDrawBlendMode(renderer, ToSDLBlendMode(command.blend_mode))) {
+        throw std::runtime_error("Could not set shape blending: " + std::string{SDL_GetError()});
+    }
+
     const auto& points = command.destination.Vertices();
 
     if (points.size() > static_cast<std::size_t>(std::numeric_limits<std::int32_t>::max() / 3) + 2) {
@@ -254,6 +288,10 @@ void RenderQueueExecutor::Execute(const RenderQueue::TextureCommand& command) co
     // Figure out which texture the handle is referring to.
 
     SDL_Texture* resolved_texture = TextureManagerInternal::Resolve(texture_manager, command.texture);
+
+    if (!SDL_SetTextureBlendMode(resolved_texture, ToSDLBlendMode(command.blend_mode))) {
+        throw std::runtime_error("Could not set texture blending: " + std::string{SDL_GetError()});
+    }
 
     // Convert center-based rectangle coordinates to SDL's top-left-based rectangle coordinates.
 
