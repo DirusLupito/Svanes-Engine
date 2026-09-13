@@ -138,6 +138,8 @@ target_sources(
         src/rectangle_geometry.cpp
         src/triangle_geometry.cpp
         src/input_manager_internal.hpp
+        src/render/bloom_pass.cpp
+        src/render/bloom_pass.hpp
         src/render/render_queue.cpp
         src/render/render_queue_executor.cpp
         src/render/render_queue_executor.hpp

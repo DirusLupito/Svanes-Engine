@@ -240,68 +240,94 @@ void OrbitalEscalationGame::CreateNonPlayerNonPlanetEntities(svanes::Registry& w
 
 void OrbitalEscalationGame::Initialize(svanes::GameContext& context)
 {
-    const svanes::TextureHandle gradient_texture = context.assets.CreateTexture(CreateGradientImage());
+    context.bloom = {
+        .enabled = true, .threshold = 0.6F, .strength = 32.0F, .radius = 32.0F};
+
+    const svanes::TextureHandle gradient_texture =
+        context.assets.CreateTexture(CreateGradientImage());
+
     constexpr float square_size = static_cast<float>(kSquarePixels);
-    const svanes::Rectangle2D square_geometry{0.0F, 0.0F, square_size, square_size};
+
+    const svanes::Rectangle2D square_geometry{0.0F, 0.0F, square_size,
+                                              square_size};
+
     const svanes::Transform player_start{0.0F, -kPlanetRadius - 800.0F};
+
+    // Camera
     context.camera.zoom = 0.02F;
-    const svanes::Rectangle2D anchor = context.camera.ScreenToWorld({
-        context.camera.OutputWidth() * 0.5F, context.camera.OutputHeight() * 0.25F, 0.0F, 0.0F
-    });
+    const svanes::Rectangle2D anchor = context.camera.ScreenToWorld(
+        {context.camera.OutputWidth() * 0.5F,
+         context.camera.OutputHeight() * 0.25F, 0.0F, 0.0F});
     context.camera.x += player_start.x - anchor.x;
     context.camera.y += player_start.y - anchor.y;
-    const svanes::Rectangle2D view = context.camera.ScreenToWorld(context.camera.Viewport());
+    const svanes::Rectangle2D view =
+        context.camera.ScreenToWorld(context.camera.Viewport());
 
+
+    // Background
     background_entity = context.world.CreateEntity();
     context.world.AddComponent<svanes::Transform>(
-        background_entity, svanes::Transform{view.x, view.y}
-    );
+        background_entity, svanes::Transform{view.x, view.y});
     context.world.AddComponent<svanes::SolidShape>(
         background_entity,
-        svanes::SolidShape{svanes::Color{0, 0, 68, 255},
-            svanes::Rectangle2D{0.0F, 0.0F, view.width, view.height}}
-    );
-    context.world.AddComponent<svanes::ZOrder>(
-        background_entity, svanes::ZOrder{-100}
-    );
+        svanes::SolidShape{
+            svanes::Color{0, 0, 68, 255},
+            svanes::Rectangle2D{0.0F, 0.0F, view.width, view.height}});
+    context.world.AddComponent<svanes::ZOrder>(background_entity,
+                                               svanes::ZOrder{-100});
 
-    
+    // Player square
     square_entity = context.world.CreateEntity();
-    context.world.AddComponent<svanes::Collider2D>(square_entity, svanes::Collider2D{square_geometry});
-    context.world.AddComponent<svanes::Kinematic2D>(square_entity);
-    context.world.GetComponent<svanes::Kinematic2D>(square_entity).velocity_x = 3000.0F;
-    context.world.AddComponent<svanes::Transform>(
-        square_entity,
-        player_start
-    );
-    context.world.AddComponent<svanes::Sprite>(
-        square_entity,
-        svanes::Sprite{.texture = gradient_texture, .geometry = square_geometry}
-    );
-
-    planet_entity = CreatePlanetLayer(context.world, kPlanetRadius, {255, 127, 38, 255}, -3);
-    CreatePlanetLayer(context.world, 3900.0F, {185, 122, 87, 255}, -2);
-    const svanes::Entity inner_layer = CreatePlanetLayer(context.world, 3750.0F, {127, 127, 127, 255}, -1);
     context.world.AddComponent<svanes::Collider2D>(
-        planet_entity, svanes::Collider2D{svanes::Circle2D{0.0F, 0.0F, kPlanetRadius}}
-    );
-    context.world.AddComponent<svanes::PointAttractor2D>(
-        planet_entity, svanes::PointAttractor2D{.accelerationField = AttractionField, .cutoff_radius = std::nullopt}
-    );
+        square_entity, svanes::Collider2D{square_geometry});
 
-    for (const svanes::Rectangle2D wall : {
-        svanes::Rectangle2D{-200000.0F, 0.0F, 100000.0F, 500000.0F},
-        svanes::Rectangle2D{200000.0F, 0.0F, 100000.0F, 500000.0F},
-        svanes::Rectangle2D{0.0F, -200000.0F, 500000.0F, 100000.0F},
-        svanes::Rectangle2D{0.0F, 200000.0F, 500000.0F, 100000.0F}
-    }) {
+    context.world.AddComponent<svanes::Kinematic2D>(square_entity);
+
+    context.world.GetComponent<svanes::Kinematic2D>(square_entity).velocity_x =
+        3000.0F;
+
+    context.world.AddComponent<svanes::Transform>(square_entity, player_start);
+
+    context.world.AddComponent<svanes::Sprite>(
+        square_entity, svanes::Sprite{.texture = gradient_texture,
+                                      .geometry = square_geometry});
+
+    context.world.AddComponent<svanes::RadialGradient2D>(
+        square_entity, svanes::RadialGradient2D{
+                           svanes::Circle2D{0.0F, 0.0F, square_size * 3.0F},
+                           {150, 190, 255, 160},
+                           {150, 190, 255, 0},
+                           svanes::BlendMode::Additive});
+
+    // Planet layers
+    planet_entity = CreatePlanetLayer(context.world, kPlanetRadius,
+                                      {255, 127, 38, 255}, -3);
+    CreatePlanetLayer(context.world, 3900.0F, {185, 122, 87, 255}, -2);
+    const svanes::Entity inner_layer =
+        CreatePlanetLayer(context.world, 3750.0F, {127, 127, 127, 255}, -1);
+    context.world.AddComponent<svanes::Collider2D>(
+        planet_entity,
+        svanes::Collider2D{svanes::Circle2D{0.0F, 0.0F, kPlanetRadius}});
+    context.world.AddComponent<svanes::PointAttractor2D>(
+        planet_entity,
+        svanes::PointAttractor2D{.accelerationField = AttractionField,
+                                 .cutoff_radius = std::nullopt});
+
+    // Destruction boundaries
+    for (const svanes::Rectangle2D wall :
+         {svanes::Rectangle2D{-200000.0F, 0.0F, 100000.0F, 500000.0F},
+          svanes::Rectangle2D{200000.0F, 0.0F, 100000.0F, 500000.0F},
+          svanes::Rectangle2D{0.0F, -200000.0F, 500000.0F, 100000.0F},
+          svanes::Rectangle2D{0.0F, 200000.0F, 500000.0F, 100000.0F}}) {
         const svanes::Entity entity = context.world.CreateEntity();
         const svanes::Rectangle2D geometry{0.0F, 0.0F, wall.width, wall.height};
-        context.world.AddComponent<svanes::Transform>(entity, svanes::Transform{wall.x, wall.y});
-        context.world.AddComponent<svanes::Collider2D>(entity, svanes::Collider2D{geometry});
+        context.world.AddComponent<svanes::Transform>(
+            entity, svanes::Transform{wall.x, wall.y});
+        context.world.AddComponent<svanes::Collider2D>(
+            entity, svanes::Collider2D{geometry});
         context.world.AddComponent<svanes::SolidShape>(
-            entity, svanes::SolidShape{svanes::Color{255, 0, 0, 255}, geometry}
-        );
+            entity,
+            svanes::SolidShape{svanes::Color{255, 0, 0, 255}, geometry});
         boundary_entities.push_back(entity);
     }
 

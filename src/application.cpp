@@ -56,7 +56,10 @@ void RunGameLoop(IGame& game, SDL_Window* window, SDL_Renderer* renderer, Regist
         throw std::runtime_error("Could not get render output dimensions: " + std::string{SDL_GetError()});
     }
     camera.SetOutputSize(output_width, output_height);
-    GameContext game_context{world, texture_manager, audio_manager, camera, output_width, output_height, gravity};
+    GameContext game_context{world,         texture_manager,
+                             audio_manager, camera,
+                             output_width,  output_height,
+                             gravity,       render_queue_executor.bloom};
 
     // Custom initialization of the game. Implemented by the user of the engine.
 
@@ -95,7 +98,10 @@ void RunGameLoop(IGame& game, SDL_Window* window, SDL_Renderer* renderer, Regist
         }
         camera.SetOutputSize(output_width, output_height);
 
-        const FrameContext frame_context{world, input, delta_seconds, output_width, output_height, audio_manager, camera, gravity};
+        const FrameContext frame_context{
+            world,        input,         delta_seconds,
+            output_width, output_height, audio_manager,
+            camera,       gravity,       render_queue_executor.bloom};
 
         // Here we should advance the kinematics of all entities before updating the game state.
         // This allows us to first update the positions of all entities based on their velocities 
@@ -133,6 +139,7 @@ void RunGameLoop(IGame& game, SDL_Window* window, SDL_Renderer* renderer, Regist
 
         SubmitShapes(world, render_queue, camera);
         SubmitSprites(world, render_queue, camera);
+        SubmitRadialGradients(world, render_queue, camera);
 
         render_queue_executor.Execute(render_queue,
             // Our clip rectangle is only relevant when we are in proportional scaling mode.
@@ -163,20 +170,38 @@ int32_t Application::run(IGame& game)
         return 1;
     }
 
-    SDL_Window* window = nullptr;
-    SDL_Renderer* renderer = nullptr;
+    SDL_Window *window = nullptr;
+    SDL_Renderer *renderer = nullptr;
 
-    const bool created = SDL_CreateWindowAndRenderer(
-        settings.title.c_str(),
-        settings.width,
-        settings.height,
-        SDL_WINDOW_RESIZABLE,
-        &window,
-        &renderer
-    );
+    window = SDL_CreateWindow(settings.title.c_str(), settings.width,
+                              settings.height, SDL_WINDOW_RESIZABLE);
+    if (window) {
+        const SDL_PropertiesID properties = SDL_CreateProperties();
+        const bool configured =
+            properties &&
+            SDL_SetPointerProperty(
+                properties, SDL_PROP_RENDERER_CREATE_WINDOW_POINTER, window) &&
+            SDL_SetStringProperty(
+                properties, SDL_PROP_RENDERER_CREATE_NAME_STRING, "gpu") &&
+            SDL_SetBooleanProperty(
+                properties, SDL_PROP_RENDERER_CREATE_GPU_SHADERS_SPIRV_BOOLEAN,
+                true) &&
+            SDL_SetBooleanProperty(
+                properties, SDL_PROP_RENDERER_CREATE_GPU_SHADERS_DXIL_BOOLEAN,
+                true) &&
+            SDL_SetBooleanProperty(
+                properties, SDL_PROP_RENDERER_CREATE_GPU_SHADERS_MSL_BOOLEAN,
+                true);
+        if (configured) {
+            renderer = SDL_CreateRendererWithProperties(properties);
+        }
+        SDL_DestroyProperties(properties);
+    }
+    const bool created = window && renderer;
 
     if (!created) {
         SDL_Log("Could not create the window and renderer: %s", SDL_GetError());
+        SDL_DestroyWindow(window);
         SDL_Quit();
         return 1;
     }

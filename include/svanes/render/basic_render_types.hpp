@@ -12,6 +12,56 @@
 
 namespace svanes {
 
+// an aside on...
+// ...blending modes:
+//
+// Call C a vector of our 3 color channels (red, green, blue) and A the alpha
+// channel. Call:
+//
+// C_src: the source color currently being drawn
+// C_dst: the destination color already in the framebuffer
+// C_out: the final color written to the framebuffer
+//
+// Then the blending equations are:
+//
+// Alpha blending:
+// C_out = C_src * alpha_src + C_dst * (1 - alpha_src)
+// source      = (255,   0,   0)
+// destination = (  0,   0, 255)
+// alpha       = 0.3
+//
+// C_out      = ( 76,   0, 178)
+//
+// Additive blending:
+// C_out = C_src * alpha_src + C_dst
+// source      = (255,   0,   0)
+// destination = (  0,   0, 255)
+// alpha       = 0.3
+//
+// C_out = (255, 0, 0) * 0.3 + (0, 0, 255) = (76, 0, 255)
+
+/**
+ * Represents the rule used to combine a rendered color with the color already
+ * present at the same location on the screen.
+ *
+ * Alpha blending uses the alpha component of the rendered color as its opacity.
+ * A color with alpha = 0 is completely transparent, so the color already on
+ * the screen remains visible. A color with alpha = 255 is completely opaque,
+ * so it covers the color already on the screen. Values between these extremes
+ * produce a mixture of the rendered color and the existing color. This is the
+ * usual mode for sprites, shapes, and other objects that should appear in
+ * front of the scene without completely hiding it.
+ *
+ * Additive blending adds the rendered color to the color already on the
+ * screen. The alpha component controls how much color is added, but the
+ * existing color is not made darker or hidden. This is useful for effects that
+ * represent light or energy, such as glows, fire, sparks, laser beams, etc.
+ */
+enum class BlendMode : std::uint8_t {
+    Alpha,
+    Additive,
+};
+
 /**
  * Represents a color with red, green, blue, and alpha components.
  * Each component is an 8-bit unsigned integer (0-255).

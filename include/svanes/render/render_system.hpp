@@ -13,6 +13,50 @@ class Camera2D;
 class Registry;
 class RenderQueue;
 
+
+/**
+ * Controls HDR bloom and its final conversion to the display's color range.
+ *
+ * FIELDS:
+ * - enabled: Whether to use the linear HDR scene, bloom, and tone mapping.
+ * - threshold: Nonnegative linear luminance above which a pixel contributes.
+ *   Values above 1 are allowed for HDR sources.
+ * - strength: Nonnegative multiplier for the blurred light added to the scene.
+ * - radius: Nonnegative sampling radius in output pixels for each blur pass.
+ * - num_iterations: Number of horizontal/vertical blur pairs; zero skips blur.
+ * - exposure: Positive multiplier applied before exponential tone mapping.
+ */
+struct BloomSettings {
+    bool enabled = false;
+    float threshold = 0.8F;
+    float strength = 1.0F;
+    float radius = 4.0F;
+    std::uint8_t num_iterations = 5;
+    float exposure = 1.0F;
+};
+
+/**
+ * Represents a radial gradient to be drawn on the screen.
+ * Essentially, this is a circle with a color that transitions
+ * from a center color to an edge color, creating a gradient effect.
+ *
+ * FIELDS:
+ * - geometry: The circle defining the area of the gradient.
+ * - center_color: The color at the center of the gradient.
+ * - edge_color: The color at the edge of the gradient.
+ * - blend_mode: The blending mode used to combine the gradient with the
+ * existing screen color. Defaults to BlendMode::Alpha.
+ */
+struct RadialGradient2D {
+    Circle2D geometry;
+    Color center_color;
+    Color edge_color;
+    BlendMode blend_mode = BlendMode::Alpha;
+};
+
+void SubmitRadialGradients(const Registry &world, RenderQueue &render_queue,
+                           const Camera2D &camera);
+
 /**
  * Represents a sprite component that can be attached to an entity for rendering.
  * This component holds a reference to a texture and an optional source rectangle that defines
@@ -30,6 +74,8 @@ struct Sprite {
     TextureHandle texture;
     std::optional<Rectangle2D> source;
     Rectangle2D geometry;
+    Color tint{255, 255, 255, 255};
+    BlendMode blend_mode = BlendMode::Alpha;
 };
 
 /**
@@ -44,6 +90,7 @@ struct Sprite {
 struct SolidShape {
     Color color;
     Geometry2D geometry;
+    BlendMode blend_mode = BlendMode::Alpha;
 };
 
 /**

@@ -25,62 +25,102 @@
 
 namespace svanes::internal {
 
-RenderQueueExecutor::RenderQueueExecutor(
-    SDL_Renderer* renderer,
-    const TextureManager& texture_manager
-)
-    : renderer(renderer),
-      texture_manager(texture_manager)
-{
+static SDL_BlendMode ToSDLBlendMode(BlendMode mode) {
+    switch (mode) {
+    case BlendMode::Alpha:
+        return SDL_BLENDMODE_BLEND;
+    case BlendMode::Additive:
+        return SDL_BLENDMODE_ADD;
+    }
+    throw std::invalid_argument("Unknown blend mode.");
+}
+
+RenderQueueExecutor::RenderQueueExecutor(SDL_Renderer *renderer,
+                                         const TextureManager &texture_manager)
+    : bloom_pass(renderer), renderer(renderer),
+      texture_manager(texture_manager) {
     if (renderer == nullptr) {
-        throw std::invalid_argument("Render queue executor requires a renderer.");
+        throw std::invalid_argument(
+            "Render queue executor requires a renderer.");
     }
 }
 
-void RenderQueueExecutor::Execute(RenderQueue& render_queue, std::optional<Rectangle2D> clip) const
-{
+void RenderQueueExecutor::Execute(RenderQueue &render_queue,
+                                  std::optional<Rectangle2D> clip) {
+    std::int32_t width = 0;
+    std::int32_t height = 0;
+    if (!SDL_GetRenderOutputSize(renderer, &width, &height)) {
+        throw std::runtime_error("Could not get output size: " +
+                                 std::string{SDL_GetError()});
+    }
+    if (width <= 0 || height <= 0) {
+        return;
+    }
+    if (bloom.enabled) {
+        bloom_pass.Begin(width, height, bloom);
+    }
     SDL_Rect clip_rect{};
     if (clip) {
-        clip_rect.x = static_cast<std::int32_t>(std::round(clip->x - clip->width * 0.5F));
-        clip_rect.y = static_cast<std::int32_t>(std::round(clip->y - clip->height * 0.5F));
-        clip_rect.w = static_cast<std::int32_t>(std::round(clip->x + clip->width * 0.5F)) - clip_rect.x;
-        clip_rect.h = static_cast<std::int32_t>(std::round(clip->y + clip->height * 0.5F)) - clip_rect.y;
+        clip_rect.x =
+            static_cast<std::int32_t>(std::round(clip->x - clip->width * 0.5F));
+        clip_rect.y = static_cast<std::int32_t>(
+            std::round(clip->y - clip->height * 0.5F));
+        clip_rect.w = static_cast<std::int32_t>(
+                          std::round(clip->x + clip->width * 0.5F)) -
+                      clip_rect.x;
+        clip_rect.h = static_cast<std::int32_t>(
+                          std::round(clip->y + clip->height * 0.5F)) -
+                      clip_rect.y;
     }
 
     if (!SDL_SetRenderClipRect(renderer, clip ? &clip_rect : nullptr)) {
-        throw std::runtime_error("Could not set rendering clip rectangle: " + std::string{SDL_GetError()});
+        throw std::runtime_error("Could not set rendering clip rectangle: " +
+                                 std::string{SDL_GetError()});
     }
 
     render_queue.SortByZOrder();
 
-    // Iterate through each command and cast it to the appropriate type, then execute it.
-    for (const auto& command : render_queue.commands) {
-        if (const auto* clear = std::get_if<RenderQueue::ClearCommand>(&command)) {
+    // Iterate through each command and cast it to the appropriate type, then
+    // execute it.
+    for (const auto &command : render_queue.commands) {
+        if (bloom.enabled) {
+            bloom_pass.SetTextureState(
+                std::holds_alternative<RenderQueue::TextureCommand>(command));
+        }
+        if (const auto *clear =
+                std::get_if<RenderQueue::ClearCommand>(&command)) {
             Execute(*clear);
             continue;
         }
 
-        if (const auto* rectangle = std::get_if<RenderQueue::RectangleCommand>(&command)) {
+        if (const auto *rectangle =
+                std::get_if<RenderQueue::RectangleCommand>(&command)) {
             Execute(*rectangle);
             continue;
         }
 
-        if (const auto* triangle = std::get_if<RenderQueue::TriangleCommand>(&command)) {
+        if (const auto *triangle =
+                std::get_if<RenderQueue::TriangleCommand>(&command)) {
             Execute(*triangle);
             continue;
         }
 
-        if (const auto* circle = std::get_if<RenderQueue::CircleCommand>(&command)) {
+        if (const auto *circle =
+                std::get_if<RenderQueue::CircleCommand>(&command)) {
             Execute(*circle);
             continue;
         }
 
-        if (const auto* polygon = std::get_if<RenderQueue::ConvexPolygonCommand>(&command)) {
+        if (const auto *polygon =
+                std::get_if<RenderQueue::ConvexPolygonCommand>(&command)) {
             Execute(*polygon);
             continue;
         }
 
         Execute(std::get<RenderQueue::TextureCommand>(command));
+    }
+    if (bloom.enabled) {
+        bloom_pass.Finish(bloom, clip ? &clip_rect : nullptr);
     }
 }
 
@@ -95,6 +135,12 @@ void RenderQueueExecutor::Execute(const RenderQueue::ClearCommand& command) cons
 
 void RenderQueueExecutor::Execute(const RenderQueue::RectangleCommand& command) const
 {
+    if (!SDL_SetRenderDrawBlendMode(renderer,
+                                    ToSDLBlendMode(command.blend_mode))) {
+        throw std::runtime_error("Could not set shape blending: " +
+                                 std::string{SDL_GetError()});
+    }
+
     SetDrawColor(command.color);
 
     // Convert center-based rectangle coordinates to SDL's top-left-based rectangle coordinates.
@@ -144,6 +190,12 @@ void RenderQueueExecutor::Execute(const RenderQueue::RectangleCommand& command) 
 
 void RenderQueueExecutor::Execute(const RenderQueue::TriangleCommand& command) const
 {
+    if (!SDL_SetRenderDrawBlendMode(renderer,
+                                    ToSDLBlendMode(command.blend_mode))) {
+        throw std::runtime_error("Could not set shape blending: " +
+                                 std::string{SDL_GetError()});
+    }
+
     const SDL_FColor color{
         command.color.red / 255.0F,
         command.color.green / 255.0F,
@@ -165,6 +217,12 @@ void RenderQueueExecutor::Execute(const RenderQueue::TriangleCommand& command) c
 
 void RenderQueueExecutor::Execute(const RenderQueue::CircleCommand& command) const
 {
+    if (!SDL_SetRenderDrawBlendMode(renderer,
+                                    ToSDLBlendMode(command.blend_mode))) {
+        throw std::runtime_error("Could not set shape blending: " +
+                                 std::string{SDL_GetError()});
+    }
+
     // How many triangles we should use in a fan to approximate the circle. 
     constexpr std::int32_t segments = 64;
 
@@ -173,6 +231,13 @@ void RenderQueueExecutor::Execute(const RenderQueue::CircleCommand& command) con
         command.color.green / 255.0F,
         command.color.blue / 255.0F,
         command.color.alpha / 255.0F,
+    };
+
+    const SDL_FColor edge_color{
+        command.edge_color.red / 255.0F,
+        command.edge_color.green / 255.0F,
+        command.edge_color.blue / 255.0F,
+        command.edge_color.alpha / 255.0F,
     };
 
     std::array<SDL_Vertex, segments + 1> vertices{};
@@ -193,9 +258,13 @@ void RenderQueueExecutor::Execute(const RenderQueue::CircleCommand& command) con
         const float angle = 2.0F * std::numbers::pi_v<float> * i / segments;
 
         vertices[i + 1] = {{
-            command.destination.x + command.destination.radius * std::cos(angle),
-            command.destination.y + command.destination.radius * std::sin(angle),
-        }, color, {}};
+                               command.destination.x +
+                                   command.destination.radius * std::cos(angle),
+                               command.destination.y +
+                                   command.destination.radius * std::sin(angle),
+                           },
+                           edge_color,
+                           {}};
 
         // Center
         indices[i * 3] = 0;
@@ -214,6 +283,12 @@ void RenderQueueExecutor::Execute(const RenderQueue::CircleCommand& command) con
 
 void RenderQueueExecutor::Execute(const RenderQueue::ConvexPolygonCommand& command) const
 {
+    if (!SDL_SetRenderDrawBlendMode(renderer,
+                                    ToSDLBlendMode(command.blend_mode))) {
+        throw std::runtime_error("Could not set shape blending: " +
+                                 std::string{SDL_GetError()});
+    }
+
     const auto& points = command.destination.Vertices();
 
     if (points.size() > static_cast<std::size_t>(std::numeric_limits<std::int32_t>::max() / 3) + 2) {
@@ -254,6 +329,14 @@ void RenderQueueExecutor::Execute(const RenderQueue::TextureCommand& command) co
     // Figure out which texture the handle is referring to.
 
     SDL_Texture* resolved_texture = TextureManagerInternal::Resolve(texture_manager, command.texture);
+    if (!SDL_SetTextureBlendMode(resolved_texture,
+                                 ToSDLBlendMode(command.blend_mode)) ||
+        !SDL_SetTextureColorMod(resolved_texture, command.tint.red,
+                                command.tint.green, command.tint.blue) ||
+        !SDL_SetTextureAlphaMod(resolved_texture, command.tint.alpha)) {
+        throw std::runtime_error("Could not set sprite appearance: " +
+                                 std::string{SDL_GetError()});
+    }
 
     // Convert center-based rectangle coordinates to SDL's top-left-based rectangle coordinates.
 

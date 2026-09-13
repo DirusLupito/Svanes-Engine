@@ -39,63 +39,135 @@ public:
 
     /**
      * Adds a command to draw a rectangle to the render queue.
+     * The rectangle is filled with the specified color and combined with the
+     * colors already on the screen according to the selected blend mode.
+     *
      * @param destination The destination rectangle.
      * @param color The color of the rectangle.
      * @param rotation The rotation angle in radians (default is 0.0F).
      * @param z_order The z order to draw the rectangle at (default is 0).
+     * @param blend_mode The blending mode used to combine the rectangle with
+     * the existing screen color (default is BlendMode::Alpha).
      */
-    void DrawRectangle(Rectangle2D destination, Color color, float rotation = 0.0F, std::int32_t z_order = 0);
+    void DrawRectangle(Rectangle2D destination, Color color,
+                       float rotation = 0.0F, std::int32_t z_order = 0,
+                       BlendMode blend_mode = BlendMode::Alpha);
 
     /**
      * Adds a command to draw a triangle to the render queue.
+     * The triangle is filled with the specified color and combined with the
+     * colors already on the screen according to the selected blend mode.
+     *
      * @param destination The triangle to be drawn.
      * @param color The color of the triangle.
      * @param z_order The z order to draw the triangle at (default is 0).
+     * @param blend_mode The blending mode used to combine the triangle with the
+     * existing screen color (default is BlendMode::Alpha).
      */
-    void DrawTriangle(Triangle2D destination, Color color, std::int32_t z_order = 0);
+    void DrawTriangle(Triangle2D destination, Color color,
+                      std::int32_t z_order = 0,
+                      BlendMode blend_mode = BlendMode::Alpha);
 
     /**
      * Adds a command to draw a circle to the render queue.
-     * 
+     * The circle is filled with the specified color and combined with the
+     * colors already on the screen according to the selected blend mode.
+     *
      * @param destination The circle to be drawn.
      * @param color The color of the circle.
-     * @param z_order The z order to draw the circle at (default is 0
+     * @param z_order The z order to draw the circle at (default is 0).
+     * @param blend_mode The blending mode used to combine the circle with the
+     * existing screen color (default is BlendMode::Alpha).
      */
-    void DrawCircle(Circle2D destination, Color color, std::int32_t z_order = 0);
+    void DrawCircle(Circle2D destination, Color color, std::int32_t z_order = 0,
+                    BlendMode blend_mode = BlendMode::Alpha);
 
     /**
      * Adds a command to draw a texture to the render queue.
      * This will draw the entire texture to the specified destination rectangle.
+     * The texture's color and alpha channels are multiplied by the
+     * corresponding channels in tint before the texture is combined with the
+     * screen.
+     *
      * @param texture The handle of the texture to draw.
-     * @param destination The destination rectangle where the texture will be drawn.
+     * @param destination The destination rectangle where the texture will be
+     * drawn.
      * @param rotation The rotation angle in radians (default is 0.0F).
      * @param z_order The z order to draw the texture at (default is 0).
+     * @param blend_mode The blending mode used to combine the texture with the
+     * existing screen color (default is BlendMode::Alpha).
+     * @param tint The color and opacity multiplier applied to the texture.
+     *             White with full opacity leaves the texture unchanged.
+     *             Other values tint the texture or make it more transparent.
+     *             Default is {255, 255, 255, 255}.
      */
-    void DrawTexture(TextureHandle texture, Rectangle2D destination, float rotation = 0.0F, std::int32_t z_order = 0);
+    void DrawTexture(TextureHandle texture, Rectangle2D destination,
+                     float rotation = 0.0F, std::int32_t z_order = 0,
+                     BlendMode blend_mode = BlendMode::Alpha,
+                     Color tint = {255, 255, 255, 255});
 
     /**
-     * Adds a command to draw a texture to the render queue with a specified source rectangle.
-     * This will draw only the source region of the texture to the specified destination rectangle.
+     * Adds a command to draw a texture to the render queue with a specified
+     * source rectangle. This will draw only the source region of the texture to
+     * the specified destination rectangle. The texture's color and alpha
+     * channels are multiplied by the corresponding channels in tint before the
+     * texture is combined with the screen.
+     *
      * @param texture The handle of the texture to draw.
      * @param source The source rectangle from the texture to draw.
-     * @param destination The destination rectangle where the texture will be drawn.
+     * @param destination The destination rectangle where the texture will be
+     * drawn.
      * @param rotation The rotation angle in radians (default is 0.0F).
      * @param z_order The z order to draw the texture at (default is 0).
+     * @param blend_mode The blending mode used to combine the texture with the
+     * existing screen color (default is BlendMode::Alpha).
+     * @param tint The color and opacity multiplier applied to the texture.
+     *             White with full opacity leaves the texture unchanged.
+     *             Other values tint the texture or make it more transparent
+     *             Default is {255, 255, 255, 255}.
      */
-    void DrawTexture(
-        TextureHandle texture, Rectangle2D source, Rectangle2D destination,
-        float rotation = 0.0F, std::int32_t z_order = 0
-    );
+    void DrawTexture(TextureHandle texture, Rectangle2D source,
+                     Rectangle2D destination, float rotation = 0.0F,
+                     std::int32_t z_order = 0,
+                     BlendMode blend_mode = BlendMode::Alpha,
+                     Color tint = {255, 255, 255, 255});
 
     /**
      * Resets the render queue by clearing all commands.
      */
     void Reset() noexcept;
 
-    void DrawConvexPolygon(const ConvexPolygon2D& destination, Color color, std::int32_t z_order = 0);
+    /**
+     * Adds a command to draw a convex polygon to the render queue.
+     * The polygon is filled with the specified color and combined with the
+     * colors already on the screen according to the selected blend mode.
+     *
+     * @param destination The convex polygon to be drawn.
+     * @param color The color of the polygon.
+     * @param z_order The z order to draw the polygon at (default is 0).
+     * @param blend_mode The blending mode used to combine the polygon with the
+     * existing screen color (default is BlendMode::Alpha).
+     */
+    void DrawConvexPolygon(const ConvexPolygon2D &destination, Color color,
+                           std::int32_t z_order = 0,
+                           BlendMode blend_mode = BlendMode::Alpha);
 
-private:
+    /**
+     * Adds a command to draw a circle whose color changes gradually from its
+     * center to its circumference.
+     *
+     * @param destination The circle to be drawn.
+     * @param center_color The color at the center of the circle.
+     * @param edge_color The color at the circumference of the circle.
+     * @param z_order The z order to draw the gradient at (default is 0).
+     * @param blend_mode The blending mode used to combine the gradient with the
+     * existing screen color (default is BlendMode::Alpha).
+     */
+    void DrawRadialGradient(Circle2D destination, Color center_color,
+                            Color edge_color, std::int32_t z_order = 0,
+                            BlendMode blend_mode = BlendMode::Alpha);
 
+  private:
     /**
      * Represents a command to clear the screen with a specific color.
      *
@@ -114,12 +186,15 @@ private:
      * - color: The fill color of the rectangle.
      * - rotation: The rotation angle in radians for the rectangle.
      * - z_order: The z order the rectangle is drawn at.
+     * - blend_mode: The blending mode used to combine the rectangle with the
+     * existing screen color.
      */
     struct RectangleCommand {
         Rectangle2D destination;
         Color color;
         float rotation;
         std::int32_t z_order;
+        BlendMode blend_mode;
     };
 
     /**
@@ -129,11 +204,14 @@ private:
      * - destination: The triangle to be drawn.
      * - color: The fill color of the triangle.
      * - z_order: The z order the triangle is drawn at.
+     * - blend_mode: The blending mode used to combine the triangle with the
+     * existing screen color.
      */
     struct TriangleCommand {
         Triangle2D destination;
         Color color;
         std::int32_t z_order;
+        BlendMode blend_mode;
     };
 
     /**
@@ -142,45 +220,74 @@ private:
      * FIELDS:
      * - destination: The circle to be drawn.
      * - color: The fill color of the circle.
+     * - edge_color: The color at the circumference of the circle.
+     * Used for radial gradients.
      * - z_order: The z order the circle is drawn at.
+     * - blend_mode: The blending mode used to combine the circle with the
+     * existing screen color.
      */
     struct CircleCommand {
         Circle2D destination;
         Color color;
+        Color edge_color;
         std::int32_t z_order;
+        BlendMode blend_mode;
     };
 
+    // An aside on...
+    // ... tinting:
+    //
+    // Tinting here is a per channel multiplier applied before blending.
+    // texture RGB * tint RGB
+    // texture alpha * tint alpha
+    //
+    // A tint of ... will affect the texture as follows:
+    //
+    // {255, 255, 255, 255}: unchanged
+    // {255, 0, 0, 255}: removes green and blue, making the texture red-tinted
+    // {128, 128, 128, 255}: darkens the texture
+    // {255, 255, 255, 128}: makes the texture 50% as opaque
+
     /**
-     * Represents a command to draw a texture, optionally specifying a source rectangle.
-     * If the source rectangle is not provided, the entire texture will be drawn.
+     * Represents a command to draw a texture, optionally specifying a source
+     * rectangle. If the source rectangle is not provided, the entire texture
+     * will be drawn.
      *
      * FIELDS:
+     * - tint: The color and opacity multiplier applied to the texture.
      * - texture: The handle of the texture to draw.
      * - source: The optional region of the texture to draw.
      * - destination: The screen region where the texture is drawn.
      * - rotation: The rotation angle in radians for the texture.
      * - z_order: The z order the texture is drawn at.
+     * - blend_mode: The blending mode used to combine the texture with the
+     * existing screen color.
      */
     struct TextureCommand {
+        Color tint;
         TextureHandle texture;
         std::optional<Rectangle2D> source;
         Rectangle2D destination;
         float rotation;
         std::int32_t z_order;
+        BlendMode blend_mode;
     };
 
     /**
      * Represents a command to draw a convex polygon with a specific color.
-     * 
+     *
      * FIELDS:
      * - destination: The convex polygon to be drawn.
      * - color: The fill color of the convex polygon.
      * - z_order: The z order the convex polygon is drawn at.
+     * - blend_mode: The blending mode used to combine the convex polygon with
+     * the existing screen color.
      */
     struct ConvexPolygonCommand {
         ConvexPolygon2D destination;
         Color color;
         std::int32_t z_order;
+        BlendMode blend_mode;
     };
 
     // union but safe

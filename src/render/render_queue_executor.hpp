@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "bloom_pass.hpp"
+
 #include <svanes/render/render_queue.hpp>
 #include <svanes/render/texture_manager.hpp>
 
@@ -33,10 +35,12 @@ public:
      * @param render_queue The RenderQueue containing the commands to execute.
      * @throws std::runtime_error if any command fails to execute.
      */
-    void Execute(RenderQueue& render_queue, std::optional<Rectangle2D> clip = std::nullopt) const;
+    void Execute(RenderQueue &render_queue,
+                 std::optional<Rectangle2D> clip = std::nullopt);
 
-private:
+    BloomSettings bloom;
 
+  private:
     /**
      * Executes a single ConvexPolygonCommand, which draws a convex polygon with a specific color.
      * @param command The ConvexPolygonCommand to execute.
@@ -93,6 +97,7 @@ private:
      * The SDL_Renderer used for rendering.
      * This will handle the actual drawing operations to the screen.
      */
+    BloomPass bloom_pass;
     SDL_Renderer* renderer;
 
     /**

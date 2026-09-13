@@ -11,6 +11,7 @@ class Camera2D;
 class InputManager;
 class Registry;
 class TextureManager;
+struct BloomSettings;
 
 /**
  * Defines relevant context for a game.
@@ -18,13 +19,18 @@ class TextureManager;
  * they must use the TextureManager provided in this context.
  *
  * FIELDS:
- * - world: The engine owned registry containing the game's entities and components.
+ * - world: The engine owned registry containing the game's entities and
+ * components.
  * - assets: The engine owned texture manager used to load and create textures.
- * - audio: The engine owned audio manager used to load and play sounds and music.
- * - camera: The engine owned camera used to convert between screen and world coordinates.
+ * - audio: The engine owned audio manager used to load and play sounds and
+ * music.
+ * - camera: The engine owned camera used to convert between screen and world
+ * coordinates.
  * - output_width: The current width of the rendering output.
  * - output_height: The current height of the rendering output.
- * - gravity: The engine owned gravity vector applied to entities with Kinematic2D and Gravity components.
+ * - gravity: The engine owned gravity vector applied to entities with
+ * Kinematic2D and Gravity components.
+ * - bloom: The engine owned bloom settings used to configure the bloom effect.
  */
 struct GameContext {
     Registry& world;
@@ -34,6 +40,7 @@ struct GameContext {
     std::int32_t output_width;
     std::int32_t output_height;
     Vector2D& gravity;
+    BloomSettings &bloom;
 };
 
 /**
@@ -45,14 +52,19 @@ struct GameContext {
  * to update its state accordingly.
  *
  * FIELDS:
- * - world: The engine owned registry containing the game's entities and components.
+ * - world: The engine owned registry containing the game's entities and
+ * components.
  * - input: The input state for the current frame.
  * - delta_seconds: The elapsed time since the previous frame, in seconds.
  * - output_width: The current width of the rendering output.
  * - output_height: The current height of the rendering output.
- * - audio: The engine owned audio manager used to load and play sounds and music.
- * - camera: The engine owned camera used to convert between screen and world coordinates.
- * - gravity: The engine owned gravity vector applied to entities with Kinematic2D and Gravity components.
+ * - audio: The engine owned audio manager used to load and play sounds and
+ * music.
+ * - camera: The engine owned camera used to convert between screen and world
+ * coordinates.
+ * - gravity: The engine owned gravity vector applied to entities with
+ * Kinematic2D and Gravity components.
+ * - bloom: The engine owned bloom settings used to configure the bloom effect.
  */
 struct FrameContext {
     Registry& world;
@@ -63,6 +75,7 @@ struct FrameContext {
     AudioManager& audio;
     Camera2D& camera;
     Vector2D& gravity;
+    BloomSettings &bloom;
 };
 
 /**

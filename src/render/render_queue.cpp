@@ -18,36 +18,53 @@ void RenderQueue::Clear(Color color)
     commands.emplace_back(ClearCommand{color});
 }
 
-void RenderQueue::DrawRectangle(Rectangle2D destination, Color color, float rotation, std::int32_t z_order)
-{
-    commands.emplace_back(RectangleCommand{destination, color, rotation, z_order});
+void RenderQueue::DrawRectangle(Rectangle2D destination, Color color,
+                                float rotation, std::int32_t z_order,
+                                BlendMode blend_mode) {
+    commands.emplace_back(
+        RectangleCommand{destination, color, rotation, z_order, blend_mode});
 }
 
-void RenderQueue::DrawTriangle(Triangle2D destination, Color color, std::int32_t z_order)
-{
-    commands.emplace_back(TriangleCommand{destination, color, z_order});
+void RenderQueue::DrawTriangle(Triangle2D destination, Color color,
+                               std::int32_t z_order, BlendMode blend_mode) {
+    commands.emplace_back(
+        TriangleCommand{destination, color, z_order, blend_mode});
 }
 
-void RenderQueue::DrawCircle(Circle2D destination, Color color, std::int32_t z_order)
-{
-    commands.emplace_back(CircleCommand{destination, color, z_order});
+void RenderQueue::DrawCircle(Circle2D destination, Color color,
+                             std::int32_t z_order, BlendMode blend_mode) {
+    commands.emplace_back(
+        CircleCommand{destination, color, color, z_order, blend_mode});
 }
 
-void RenderQueue::DrawConvexPolygon(const ConvexPolygon2D& destination, Color color, std::int32_t z_order)
-{
-    commands.emplace_back(ConvexPolygonCommand{destination, color, z_order});
+void RenderQueue::DrawRadialGradient(Circle2D destination, Color center_color,
+                                     Color edge_color, std::int32_t z_order,
+                                     BlendMode blend_mode) {
+    commands.emplace_back(CircleCommand{destination, center_color, edge_color,
+                                        z_order, blend_mode});
 }
 
-void RenderQueue::DrawTexture(TextureHandle texture, Rectangle2D destination, float rotation, std::int32_t z_order)
-{
-    commands.emplace_back(TextureCommand{texture, std::nullopt, destination, rotation, z_order});
+void RenderQueue::DrawConvexPolygon(const ConvexPolygon2D &destination,
+                                    Color color, std::int32_t z_order,
+                                    BlendMode blend_mode) {
+    commands.emplace_back(
+        ConvexPolygonCommand{destination, color, z_order, blend_mode});
 }
 
-void RenderQueue::DrawTexture(
-    TextureHandle texture, Rectangle2D source, Rectangle2D destination, float rotation, std::int32_t z_order
-)
-{
-    commands.emplace_back(TextureCommand{texture, source, destination, rotation, z_order});
+void RenderQueue::DrawTexture(TextureHandle texture, Rectangle2D destination,
+                              float rotation, std::int32_t z_order,
+                              BlendMode blend_mode, Color tint) {
+    commands.emplace_back(TextureCommand{tint, texture, std::nullopt,
+                                         destination, rotation, z_order,
+                                         blend_mode});
+}
+
+void RenderQueue::DrawTexture(TextureHandle texture, Rectangle2D source,
+                              Rectangle2D destination, float rotation,
+                              std::int32_t z_order, BlendMode blend_mode,
+                              Color tint) {
+    commands.emplace_back(TextureCommand{tint, texture, source, destination,
+                                         rotation, z_order, blend_mode});
 }
 
 // Except for reset which just clears the command queue
