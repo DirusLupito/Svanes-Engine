@@ -8,6 +8,7 @@ project(
 )
 
 include(FetchContent)
+find_package(Threads REQUIRED)
 
 set(SDL_SHARED OFF CACHE BOOL "Build SDL as a shared library")
 set(SDL_STATIC ON CACHE BOOL "Build SDL as a static library")
@@ -125,6 +126,7 @@ target_sources(
     svanes_engine
     PRIVATE
         src/application.cpp
+        src/async/async_parallel_for_driver.cpp
         src/attractor_system.cpp
         src/audio/audio_manager.cpp
         src/audio/audio_manager_internal.hpp
@@ -151,6 +153,7 @@ target_sources(
         BASE_DIRS include
         FILES
             include/svanes/application.hpp
+            include/svanes/async/async_parallel_for_driver.hpp
             include/svanes/attractor_system.hpp
             include/svanes/audio/audio_manager.hpp
             include/svanes/camera2d.hpp
@@ -176,7 +179,7 @@ target_sources(
 target_compile_features(svanes_engine PUBLIC cxx_std_23)
 target_link_libraries(
     svanes_engine
-    PUBLIC SDL3::SDL3 cppzmq-static
+    PUBLIC SDL3::SDL3 cppzmq-static Threads::Threads
     PRIVATE SDL3_image::SDL3_image SDL3_mixer::SDL3_mixer
 )
 
@@ -228,6 +231,7 @@ set_target_properties(
 
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FILES
     include/svanes/application.hpp
+    include/svanes/async/async_parallel_for_driver.hpp
     include/svanes/attractor_system.hpp
     include/svanes/audio/audio_manager.hpp
     include/svanes/camera2d.hpp
@@ -251,6 +255,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
 )
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/application.cpp
+    src/async/async_parallel_for_driver.cpp
     src/attractor_system.cpp
     src/audio/audio_manager.cpp
     src/audio/audio_manager_internal.hpp
