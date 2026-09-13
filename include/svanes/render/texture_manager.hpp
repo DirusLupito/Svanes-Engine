@@ -37,7 +37,7 @@ class TextureManagerInternal;
  * map and the SDL_Renderer pointer.
  *
  * Unlike its internal counterpart, the TextureManager class
- * s intended to be used by external game code.
+ * is intended to be used by external game code.
  */
 class TextureManager final {
   public:
