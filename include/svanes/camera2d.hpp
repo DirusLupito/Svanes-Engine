@@ -29,7 +29,7 @@ enum class ScaleMode : std::uint8_t {
 };
 
 class Camera2D final {
-  public:
+public:
     // x axis position of the center of the camera in world coordinates
     float x = 0.0F;
 
@@ -195,7 +195,7 @@ class Camera2D final {
     PrepareForRendering(const Transform &transform,
                         const ConvexPolygon2D &polygon) const;
 
-  private:
+private:
     // width of the rendering output the camera draws into
     std::int32_t output_width = 0;
 

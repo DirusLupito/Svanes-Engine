@@ -32,7 +32,7 @@ struct ApplicationSettings {
  * game indicates that it should quit.
  */
 class Application final {
-  public:
+public:
     /**
      * Constructs an Application with the specified settings.
      * @param settings The settings for the application, including the window
@@ -53,7 +53,7 @@ class Application final {
      */
     int32_t run(IGame &game);
 
-  private:
+private:
     // The settings for the application, including the window title and
     // dimensions.
     ApplicationSettings settings;

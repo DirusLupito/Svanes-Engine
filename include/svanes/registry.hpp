@@ -21,7 +21,7 @@ namespace svanes {
  *
  */
 class Registry final {
-  public:
+public:
     /**
      * Creates a new entity and returns its unique identifier.
      *
@@ -167,7 +167,7 @@ class Registry final {
         }
     }
 
-  private:
+private:
     // The unique ID for each entity, which is incremented each time a new
     // entity is created.
     Entity next_entity = 0;

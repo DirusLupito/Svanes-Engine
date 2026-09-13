@@ -31,7 +31,7 @@ namespace svanes {
  * system.
  */
 class RenderQueue final {
-  public:
+public:
     /**
      * Clears the render queue and adds a command to clear the screen with the
      * specified color.
@@ -141,7 +141,7 @@ class RenderQueue final {
                             Color edge_color, std::int32_t z_order = 0,
                             BlendMode blend_mode = BlendMode::Alpha);
 
-  private:
+private:
     /**
      * Represents a command to clear the screen with a specific color.
      *

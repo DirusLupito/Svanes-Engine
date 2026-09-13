@@ -43,7 +43,7 @@ struct Triangle2D {
 Triangle2D TransformTriangle(Triangle2D triangle, const Transform &transform);
 
 class TriangleGeometry final {
-  public:
+public:
     /**
      * Constructs a TriangleGeometry object from a Triangle2D.
      *
@@ -67,7 +67,7 @@ class TriangleGeometry final {
      */
     const std::array<Vector2D, 3> &Vertices() const;
 
-  private:
+private:
     // The triangle's vertices in local coordinates.
     std::array<Vector2D, 3> vertices;
 };

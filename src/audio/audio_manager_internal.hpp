@@ -20,7 +20,7 @@ namespace svanes::internal {
  *
  */
 class AudioManagerInternal {
-  public:
+public:
     /**
      * Creates an AudioManager instance using the provided SDL_Renderer.
      * @return A AudioManager instance.

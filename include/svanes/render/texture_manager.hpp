@@ -40,7 +40,7 @@ class TextureManagerInternal;
  * is intended to be used by external game code.
  */
 class TextureManager final {
-  public:
+public:
     /**
      * Destructor for the TextureManager class.
      * Currently, it does not need to perform any special cleanup,
@@ -74,7 +74,7 @@ class TextureManager final {
      */
     TextureHandle CreateTexture(const ImageData &image);
 
-  private:
+private:
     /**
      * Used by std::unique_ptr to automatically manage the lifetime of
      * SDL_Texture objects. Destroying a texture is simple, as the only resource

@@ -51,7 +51,7 @@ Rectangle2D TransformRectangle(Rectangle2D rectangle,
  * of the rectangle.
  */
 class RectangleGeometry final {
-  public:
+public:
     /**
      * Constructs a RectangleGeometry object from a rectangle and a rotation
      * angle. The rectangle is defined by its center (x, y), width, and height.
@@ -89,7 +89,7 @@ class RectangleGeometry final {
      */
     std::array<Vector2D, 4> Corners() const;
 
-  private:
+private:
     // Half the width of the rotated rectangle.
     float half_width;
 

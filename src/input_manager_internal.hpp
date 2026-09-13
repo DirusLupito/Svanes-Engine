@@ -15,7 +15,7 @@ namespace svanes::internal {
  * This class should not be used directly by the user of the engine.
  */
 class InputManagerInternal final {
-  public:
+public:
     /**
      * Prepares the InputManager for a new frame.
      * This should be called at the start of each frame to update the previous
@@ -59,7 +59,7 @@ class InputManagerInternal final {
      */
     static void SynchronizeTextInput(InputManager &input, SDL_Window *window);
 
-  private:
+private:
     /**
      * Translates an SDL_Scancode to the engine's Key enum.
      * @param scancode The SDL_Scancode to translate.

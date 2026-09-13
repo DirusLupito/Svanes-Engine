@@ -15,7 +15,7 @@ struct Transform;
  * order.
  */
 class ConvexPolygon2D final {
-  public:
+public:
     /**
      * Constructs a ConvexPolygon2D with the given vertices, checking to make
      * sure they form a valid convex polygon.
@@ -46,7 +46,7 @@ class ConvexPolygon2D final {
      */
     Rectangle2D Bounds() const;
 
-  private:
+private:
     // The vertices of the convex polygon, stored in the order they were
     // provided.
     std::vector<Vector2D> vertices;

@@ -11,7 +11,7 @@
  * to the engine.
  */
 class OrbitalEscalationGame final : public svanes::IGame {
-  public:
+public:
     /**
      * Initializes the game with the provided context.
      * @param context The context for the game, providing access to the
@@ -28,7 +28,7 @@ class OrbitalEscalationGame final : public svanes::IGame {
 
     bool ShouldQuit() const override;
 
-  private:
+private:
     svanes::Entity background_entity = 0;
     svanes::Entity square_entity = 0;
     svanes::Entity planet_entity = 0;

@@ -308,7 +308,7 @@ enum class MouseButton : std::uint8_t {
  * Mostly a wrapper around SDL's input handling.
  */
 class InputManager final {
-  public:
+public:
     /**
      * Checks if a specific key is currently pressed down.
      * @param key The key to check.
@@ -398,7 +398,7 @@ class InputManager final {
      */
     const std::string &TextInputThisFrame() const;
 
-  private:
+private:
     // Constants for the number of keys and mouse buttons, used to size the
     // arrays.
 

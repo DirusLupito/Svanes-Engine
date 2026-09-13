@@ -42,7 +42,7 @@ struct MusicHandle {
 };
 
 class AudioManager final {
-  public:
+public:
     ~AudioManager();
 
     /**
@@ -124,7 +124,7 @@ class AudioManager final {
      */
     void SetMusicPlaybackRate(float ratio);
 
-  private:
+private:
     struct MixerDeleter {
         void operator()(MIX_Mixer *mixer) const;
     };

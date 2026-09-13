@@ -17,7 +17,7 @@ namespace svanes::internal {
  * Executes rendering commands stored in a RenderQueue.
  */
 class RenderQueueExecutor final {
-  public:
+public:
     /**
      * Constructs a RenderQueueExecutor with the specified SDL_Renderer and
      * TextureManager.
@@ -37,7 +37,7 @@ class RenderQueueExecutor final {
     void Execute(RenderQueue &render_queue,
                  std::optional<Rectangle2D> clip = std::nullopt) const;
 
-  private:
+private:
     /**
      * Executes a single ConvexPolygonCommand, which draws a convex polygon with
      * a specific color.

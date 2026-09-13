@@ -23,7 +23,7 @@ namespace svanes::internal {
  * access private members such as the textures map and the SDL_Renderer pointer.
  */
 class TextureManagerInternal final {
-  public:
+public:
     /**
      * Creates a TextureManager instance using the provided SDL_Renderer.
      * Throws an exception if the renderer is null.

@@ -80,7 +80,7 @@ struct FrameContext {
  * logic.
  */
 class IGame {
-  public:
+public:
     virtual ~IGame() = default;
 
     /**
