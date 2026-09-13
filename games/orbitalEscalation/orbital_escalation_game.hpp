@@ -66,6 +66,8 @@ private:
     // A list of all collidable entities in the game.
     std::vector<svanes::Entity> collidable_entities = {};
 
+    std::vector<svanes::Entity> collision_flashes = {};
+
     /**
      * Creates num_npc_entities_to_spawn random non-player, non-planet entities
      * inside the non_planet_non_player_entities vector. It will add entities

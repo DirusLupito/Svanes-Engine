@@ -18,6 +18,24 @@
 
 constexpr std::int32_t kSquarePixels = 300;
 constexpr float kPlanetRadius = 4200.0F;
+constexpr float kCollisionFlashLifetime = 5.0F;
+constexpr float kCollisionFlashExpansionTime = 0.5F;
+constexpr float kCollisionFlashInitialRadius = 4000.0F;
+constexpr float kCollisionFlashExpansionRadius = 8000.0F;
+
+/**
+ * Just a rapidly expanding ball that's much brighter at its center than at its edge.
+ * A ball that will add white to the screen where it is drawn, at greater intensity
+ * at its center than at its edge.
+ * Will fade out much slower than it expands. That is how we get the effect of an
+ * explosion of light.
+ * 
+ * FIELDS:
+ * - elapsed_seconds: The time elapsed since the collision flash was created.
+ */
+struct CollisionFlash {
+    float elapsed_seconds = 0.0F;
+};
 
 /**
  * Helper for the planet's gravitational field. 
@@ -37,14 +55,159 @@ static svanes::Vector2D AttractionField(svanes::Vector2D offset_to_source)
 }
 
 /**
+ * Updates all active collision flashes, expanding them at the start of their lifetime
+ * and fading them out before destroying them when their lifetime has elapsed.
+ *
+ * @param world The registry containing the collision flash entities.
+ * @param collision_flashes The list of active collision flash entities.
+ * @param delta_seconds The time elapsed since the previous update.
+ */
+static void UpdateCollisionFlashes(
+    svanes::Registry& world, std::vector<svanes::Entity>& collision_flashes,
+    float delta_seconds)
+{
+    // if the flash has been alive for longer than its lifetime,
+    // destroy it and remove it from the list of active flashes.
+    std::erase_if(collision_flashes, [&](svanes::Entity flash) {
+        CollisionFlash& state = world.GetComponent<CollisionFlash>(flash);
+        state.elapsed_seconds += delta_seconds;
+        if (state.elapsed_seconds >= kCollisionFlashLifetime) {
+            world.DestroyEntity(flash);
+            return true;
+        }
+
+        // Well we're already iterating over all the flashes, 
+        // so we might as well update their size and alpha here too.
+
+        const float expansion = std::min(
+            state.elapsed_seconds / kCollisionFlashExpansionTime, 1.0F
+        );
+        const float fade = state.elapsed_seconds <= kCollisionFlashExpansionTime
+            ? 1.0F
+            : 1.0F - (state.elapsed_seconds - kCollisionFlashExpansionTime) /
+                (kCollisionFlashLifetime - kCollisionFlashExpansionTime);
+        auto& gradient = world.GetComponent<svanes::RadialGradient2D>(flash);
+        gradient.geometry.radius = std::lerp(
+            kCollisionFlashInitialRadius, kCollisionFlashExpansionRadius, expansion
+        );
+        gradient.center_color.alpha = static_cast<std::uint8_t>(255.0F * fade);
+        return false;
+    });
+}
+
+/**
+ * Creates a collision flash at the specified point and adds it to the list of active flashes.
+ *
+ * @param world The registry to create the collision flash entity in.
+ * @param collision_flashes The list to which the new collision flash will be added.
+ * @param contact_point The world-space point at which the collision flash will be drawn.
+ */
+static void CreateCollisionFlash(
+    svanes::Registry& world, std::vector<svanes::Entity>& collision_flashes,
+    svanes::Vector2D contact_point)
+{
+
+    const svanes::Entity flash = world.CreateEntity();
+    world.AddComponent<svanes::Transform>(
+        flash, svanes::Transform{contact_point.x, contact_point.y}
+    );
+
+    // could probably have also worked with alpha blending and an
+    // all white radial gradient.
+    world.AddComponent<svanes::RadialGradient2D>(
+        flash,
+        svanes::RadialGradient2D{
+            .geometry = svanes::Circle2D{0.0F, 0.0F, kCollisionFlashInitialRadius},
+            .center_color = svanes::Color{255, 255, 255, 255},
+            .edge_color = svanes::Color{0, 0, 0, 0},
+            .blend_mode = svanes::BlendMode::Additive,
+        }
+    );
+
+    world.AddComponent<CollisionFlash>(flash);
+    collision_flashes.push_back(flash);
+}
+
+/**
+ * Creates a flash for each circle involved in the supplied collisions, except when
+ * either entity is the planet. The flash is placed on the circle's side facing
+ * the shape it collided with.
+ *
+ * @param world The registry containing the colliding entities.
+ * @param a The first entity in the collision pair.
+ * @param b The second entity in the collision pair.
+ * @param collisions The collisions detected between the two entities.
+ * @param collision_flashes The list to which newly created flashes will be added.
+ */
+static void CreateCollisionFlashes(
+    svanes::Registry& world, svanes::Entity a, svanes::Entity b,
+    const std::vector<svanes::Collision2D>& collisions,
+    std::vector<svanes::Entity>& collision_flashes)
+{
+    // only the planet has a PointAttractor2D component, so if either entity has one,
+    // the planet is involved in the collision and we don't want to create flashes for it.
+    if (world.HasComponent<svanes::PointAttractor2D>(a) ||
+        world.HasComponent<svanes::PointAttractor2D>(b)) {
+        return;
+    }
+
+    // we only want to create flashes for circles because
+    // its really easy to figure out where to put the flash for a circle
+    // (just put it on the edge of the circle in the direction of the collision normal)
+
+    const auto* circle_a = std::get_if<svanes::Circle2D>(
+        &world.GetComponent<svanes::Collider2D>(a).geometry
+    );
+
+    const auto* circle_b = std::get_if<svanes::Circle2D>(
+        &world.GetComponent<svanes::Collider2D>(b).geometry
+    );
+
+    if (circle_a == nullptr && circle_b == nullptr) {
+        return;
+    }
+
+    const svanes::Transform& transform_a = world.GetComponent<svanes::Transform>(a);
+    const svanes::Transform& transform_b = world.GetComponent<svanes::Transform>(b);
+
+    for (const svanes::Collision2D& collision : collisions) {
+        if (circle_a != nullptr) {
+            const svanes::Vector2D center{
+                transform_a.x + circle_a->x,
+                transform_a.y + circle_a->y,
+            };
+
+            CreateCollisionFlash(
+                world, collision_flashes,
+                center - collision.normal * circle_a->radius
+            );
+        }
+        if (circle_b != nullptr) {
+            const svanes::Vector2D center{
+                transform_b.x + circle_b->x,
+                transform_b.y + circle_b->y,
+            };
+
+            CreateCollisionFlash(
+                world, collision_flashes,
+                center + collision.normal * circle_b->radius
+            );
+        }
+    }
+}
+
+/**
  * Applies an acceleration to two entities based on their collision, if they have collided
  * to slam them apart. The acceleration is applied in the direction of the collision normal.
  * 
  * @param world The registry containing the entities.
  * @param a The first entity.
  * @param b The second entity.
+ * @param collision_flashes The list to which flashes created by the collisions will be added.
  */
-static void ApplyCollisionAcceleration(svanes::Registry& world, svanes::Entity a, svanes::Entity b)
+static void ApplyCollisionAcceleration(
+    svanes::Registry& world, svanes::Entity a, svanes::Entity b,
+    std::vector<svanes::Entity>& collision_flashes)
 {
     const auto collisions = svanes::DetectCollisions(
         world.GetComponent<svanes::Collider2D>(a).geometry, world.GetComponent<svanes::Transform>(a),
@@ -66,9 +229,9 @@ static void ApplyCollisionAcceleration(svanes::Registry& world, svanes::Entity a
             motion.acceleration_x -= acceleration.x;
             motion.acceleration_y -= acceleration.y;
         }
-
-
     }
+
+    CreateCollisionFlashes(world, a, b, collisions, collision_flashes);
 }
 
 /**
@@ -76,12 +239,15 @@ static void ApplyCollisionAcceleration(svanes::Registry& world, svanes::Entity a
  * 
  * @param world The registry containing the entities.
  * @param entities The list of entities to check for collisions and apply acceleration.
+ * @param collision_flashes The list to which flashes created by the collisions will be added.
  */
-static void ApplyCollisionAcceleration(svanes::Registry& world, const std::vector<svanes::Entity>& entities)
+static void ApplyCollisionAcceleration(
+    svanes::Registry& world, const std::vector<svanes::Entity>& entities,
+    std::vector<svanes::Entity>& collision_flashes)
 {
     for (std::size_t i = 0; i < entities.size(); ++i) {
         for (std::size_t j = i + 1; j < entities.size(); ++j) {
-            ApplyCollisionAcceleration(world, entities[i], entities[j]);
+            ApplyCollisionAcceleration(world, entities[i], entities[j], collision_flashes);
         }
     }
 }
@@ -322,6 +488,8 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext& context)
 
 void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
 {
+    UpdateCollisionFlashes(frame.world, collision_flashes, frame.delta_seconds);
+
     if (frame.input.WasPressed(svanes::Key::Escape)) {
         should_quit = true;
     }
@@ -394,11 +562,15 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
                 return;
             }
             for (svanes::Entity boundary : boundary_entities) {
-                if (!svanes::DetectCollisions(
+                const auto collisions = svanes::DetectCollisions(
                     collider.geometry, transform,
                     frame.world.GetComponent<svanes::Collider2D>(boundary).geometry,
                     frame.world.GetComponent<svanes::Transform>(boundary)
-                ).empty()) {
+                );
+                if (!collisions.empty()) {
+                    CreateCollisionFlashes(
+                        frame.world, entity, boundary, collisions, collision_flashes
+                    );
                     destroyed_entities.push_back(entity);
                     break;
                 }
@@ -411,7 +583,7 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext& frame)
         std::erase(non_planet_non_player_entities, entity);
     }
 
-    ApplyCollisionAcceleration(frame.world, collidable_entities);
+    ApplyCollisionAcceleration(frame.world, collidable_entities, collision_flashes);
 
 }
 
