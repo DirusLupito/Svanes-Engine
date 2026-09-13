@@ -3,4 +3,17 @@ IndentWidth: 4
 TabWidth: 4
 UseTab: Never
 MaxEmptyLinesToKeep: 2
-
+# Fixes the 2-space indentation for public/private
+AccessModifierOffset: -4 
+---
+Language: Cpp
+IndentWidth: 4
+TabWidth: 4
+# Fixes the 2-space indentation for public/private
+AccessModifierOffset: -4 
+---
+Language: C
+IndentWidth: 4
+TabWidth: 4
+# Fixes the 2-space indentation for public/private
+AccessModifierOffset: -4 
