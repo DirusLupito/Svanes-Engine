@@ -205,6 +205,13 @@ void RenderQueueExecutor::Execute(const RenderQueue::CircleCommand& command) con
         command.color.alpha / 255.0F,
     };
 
+    const SDL_FColor edge_color{
+        command.edge_color.red / 255.0F,
+        command.edge_color.green / 255.0F,
+        command.edge_color.blue / 255.0F,
+        command.edge_color.alpha / 255.0F,
+    };
+
     std::array<SDL_Vertex, segments + 1> vertices{};
 
     // Need 3 indices per triangle, and we have segments many triangles in the fan.
@@ -225,7 +232,7 @@ void RenderQueueExecutor::Execute(const RenderQueue::CircleCommand& command) con
         vertices[i + 1] = {{
             command.destination.x + command.destination.radius * std::cos(angle),
             command.destination.y + command.destination.radius * std::sin(angle),
-        }, color, {}};
+        }, edge_color, {}};
 
         // Center
         indices[i * 3] = 0;

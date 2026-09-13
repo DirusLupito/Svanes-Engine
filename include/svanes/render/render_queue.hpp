@@ -119,6 +119,21 @@ public:
                            std::int32_t z_order = 0,
                            BlendMode blend_mode = BlendMode::Alpha);
 
+    /**
+     * Adds a command to draw a circle whose color changes linearly from its
+     * center to its circumference.
+     *
+     * @param destination The circle to be drawn.
+     * @param center_color The color at the center of the circle.
+     * @param edge_color The color at the circumference of the circle.
+     * @param z_order The z order to draw the gradient at (default is 0).
+     * @param blend_mode The blending mode used to combine the gradient with
+     * the existing screen color (default is BlendMode::Alpha).
+     */
+    void DrawRadialGradient(Circle2D destination, Color center_color,
+                            Color edge_color, std::int32_t z_order = 0,
+                            BlendMode blend_mode = BlendMode::Alpha);
+
 private:
 
     /**
@@ -171,12 +186,14 @@ private:
      * FIELDS:
      * - destination: The circle to be drawn.
      * - color: The fill color of the circle.
+     * - edge_color: The color at the circumference of the circle, used for radial gradients.
      * - z_order: The z order the circle is drawn at.
      * - blend_mode: The blending mode used to combine the circle with the existing screen color.
      */
     struct CircleCommand {
         Circle2D destination;
         Color color;
+        Color edge_color;
         std::int32_t z_order;
         BlendMode blend_mode;
     };

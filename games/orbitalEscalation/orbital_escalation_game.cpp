@@ -278,6 +278,14 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext& context)
         square_entity,
         svanes::Sprite{.texture = gradient_texture, .geometry = square_geometry}
     );
+    context.world.AddComponent<svanes::RadialGradient2D>(
+        square_entity,
+        svanes::RadialGradient2D{
+            .geometry = svanes::Circle2D{0.0F, 0.0F, square_size * 5.0F},
+            .center_color = svanes::Color{255, 255, 255, 160},
+            .edge_color = svanes::Color{64, 128, 255, 0},
+        }
+    );
 
     planet_entity = CreatePlanetLayer(context.world, kPlanetRadius, {255, 127, 38, 255}, -3);
     CreatePlanetLayer(context.world, 3900.0F, {185, 122, 87, 255}, -2);

@@ -179,6 +179,22 @@ void SubmitShapes(const Registry& world, RenderQueue& render_queue, const Camera
     );
 }
 
+void SubmitRadialGradients(const Registry& world, RenderQueue& render_queue, const Camera2D& camera)
+{
+    world.ForEach<Transform, RadialGradient2D>(
+        [&](Entity entity, const Transform& transform, const RadialGradient2D& gradient) {
+            const auto destination = camera.PrepareForRendering(transform, gradient.geometry);
+            if (!destination) {
+                return;
+            }
+
+            render_queue.DrawRadialGradient(
+                *destination, gradient.center_color, gradient.edge_color,
+                ZOrderOf(world, entity), gradient.blend_mode);
+        }
+    );
+}
+
 void SubmitSprites(const Registry& world, RenderQueue& render_queue, const Camera2D& camera)
 {
     world.ForEach<Transform, Sprite>(

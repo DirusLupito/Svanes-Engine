@@ -133,6 +133,7 @@ void RunGameLoop(IGame& game, SDL_Window* window, SDL_Renderer* renderer, Regist
 
         SubmitShapes(world, render_queue, camera);
         SubmitSprites(world, render_queue, camera);
+        SubmitRadialGradients(world, render_queue, camera);
 
         render_queue_executor.Execute(render_queue,
             // Our clip rectangle is only relevant when we are in proportional scaling mode.

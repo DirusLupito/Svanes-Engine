@@ -33,7 +33,15 @@ void RenderQueue::DrawTriangle(Triangle2D destination, Color color,
 void RenderQueue::DrawCircle(Circle2D destination, Color color,
                              std::int32_t z_order, BlendMode blend_mode)
 {
-    commands.emplace_back(CircleCommand{destination, color, z_order, blend_mode});
+    commands.emplace_back(CircleCommand{destination, color, color, z_order, blend_mode});
+}
+
+void RenderQueue::DrawRadialGradient(Circle2D destination, Color center_color,
+                                     Color edge_color, std::int32_t z_order,
+                                     BlendMode blend_mode)
+{
+    commands.emplace_back(CircleCommand{destination, center_color, edge_color,
+                                        z_order, blend_mode});
 }
 
 void RenderQueue::DrawConvexPolygon(const ConvexPolygon2D& destination, Color color,
