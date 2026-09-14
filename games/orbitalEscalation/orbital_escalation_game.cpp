@@ -2,6 +2,7 @@
 
 #include <svanes/attractor_system.hpp>
 #include <svanes/camera2d.hpp>
+#include <svanes/collision_pass.hpp>
 #include <svanes/collision_system.hpp>
 #include <svanes/input.hpp>
 #include <svanes/kinematic_system.hpp>
@@ -213,14 +214,8 @@ CreateCollisionFlashes(svanes::Registry &world, svanes::Entity a,
 static void
 ApplyCollisionAcceleration(svanes::Registry &world, svanes::Entity a,
                            svanes::Entity b,
+                           const std::vector<svanes::Collision2D> &collisions,
                            std::vector<svanes::Entity> &collision_flashes) {
-    const auto collisions = svanes::DetectCollisions(
-        world.GetComponent<svanes::Collider2D>(a).geometry,
-        world.GetComponent<svanes::Transform>(a),
-        world.GetComponent<svanes::Collider2D>(b).geometry,
-        world.GetComponent<svanes::Transform>(b));
-
-
     for (const svanes::Collision2D &collision : collisions) {
         const bool a_is_planet =
             world.HasComponent<svanes::PointAttractor2D>(a);
@@ -255,11 +250,10 @@ static void
 ApplyCollisionAcceleration(svanes::Registry &world,
                            const std::vector<svanes::Entity> &entities,
                            std::vector<svanes::Entity> &collision_flashes) {
-    for (std::size_t i = 0; i < entities.size(); ++i) {
-        for (std::size_t j = i + 1; j < entities.size(); ++j) {
-            ApplyCollisionAcceleration(world, entities[i], entities[j],
-                                       collision_flashes);
-        }
+    const auto collisions = svanes::DetectEntityCollisions(world, entities);
+    for (const svanes::EntityCollision2D &pair : collisions) {
+        ApplyCollisionAcceleration(world, pair.a, pair.b, pair.collisions,
+                                   collision_flashes);
     }
 }
 

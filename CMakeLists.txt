@@ -134,6 +134,7 @@ target_sources(
         src/circle_geometry.cpp
         src/convex_polygon_geometry.cpp
         src/collision_system.cpp
+        src/collision_pass.cpp
         src/geometry.cpp
         src/input.cpp
         src/kinematic_system.cpp
@@ -160,6 +161,7 @@ target_sources(
             include/svanes/circle_geometry.hpp
             include/svanes/convex_polygon_geometry.hpp
             include/svanes/collision_system.hpp
+            include/svanes/collision_pass.hpp
             include/svanes/entity.hpp
             include/svanes/game.hpp
             include/svanes/geometry.hpp
@@ -238,6 +240,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/circle_geometry.hpp
     include/svanes/convex_polygon_geometry.hpp
     include/svanes/collision_system.hpp
+    include/svanes/collision_pass.hpp
     include/svanes/entity.hpp
     include/svanes/game.hpp
     include/svanes/geometry.hpp
@@ -263,6 +266,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/circle_geometry.cpp
     src/convex_polygon_geometry.cpp
     src/collision_system.cpp
+    src/collision_pass.cpp
     src/geometry.cpp
     src/input.cpp
     src/kinematic_system.cpp
