@@ -29,6 +29,8 @@ class TextureManager;
  * - output_height: The current height of the rendering output.
  * - gravity: The engine owned gravity vector applied to entities with
  * Kinematic2D and Gravity components.
+ * - concurrency: The number of worker threads to use for parallel execution.
+ * Defaults to 1, which means no parallel execution.
  */
 struct GameContext {
     Registry &world;
@@ -38,6 +40,7 @@ struct GameContext {
     std::int32_t output_width;
     std::int32_t output_height;
     Vector2D &gravity;
+    std::uint32_t concurrency = 1;
 };
 
 /**

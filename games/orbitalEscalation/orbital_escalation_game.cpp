@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <numbers>
 #include <random>
+#include <thread>
 
 constexpr std::int32_t kSquarePixels = 300;
 constexpr float kPlanetRadius = 4200.0F;
@@ -438,6 +439,11 @@ void OrbitalEscalationGame::CreateNonPlayerNonPlanetEntities(
 }
 
 void OrbitalEscalationGame::Initialize(svanes::GameContext &context) {
+    // number of logical cores
+    // this number includes the main thread, which is also treated as a worker
+    // thread, so we don't need to add 1 to it.
+    context.concurrency = // 1;
+        static_cast<std::uint32_t>(std::thread::hardware_concurrency());
     const svanes::TextureHandle gradient_texture =
         context.assets.CreateTexture(CreateGradientImage());
     constexpr float square_size = static_cast<float>(kSquarePixels);

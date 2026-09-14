@@ -3,6 +3,7 @@
 
 #include <svanes/application.hpp>
 
+#include <svanes/async/async_parallel_for_driver.hpp>
 #include <svanes/audio/audio_manager.hpp>
 #include <svanes/camera2d.hpp>
 #include <svanes/game.hpp>
@@ -66,6 +67,7 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
     // Custom initialization of the game. Implemented by the user of the engine.
 
     game.Initialize(game_context);
+    AsyncParallelForDriver parallel_for(game_context.concurrency);
 
     Uint64 previous_ticks = SDL_GetTicks();
 
@@ -118,7 +120,7 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
         //
         // This does however mean that there is now one frame of input latency,
         // so we can talk about whether this is the best approach or not.
-        AdvanceKinematics(world, delta_seconds, gravity);
+        AdvanceKinematics(world, delta_seconds, gravity, parallel_for);
         game.Update(frame_context);
 
         InputManagerInternal::SynchronizeTextInput(input, window);

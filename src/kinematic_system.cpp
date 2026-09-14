@@ -1,5 +1,6 @@
 #include <svanes/kinematic_system.hpp>
 
+#include <svanes/async/async_parallel_for_driver.hpp>
 #include <svanes/attractor_system.hpp>
 #include <svanes/geometry.hpp>
 #include <svanes/registry.hpp>
@@ -7,6 +8,7 @@
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
+#include <vector>
 
 namespace svanes {
 
@@ -66,7 +68,56 @@ static void ClampMagnitude(float &value, std::optional<float> limit) {
     }
 }
 
-void AdvanceKinematics(Registry &world, float delta_seconds, Vector2D gravity) {
+/**
+ * Parallelizable function that advances the kinematic state of a single entity.
+ * This function is designed to be called in parallel by the
+ * AsyncParallelForDriver.
+ *
+ * @param transform The Transform component of the entity, representing its
+ * position and rotation.
+ * @param motion The Kinematic2D component of the entity, representing its
+ * motion state.
+ * @param acceleration The total acceleration to be applied to the entity, which
+ * includes contributions from attractors and global acceleration fields.
+ * @param delta_seconds The time delta in seconds to advance the kinematic
+ * state.
+ */
+static void AdvanceKinematic(Transform &transform, Kinematic2D &motion,
+                             Vector2D acceleration, float delta_seconds) {
+    //
+    // Clamp accelerations
+    //
+
+    ClampMagnitude(acceleration.x, acceleration.y, motion.max_acceleration);
+    ClampMagnitude(motion.angular_acceleration,
+                   motion.max_angular_acceleration);
+
+    //
+    // Velocity update from acceleration
+    //
+
+    motion.velocity_x += acceleration.x * delta_seconds;
+    motion.velocity_y += acceleration.y * delta_seconds;
+    motion.angular_velocity += motion.angular_acceleration * delta_seconds;
+
+    //
+    // Velocity clamping
+    //
+
+    ClampMagnitude(motion.velocity_x, motion.velocity_y, motion.max_speed);
+    ClampMagnitude(motion.angular_velocity, motion.max_angular_speed);
+
+    //
+    // Position and rotation update from velocity
+    //
+
+    transform.x += motion.velocity_x * delta_seconds;
+    transform.y += motion.velocity_y * delta_seconds;
+    transform.rotation += motion.angular_velocity * delta_seconds;
+}
+
+void AdvanceKinematics(Registry &world, float delta_seconds, Vector2D gravity,
+                       AsyncParallelForDriver &driver) {
     if (!std::isfinite(delta_seconds) || delta_seconds < 0.0F) {
         throw std::invalid_argument(
             "Kinematics delta_seconds must be finite and nonnegative.");
@@ -79,6 +130,8 @@ void AdvanceKinematics(Registry &world, float delta_seconds, Vector2D gravity) {
     // Map of entity to the total acceleration applied to that entity by all
     // attractors.
     const auto attractions = EvaluateAttractors(world);
+
+    std::vector<WorkItem> items;
 
     // Filter to only update entities that have both a Transform (representing
     // position and rotation) and a Kinematic2D (representing motion state).
@@ -107,37 +160,36 @@ void AdvanceKinematics(Registry &world, float delta_seconds, Vector2D gravity) {
             acceleration_y += gravity.y;
         }
 
-        //
-        // Clamp accelerations
-        //
-
-        ClampMagnitude(acceleration_x, acceleration_y, motion.max_acceleration);
-        ClampMagnitude(motion.angular_acceleration,
-                       motion.max_angular_acceleration);
-
-        //
-        // Velocity update from acceleration
-        //
-
-        motion.velocity_x += acceleration_x * delta_seconds;
-        motion.velocity_y += acceleration_y * delta_seconds;
-        motion.angular_velocity += motion.angular_acceleration * delta_seconds;
-
-        //
-        // Velocity clamping
-        //
-
-        ClampMagnitude(motion.velocity_x, motion.velocity_y, motion.max_speed);
-        ClampMagnitude(motion.angular_velocity, motion.max_angular_speed);
-
-        //
-        // Position and rotation update from velocity
-        //
-
-        transform.x += motion.velocity_x * delta_seconds;
-        transform.y += motion.velocity_y * delta_seconds;
-        transform.rotation += motion.angular_velocity * delta_seconds;
+        items.push_back(
+            {&transform, &motion, {acceleration_x, acceleration_y}});
     });
+
+    // Current hardcoded batch size. This will control the size of work an
+    // individual thread will do before it checks for more work to do. Higher
+    // values will reduce the overhead of thread management, but may lead to
+    // less balanced work distribution if the work items vary significantly in
+    // complexity. Lower values will increase the overhead of thread management,
+    // but may lead to better load balancing. If all items of work are roughly
+    // equal in complexity, AND all threads are scheduled to run on cores which
+    // are roughly equal in performance, then the optimal batch size is the
+    // number of items divided by the number of threads.
+    //
+    // Here, we hope this is the case.
+    size_t batch_size =
+        std::max<size_t>(1, items.size() / (driver.GetConcurrency()));
+
+    // We wrap our actual work function in a lambda which forwards the work to
+    // the AdvanceKinematic function to allow us to match the signature 
+    // expected by the AsyncParallelForDriver's ParallelFor method.
+    driver.ParallelFor(items.size(), batch_size,
+                       [&](std::size_t begin, std::size_t end, std::uint32_t) {
+                           for (std::size_t i = begin; i < end; ++i) {
+                               const WorkItem &item = items[i];
+                               AdvanceKinematic(*item.transform, *item.motion,
+                                                item.acceleration,
+                                                delta_seconds);
+                           }
+                       });
 }
 
 } // namespace svanes

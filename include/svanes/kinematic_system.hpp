@@ -7,6 +7,7 @@
 namespace svanes {
 
 class Registry;
+class AsyncParallelForDriver;
 
 /**
  * Motion integrated into an entity's Transform. Acceleration persists until
@@ -52,6 +53,23 @@ struct Kinematic2D {
 };
 
 /**
+ * Represents a single work item for advancing the kinematic state of an entity.
+ * Each work item contains pointers to the entity's Transform and Kinematic2D
+ * components, as well as the total acceleration to be applied to the entity.
+ *
+ * FIELDS:
+ * - transform: Pointer to the entity's Transform component.
+ * - motion: Pointer to the entity's Kinematic2D component.
+ * - acceleration: The total acceleration to be applied to the entity, which
+ * includes contributions from attractors and global acceleration fields.
+ */
+struct WorkItem {
+    Transform *transform;
+    Kinematic2D *motion;
+    Vector2D acceleration;
+};
+
+/**
  * Represents a gravity force applied to entities that have both the Kinematic2D
  * and Gravity components. Default is set to {0, 0}.
  *
@@ -71,9 +89,13 @@ struct Gravity {};
  * state.
  * @param gravity The gravity vector to apply to entities with Kinematic2D and
  * Gravity components.
+ * @param driver The AsyncParallelForDriver to use for parallel execution of
+ * the kinematic updates. If the driver has a concurrency of 1, the updates will
+ * be executed sequentially on the calling thread.
  *
  * @throws std::invalid_argument if delta_seconds is not finite or is negative.
  */
-void AdvanceKinematics(Registry &world, float delta_seconds, Vector2D gravity);
+void AdvanceKinematics(Registry &world, float delta_seconds, Vector2D gravity,
+                       AsyncParallelForDriver &driver);
 
 } // namespace svanes
