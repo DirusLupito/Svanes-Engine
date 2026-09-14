@@ -8,6 +8,7 @@ namespace svanes {
 
 class Registry;
 class AsyncParallelForDriver;
+struct Transform;
 
 /**
  * Motion integrated into an entity's Transform. Acceleration persists until
