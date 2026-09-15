@@ -53,10 +53,11 @@ public:
      *     .texture = orb_texture,
      * });
      *
+     * registry.AddComponent<svanes::Timeline>(entity);
      * registry.AddComponent<svanes::SpriteAnimation>(entity,
      * svanes::SpriteAnimation{ .frame_width = 128, .frame_height = 128,
      *     .frame_count = 4,
-     *     .seconds_per_frame = 0.12F,
+     *     .tics_per_frame = svanes::SecondsToTics(0.12),
      * });
      *
      * @tparam T The component to add.

@@ -47,9 +47,14 @@ std::unordered_map<Entity, Vector2D> EvaluateAttractors(const Registry &world) {
             }
 
             // Will hopefully some day be replaced with a spatial lookup.
-            world.ForEach<Transform, Kinematic2D>([&](Entity target_entity,
-                                                      const Transform &target,
-                                                      const Kinematic2D &) {
+            world.ForEach<Transform, Kinematic2D,
+                          Timeline>([&](Entity target_entity,
+                                        const Transform &target,
+                                        const Kinematic2D &,
+                                        const Timeline &timeline) {
+                if (timeline.GetDeltaTics() == 0) {
+                    return;
+                }
                 // Special case: An attractor does not affect itself.
                 // If it did, the distance would be zero, and any acceleration
                 // field utilizing the distance may return a non-finite

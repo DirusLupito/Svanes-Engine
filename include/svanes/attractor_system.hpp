@@ -28,7 +28,8 @@ class Registry;
  *          @param offset_to_source: The offset from the target entity to the attractor.
  *                                   Measured as (attractor_position - target_position).
  *
- *          @return Vector2D: The acceleration vector to apply to the target entity.
+ *          @return Vector2D: Acceleration in world units per target local tic
+ *          squared.
  *
  * =======
  *
@@ -45,7 +46,7 @@ struct PointAttractor2D {
 /**
  * Evaluates all PointAttractor2D components in the given world and computes the
  * resulting accelerations for all entities that are influenced by these
- * attractors.
+ * attractors. Call after AdvanceTimelines.
  *
  * @param world The registry containing all entities and their components.
  *

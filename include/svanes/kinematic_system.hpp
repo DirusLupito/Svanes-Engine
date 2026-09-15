@@ -1,5 +1,6 @@
 #pragma once
 
+#include <svanes/timeline_system.hpp>
 #include <svanes/vector2d.hpp>
 
 #include <optional>
@@ -15,18 +16,20 @@ struct Transform;
  * changed. Limits must be finite and nonnegative; std::nullopt means unlimited.
  *
  * FIELDS:
- * - velocity_x: Horizontal velocity in world units per second.
- * - velocity_y: Vertical velocity in world units per second.
+ * - velocity_x: Horizontal velocity in world units per local tic.
+ * - velocity_y: Vertical velocity in world units per local tic.
  *
  * ====
  *
- * - acceleration_x: Horizontal acceleration in world units per second squared.
- * - acceleration_y: Vertical acceleration in world units per second squared.
+ * - acceleration_x: Horizontal acceleration in world units per local tic
+ * squared.
+ * - acceleration_y: Vertical acceleration in world units per local tic squared.
  *
  * ====
  *
- * - angular_velocity: Angular velocity in radians per second.
- * - angular_acceleration: Angular acceleration in radians per second squared.
+ * - angular_velocity: Angular velocity in radians per local tic.
+ * - angular_acceleration: Angular acceleration in radians per local tic
+ * squared.
  *
  * ====
  *
@@ -61,6 +64,7 @@ struct Kinematic2D {
  * FIELDS:
  * - transform: Pointer to the entity's Transform component.
  * - motion: Pointer to the entity's Kinematic2D component.
+ * - delta_tics: How many local tics to advance the kinematic state.
  * - acceleration: The total acceleration to be applied to the entity, which
  * includes contributions from attractors and global acceleration fields.
  */
@@ -68,11 +72,13 @@ struct WorkItem {
     Transform *transform;
     Kinematic2D *motion;
     Vector2D acceleration;
+    TicCount delta_tics;
 };
 
 /**
  * Represents a gravity force applied to entities that have both the Kinematic2D
- * and Gravity components. Default is set to {0, 0}.
+ * and Gravity components. Acceleration is in world units per local tic squared.
+ * Default is set to {0, 0}.
  *
  * Since we're in screen and world space, positive y is downwards. The gravity
  * vector is applied to the acceleration of entities with Kinematic2D and
@@ -82,21 +88,20 @@ struct Gravity {};
 
 
 /**
- * Advances the kinematic state of all entities in the provided registry by the
- * specified time delta.
+ * Advances the kinematic state of all entities in the provided registry
+ * according to the delta tics of their Timeline components.
+ * AdvanceTimelines must run first.
  *
  * @param world The registry containing all entities and their components.
- * @param delta_seconds The time delta in seconds to advance the kinematic
- * state.
  * @param gravity The gravity vector to apply to entities with Kinematic2D and
  * Gravity components.
  * @param driver The AsyncParallelForDriver to use for parallel execution of
  * the kinematic updates. If the driver has a concurrency of 1, the updates will
  * be executed sequentially on the calling thread.
  *
- * @throws std::invalid_argument if delta_seconds is not finite or is negative.
+ * @throws std::invalid_argument for nonfinite gravity or invalid limits.
  */
-void AdvanceKinematics(Registry &world, float delta_seconds, Vector2D gravity,
+void AdvanceKinematics(Registry &world, Vector2D gravity,
                        AsyncParallelForDriver &driver);
 
 } // namespace svanes

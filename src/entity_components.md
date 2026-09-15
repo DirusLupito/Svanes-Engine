@@ -6,8 +6,8 @@ This is opposed to a traditional inheritance-based approach, where entities woul
 
 ### Components
 
-Components themselves are data structs, and nothing more. They do not contain any logic or behavior.
-Their logic lies in utility functions specific to that component type, which operate on the data contained within the component.
+Most components are data structs. Systems operate on entities containing the components they need.
+A component can also be a class when it needs to maintain its own invariants: `Timeline`, for example, keeps its rational tic size and incomplete progress private. The timeline system advances these components before movement or animation reads their published local time.
 
 ### What this looks like
 
@@ -20,8 +20,8 @@ struct SpriteAnimation {
     std::int32_t frame_height = 0;
     std::int32_t frame_count = 1;
     std::int32_t current_frame = 0;
-    float seconds_per_frame = 0.1F;
-    float elapsed_seconds = 0.0F;
+    TicCount tics_per_frame = SecondsToTics(0.1);
+    TicCount elapsed_tics = 0;
 };
 ```
 
@@ -31,12 +31,14 @@ The logic for this component is contained in a utility function that operates on
 For example the [AdvanceSpriteAnimations](sprite_animation_system.cpp) function is roughly defined like this:
 
 ```cpp
-void AdvanceSpriteAnimations(Registry& registry, float delta_seconds)
+void AdvanceSpriteAnimations(Registry& registry)
 {
-    // Run a ForEach on our registry to get every entity that has both a <SpriteAnimation> and <Sprite> component.
-    registry.ForEach<SpriteAnimation, Sprite>([delta_seconds](Entity, SpriteAnimation& animation, Sprite& sprite) {
+    // Run a ForEach on our registry to get every entity that has SpriteAnimation, Sprite, and Timeline components.
+    registry.ForEach<SpriteAnimation, Sprite, Timeline>([](Entity, SpriteAnimation& animation, Sprite& sprite, const Timeline& timeline) {
 
-        // Accumulate elapsed_seconds, advance the frame, and update sprite.source.
+        // Accumulate timeline.GetDeltaTics(), advance the frame, and update sprite.source.
     });
 }
 ```
+
+Call `AdvanceTimelines` before these systems. Entities without a `Timeline` are excluded from time-dependent iteration. A root timeline uses real microseconds; a child uses its parent's local tics. Tic size `2/1` runs at half the parent's speed, while `1/2` runs at double speed.

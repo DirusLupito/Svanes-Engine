@@ -9,6 +9,7 @@
 #include <svanes/registry.hpp>
 #include <svanes/render/render_system.hpp>
 #include <svanes/render/texture_manager.hpp>
+#include <svanes/timeline_system.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -20,23 +21,11 @@
 
 constexpr std::int32_t kSquarePixels = 300;
 constexpr float kPlanetRadius = 4200.0F;
-constexpr float kCollisionFlashLifetime = 5.0F;
-constexpr float kCollisionFlashExpansionTime = 0.5F;
+const svanes::TicCount kCollisionFlashLifetime = svanes::SecondsToTics(5.0);
+const svanes::TicCount kCollisionFlashExpansionTime =
+    svanes::SecondsToTics(0.5);
 constexpr float kCollisionFlashInitialRadius = 4000.0F;
 constexpr float kCollisionFlashExpansionRadius = 8000.0F;
-
-/**
- * Just a rapidly expanding ball that's much brighter at its center than at its
- * edge. A ball that will add white to the screen where it is drawn, at greater
- * intensity at its center than at its edge. Will fade out much slower than it
- * expands. That is how we get the effect of an explosion of light.
- *
- * FIELDS:
- * - elapsed_seconds: The time elapsed since the collision flash was created.
- */
-struct CollisionFlash {
-    float elapsed_seconds = 0.0F;
-};
 
 /**
  * Helper for the planet's gravitational field.
@@ -53,7 +42,8 @@ static svanes::Vector2D AttractionField(svanes::Vector2D offset_to_source) {
         return {};
     }
     const float strength =
-        180000000.0F / (1.0F + distance * distance / kPlanetRadius);
+        svanes::PerSecondSquaredToPerTicSquared(180000000.0F) /
+        (1.0F + distance * distance / kPlanetRadius);
     return offset_to_source / distance * strength;
 }
 
@@ -64,18 +54,16 @@ static svanes::Vector2D AttractionField(svanes::Vector2D offset_to_source) {
  *
  * @param world The registry containing the collision flash entities.
  * @param collision_flashes The list of active collision flash entities.
- * @param delta_seconds The time elapsed since the previous update.
  */
 static void
 UpdateCollisionFlashes(svanes::Registry &world,
-                       std::vector<svanes::Entity> &collision_flashes,
-                       float delta_seconds) {
+                       std::vector<svanes::Entity> &collision_flashes) {
     // if the flash has been alive for longer than its lifetime,
     // destroy it and remove it from the list of active flashes.
     std::erase_if(collision_flashes, [&](svanes::Entity flash) {
-        CollisionFlash &state = world.GetComponent<CollisionFlash>(flash);
-        state.elapsed_seconds += delta_seconds;
-        if (state.elapsed_seconds >= kCollisionFlashLifetime) {
+        const svanes::TicCount elapsed_tics =
+            world.GetComponent<svanes::Timeline>(flash).GetTotalTics();
+        if (elapsed_tics >= kCollisionFlashLifetime) {
             world.DestroyEntity(flash);
             return true;
         }
@@ -83,14 +71,17 @@ UpdateCollisionFlashes(svanes::Registry &world,
         // Well we're already iterating over all the flashes,
         // so we might as well update their size and alpha here too.
 
-        const float expansion = std::min(
-            state.elapsed_seconds / kCollisionFlashExpansionTime, 1.0F);
-        const float fade = state.elapsed_seconds <= kCollisionFlashExpansionTime
-                               ? 1.0F
-                               : 1.0F - (state.elapsed_seconds -
-                                         kCollisionFlashExpansionTime) /
-                                            (kCollisionFlashLifetime -
-                                             kCollisionFlashExpansionTime);
+        const float expansion =
+            std::min(static_cast<float>(elapsed_tics) /
+                         static_cast<float>(kCollisionFlashExpansionTime),
+                     1.0F);
+        const float fade =
+            elapsed_tics <= kCollisionFlashExpansionTime
+                ? 1.0F
+                : 1.0F - static_cast<float>(elapsed_tics -
+                                            kCollisionFlashExpansionTime) /
+                             static_cast<float>(kCollisionFlashLifetime -
+                                                kCollisionFlashExpansionTime);
         auto &gradient = world.GetComponent<svanes::RadialGradient2D>(flash);
         gradient.geometry.radius =
             std::lerp(kCollisionFlashInitialRadius,
@@ -103,6 +94,12 @@ UpdateCollisionFlashes(svanes::Registry &world,
 /**
  * Creates a collision flash at the specified point and adds it to the list of
  * active flashes.
+ *
+ * Just a rapidly expanding ball that's much brighter at its center than at its
+ * edge. A ball that will add white to the screen where it is drawn, at greater
+ * intensity at its center than at its edge. Will fade out much slower than it
+ * expands. That is how we get the effect of an explosion of light.
+ * Its Timeline supplies the elapsed lifetime; there is no second accumulator.
  *
  * @param world The registry to create the collision flash entity in.
  * @param collision_flashes The list to which the new collision flash will be
@@ -129,7 +126,7 @@ static void CreateCollisionFlash(svanes::Registry &world,
                    .blend_mode = svanes::BlendMode::Additive,
                });
 
-    world.AddComponent<CollisionFlash>(flash);
+    world.AddComponent<svanes::Timeline>(flash);
     collision_flashes.push_back(flash);
 }
 
@@ -221,7 +218,9 @@ ApplyCollisionAcceleration(svanes::Registry &world, svanes::Entity a,
             world.HasComponent<svanes::PointAttractor2D>(a);
         const bool b_is_planet =
             world.HasComponent<svanes::PointAttractor2D>(b);
-        const svanes::Vector2D acceleration = collision.normal * 400000.0F;
+        const svanes::Vector2D acceleration =
+            collision.normal *
+            svanes::PerSecondSquaredToPerTicSquared(400000.0F);
         if (world.HasComponent<svanes::Kinematic2D>(a)) {
             auto &motion = world.GetComponent<svanes::Kinematic2D>(a);
             motion.acceleration_x += acceleration.x;
@@ -365,8 +364,10 @@ void OrbitalEscalationGame::CreateNonPlayerNonPlanetEntities(
     for (uint32_t i = 0; i < num_npc_entities_to_spawn; ++i) {
         const float angle = angle_dist(gen);
         const float distance = distance_dist(gen);
-        const float velocity_magnitude = velocity_dist(gen);
-        const float angular_velocity = angular_velocity_dist(gen);
+        const float velocity_magnitude =
+            svanes::PerSecondToPerTic(velocity_dist(gen));
+        const float angular_velocity =
+            svanes::PerSecondToPerTic(angular_velocity_dist(gen));
 
         // Calculate the position of the entity based on the angle and distance
         // from the planet's surface.
@@ -376,6 +377,7 @@ void OrbitalEscalationGame::CreateNonPlayerNonPlanetEntities(
         svanes::Entity entity = world.CreateEntity();
         world.AddComponent<svanes::Transform>(entity, svanes::Transform{x, y});
         world.AddComponent<svanes::Kinematic2D>(entity);
+        world.AddComponent<svanes::Timeline>(entity);
 
         // Set the initial velocity tangent to the vector from the planet to the
         // entity
@@ -469,8 +471,9 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext &context) {
     context.world.AddComponent<svanes::Collider2D>(
         square_entity, svanes::Collider2D{square_geometry});
     context.world.AddComponent<svanes::Kinematic2D>(square_entity);
+    context.world.AddComponent<svanes::Timeline>(square_entity);
     context.world.GetComponent<svanes::Kinematic2D>(square_entity).velocity_x =
-        3000.0F;
+        svanes::PerSecondToPerTic(3000.0F);
     context.world.AddComponent<svanes::Transform>(square_entity, player_start);
     context.world.AddComponent<svanes::Sprite>(
         square_entity, svanes::Sprite{.texture = gradient_texture,
@@ -523,7 +526,7 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext &context) {
 }
 
 void OrbitalEscalationGame::Update(const svanes::FrameContext &frame) {
-    UpdateCollisionFlashes(frame.world, collision_flashes, frame.delta_seconds);
+    UpdateCollisionFlashes(frame.world, collision_flashes);
 
     if (frame.input.WasPressed(svanes::Key::Escape)) {
         should_quit = true;
@@ -578,15 +581,18 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext &frame) {
     if (frame.world.HasComponent<svanes::Kinematic2D>(square_entity)) {
         svanes::Kinematic2D &motion =
             frame.world.GetComponent<svanes::Kinematic2D>(square_entity);
-        motion.acceleration_x =
-            static_cast<float>(1000.0f * (frame.input.IsDown(svanes::Key::D) -
-                                          frame.input.IsDown(svanes::Key::A)));
-        motion.acceleration_y =
-            static_cast<float>(1000.0f * (frame.input.IsDown(svanes::Key::S) -
-                                          frame.input.IsDown(svanes::Key::W)));
+        motion.acceleration_x = static_cast<float>(
+            svanes::PerSecondSquaredToPerTicSquared(1000.0F) *
+            (frame.input.IsDown(svanes::Key::D) -
+             frame.input.IsDown(svanes::Key::A)));
+        motion.acceleration_y = static_cast<float>(
+            svanes::PerSecondSquaredToPerTicSquared(1000.0F) *
+            (frame.input.IsDown(svanes::Key::S) -
+             frame.input.IsDown(svanes::Key::W)));
         motion.angular_acceleration =
-            100.0F * (frame.input.IsDown(svanes::Key::E) -
-                      frame.input.IsDown(svanes::Key::Q));
+            svanes::PerSecondSquaredToPerTicSquared(100.0F) *
+            (frame.input.IsDown(svanes::Key::E) -
+             frame.input.IsDown(svanes::Key::Q));
     }
 
     // Reset the acceleration of all non-player, non-planet entities to zero

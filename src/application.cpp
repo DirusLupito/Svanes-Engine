@@ -12,6 +12,7 @@
 #include <svanes/render/render_queue.hpp>
 #include <svanes/render/render_system.hpp>
 #include <svanes/sprite_animation_system.hpp>
+#include <svanes/timeline_system.hpp>
 #include <svanes/vector2d.hpp>
 
 #include "audio/audio_manager_internal.hpp"
@@ -21,6 +22,7 @@
 
 #include <SDL3/SDL.h>
 
+#include <chrono>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -69,7 +71,10 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
     game.Initialize(game_context);
     AsyncParallelForDriver parallel_for(game_context.concurrency);
 
-    Uint64 previous_ticks = SDL_GetTicks();
+    // fixed origin for measuring elapsed time, so truncation to whole
+    // microseconds does not discard part of a microsecond on every frame.
+    const auto start_time = std::chrono::steady_clock::now();
+    TicCount previous_tics = 0;
 
     bool running = true;
     while (running) {
@@ -88,10 +93,16 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
             InputManagerInternal::HandleEvent(input, event);
         }
 
-        const Uint64 current_ticks = SDL_GetTicks();
-        const float delta_seconds =
-            static_cast<float>(current_ticks - previous_ticks) / 1000.0F;
-        previous_ticks = current_ticks;
+        //
+        // DELTA TIME CALCULATION
+        //
+        const TicCount current_tics = static_cast<TicCount>(
+            std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::steady_clock::now() - start_time)
+                .count());
+
+        const TicCount real_delta_tics = current_tics - previous_tics;
+        previous_tics = current_tics;
 
 
         //
@@ -107,8 +118,8 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
         camera.SetOutputSize(output_width, output_height);
 
         const FrameContext frame_context{
-            world,         input,         delta_seconds, output_width,
-            output_height, audio_manager, camera,        gravity};
+            world,         input,         real_delta_tics, output_width,
+            output_height, audio_manager, camera,          gravity};
 
         // Here we should advance the kinematics of all entities before updating
         // the game state. This allows us to first update the positions of all
@@ -120,11 +131,12 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
         //
         // This does however mean that there is now one frame of input latency,
         // so we can talk about whether this is the best approach or not.
-        AdvanceKinematics(world, delta_seconds, gravity, parallel_for);
+        AdvanceTimelines(world, real_delta_tics);
+        AdvanceKinematics(world, gravity, parallel_for);
         game.Update(frame_context);
 
         InputManagerInternal::SynchronizeTextInput(input, window);
-        AdvanceSpriteAnimations(world, delta_seconds);
+        AdvanceSpriteAnimations(world);
 
         if (game.ShouldQuit()) {
             running = false;

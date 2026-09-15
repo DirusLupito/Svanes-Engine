@@ -79,11 +79,11 @@ static void ClampMagnitude(float &value, std::optional<float> limit) {
  * motion state.
  * @param acceleration The total acceleration to be applied to the entity, which
  * includes contributions from attractors and global acceleration fields.
- * @param delta_seconds The time delta in seconds to advance the kinematic
+ * @param delta_tics The elapsed local tics to advance the kinematic
  * state.
  */
 static void AdvanceKinematic(Transform &transform, Kinematic2D &motion,
-                             Vector2D acceleration, float delta_seconds) {
+                             Vector2D acceleration, float delta_tics) {
     //
     // Clamp accelerations
     //
@@ -96,9 +96,9 @@ static void AdvanceKinematic(Transform &transform, Kinematic2D &motion,
     // Velocity update from acceleration
     //
 
-    motion.velocity_x += acceleration.x * delta_seconds;
-    motion.velocity_y += acceleration.y * delta_seconds;
-    motion.angular_velocity += motion.angular_acceleration * delta_seconds;
+    motion.velocity_x += acceleration.x * delta_tics;
+    motion.velocity_y += acceleration.y * delta_tics;
+    motion.angular_velocity += motion.angular_acceleration * delta_tics;
 
     //
     // Velocity clamping
@@ -111,18 +111,13 @@ static void AdvanceKinematic(Transform &transform, Kinematic2D &motion,
     // Position and rotation update from velocity
     //
 
-    transform.x += motion.velocity_x * delta_seconds;
-    transform.y += motion.velocity_y * delta_seconds;
-    transform.rotation += motion.angular_velocity * delta_seconds;
+    transform.x += motion.velocity_x * delta_tics;
+    transform.y += motion.velocity_y * delta_tics;
+    transform.rotation += motion.angular_velocity * delta_tics;
 }
 
-void AdvanceKinematics(Registry &world, float delta_seconds, Vector2D gravity,
+void AdvanceKinematics(Registry &world, Vector2D gravity,
                        AsyncParallelForDriver &driver) {
-    if (!std::isfinite(delta_seconds) || delta_seconds < 0.0F) {
-        throw std::invalid_argument(
-            "Kinematics delta_seconds must be finite and nonnegative.");
-    }
-
     if (!std::isfinite(gravity.x) || !std::isfinite(gravity.y)) {
         throw std::invalid_argument("Kinematics gravity must be finite.");
     }
@@ -133,36 +128,42 @@ void AdvanceKinematics(Registry &world, float delta_seconds, Vector2D gravity,
 
     std::vector<WorkItem> items;
 
-    // Filter to only update entities that have both a Transform (representing
-    // position and rotation) and a Kinematic2D (representing motion state).
-    world.ForEach<Transform, Kinematic2D>([&](Entity entity,
-                                              Transform &transform,
-                                              Kinematic2D &motion) {
-        float acceleration_x = motion.acceleration_x;
-        float acceleration_y = motion.acceleration_y;
+    // Filter to entities with Transform (position and rotation), Kinematic2D
+    // (motion), and Timeline (local time).
+    world.ForEach<Transform, Kinematic2D, Timeline>(
+        [&](Entity entity, Transform &transform, Kinematic2D &motion,
+            const Timeline &timeline) {
+            if (timeline.GetDeltaTics() == 0) {
+                return;
+            }
 
-        //
-        // Contributions from point source attractors
-        //
+            float acceleration_x = motion.acceleration_x;
+            float acceleration_y = motion.acceleration_y;
 
-        const auto attraction = attractions.find(entity);
-        if (attraction != attractions.end()) {
-            acceleration_x += attraction->second.x;
-            acceleration_y += attraction->second.y;
-        }
+            //
+            // Contributions from point source attractors
+            //
 
-        //
-        // Contributions from global acceleration fields
-        //
+            const auto attraction = attractions.find(entity);
+            if (attraction != attractions.end()) {
+                acceleration_x += attraction->second.x;
+                acceleration_y += attraction->second.y;
+            }
 
-        if (world.HasComponent<Gravity>(entity)) {
-            acceleration_x += gravity.x;
-            acceleration_y += gravity.y;
-        }
+            //
+            // Contributions from global acceleration fields
+            //
 
-        items.push_back(
-            {&transform, &motion, {acceleration_x, acceleration_y}});
-    });
+            if (world.HasComponent<Gravity>(entity)) {
+                acceleration_x += gravity.x;
+                acceleration_y += gravity.y;
+            }
+
+            items.push_back({&transform,
+                             &motion,
+                             {acceleration_x, acceleration_y},
+                             timeline.GetDeltaTics()});
+        });
 
     // Current hardcoded batch size. This will control the size of work an
     // individual thread will do before it checks for more work to do. Higher
@@ -185,9 +186,10 @@ void AdvanceKinematics(Registry &world, float delta_seconds, Vector2D gravity,
                        [&](std::size_t begin, std::size_t end, std::uint32_t) {
                            for (std::size_t i = begin; i < end; ++i) {
                                const WorkItem &item = items[i];
-                               AdvanceKinematic(*item.transform, *item.motion,
-                                                item.acceleration,
-                                                delta_seconds);
+                               AdvanceKinematic(
+                                   *item.transform, *item.motion,
+                                   item.acceleration,
+                                   static_cast<float>(item.delta_tics));
                            }
                        });
 }

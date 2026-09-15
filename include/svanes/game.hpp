@@ -1,5 +1,6 @@
 #pragma once
 
+#include <svanes/timeline_system.hpp>
 #include <svanes/vector2d.hpp>
 
 #include <cstdint>
@@ -28,7 +29,7 @@ class TextureManager;
  * - output_width: The current width of the rendering output.
  * - output_height: The current height of the rendering output.
  * - gravity: The engine owned gravity vector applied to entities with
- * Kinematic2D and Gravity components.
+ * Kinematic2D and Gravity components, in world units per local tic squared.
  * - concurrency: The number of worker threads to use for parallel execution.
  * Defaults to 1, which means no parallel execution.
  */
@@ -47,15 +48,18 @@ struct GameContext {
  * Defines relevant context for a single frame of a game.
  * For games to have their input managed by the engine,
  * they must use the InputManager provided in this context.
- * Furthermore, the engine fills in the delta_seconds field
- * with the time elapsed since the last frame, allowing the game
- * to update its state accordingly.
+ * The engine fills real_delta_tics with unscaled elapsed microseconds.
+ * However, entities use their timeline to determine how much time has
+ * actually passed for them. real_delta_tics should therefore not be
+ * used to update entity state directly, as it does not account for entity
+ * relative time scaling.
  *
  * FIELDS:
  * - world: The engine owned registry containing the game's entities and
  * components.
  * - input: The input state for the current frame.
- * - delta_seconds: The elapsed time since the previous frame, in seconds.
+ * - real_delta_tics: Unscaled elapsed time since the previous frame, in
+ * microseconds.
  * - output_width: The current width of the rendering output.
  * - output_height: The current height of the rendering output.
  * - audio: The engine owned audio manager used to load and play sounds and
@@ -63,12 +67,12 @@ struct GameContext {
  * - camera: The engine owned camera used to convert between screen and world
  * coordinates.
  * - gravity: The engine owned gravity vector applied to entities with
- * Kinematic2D and Gravity components.
+ * Kinematic2D and Gravity components, in world units per local tic squared.
  */
 struct FrameContext {
     Registry &world;
     InputManager &input;
-    float delta_seconds;
+    TicCount real_delta_tics;
     std::int32_t output_width;
     std::int32_t output_height;
     AudioManager &audio;
