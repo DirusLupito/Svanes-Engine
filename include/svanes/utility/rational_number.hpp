@@ -39,6 +39,43 @@ public:
      */
     std::uint64_t GetDenominator() const;
 
+    /**
+     * Adds two fractions exactly and returns the result in simplest form.
+     * The operands are unchanged on failure.
+     *
+     * @param other The other RationalNumber to add to this one.
+     *
+     * @return The sum of the two RationalNumbers in simplest form.
+     *
+     * @throws std::overflow_error if the result cannot be represented as a
+     * RationalNumber.
+     */
+    RationalNumber operator+(const RationalNumber &other) const;
+
+    /**
+     * Divides by another fraction, cancelling common factors before
+     * multiplying. Throws std::invalid_argument for division by zero, or
+     * std::overflow_error if the result cannot be represented. The operands are
+     * unchanged on failure.
+     */
+    RationalNumber operator/(const RationalNumber &other) const;
+
+    /**
+     * Returns the whole part of the rational number, discarding any fractional
+     * part. For example, 15/2 returns 7.
+     *
+     * @return The whole part of the rational number.
+     */
+    std::uint64_t GetWholePart() const;
+
+    /**
+     * Returns the fractional part of the rational number, discarding any whole
+     * part. For example, 15/2 returns 1/2.
+     *
+     * @return The fractional part of the rational number in simplest form.
+     */
+    RationalNumber GetFractionalPart() const;
+
 private:
 
     // The non-negative numerator of the rational number.
