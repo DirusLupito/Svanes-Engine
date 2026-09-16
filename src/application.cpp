@@ -8,7 +8,7 @@
 #include <svanes/camera2d.hpp>
 #include <svanes/game.hpp>
 #include <svanes/input.hpp>
-#include <svanes/kinematic_system.hpp>
+#include <svanes/physics_system.hpp>
 #include <svanes/render/render_queue.hpp>
 #include <svanes/render/render_system.hpp>
 #include <svanes/sprite_animation_system.hpp>
@@ -69,12 +69,30 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
     // Custom initialization of the game. Implemented by the user of the engine.
 
     game.Initialize(game_context);
+
+    // The fixed number of tics in a simulation step. This is used to
+    // determine how many simulation steps to run based on the elapsed time
+    // since the last frame. The engine requires this to be positive, and it is
+    // copied from the game context after initialization. A slow rendered frame
+    // runs more of these steps, rather than making an individual step larger.
+    const TicCount physics_step_tics = game_context.physics_step_tics;
+
+    if (physics_step_tics == 0) {
+        throw std::invalid_argument("The physics step must be positive.");
+    }
+
     AsyncParallelForDriver parallel_for(game_context.concurrency);
 
     // fixed origin for measuring elapsed time, so truncation to whole
     // microseconds does not discard part of a microsecond on every frame.
     const auto start_time = std::chrono::steady_clock::now();
+
+    // The previous time in tics, used to calculate the delta time for each
+    // render frame.
     TicCount previous_tics = 0;
+
+    // The number of tics that have accumulated since the last simulation step.
+    TicCount pending_tics = 0;
 
     bool running = true;
     while (running) {
@@ -103,6 +121,7 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
 
         const TicCount real_delta_tics = current_tics - previous_tics;
         previous_tics = current_tics;
+        pending_tics += real_delta_tics;
 
 
         //
@@ -121,22 +140,47 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
             world,         input,         real_delta_tics, output_width,
             output_height, audio_manager, camera,          gravity};
 
-        // Here we should advance the kinematics of all entities before updating
-        // the game state. This allows us to first update the positions of all
-        // entities based on their velocities and accelerations, and then allow
-        // the game logic to respond to those new positions. Fixes the broken
-        // behavior where the game logic was responding to the previous frame's
-        // positions, which could lead to incorrect behavior likely around
-        // collisions.
+        // Here we should advance the kinematics of all entities before each
+        // game physics update. This allows us to first update the positions of
+        // all entities based on their velocities and accelerations, and then
+        // allow the game logic to respond to those new positions. Fixes the
+        // broken behavior where the game logic was responding to the previous
+        // step's positions, which could lead to incorrect behavior likely
+        // around collisions.
         //
-        // This does however mean that there is now one frame of input latency,
-        // so we can talk about whether this is the best approach or not.
-        AdvanceTimelines(world, real_delta_tics);
-        AdvanceKinematics(world, gravity, parallel_for);
+        // This does however mean that there is now one physics step of input
+        // latency, so we can talk about whether this is the best approach or
+        // not.
+        //
+        // Suppose our simulation step is 10000 source tics, and this frame
+        // accumulated 16000 source tics. We advance one complete simulation
+        // step and retain the remaining 6000. Advancing a smaller step would
+        // make the simulation depend on rendering time. Another 4000 source
+        // tics will complete the next simulation step, so a slow frame causes
+        // catchup steps, not larger steps.
+        //
+        // Each simulation step advances the shared clock by physics_step_tics.
+        // Timelines convert that source time delta through their parents and
+        // their own rates. A double speed entity receives 20000 local tics per
+        // step, while a half speed entity receives 5000. Both participate in
+        // the same number of simulation steps. ONLY their local elapsed time
+        // differ.
+        while (pending_tics >= physics_step_tics) {
+            AdvanceTimelines(world, physics_step_tics);
+            AdvancePhysics(world, gravity, parallel_for,
+                           [&](std::span<const PhysicsTimeStep> steps) {
+                               game.PhysicsUpdate({world, input, steps});
+                           });
+
+            // Animation uses the delta published by this timeline pass.
+            // Doing this once per rendered frame would miss earlier steps
+            // during catchup, or reuse the last delta when no step ran.
+            AdvanceSpriteAnimations(world);
+            pending_tics -= physics_step_tics;
+        }
         game.Update(frame_context);
 
         InputManagerInternal::SynchronizeTextInput(input, window);
-        AdvanceSpriteAnimations(world);
 
         if (game.ShouldQuit()) {
             running = false;

@@ -138,6 +138,7 @@ target_sources(
         src/geometry.cpp
         src/input.cpp
         src/kinematic_system.cpp
+        src/physics_system.cpp
         src/rectangle_geometry.cpp
         src/triangle_geometry.cpp
         src/input_manager_internal.hpp
@@ -169,6 +170,7 @@ target_sources(
             include/svanes/geometry.hpp
             include/svanes/input.hpp
             include/svanes/kinematic_system.hpp
+            include/svanes/physics_system.hpp
             include/svanes/rectangle_geometry.hpp
             include/svanes/triangle_geometry.hpp
             include/svanes/render/basic_render_types.hpp
@@ -250,6 +252,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/geometry.hpp
     include/svanes/input.hpp
     include/svanes/kinematic_system.hpp
+    include/svanes/physics_system.hpp
     include/svanes/rectangle_geometry.hpp
     include/svanes/triangle_geometry.hpp
     include/svanes/render/basic_render_types.hpp
@@ -276,6 +279,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/geometry.cpp
     src/input.cpp
     src/kinematic_system.cpp
+    src/physics_system.cpp
     src/rectangle_geometry.cpp
     src/triangle_geometry.cpp
     src/input_manager_internal.hpp

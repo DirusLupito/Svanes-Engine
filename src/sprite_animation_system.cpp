@@ -27,7 +27,8 @@ void AdvanceSpriteAnimations(Registry &registry) {
                         (animation.current_frame + 1) % animation.frame_count;
                 }
                 // Calculate the next frame to move to.
-                // Realistically, only if there's a lag spike.
+                // For example, if the Timeline runs fast enough to advance
+                // several animation frames within one simulation step.
                 else {
                     const TicCount num_frames =
                         (animation.elapsed_tics / animation.tics_per_frame) %

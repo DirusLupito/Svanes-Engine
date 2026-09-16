@@ -12,8 +12,9 @@ class Registry;
 
 using TicCount = std::uint64_t;
 
-// The real-time source counts microseconds. Local tics have this duration only
-// when their timeline and all ancestors run at normal speed.
+// A source tic is one tic from the shared realtime clock, counted in
+// microseconds. Local tics have this duration only when their timeline and all
+// ancestors run at normal speed.
 inline constexpr TicCount TicsPerSecond = 1000000;
 
 /**
@@ -109,15 +110,15 @@ public:
      * Pauses the Timeline, stopping the accumulation of time. When paused,
      * Advance() reports zero delta, leaves total time and incomplete progress
      * unchanged, and discards incoming parent time. Changes apply on the next
-     * advance, without rewriting this frame's delta.
+     * advance, without rewriting the currently reported delta.
      */
     void Pause();
 
     /**
      * Unpauses the Timeline, allowing it to accumulate time again. When
-     * unpaused, the Timeline will resume advancing based on its parent or
-     * source time. Changes apply on the next advance, without rewriting this
-     * frame's delta.
+     * unpaused, the Timeline will resume advancing based on its parent or, for
+     * a root Timeline, the shared source clock. Changes apply on the next
+     * advance, without rewriting the currently reported delta.
      */
     void Unpause();
 
@@ -205,22 +206,33 @@ private:
 
 /**
  * Advances every Timeline once, parents before children. Roots receive
- * source_delta_tics. Children receive their parent's reported local delta.
- * The application supplies real microseconds, but callers can supply a manual
- * source. Throws for missing parent timelines, cycles, or arithmetic overflow.
- * Run this before anything needs to check anything time related.
+ * source_delta_tics from the shared simulation clock. A source tic is one
+ * clock tic, counted in microseconds here. Children receive their parent's
+ * reported local delta. The application supplies a fixed step of real
+ * microseconds, but callers can supply a manual source. Throws for missing
+ * parent timelines, cycles, or arithmetic overflow. Run this before anything
+ * needs to check anything time related.
+ *
+ * In the engine's main loop, this runs once per simulation step, not once per
+ * rendered frame. The loop accumulates elapsed source tics and calls this with
+ * the fixed step size whenever enough time has accumulated. For example, if
+ * 35000 source tics have accumulated and the step is 10000, it calls this
+ * three times with 10000 and carries the remaining 5000 into the next frame.
+ * Standalone timelines can still be advanced from another source.
  *
  * @param world The registry containing all entities whose Timeline components
  * will be advanced.
- * @param source_delta_tics The number of tics that have elapsed in the global
- * time source since the last advance. This value is used to advance root
+ * @param source_delta_tics The number of source tics that have elapsed in the
+ * shared time source since the last advance. A source tic is one tic from that
+ * clock, counted in microseconds here. This value is used to advance root
  * Timelines that have no parent, and is therefore the basis for all other
  * Timelines in the hierarchy. It should be a non-negative value representing
  * the elapsed time in whole tics.
  *
- * @throws std::invalid_argument if any parent Timeline is missing, if there are
- * cycles in the Timeline hierarchy, or if any arithmetic overflow occurs during
- * the advancement of Timelines. In such cases, the state of the Timelines may
+ * @throws std::logic_error if any parent Timeline is missing or if there are
+ * cycles in the Timeline hierarchy.
+ * @throws std::overflow_error if arithmetic overflows during the advancement
+ * of Timelines. In such cases, the state of the Timelines may
  * be partially advanced, and it is not rolled back.
  *
  */

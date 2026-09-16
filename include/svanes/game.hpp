@@ -1,6 +1,6 @@
 #pragma once
 
-#include <svanes/timeline_system.hpp>
+#include <svanes/physics_system.hpp>
 #include <svanes/vector2d.hpp>
 
 #include <cstdint>
@@ -32,6 +32,10 @@ class TextureManager;
  * Kinematic2D and Gravity components, in world units per local tic squared.
  * - concurrency: The number of worker threads to use for parallel execution.
  * Defaults to 1, which means no parallel execution.
+ * - physics_step_tics: The fixed number of source tics in a simulation step.
+ * A source tic is one tic from the shared simulation clock, measured in
+ * microseconds here. Defaults to DefaultPhysicsStepTics. Set this during
+ * Initialize.
  */
 struct GameContext {
     Registry &world;
@@ -42,6 +46,7 @@ struct GameContext {
     std::int32_t output_height;
     Vector2D &gravity;
     std::uint32_t concurrency = 1;
+    TicCount physics_step_tics = DefaultPhysicsStepTics;
 };
 
 /**
@@ -53,6 +58,8 @@ struct GameContext {
  * actually passed for them. real_delta_tics should therefore not be
  * used to update entity state directly, as it does not account for entity
  * relative time scaling.
+ *
+ * A rendered frame may run zero, one, or several simulation steps.
  *
  * FIELDS:
  * - world: The engine owned registry containing the game's entities and
@@ -99,9 +106,22 @@ public:
     virtual void Initialize(GameContext &context) = 0;
 
     /**
+     * Runs after one physics simulation step has completed, allowing the game
+     * to respond before the next step. This may run several times before Update
+     * in an interleaved manner with the engine's AdvancePhysics loop,
+     * or not at all if no complete simulation step has elapsed.
+     *
+     * @param physics The world, current input, and local time deltas for the
+     * entities in the completed simulation step.
+     */
+    virtual void PhysicsUpdate(const PhysicsContext &) {}
+
+    /**
      * Updates the game state based on the provided frame context.
      * This method is called once per frame, allowing the game to process input
-     * and update its state.
+     * and update its state. Runs after all physics simulation steps for the
+     * frame have completed.
+     *
      * @param frame The context for the current frame, providing access to the
      * InputManager and the time elapsed since the last frame.
      */

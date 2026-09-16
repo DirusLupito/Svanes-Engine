@@ -1,6 +1,7 @@
 #pragma once
 
 #include <svanes/entity.hpp>
+#include <svanes/physics_system.hpp>
 #include <svanes/vector2d.hpp>
 
 #include <functional>
@@ -49,9 +50,15 @@ struct PointAttractor2D {
  * attractors. Call after AdvanceTimelines.
  *
  * @param world The registry containing all entities and their components.
+ * @param entity_steps The entities participating in the current physics step,
+ * along with their local tic deltas. These are the entities with Transform,
+ * Kinematic2D, and Timeline components collected by the physics pass. Entries
+ * with zero delta_tics are ignored.
  *
  * @return A map of entities to their resulting acceleration vectors.
  */
-std::unordered_map<Entity, Vector2D> EvaluateAttractors(const Registry &world);
+std::unordered_map<Entity, Vector2D>
+EvaluateAttractors(const Registry &world,
+                   std::span<const PhysicsTimeStep> entity_steps);
 
 } // namespace svanes

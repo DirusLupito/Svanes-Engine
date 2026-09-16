@@ -1,6 +1,6 @@
 #pragma once
 
-#include <svanes/timeline_system.hpp>
+#include <svanes/physics_system.hpp>
 #include <svanes/vector2d.hpp>
 
 #include <optional>
@@ -89,8 +89,17 @@ struct Gravity {};
 
 /**
  * Advances the kinematic state of all entities in the provided registry
- * according to the delta tics of their Timeline components.
+ * according to the local delta tics supplied for this physics step.
  * AdvanceTimelines must run first.
+ *
+ * Each application physics simulation step advances the shared simulation
+ * clock by the same number of source tics. A source tic is one tic on that
+ * clock, measured in microseconds here. Timelines may convert that source
+ * interval into different numbers of local tics for different entities, but
+ * they do not change the source interval. For example, during a step of
+ * 10000 source tics, a normal-speed entity receives 10000 local tics, a
+ * double-speed entity receives 20000, and a half-speed entity receives 5000.
+ * The integration uses each entity's local delta directly.
  *
  * @param world The registry containing all entities and their components.
  * @param gravity The gravity vector to apply to entities with Kinematic2D and
@@ -98,10 +107,15 @@ struct Gravity {};
  * @param driver The AsyncParallelForDriver to use for parallel execution of
  * the kinematic updates. If the driver has a concurrency of 1, the updates will
  * be executed sequentially on the calling thread.
+ * @param entity_steps The entities and their local elapsed tics for this
+ * simulation step. Each entity appears once and has Transform, Kinematic2D,
+ * and Timeline components. A delta_tics of zero means that the entity
+ * will skip integration and clamping for this step.
  *
  * @throws std::invalid_argument for nonfinite gravity or invalid limits.
  */
 void AdvanceKinematics(Registry &world, Vector2D gravity,
-                       AsyncParallelForDriver &driver);
+                       AsyncParallelForDriver &driver,
+                       std::span<const PhysicsTimeStep> entity_steps);
 
 } // namespace svanes

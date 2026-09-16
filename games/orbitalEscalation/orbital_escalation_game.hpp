@@ -26,6 +26,18 @@ public:
      */
     void Update(const svanes::FrameContext &frame) override;
 
+    /**
+     * Post-physics update logic. Called by the engine once per simulation step
+     * immediately after the physics system has updated all entities' for this
+     * one single simulation step. Note that this may immediately be followed
+     * another physics update step, which will then be followed by another call
+     * to this method, and so on in an interleaved manner, until all updates
+     * for the current frame have been completed.
+     *
+     * @param physics The world, sampled input, and entities' local tic deltas.
+     */
+    void PhysicsUpdate(const svanes::PhysicsContext &physics) override;
+
     bool ShouldQuit() const override;
 
 private:

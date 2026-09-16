@@ -117,53 +117,57 @@ static void AdvanceKinematic(Transform &transform, Kinematic2D &motion,
 }
 
 void AdvanceKinematics(Registry &world, Vector2D gravity,
-                       AsyncParallelForDriver &driver) {
+                       AsyncParallelForDriver &driver,
+                       std::span<const PhysicsTimeStep> entity_steps) {
     if (!std::isfinite(gravity.x) || !std::isfinite(gravity.y)) {
         throw std::invalid_argument("Kinematics gravity must be finite.");
     }
 
     // Map of entity to the total acceleration applied to that entity by all
     // attractors.
-    const auto attractions = EvaluateAttractors(world);
+    const auto attractions = EvaluateAttractors(world, entity_steps);
 
     std::vector<WorkItem> items;
 
-    // Filter to entities with Transform (position and rotation), Kinematic2D
-    // (motion), and Timeline (local time).
-    world.ForEach<Transform, Kinematic2D, Timeline>(
-        [&](Entity entity, Transform &transform, Kinematic2D &motion,
-            const Timeline &timeline) {
-            if (timeline.GetDeltaTics() == 0) {
-                return;
-            }
+    // We need only update those entities we already know are participating in
+    // this physics step, rather than iterating over all entities with a
+    // transform, kinematic, and timeline.
+    for (const PhysicsTimeStep &step : entity_steps) {
+        if (step.delta_tics == 0) {
+            continue;
+        }
 
-            float acceleration_x = motion.acceleration_x;
-            float acceleration_y = motion.acceleration_y;
+        const Entity entity = step.entity;
+        Transform &transform = world.GetComponent<Transform>(entity);
+        Kinematic2D &motion = world.GetComponent<Kinematic2D>(entity);
 
-            //
-            // Contributions from point source attractors
-            //
+        float acceleration_x = motion.acceleration_x;
+        float acceleration_y = motion.acceleration_y;
 
-            const auto attraction = attractions.find(entity);
-            if (attraction != attractions.end()) {
-                acceleration_x += attraction->second.x;
-                acceleration_y += attraction->second.y;
-            }
+        //
+        // Contributions from point source attractors
+        //
 
-            //
-            // Contributions from global acceleration fields
-            //
+        const auto attraction = attractions.find(entity);
+        if (attraction != attractions.end()) {
+            acceleration_x += attraction->second.x;
+            acceleration_y += attraction->second.y;
+        }
 
-            if (world.HasComponent<Gravity>(entity)) {
-                acceleration_x += gravity.x;
-                acceleration_y += gravity.y;
-            }
+        //
+        // Contributions from global acceleration fields
+        //
 
-            items.push_back({&transform,
-                             &motion,
-                             {acceleration_x, acceleration_y},
-                             timeline.GetDeltaTics()});
-        });
+        if (world.HasComponent<Gravity>(entity)) {
+            acceleration_x += gravity.x;
+            acceleration_y += gravity.y;
+        }
+
+        items.push_back({&transform,
+                         &motion,
+                         {acceleration_x, acceleration_y},
+                         step.delta_tics});
+    }
 
     // Current hardcoded batch size. This will control the size of work an
     // individual thread will do before it checks for more work to do. Higher

@@ -197,7 +197,7 @@ static void AdvanceTimeline(Registry &world, Entity entity,
     // Mark this Timeline as Complete, indicating that it has been fully
     // processed and its state is now consistent. This prevents re-visiting it
     // in the current traversal and ensures that each Timeline is advanced
-    // exactly once per frame.
+    // exactly once per pass.
     visits.at(entity) = TimelineVisit::Complete;
 }
 

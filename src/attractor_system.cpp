@@ -9,7 +9,9 @@
 
 namespace svanes {
 
-std::unordered_map<Entity, Vector2D> EvaluateAttractors(const Registry &world) {
+std::unordered_map<Entity, Vector2D>
+EvaluateAttractors(const Registry &world,
+                   std::span<const PhysicsTimeStep> entity_steps) {
 
     // Rather than take in an entity and iterate over all other entities to find
     // attractors and then calculate the total acceleration, we can instead
@@ -47,20 +49,25 @@ std::unordered_map<Entity, Vector2D> EvaluateAttractors(const Registry &world) {
             }
 
             // Will hopefully some day be replaced with a spatial lookup.
-            world.ForEach<Transform, Kinematic2D,
-                          Timeline>([&](Entity target_entity,
-                                        const Transform &target,
-                                        const Kinematic2D &,
-                                        const Timeline &timeline) {
-                if (timeline.GetDeltaTics() == 0) {
-                    return;
+
+            // We need only analyze those entities we already know are
+            // participating in this physics step, rather than iterating over
+            // all entities with a transform, kinematic, and timeline.
+            for (const PhysicsTimeStep &step : entity_steps) {
+                if (step.delta_tics == 0) {
+                    continue;
                 }
+
+                const Entity target_entity = step.entity;
+                const Transform &target =
+                    world.GetComponent<Transform>(target_entity);
+
                 // Special case: An attractor does not affect itself.
                 // If it did, the distance would be zero, and any acceleration
                 // field utilizing the distance may return a non-finite
                 // acceleration.
                 if (source_entity == target_entity) {
-                    return;
+                    continue;
                 }
 
                 // Our chosen convention is that the offset is measured as
@@ -75,7 +82,7 @@ std::unordered_map<Entity, Vector2D> EvaluateAttractors(const Registry &world) {
                 if (attractor.cutoff_radius &&
                     std::hypot(offset_to_source.x, offset_to_source.y) >=
                         *attractor.cutoff_radius) {
-                    return;
+                    continue;
                 }
 
                 const Vector2D acceleration =
@@ -91,7 +98,7 @@ std::unordered_map<Entity, Vector2D> EvaluateAttractors(const Registry &world) {
                 }
 
                 accelerations[target_entity] += acceleration;
-            });
+            }
         });
 
     return accelerations;
