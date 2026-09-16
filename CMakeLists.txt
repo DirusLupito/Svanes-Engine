@@ -138,6 +138,12 @@ target_sources(
         src/geometry.cpp
         src/input.cpp
         src/kinematic_system.cpp
+        src/network/network_client.cpp
+        src/network/network_internal.cpp
+        src/network/network_internal.hpp
+        src/network/network_message.cpp
+        src/network/network_replication.cpp
+        src/network/network_server.cpp
         src/physics_system.cpp
         src/rectangle_geometry.cpp
         src/triangle_geometry.cpp
@@ -170,6 +176,10 @@ target_sources(
             include/svanes/geometry.hpp
             include/svanes/input.hpp
             include/svanes/kinematic_system.hpp
+            include/svanes/network/network_client.hpp
+            include/svanes/network/network_message.hpp
+            include/svanes/network/network_replication.hpp
+            include/svanes/network/network_server.hpp
             include/svanes/physics_system.hpp
             include/svanes/rectangle_geometry.hpp
             include/svanes/triangle_geometry.hpp
@@ -252,6 +262,10 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/geometry.hpp
     include/svanes/input.hpp
     include/svanes/kinematic_system.hpp
+    include/svanes/network/network_client.hpp
+    include/svanes/network/network_message.hpp
+    include/svanes/network/network_replication.hpp
+    include/svanes/network/network_server.hpp
     include/svanes/physics_system.hpp
     include/svanes/rectangle_geometry.hpp
     include/svanes/triangle_geometry.hpp
@@ -279,6 +293,12 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/geometry.cpp
     src/input.cpp
     src/kinematic_system.cpp
+    src/network/network_client.cpp
+    src/network/network_internal.cpp
+    src/network/network_internal.hpp
+    src/network/network_message.cpp
+    src/network/network_replication.cpp
+    src/network/network_server.cpp
     src/physics_system.cpp
     src/rectangle_geometry.cpp
     src/triangle_geometry.cpp
