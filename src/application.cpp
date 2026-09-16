@@ -22,6 +22,7 @@
 
 #include <SDL3/SDL.h>
 
+#include <algorithm>
 #include <chrono>
 #include <stdexcept>
 #include <string>
@@ -121,7 +122,12 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
 
         const TicCount real_delta_tics = current_tics - previous_tics;
         previous_tics = current_tics;
-        pending_tics += real_delta_tics;
+
+        // Naive solution to a feedback loop where a slow frame causes more
+        // simulation steps, which causes more work, which causes slower
+        // frames, which causes more simulation steps, etc. We limit the number
+        // of tics we accumulate to one second's worth.
+        pending_tics += std::min(real_delta_tics, TicsPerSecond);
 
 
         //
