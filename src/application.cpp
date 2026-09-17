@@ -71,10 +71,10 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
     game.Initialize(game_context);
 
     // The fixed number of tics in a simulation step. This is used to
-    // determine how many simulation steps to run based on the elapsed time
-    // since the last frame. The engine requires this to be positive, and it is
-    // copied from the game context after initialization. A slow rendered frame
-    // runs more of these steps, rather than making an individual step larger.
+    // determine whether a simulation step is due based on accumulated real
+    // time. The engine requires this to be positive, and it is copied from the
+    // game context after initialization. Each rendered frame runs zero or one
+    // steps. Slow frames slow simulated time without changing step size.
     const TicCount physics_step_tics = game_context.physics_step_tics;
 
     if (physics_step_tics == 0) {
@@ -91,7 +91,8 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
     // render frame.
     TicCount previous_tics = 0;
 
-    // The number of tics that have accumulated since the last simulation step.
+    // Real tics accumulated toward the next simulation step. After a step,
+    // only the fractional step remains. Overdue whole steps are lost.
     TicCount pending_tics = 0;
 
     bool running = true;
@@ -121,6 +122,7 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
 
         const TicCount real_delta_tics = current_tics - previous_tics;
         previous_tics = current_tics;
+
         pending_tics += real_delta_tics;
 
 
@@ -155,28 +157,32 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
         // Suppose our simulation step is 10000 source tics, and this frame
         // accumulated 16000 source tics. We advance one complete simulation
         // step and retain the remaining 6000. Advancing a smaller step would
-        // make the simulation depend on rendering time. Another 4000 source
-        // tics will complete the next simulation step, so a slow frame causes
-        // catchup steps, not larger steps.
+        // make the simulation depend on rendering time. Another 4000 real
+        // tics will make the next step due. If we accumulated 35000 instead,
+        // we still run only one step and retain 5000, discarding 20000 overdue
+        // tics. Keeping the fraction preserves the nominal average rate when
+        // rendering is frequent enough. Discarding whole intervals prevents
+        // slow frames from scheduling more work and causing even slower frames.
+        // One expensive step can still delay rendering on this same thread.
         //
         // Each simulation step advances the shared clock by physics_step_tics.
         // Timelines convert that source time delta through their parents and
         // their own rates. A double speed entity receives 20000 local tics per
         // step, while a half speed entity receives 5000. Both participate in
         // the same number of simulation steps. ONLY their local elapsed time
-        // differ.
-        while (pending_tics >= physics_step_tics) {
+        // differ. Normal rate timelines follow completed simulation time,
+        // not real time. Discarded steps never advance the simulation.
+        if (pending_tics >= physics_step_tics) {
             AdvanceTimelines(world, physics_step_tics);
             AdvancePhysics(world, gravity, parallel_for,
                            [&](std::span<const PhysicsTimeStep> steps) {
                                game.PhysicsUpdate({world, input, steps});
                            });
 
-            // Animation uses the delta published by this timeline pass.
-            // Doing this once per rendered frame would miss earlier steps
-            // during catchup, or reuse the last delta when no step ran.
+            // Animation uses the delta reported by this timeline pass.
+            // Doing this on a frame without a step would reuse the last delta.
             AdvanceSpriteAnimations(world);
-            pending_tics -= physics_step_tics;
+            pending_tics %= physics_step_tics;
         }
         game.Update(frame_context);
 

@@ -7,7 +7,7 @@ This is opposed to a traditional inheritance-based approach, where entities woul
 ### Components
 
 Most components are data structs. Systems operate on entities containing the components they need.
-A component can also be a class when it needs to maintain its own invariants: `Timeline`, for example, keeps its rational tic size and incomplete progress private. The timeline system advances these components before movement or animation reads their published local time.
+A component can also be a class when it needs to maintain its own invariants: `Timeline`, for example, keeps its rational tic size and incomplete progress private. The timeline system advances these components before movement or animation reads their reported local time.
 
 ### What this looks like
 
