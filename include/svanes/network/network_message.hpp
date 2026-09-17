@@ -25,6 +25,8 @@ ClientId GenerateClientId();
  */
 std::string MakeTcpEndpoint(const std::string &host, std::uint16_t port);
 
+std::string MakeUdpEndpoint(const std::string &host, std::uint16_t port);
+
 /**
  * Representation of an arbitrary message being sent over the network.
  * All messages are sent as raw bytes

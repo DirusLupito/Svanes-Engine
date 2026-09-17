@@ -14,4 +14,8 @@ std::string MakeTcpEndpoint(const std::string &host, std::uint16_t port) {
     return "tcp://" + host + ":" + std::to_string(port);
 }
 
+std::string MakeUdpEndpoint(const std::string &host, std::uint16_t port) {
+    return "udp://" + host + ":" + std::to_string(port);
+}
+
 } // namespace svanes

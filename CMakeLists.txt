@@ -96,7 +96,7 @@ block(SCOPE_FOR VARIABLES)
     set(WITH_DOC OFF)
     set(WITH_DOCS OFF)
     set(ENABLE_CPACK OFF)
-    set(ENABLE_DRAFTS OFF)
+    set(ENABLE_DRAFTS ON)
     set(WITH_LIBBSD OFF)
     set(CPPZMQ_BUILD_TESTS OFF)
 
@@ -144,6 +144,7 @@ target_sources(
         src/network/network_message.cpp
         src/network/network_replication.cpp
         src/network/network_server.cpp
+        src/network/udp_msg_pipe.cpp
         src/physics_system.cpp
         src/rectangle_geometry.cpp
         src/triangle_geometry.cpp
@@ -176,10 +177,12 @@ target_sources(
             include/svanes/geometry.hpp
             include/svanes/input.hpp
             include/svanes/kinematic_system.hpp
+            include/svanes/network/msg_pipe.hpp
             include/svanes/network/network_client.hpp
             include/svanes/network/network_message.hpp
             include/svanes/network/network_replication.hpp
             include/svanes/network/network_server.hpp
+            include/svanes/network/udp_msg_pipe.hpp
             include/svanes/physics_system.hpp
             include/svanes/rectangle_geometry.hpp
             include/svanes/triangle_geometry.hpp
@@ -262,10 +265,12 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/geometry.hpp
     include/svanes/input.hpp
     include/svanes/kinematic_system.hpp
+    include/svanes/network/msg_pipe.hpp
     include/svanes/network/network_client.hpp
     include/svanes/network/network_message.hpp
     include/svanes/network/network_replication.hpp
     include/svanes/network/network_server.hpp
+    include/svanes/network/udp_msg_pipe.hpp
     include/svanes/physics_system.hpp
     include/svanes/rectangle_geometry.hpp
     include/svanes/triangle_geometry.hpp
@@ -299,6 +304,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/network/network_message.cpp
     src/network/network_replication.cpp
     src/network/network_server.cpp
+    src/network/udp_msg_pipe.cpp
     src/physics_system.cpp
     src/rectangle_geometry.cpp
     src/triangle_geometry.cpp
