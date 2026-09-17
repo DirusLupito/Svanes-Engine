@@ -41,7 +41,8 @@ void SpawnBullet(
         throw std::invalid_argument("SpawnBullet requires a finite and positive speed.");
     }
 
-    const svanes::Vector2D velocity = direction / length * speed;
+    const svanes::Vector2D velocity = direction / length *
+        svanes::PerSecondToPerTic(speed);
 
     const svanes::Rectangle2D body{
         .width = kBulletSize,
@@ -53,6 +54,7 @@ void SpawnBullet(
         .x = origin.x,
         .y = origin.y,
     });
+    world.AddComponent<svanes::Timeline>(bullet);
     world.AddComponent<svanes::Kinematic2D>(bullet, svanes::Kinematic2D{
         .velocity_x = velocity.x,
         .velocity_y = velocity.y,

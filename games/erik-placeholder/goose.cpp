@@ -34,6 +34,12 @@ constexpr float kInvincibleSeconds = 0.8F;
 constexpr float kWalkSecondsPerFrame = 0.1F;
 constexpr float kFlySecondsPerFrame = 0.06F;
 
+float FrameSeconds(const svanes::FrameContext& frame)
+{
+    return static_cast<float>(frame.real_delta_tics) /
+        static_cast<float>(svanes::TicsPerSecond);
+}
+
 }
 
 void Goose::Spawn(svanes::GameContext& context, float x, float y)
@@ -59,6 +65,7 @@ void Goose::Spawn(svanes::GameContext& context, float x, float y)
         .texture = idle_texture,
         .geometry = body,
     });
+    context.world.AddComponent<svanes::Timeline>(entity);
     // TASK 3, physics: these two components are what put the goose under the
     // engine's physics. Kinematic2D holds its velocity and acceleration, and
     // Gravity opts it into the world gravity vector set in ErikGame::Initialize
@@ -76,11 +83,12 @@ void Goose::Update(const svanes::FrameContext& frame, const GooseIntent& intent)
         throw std::logic_error("Goose::Update called before Goose::Spawn.");
     }
 
-    time_in_state += frame.delta_seconds;
-    knockback_timer = std::max(knockback_timer - frame.delta_seconds, 0.0F);
-    invincible_timer = std::max(invincible_timer - frame.delta_seconds, 0.0F);
-    dash_timer = std::max(dash_timer - frame.delta_seconds, 0.0F);
-    dash_cooldown = std::max(dash_cooldown - frame.delta_seconds, 0.0F);
+    const float delta_seconds = FrameSeconds(frame);
+    time_in_state += delta_seconds;
+    knockback_timer = std::max(knockback_timer - delta_seconds, 0.0F);
+    invincible_timer = std::max(invincible_timer - delta_seconds, 0.0F);
+    dash_timer = std::max(dash_timer - delta_seconds, 0.0F);
+    dash_cooldown = std::max(dash_cooldown - delta_seconds, 0.0F);
 
     ResolveCollisions(frame.world);
 
@@ -95,34 +103,35 @@ void Goose::Update(const svanes::FrameContext& frame, const GooseIntent& intent)
 
     if (knockback_timer <= 0.0F) {
         if (dash_timer <= 0.0F) {
-            motion.velocity_x = intent.move.x * speed;
+            motion.velocity_x = svanes::PerSecondToPerTic(intent.move.x * speed);
         }
 
         if (intent.dash != 0.0F && dash_cooldown <= 0.0F) {
-            motion.velocity_x = intent.dash * dash_speed;
+            motion.velocity_x = svanes::PerSecondToPerTic(intent.dash * dash_speed);
             dash_timer = dash_seconds;
             dash_cooldown = dash_cooldown_seconds;
         }
 
         if (intent.jump && grounded) {
-            motion.velocity_y = -jump_speed;
+            motion.velocity_y = svanes::PerSecondToPerTic(-jump_speed);
             grounded = false;
         }
 
         flying = intent.jump && !grounded && fly_time_remaining > 0.0F;
 
         if (flying) {
-            if (motion.velocity_y > -fly_rise_speed) {
-                motion.acceleration_y = -fly_rise_acceleration;
+            if (motion.velocity_y > svanes::PerSecondToPerTic(-fly_rise_speed)) {
+                motion.acceleration_y = svanes::PerSecondSquaredToPerTicSquared(-fly_rise_acceleration);
             }
 
-            fly_time_remaining = std::max(fly_time_remaining - frame.delta_seconds, 0.0F);
+            fly_time_remaining = std::max(fly_time_remaining - delta_seconds, 0.0F);
         }
     }
 
-    motion.velocity_y = std::min(motion.velocity_y, max_fall_speed);
+    motion.velocity_y = std::min(
+        motion.velocity_y, svanes::PerSecondToPerTic(max_fall_speed));
 
-    fire_cooldown = std::max(fire_cooldown - frame.delta_seconds, 0.0F);
+    fire_cooldown = std::max(fire_cooldown - delta_seconds, 0.0F);
 
     if (intent.fire && fire_cooldown <= 0.0F) {
         const svanes::Transform& transform = frame.world.GetComponent<svanes::Transform>(entity);
@@ -208,20 +217,26 @@ void Goose::SetState(svanes::Registry& world, GooseState next)
         break;
     case GooseState::Walking:
         sprite.texture = walk_texture;
+        sprite.source = svanes::Rectangle2D{
+            kFrameWidth * 0.5F, kFrameHeight * 0.5F,
+            static_cast<float>(kFrameWidth), static_cast<float>(kFrameHeight)};
         world.AddComponent<svanes::SpriteAnimation>(entity, svanes::SpriteAnimation{
             .frame_width = kFrameWidth,
             .frame_height = kFrameHeight,
             .frame_count = kWalkFrameCount,
-            .seconds_per_frame = kWalkSecondsPerFrame,
+            .tics_per_frame = svanes::SecondsToTics(kWalkSecondsPerFrame),
         });
         break;
     case GooseState::Flying:
         sprite.texture = walk_texture;
+        sprite.source = svanes::Rectangle2D{
+            kFrameWidth * 0.5F, kFrameHeight * 0.5F,
+            static_cast<float>(kFrameWidth), static_cast<float>(kFrameHeight)};
         world.AddComponent<svanes::SpriteAnimation>(entity, svanes::SpriteAnimation{
             .frame_width = kFrameWidth,
             .frame_height = kFrameHeight,
             .frame_count = kWalkFrameCount,
-            .seconds_per_frame = kFlySecondsPerFrame,
+            .tics_per_frame = svanes::SecondsToTics(kFlySecondsPerFrame),
         });
         break;
     }
@@ -246,7 +261,8 @@ void Goose::ApplyKnockback(svanes::Registry& world, svanes::Vector2D direction, 
         throw std::invalid_argument("Goose::ApplyKnockback requires a finite and positive speed.");
     }
 
-    const svanes::Vector2D velocity = direction / length * speed;
+    const svanes::Vector2D velocity = direction / length *
+        svanes::PerSecondToPerTic(speed);
 
     svanes::Kinematic2D& motion = world.GetComponent<svanes::Kinematic2D>(entity);
     motion.velocity_x = velocity.x;

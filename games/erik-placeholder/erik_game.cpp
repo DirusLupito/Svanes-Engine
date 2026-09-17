@@ -77,6 +77,12 @@ constexpr float kEnemyPathSpeed = 0.8F;
 constexpr float kBulletKnockback = 350.0F;
 constexpr float kContactKnockback = 550.0F;
 
+float FrameSeconds(const svanes::FrameContext& frame)
+{
+    return static_cast<float>(frame.real_delta_tics) /
+        static_cast<float>(svanes::TicsPerSecond);
+}
+
 /**
  * Creates one piece of immovable world geometry, drawn as a colored rectangle and
  * tagged Solid so the goose collides with it.
@@ -117,7 +123,7 @@ void ErikGame::Initialize(svanes::GameContext& context)
 {
     // the world gravity vector, applied by the engine every frame to any entity
     // holding both Kinematic2D and Gravity. Positive y is down
-    context.gravity = {0.0F, 2000.0F};
+    context.gravity = {0.0F, svanes::PerSecondSquaredToPerTicSquared(2000.0F)};
 
     background = context.world.CreateEntity();
     context.world.AddComponent<svanes::Transform>(background, svanes::Transform{
@@ -179,12 +185,15 @@ void ErikGame::Initialize(svanes::GameContext& context)
             .height = 128.0F,
         },
     });
+    context.world.AddComponent<svanes::Timeline>(orb);
     context.world.AddComponent<svanes::SpriteAnimation>(orb, svanes::SpriteAnimation{
         .frame_width = 128,
         .frame_height = 128,
         .frame_count = 4,
-        .seconds_per_frame = 0.12F,
+        .tics_per_frame = svanes::SecondsToTics(0.12),
     });
+    context.world.GetComponent<svanes::Sprite>(orb).source = svanes::Rectangle2D{
+        64.0F, 64.0F, 128.0F, 128.0F};
 
     // TASK 2C, auto-moving entity: the enemy. It takes no input, and is walked
     // along its path by the game in Update.
@@ -223,8 +232,9 @@ void ErikGame::Update(const svanes::FrameContext& frame)
     // a dash is a double tap of A or D. The first press starts that direction's
     // timer, and a second press while the timer is still running becomes the dash
     // instead
-    left_tap_timer = std::max(left_tap_timer - frame.delta_seconds, 0.0F);
-    right_tap_timer = std::max(right_tap_timer - frame.delta_seconds, 0.0F);
+    const float delta_seconds = FrameSeconds(frame);
+    left_tap_timer = std::max(left_tap_timer - delta_seconds, 0.0F);
+    right_tap_timer = std::max(right_tap_timer - delta_seconds, 0.0F);
 
     if (frame.input.WasPressed(svanes::Key::A)) {
         if (left_tap_timer > 0.0F) {
@@ -283,7 +293,7 @@ void ErikGame::Update(const svanes::FrameContext& frame)
     sky_body.width = view.width * kSkyMargin;
     sky_body.height = view.height * kSkyMargin;
 
-    elapsed_seconds += frame.delta_seconds;
+    elapsed_seconds += delta_seconds;
 
     // TASK 2C, auto-moving entity: the enemy's motion for this frame. Its position
     // is a sine wave over elapsed time, sweeping it back and forth above the arena

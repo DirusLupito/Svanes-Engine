@@ -66,7 +66,9 @@ void Enemy::Update(const svanes::FrameContext& frame, const EnemyIntent& intent)
 
     const svanes::Vector2D offset{intent.move_to.x - transform.x, intent.move_to.y - transform.y};
     const float distance = std::hypot(offset.x, offset.y);
-    const float step = move_speed * frame.delta_seconds;
+    const float delta_seconds = static_cast<float>(frame.real_delta_tics) /
+        static_cast<float>(svanes::TicsPerSecond);
+    const float step = move_speed * delta_seconds;
 
     if (distance > step && distance > 0.0F) {
         transform.x += offset.x / distance * step;
@@ -76,7 +78,7 @@ void Enemy::Update(const svanes::FrameContext& frame, const EnemyIntent& intent)
         transform.y = intent.move_to.y;
     }
 
-    fire_cooldown = std::max(fire_cooldown - frame.delta_seconds, 0.0F);
+    fire_cooldown = std::max(fire_cooldown - delta_seconds, 0.0F);
 
     if (!intent.fire || fire_cooldown > 0.0F) {
         return;
