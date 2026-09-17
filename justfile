@@ -70,11 +70,12 @@ _check-target target:
 run target="": (_check-target target) (build if target == "" { "orbitalEscalation" } else { target })
     {{ if target == "chris" { "just _run-chris-duo" } else { bin-dir + (if target == "" { "svanes_game_orbital_escalation" } else if target == "erik" { "svanes_game_erik" } else if target == "orbitalEscalation" { "svanes_game_orbital_escalation" } else if target == "chris-server" { "svanes_game_chris_server" } else { "svanes_game_chris" }) + exe-suffix } }}
 
-# Launch two chris clients at once. The first is backgrounded so the second still blocks
-# the terminal until you close it; the first keeps running until you close its window too.
+# Launch two chris clients at once, one controlling the character and the other the
+# platform. The first is backgrounded so the second still blocks the terminal until you
+# close it; the first keeps running until you close its window too.
 _run-chris-duo:
-    {{ if os() == "windows" { "Start-Process -FilePath " + bin-dir + "svanes_game_chris" + exe-suffix } else { bin-dir + "svanes_game_chris" + exe-suffix + " &" } }}
-    {{ if os() == "windows" { "& " + bin-dir + "svanes_game_chris" + exe-suffix } else { bin-dir + "svanes_game_chris" + exe-suffix } }}
+    {{ if os() == "windows" { "Start-Process -FilePath " + bin-dir + "svanes_game_chris" + exe-suffix + " -ArgumentList '127.0.0.1 character'" } else { bin-dir + "svanes_game_chris" + exe-suffix + " 127.0.0.1 character &" } }}
+    {{ if os() == "windows" { "& " + bin-dir + "svanes_game_chris" + exe-suffix + " 127.0.0.1 platform" } else { bin-dir + "svanes_game_chris" + exe-suffix + " 127.0.0.1 platform" } }}
 
 # Remove compiled outputs while retaining the configured build tree.
 clean: configure

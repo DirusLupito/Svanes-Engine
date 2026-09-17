@@ -4,11 +4,13 @@
 #include <svanes/input.hpp>
 #include <svanes/registry.hpp>
 #include <svanes/render/render_system.hpp>
+#include <svanes/render/texture_manager.hpp>
+#include <svanes/sprite_animation_system.hpp>
 #include <svanes/timeline_system.hpp>
 
 #include <SDL3/SDL.h>
 
-#include <array>
+#include <cmath>
 #include <cstdint>
 
 namespace {
@@ -22,17 +24,26 @@ constexpr svanes::Color kBackgroundColor{17, 24, 39, 255};
 constexpr svanes::Color kGroundColor{92, 64, 51, 255};
 constexpr svanes::Color kPlatformColor{160, 82, 45, 255};
 
-constexpr std::array<svanes::Color, 4> kCharacterPalette{
-    svanes::Color{37, 99, 235, 255},
-    svanes::Color{220, 38, 38, 255},
-    svanes::Color{22, 163, 74, 255},
-    svanes::Color{234, 179, 8, 255},
+constexpr std::int32_t kCharacterFrameWidth = 288;
+constexpr std::int32_t kCharacterFrameHeight = 320;
+constexpr std::int32_t kIdleFrameCount = 8;
+constexpr std::int32_t kRunningFrameCount = 10;
+constexpr float kCharacterFramesPerSecond = 12.0F;
+constexpr float kCharacterRunPositionEpsilon = 0.5F;
+
+constexpr const char *kIdleSpriteSheetFilename = "sheet_umeko-idle.png";
+constexpr const char *kRunningSpriteSheetFilename = "sheet_umeko-run.png";
+
+constexpr float kNetworkSmoothingRatePerSecond = 25.0F;
+
+struct NetworkInterpolationTarget {
+    svanes::Transform target;
 };
 
 } // namespace
 
-ChrisGame::ChrisGame(std::string server_host)
-    : network_client(server_host, kChrisStatePort, kChrisInputPort) {
+ChrisGame::ChrisGame(std::string server_host, ClientRole role)
+    : network_client(server_host, kChrisStatePort, kChrisInputPort), role(role) {
     SDL_Log("Networking: client %u connecting to server at %s.", network_client.Id(), server_host.c_str());
 }
 
@@ -59,34 +70,48 @@ void ChrisGame::Initialize(svanes::GameContext &context) {
     );
     context.world.AddComponent<svanes::ZOrder>(ground_entity, svanes::ZOrder{kGroundZOrder});
 
-    const float platform_top = ground_top - kChrisPlatformTopHeightAboveGround;
-    const svanes::Entity platform_entity = context.world.CreateEntity();
-    context.world.AddComponent<svanes::Transform>(
-        platform_entity,
-        svanes::Transform{
-            kChrisPlatformLeft + kChrisPlatformWidth * 0.5F, platform_top + kChrisPlatformHeight * 0.5F, 0.0F
-        }
-    );
-    context.world.AddComponent<svanes::SolidShape>(
-        platform_entity,
-        svanes::SolidShape{kPlatformColor, svanes::Rectangle2D{0.0F, 0.0F, kChrisPlatformWidth, kChrisPlatformHeight}}
-    );
-    context.world.AddComponent<svanes::ZOrder>(platform_entity, svanes::ZOrder{kGroundZOrder});
+    idle_texture = context.assets.LoadTexture(std::string{CHRIS_GAME_ASSETS_DIR} + "/" + kIdleSpriteSheetFilename);
+    running_texture =
+        context.assets.LoadTexture(std::string{CHRIS_GAME_ASSETS_DIR} + "/" + kRunningSpriteSheetFilename);
 }
 
-svanes::Entity ChrisGame::SpawnRemoteCharacter(svanes::Registry &world, svanes::Entity network_entity) {
-    SDL_Log("Networking: client %u observed new networked entity %u.", network_client.Id(), network_entity);
+svanes::Entity ChrisGame::SpawnCharacter(svanes::Registry &world, svanes::Transform initial_transform) {
+    SDL_Log("Networking: client %u observed the networked character.", network_client.Id());
 
     const svanes::Entity entity = world.CreateEntity();
-    world.AddComponent<svanes::Transform>(entity, svanes::Transform{});
-    world.AddComponent<svanes::SolidShape>(
+    world.AddComponent<svanes::Transform>(entity, initial_transform);
+    world.AddComponent<svanes::Sprite>(
         entity,
-        svanes::SolidShape{
-            kCharacterPalette[network_entity % kCharacterPalette.size()],
-            svanes::Rectangle2D{0.0F, 0.0F, kChrisCharacterWidth, kChrisCharacterHeight},
+        svanes::Sprite{
+            .texture = idle_texture,
+            .geometry = svanes::Rectangle2D{0.0F, 0.0F, kChrisCharacterWidth, kChrisCharacterHeight},
         }
     );
+    world.AddComponent<svanes::SpriteAnimation>(
+        entity,
+        svanes::SpriteAnimation{
+            .frame_width = kCharacterFrameWidth,
+            .frame_height = kCharacterFrameHeight,
+            .frame_count = kIdleFrameCount,
+            .tics_per_frame = svanes::SecondsToTics(1.0 / kCharacterFramesPerSecond),
+        }
+    );
+    world.AddComponent<svanes::Timeline>(entity);
     world.AddComponent<svanes::ZOrder>(entity, svanes::ZOrder{kCharacterZOrder});
+    character_is_running = false;
+    return entity;
+}
+
+svanes::Entity ChrisGame::SpawnPlatform(svanes::Registry &world, svanes::Transform initial_transform) {
+    SDL_Log("Networking: client %u observed the networked platform.", network_client.Id());
+
+    const svanes::Entity entity = world.CreateEntity();
+    world.AddComponent<svanes::Transform>(entity, initial_transform);
+    world.AddComponent<svanes::SolidShape>(
+        entity,
+        svanes::SolidShape{kPlatformColor, svanes::Rectangle2D{0.0F, 0.0F, kChrisPlatformWidth, kChrisPlatformHeight}}
+    );
+    world.AddComponent<svanes::ZOrder>(entity, svanes::ZOrder{kGroundZOrder});
     return entity;
 }
 
@@ -98,34 +123,80 @@ void ChrisGame::SendInput(const svanes::FrameContext &frame) {
     input_send_timer -= kInputSendIntervalSeconds;
 
     float horizontal_input = 0.0F;
-    if (frame.input.IsDown(svanes::Key::Left)) {
-        horizontal_input -= 1.0F;
-    }
-    if (frame.input.IsDown(svanes::Key::Right)) {
-        horizontal_input += 1.0F;
+    if (role == ClientRole::Character) {
+        if (frame.input.IsDown(svanes::Key::Left)) {
+            horizontal_input -= 1.0F;
+        }
+        if (frame.input.IsDown(svanes::Key::Right)) {
+            horizontal_input += 1.0F;
+        }
     }
 
-    const PlayerInputMessage input{network_client.Id(), horizontal_input, jump_requested_since_last_send};
+    const PlayerInputMessage input{network_client.Id(), role, horizontal_input, action_requested_since_last_send};
     network_client.Send(input);
-    jump_requested_since_last_send = false;
+    action_requested_since_last_send = false;
 }
 
 void ChrisGame::ApplyServerState(svanes::Registry &world) {
     for (const svanes::NetworkMessage &message : network_client.PollBroadcast()) {
         const svanes::EntityTransformState state = message.As<svanes::EntityTransformState>();
-        svanes::ApplyTransformState(world, entity_map, state, [&]() {
-            return SpawnRemoteCharacter(world, state.network_entity);
+
+        if (state.network_entity == kChrisPlatformNetworkEntity) {
+            const svanes::Entity local_entity = entity_map.Resolve(state.network_entity, [&]() {
+                return SpawnPlatform(world, state.transform);
+            });
+            world.AddComponent<NetworkInterpolationTarget>(local_entity, NetworkInterpolationTarget{state.transform});
+            continue;
+        }
+
+        bool freshly_spawned = false;
+        const svanes::Entity local_entity = entity_map.Resolve(state.network_entity, [&]() {
+            freshly_spawned = true;
+            return SpawnCharacter(world, state.transform);
         });
+
+        const float previous_target_x = freshly_spawned
+                                             ? state.transform.x
+                                             : world.GetComponent<NetworkInterpolationTarget>(local_entity).target.x;
+        world.AddComponent<NetworkInterpolationTarget>(local_entity, NetworkInterpolationTarget{state.transform});
+
+        const bool is_running = std::fabs(state.transform.x - previous_target_x) > kCharacterRunPositionEpsilon;
+        if (is_running != character_is_running) {
+            character_is_running = is_running;
+
+            svanes::Sprite &sprite = world.GetComponent<svanes::Sprite>(local_entity);
+            sprite.texture = character_is_running ? running_texture : idle_texture;
+
+            svanes::SpriteAnimation &animation = world.GetComponent<svanes::SpriteAnimation>(local_entity);
+            animation.frame_count = character_is_running ? kRunningFrameCount : kIdleFrameCount;
+            animation.current_frame = 0;
+            animation.elapsed_tics = 0;
+        }
     }
+}
+
+void ChrisGame::SmoothNetworkedTransforms(const svanes::FrameContext &frame) {
+    const float delta_seconds =
+        static_cast<float>(frame.real_delta_tics) / static_cast<float>(svanes::TicsPerSecond);
+    const float smoothing = 1.0F - std::exp(-kNetworkSmoothingRatePerSecond * delta_seconds);
+
+    frame.world.ForEach<svanes::Transform, NetworkInterpolationTarget>(
+        [&](svanes::Entity, svanes::Transform &transform, const NetworkInterpolationTarget &interpolation) {
+            transform.x += (interpolation.target.x - transform.x) * smoothing;
+            transform.y += (interpolation.target.y - transform.y) * smoothing;
+            transform.rotation += (interpolation.target.rotation - transform.rotation) * smoothing;
+        }
+    );
 }
 
 void ChrisGame::Update(const svanes::FrameContext &frame) {
     if (frame.input.WasPressed(svanes::Key::Space)) {
-        jump_requested_since_last_send = true;
+        action_requested_since_last_send = true;
     }
 
     SendInput(frame);
     ApplyServerState(frame.world);
+    SmoothNetworkedTransforms(frame);
 
     frame.camera.x = kChrisWorldWidth * 0.5F;
     frame.camera.y = kChrisWorldHeight * 0.5F;

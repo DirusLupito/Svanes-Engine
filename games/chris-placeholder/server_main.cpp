@@ -18,7 +18,6 @@
 #include <optional>
 #include <span>
 #include <thread>
-#include <unordered_map>
 
 namespace {
 
@@ -28,14 +27,34 @@ constexpr float kGravityPerSecondSquared = 1500.0F;
 
 constexpr float kCharacterSpawnLeft = 64.0F;
 constexpr float kCharacterSpawnTop = 64.0F;
-constexpr float kCharacterSpawnSpacing = 220.0F;
 
 constexpr std::int32_t kMaxResolutionIterations = 4;
 
+constexpr float kPlatformSlideDistance = 360.0F;
+constexpr float kPlatformSlideSpeedPerSecond = 1400.0F;
+constexpr float kPlatformBeatSeconds = 0.5F;
+constexpr std::int32_t kPlatformHoldBeats = 2;
+
 struct ServerCharacter {
     svanes::Entity entity;
+    svanes::ClientId client_id;
     float horizontal_input = 0.0F;
     bool jump_requested = false;
+};
+
+enum class PlatformState : std::uint8_t {
+    Idle,
+    SlidingLeft,
+    Holding,
+    SlidingBack,
+};
+
+struct ServerPlatform {
+    svanes::Entity entity;
+    float home_x = 0.0F;
+    float target_left_x = 0.0F;
+    PlatformState state = PlatformState::Idle;
+    svanes::TicCount holding_tics_remaining = 0;
 };
 
 void ResolveCharacterAxis(svanes::Registry &world, svanes::Entity character_entity, bool horizontal) {
@@ -96,6 +115,48 @@ svanes::Entity SpawnCharacter(svanes::Registry &world, float x, float y) {
     return entity;
 }
 
+void AdvancePlatform(
+    svanes::Registry &world, ServerPlatform &platform, bool trigger_requested, svanes::TicCount hold_tics
+) {
+    svanes::Transform &transform = world.GetComponent<svanes::Transform>(platform.entity);
+    svanes::Kinematic2D &motion = world.GetComponent<svanes::Kinematic2D>(platform.entity);
+
+    switch (platform.state) {
+    case PlatformState::Idle:
+        if (trigger_requested) {
+            platform.state = PlatformState::SlidingLeft;
+            motion.velocity_x = -svanes::PerSecondToPerTic(kPlatformSlideSpeedPerSecond);
+        }
+        break;
+
+    case PlatformState::SlidingLeft:
+        if (transform.x <= platform.target_left_x) {
+            transform.x = platform.target_left_x;
+            motion.velocity_x = 0.0F;
+            platform.state = PlatformState::Holding;
+            platform.holding_tics_remaining = hold_tics;
+        }
+        break;
+
+    case PlatformState::Holding:
+        platform.holding_tics_remaining -=
+            std::min(platform.holding_tics_remaining, svanes::DefaultPhysicsStepTics);
+        if (platform.holding_tics_remaining == 0) {
+            platform.state = PlatformState::SlidingBack;
+            motion.velocity_x = svanes::PerSecondToPerTic(kPlatformSlideSpeedPerSecond);
+        }
+        break;
+
+    case PlatformState::SlidingBack:
+        if (transform.x >= platform.home_x) {
+            transform.x = platform.home_x;
+            motion.velocity_x = 0.0F;
+            platform.state = PlatformState::Idle;
+        }
+        break;
+    }
+}
+
 } // namespace
 
 int32_t main() {
@@ -104,6 +165,30 @@ int32_t main() {
     svanes::Registry world;
 
     const float ground_top = kChrisWorldHeight - kChrisGroundHeight;
+    const float platform_top = ground_top - kChrisPlatformTopHeightAboveGround;
+    const float platform_home_x = kChrisPlatformLeft + kChrisPlatformWidth * 0.5F;
+
+    const svanes::Entity platform_entity = world.CreateEntity();
+    if (platform_entity != kChrisPlatformNetworkEntity) {
+        SDL_Log(
+            "Server: expected the platform to be entity %u but entity creation order produced %u instead.",
+            kChrisPlatformNetworkEntity, platform_entity
+        );
+        return 1;
+    }
+    world.AddComponent<svanes::Transform>(
+        platform_entity, svanes::Transform{platform_home_x, platform_top + kChrisPlatformHeight * 0.5F, 0.0F}
+    );
+    world.AddComponent<svanes::Collider2D>(
+        platform_entity, svanes::Collider2D{svanes::Rectangle2D{0.0F, 0.0F, kChrisPlatformWidth, kChrisPlatformHeight}}
+    );
+    world.AddComponent<svanes::Kinematic2D>(platform_entity, svanes::Kinematic2D{});
+    world.AddComponent<svanes::Timeline>(platform_entity);
+    world.AddComponent<svanes::Networked>(platform_entity);
+
+    ServerPlatform platform{platform_entity, platform_home_x, platform_home_x - kPlatformSlideDistance};
+    const svanes::TicCount platform_hold_tics = svanes::SecondsToTics(kPlatformBeatSeconds * kPlatformHoldBeats);
+
     const svanes::Entity ground_entity = world.CreateEntity();
     world.AddComponent<svanes::Transform>(
         ground_entity, svanes::Transform{kChrisWorldWidth * 0.5F, ground_top + kChrisGroundHeight * 0.5F, 0.0F}
@@ -112,19 +197,8 @@ int32_t main() {
         ground_entity, svanes::Collider2D{svanes::Rectangle2D{0.0F, 0.0F, kChrisWorldWidth, kChrisGroundHeight}}
     );
 
-    const float platform_top = ground_top - kChrisPlatformTopHeightAboveGround;
-    const svanes::Entity platform_entity = world.CreateEntity();
-    world.AddComponent<svanes::Transform>(
-        platform_entity,
-        svanes::Transform{
-            kChrisPlatformLeft + kChrisPlatformWidth * 0.5F, platform_top + kChrisPlatformHeight * 0.5F, 0.0F
-        }
-    );
-    world.AddComponent<svanes::Collider2D>(
-        platform_entity, svanes::Collider2D{svanes::Rectangle2D{0.0F, 0.0F, kChrisPlatformWidth, kChrisPlatformHeight}}
-    );
-
-    std::unordered_map<svanes::ClientId, ServerCharacter> characters;
+    std::optional<ServerCharacter> character;
+    bool platform_trigger_requested = false;
 
     svanes::AsyncParallelForDriver driver(1);
     const svanes::Vector2D gravity{0.0F, svanes::PerSecondSquaredToPerTicSquared(kGravityPerSecondSquared)};
@@ -136,18 +210,25 @@ int32_t main() {
         for (const svanes::NetworkMessage &message : network_server.PollInbound()) {
             const PlayerInputMessage input = message.As<PlayerInputMessage>();
 
-            auto existing = characters.find(input.client_id);
-            if (existing == characters.end()) {
-                const auto spawn_index = static_cast<float>(characters.size());
-                const svanes::Entity entity = SpawnCharacter(
-                    world, kCharacterSpawnLeft + spawn_index * kCharacterSpawnSpacing, kCharacterSpawnTop
-                );
-                existing = characters.emplace(input.client_id, ServerCharacter{entity}).first;
-                SDL_Log("Server: spawned character for client %u.", input.client_id);
+            if (input.role == ClientRole::Platform) {
+                platform_trigger_requested = platform_trigger_requested || input.action_requested;
+                continue;
             }
 
-            existing->second.horizontal_input = input.horizontal;
-            existing->second.jump_requested = existing->second.jump_requested || input.jump_requested;
+            if (!character.has_value()) {
+                const svanes::Entity entity = SpawnCharacter(world, kCharacterSpawnLeft, kCharacterSpawnTop);
+                character = ServerCharacter{entity, input.client_id};
+                SDL_Log("Server: spawned the character for client %u.", input.client_id);
+            } else if (character->client_id != input.client_id) {
+                SDL_Log(
+                    "Server: client %u took control of the character from client %u.", input.client_id,
+                    character->client_id
+                );
+                character->client_id = input.client_id;
+            }
+
+            character->horizontal_input = input.horizontal;
+            character->jump_requested = character->jump_requested || input.action_requested;
         }
 
         const auto now = std::chrono::steady_clock::now();
@@ -156,37 +237,40 @@ int32_t main() {
         );
         previous_tick = now;
 
-        for (auto &[client_id, character] : characters) {
-            svanes::Kinematic2D &motion = world.GetComponent<svanes::Kinematic2D>(character.entity);
-            motion.velocity_x = character.horizontal_input * svanes::PerSecondToPerTic(kCharacterMoveSpeedPerSecond);
+        if (character.has_value()) {
+            svanes::Kinematic2D &motion = world.GetComponent<svanes::Kinematic2D>(character->entity);
+            motion.velocity_x = character->horizontal_input * svanes::PerSecondToPerTic(kCharacterMoveSpeedPerSecond);
         }
 
         while (pending_tics >= svanes::DefaultPhysicsStepTics) {
             svanes::AdvanceTimelines(world, svanes::DefaultPhysicsStepTics);
             svanes::AdvancePhysics(world, gravity, driver, [&](std::span<const svanes::PhysicsTimeStep>) {
-                for (auto &[client_id, character] : characters) {
-                    svanes::Transform &transform = world.GetComponent<svanes::Transform>(character.entity);
+                if (character.has_value()) {
+                    svanes::Transform &transform = world.GetComponent<svanes::Transform>(character->entity);
                     transform.x = std::clamp(transform.x, 0.0F, kChrisWorldWidth);
                     transform.y = std::clamp(transform.y, 0.0F, kChrisWorldHeight);
 
-                    ResolveCharacterAxis(world, character.entity, false);
-                    ResolveCharacterAxis(world, character.entity, true);
+                    ResolveCharacterAxis(world, character->entity, false);
+                    ResolveCharacterAxis(world, character->entity, true);
 
-                    svanes::Kinematic2D &motion = world.GetComponent<svanes::Kinematic2D>(character.entity);
+                    svanes::Kinematic2D &motion = world.GetComponent<svanes::Kinematic2D>(character->entity);
                     const bool is_grounded = motion.velocity_y == 0.0F;
-                    if (is_grounded && character.jump_requested) {
+                    if (is_grounded && character->jump_requested) {
                         motion.velocity_y = -svanes::PerSecondToPerTic(kJumpSpeedPerSecond);
                     }
-                    character.jump_requested = false;
+                    character->jump_requested = false;
                 }
+
+                AdvancePlatform(world, platform, platform_trigger_requested, platform_hold_tics);
+                platform_trigger_requested = false;
             });
             pending_tics -= svanes::DefaultPhysicsStepTics;
+
+            for (const svanes::EntityTransformState &state : svanes::CollectTransformStates(world)) {
+                network_server.Broadcast(state);
+            }
         }
 
-        for (const svanes::EntityTransformState &state : svanes::CollectTransformStates(world)) {
-            network_server.Broadcast(state);
-        }
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(16));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 }
