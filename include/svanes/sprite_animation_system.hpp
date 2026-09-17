@@ -40,10 +40,10 @@ struct SpriteAnimation {
  * when necessary. The `elapsed_tics` is set to the excess time, so
  * `elapsed_tics` is always less than `tics_per_frame`.
  *
- * A rendered frame might contain several simulation steps, or none at all.
- * A Timeline retains its most recent delta when merely read. Thus calling
- * this once per rendered frame would either miss the earlier steps or apply
- * an old delta again, making the animation depend on the rendering rate.
+ * A rendered frame contains zero or one simulation steps. A Timeline retains
+ * its most recent delta when merely read. Thus calling this on a frame without
+ * a simulation step would apply an old delta again. Animations follow completed
+ * simulation time, including its slowdown when rendering cannot keep up.
  *
  * In the case where multiple animation frames fit in one local delta, we
  * calculate the number of frames skipped based on `elapsed_tics` and

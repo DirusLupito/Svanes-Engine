@@ -41,16 +41,15 @@ struct PhysicsTimeStep {
 /**
  * Provides the context for a game's post-physics update. It is passed to
  * IGame::PhysicsUpdate after one simulation step has moved the entities and
- * before the next step begins. A rendered frame may generate several
- * PhysicsContext instances, one for each simulation step. or none at all if no
- * complete simulation step has elapsed.
+ * before animation and the frame update. A rendered frame generates one
+ * PhysicsContext when a complete simulation step is due, or none at all
+ * otherwise. Overdue steps are discarded without additional updates.
  *
  * FIELDS:
  * - world: The registry containing the entities and their components. The
  * game may inspect or modify it while responding to the completed step.
- * - input: The input sampled for the current rendered frame. Several
- * post-physics updates may receive the same input during a slow frame,
- * as inputs are not sampled more than once per frame.
+ * - input: The input sampled for the current rendered frame. Input is sampled
+ * once per frame, even when no simulation step is due.
  * - entity_steps: The entities moved during the completed step and their local
  * time deltas. The span is valid only during the post-physics update. If the
  * game destroys an entity, its entry remains in the span, so check the

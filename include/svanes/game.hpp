@@ -57,9 +57,9 @@ struct GameContext {
  * However, entities use their timeline to determine how much time has
  * actually passed for them. real_delta_tics should therefore not be
  * used to update entity state directly, as it does not account for entity
- * relative time scaling.
+ * relative time scaling or simulation slowdown.
  *
- * A rendered frame may run zero, one, or several simulation steps.
+ * A rendered frame runs zero or one simulation steps.
  *
  * FIELDS:
  * - world: The engine owned registry containing the game's entities and
@@ -107,9 +107,8 @@ public:
 
     /**
      * Runs after one physics simulation step has completed, allowing the game
-     * to respond before the next step. This may run several times before Update
-     * in an interleaved manner with the engine's AdvancePhysics loop,
-     * or not at all if no complete simulation step has elapsed.
+     * to respond before animation and Update. This runs once before Update
+     * when a complete simulation step is due, or not at all otherwise.
      *
      * @param physics The world, current input, and local time deltas for the
      * entities in the completed simulation step.
@@ -119,8 +118,8 @@ public:
     /**
      * Updates the game state based on the provided frame context.
      * This method is called once per frame, allowing the game to process input
-     * and update its state. Runs after all physics simulation steps for the
-     * frame have completed.
+     * and update its state. Runs after the frame's simulation step, if any,
+     * has completed.
      *
      * @param frame The context for the current frame, providing access to the
      * InputManager and the time elapsed since the last frame.

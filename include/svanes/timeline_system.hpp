@@ -12,7 +12,7 @@ class Registry;
 
 using TicCount = std::uint64_t;
 
-// A source tic is one tic from the shared realtime clock, counted in
+// A source tic is one tic from the shared simulation clock, counted in
 // microseconds. Local tics have this duration only when their timeline and all
 // ancestors run at normal speed.
 inline constexpr TicCount TicsPerSecond = 1000000;
@@ -57,7 +57,9 @@ float PerSecondSquaredToPerTicSquared(float value);
  * Represents an entity's local clock. Tic size is parent tics per local tic:
  * 2/1 is half the parent's speed, 1/2 is twice its speed, and 1/1 follows it
  * unchanged.
- * With no parent, the source is real time, measured in microseconds.
+ * With no parent, the source is the shared simulation clock, measured in
+ * microseconds. Normal rate timelines follow completed simulation steps,
+ * which can advance more slowly than real time when rendering cannot keep up.
  * A parent identifies another entity's Timeline, not its
  * transform or ownership relationship.
  */
@@ -208,17 +210,19 @@ private:
  * Advances every Timeline once, parents before children. Roots receive
  * source_delta_tics from the shared simulation clock. A source tic is one
  * clock tic, counted in microseconds here. Children receive their parent's
- * reported local delta. The application supplies a fixed step of real
+ * reported local delta. The application supplies a fixed step of simulated
  * microseconds, but callers can supply a manual source. Throws for missing
  * parent timelines, cycles, or arithmetic overflow. Run this before anything
  * needs to check anything time related.
  *
  * In the engine's main loop, this runs once per simulation step, not once per
- * rendered frame. The loop accumulates elapsed source tics and calls this with
- * the fixed step size whenever enough time has accumulated. For example, if
- * 35000 source tics have accumulated and the step is 10000, it calls this
- * three times with 10000 and carries the remaining 5000 into the next frame.
- * Standalone timelines can still be advanced from another source.
+ * rendered frame. The loop accumulates real time and calls this at most once
+ * per frame with the fixed step size when a complete interval is due. If
+ * 35000 real tics have accumulated and the step is 10000, it calls this once
+ * with 10000, carries 5000 into the next frame, and discards 20000 overdue
+ * tics. Only completed steps advance timelines. Discarded steps do not.
+ * This slows simulated time under overload without changing integration
+ * granularity. Standalone timelines can still be advanced from another source.
  *
  * @param world The registry containing all entities whose Timeline components
  * will be advanced.
