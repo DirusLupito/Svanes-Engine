@@ -2,6 +2,7 @@
 
 #include <svanes/camera2d.hpp>
 #include <svanes/input.hpp>
+#include <svanes/network/udp_msg_pipe.hpp>
 #include <svanes/registry.hpp>
 #include <svanes/render/render_system.hpp>
 #include <svanes/render/texture_manager.hpp>
@@ -12,6 +13,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <memory>
 
 namespace {
 
@@ -43,7 +45,7 @@ struct NetworkInterpolationTarget {
 } // namespace
 
 ChrisGame::ChrisGame(std::string server_host, ClientRole role)
-    : network_client(server_host, kChrisStatePort, kChrisInputPort), role(role) {
+    : network_client(std::make_unique<svanes::UdpMsgPipe>(0, server_host, kChrisServerPort)), role(role) {
     SDL_Log("Networking: client %u connecting to server at %s.", network_client.Id(), server_host.c_str());
 }
 

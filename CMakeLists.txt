@@ -139,11 +139,10 @@ target_sources(
         src/input.cpp
         src/kinematic_system.cpp
         src/network/network_client.cpp
-        src/network/network_internal.cpp
-        src/network/network_internal.hpp
         src/network/network_message.cpp
         src/network/network_replication.cpp
         src/network/network_server.cpp
+        src/network/tcp_msg_pipe.cpp
         src/network/udp_msg_pipe.cpp
         src/physics_system.cpp
         src/rectangle_geometry.cpp
@@ -182,6 +181,7 @@ target_sources(
             include/svanes/network/network_message.hpp
             include/svanes/network/network_replication.hpp
             include/svanes/network/network_server.hpp
+            include/svanes/network/tcp_msg_pipe.hpp
             include/svanes/network/udp_msg_pipe.hpp
             include/svanes/physics_system.hpp
             include/svanes/rectangle_geometry.hpp
@@ -270,6 +270,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/network/network_message.hpp
     include/svanes/network/network_replication.hpp
     include/svanes/network/network_server.hpp
+    include/svanes/network/tcp_msg_pipe.hpp
     include/svanes/network/udp_msg_pipe.hpp
     include/svanes/physics_system.hpp
     include/svanes/rectangle_geometry.hpp
@@ -299,11 +300,10 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/input.cpp
     src/kinematic_system.cpp
     src/network/network_client.cpp
-    src/network/network_internal.cpp
-    src/network/network_internal.hpp
     src/network/network_message.cpp
     src/network/network_replication.cpp
     src/network/network_server.cpp
+    src/network/tcp_msg_pipe.cpp
     src/network/udp_msg_pipe.cpp
     src/physics_system.cpp
     src/rectangle_geometry.cpp

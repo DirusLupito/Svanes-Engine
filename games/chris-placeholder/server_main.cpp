@@ -5,6 +5,7 @@
 #include <svanes/kinematic_system.hpp>
 #include <svanes/network/network_replication.hpp>
 #include <svanes/network/network_server.hpp>
+#include <svanes/network/udp_msg_pipe.hpp>
 #include <svanes/physics_system.hpp>
 #include <svanes/registry.hpp>
 #include <svanes/timeline_system.hpp>
@@ -15,6 +16,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <span>
 #include <thread>
@@ -160,7 +162,7 @@ void AdvancePlatform(
 } // namespace
 
 int32_t main() {
-    svanes::NetworkServer network_server(kChrisStatePort, kChrisInputPort);
+    svanes::NetworkServer network_server(std::make_unique<svanes::UdpMsgPipe>(kChrisServerPort));
 
     svanes::Registry world;
 

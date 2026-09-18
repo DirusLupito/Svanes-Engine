@@ -34,6 +34,17 @@ std::string MakeUdpEndpoint(const std::string &host, std::uint16_t port);
 struct NetworkMessage {
     std::vector<std::byte> bytes;
 
+    template <typename T> static NetworkMessage From(const T &value) {
+        static_assert(
+            std::is_trivially_copyable_v<T>,
+            "NetworkMessage::From requires a trivially copyable type.");
+
+        NetworkMessage message;
+        message.bytes.resize(sizeof(T));
+        std::memcpy(message.bytes.data(), &value, sizeof(T));
+        return message;
+    }
+
     /**
      * Copies this message into memory for interpretation.
      * Checks to make sure that the type is copyable, as well as
