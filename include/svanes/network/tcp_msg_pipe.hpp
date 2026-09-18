@@ -14,18 +14,17 @@ namespace svanes {
 /**
  *
  */
-class UdpMsgPipe final : public MsgPipe {
+class TcpMsgPipe final : public MsgPipe {
 public:
     /**
      *
      */
-    explicit UdpMsgPipe(std::uint16_t local_port);
+    explicit TcpMsgPipe(std::uint16_t local_port);
 
     /**
      *
      */
-    UdpMsgPipe(std::uint16_t local_port, const std::string &remote_host,
-               std::uint16_t remote_port);
+    TcpMsgPipe(const std::string &remote_host, std::uint16_t remote_port);
 
     /**
      *
@@ -40,6 +39,7 @@ public:
 private:
     zmq::context_t context;
     zmq::socket_t socket;
+    bool listening;
     std::vector<std::string> peers;
 };
 

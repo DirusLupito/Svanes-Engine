@@ -6,8 +6,7 @@
 #include <cstdint>
 
 constexpr const char *kChrisDefaultServerHost = "127.0.0.1";
-constexpr std::uint16_t kChrisStatePort = 5555;
-constexpr std::uint16_t kChrisInputPort = 5557;
+constexpr std::uint16_t kChrisServerPort = 5555;
 
 constexpr float kChrisWorldWidth = 1920.0F;
 constexpr float kChrisWorldHeight = 1080.0F;
