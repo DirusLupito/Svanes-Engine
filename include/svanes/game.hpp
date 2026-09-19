@@ -9,6 +9,7 @@ namespace svanes {
 
 class AudioManager;
 class Camera2D;
+class FontManager;
 class InputManager;
 class Registry;
 class TextureManager;
@@ -17,6 +18,10 @@ class TextureManager;
  * Defines relevant context for a game.
  * For games to have their textures managed by the engine,
  * they must use the TextureManager provided in this context.
+ * For games to have their audio managed by the engine,
+ * they must use the AudioManager provided in this context.
+ * For games to have their fonts managed by the engine,
+ * they must use the FontManager provided in this context.
  *
  * FIELDS:
  * - world: The engine owned registry containing the game's entities and
@@ -24,6 +29,7 @@ class TextureManager;
  * - assets: The engine owned texture manager used to load and create textures.
  * - audio: The engine owned audio manager used to load and play sounds and
  * music.
+ * - fonts: The engine owned font manager used to load and render fonts.
  * - camera: The engine owned camera used to convert between screen and world
  * coordinates.
  * - output_width: The current width of the rendering output.
@@ -41,6 +47,7 @@ struct GameContext {
     Registry &world;
     TextureManager &assets;
     AudioManager &audio;
+    FontManager &fonts;
     Camera2D &camera;
     std::int32_t output_width;
     std::int32_t output_height;
