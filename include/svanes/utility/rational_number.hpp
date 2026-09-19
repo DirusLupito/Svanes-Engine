@@ -12,29 +12,28 @@ namespace svanes {
  */
 class RationalNumber {
 public:
-    
     /**
      * Constructs a RationalNumber with the given numerator and denominator.
      * The denominator must be positive, and the numerator must be non-negative.
      * The rational number is automatically reduced to its simplest form.
-     * 
+     *
      * @param numerator The non-negative numerator of the rational number.
      * @param denominator The positive denominator of the rational number.
-     * 
+     *
      * @throws std::invalid_argument if the denominator is zero.
      */
     RationalNumber(std::uint64_t numerator, std::uint64_t denominator = 1);
 
     /**
      * Returns the numerator of the rational number.
-     * 
+     *
      * @return The non-negative numerator.
      */
     std::uint64_t GetNumerator() const;
 
     /**
      * Returns the denominator of the rational number.
-     * 
+     *
      * @return The positive denominator.
      */
     std::uint64_t GetDenominator() const;
@@ -77,7 +76,6 @@ public:
     RationalNumber GetFractionalPart() const;
 
 private:
-
     // The non-negative numerator of the rational number.
     std::uint64_t numerator;
 

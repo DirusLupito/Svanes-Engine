@@ -56,10 +56,10 @@ struct NetworkMessage {
                       "NetworkMessage::As requires a trivially copyable type.");
 
         if (bytes.size() != sizeof(T)) {
-            throw std::runtime_error(
-                "NetworkMessage::As: message size " + std::to_string(bytes.size()) +
-                " does not match sizeof(T) " + std::to_string(sizeof(T)) + "."
-            );
+            throw std::runtime_error("NetworkMessage::As: message size " +
+                                     std::to_string(bytes.size()) +
+                                     " does not match sizeof(T) " +
+                                     std::to_string(sizeof(T)) + ".");
         }
 
         T value;

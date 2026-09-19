@@ -10,7 +10,8 @@
 
 namespace svanes {
 
-// Used to instruct unique_ptr to call TTF_CloseFont when the FontPointer goes out of scope.
+// Used to instruct unique_ptr to call TTF_CloseFont when the FontPointer goes
+// out of scope.
 void FontManager::FontDeleter::operator()(TTF_Font *font) const {
     TTF_CloseFont(font);
 }
@@ -77,4 +78,4 @@ internal::FontManagerInternal::Resolve(const FontManager &font_manager,
     return font->second.get();
 }
 
-}
+} // namespace svanes

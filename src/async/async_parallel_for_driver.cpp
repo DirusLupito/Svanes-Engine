@@ -364,10 +364,11 @@ void AsyncParallelForDriver::RunBatches(std::uint32_t worker_index) {
             // The cycle continues.
             begin = next_index.load(std::memory_order_relaxed);
         }
-    // If anyone fails, record the first exception and set the failed flag to true, 
-    // so that when all current batches finish we abort the remaining work
-    // and then inform the calling thread of the first exception that was thrown. 
-    // Note that this will drop any later exceptions that are thrown.
+        // If anyone fails, record the first exception and set the failed flag
+        // to true, so that when all current batches finish we abort the
+        // remaining work and then inform the calling thread of the first
+        // exception that was thrown. Note that this will drop any later
+        // exceptions that are thrown.
     } catch (...) {
         std::lock_guard lock(mutex);
         if (!failure) {
@@ -376,9 +377,9 @@ void AsyncParallelForDriver::RunBatches(std::uint32_t worker_index) {
         failed.store(true, std::memory_order_relaxed);
     }
 
-    // Restore the previous active driver and worker index for the current thread,
-    // so that if this thread is executing a nested ParallelFor, it will know
-    // which driver and worker index to use.
+    // Restore the previous active driver and worker index for the current
+    // thread, so that if this thread is executing a nested ParallelFor, it will
+    // know which driver and worker index to use.
 
     active_driver = previous_driver;
     active_worker_index = previous_index;

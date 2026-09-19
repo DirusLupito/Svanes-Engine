@@ -7,11 +7,11 @@ namespace svanes::internal {
 /**
  * Internal class responsible for creating and managing FontManager instances.
  * This class has access to the private constructor of FontManager, allowing it
- * to create instances of FontManager while preventing external code from doing so.
+ * to create instances of FontManager while preventing external code from doing
+ * so.
  */
 class FontManagerInternal final {
 public:
-
     /**
      * Creates a new instance of FontManager.
      * This method is the only way to create a FontManager instance, as the
@@ -37,4 +37,4 @@ public:
                              FontHandle handle);
 };
 
-}
+} // namespace svanes::internal

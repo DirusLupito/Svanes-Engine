@@ -13,9 +13,10 @@ DetectEntityCollisions(const Registry &world,
     std::vector<EntityCollision2D> results;
 
     // Simple, inefficient all-pairs collision detection.
-    // For each pair of entities, check if they have Collider2D and Transform components,
-    // and if so, detect collisions between their geometries using their transforms.
-    
+    // For each pair of entities, check if they have Collider2D and Transform
+    // components, and if so, detect collisions between their geometries using
+    // their transforms.
+
     for (std::size_t i = 0; i < entities.size(); ++i) {
         for (std::size_t j = i + 1; j < entities.size(); ++j) {
             const Entity a = entities[i];
