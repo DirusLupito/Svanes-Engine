@@ -57,6 +57,35 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(SDL3_image)
 
+set(FT_DISABLE_ZLIB ON CACHE BOOL "")
+set(FT_DISABLE_BZIP2 ON CACHE BOOL "")
+set(FT_DISABLE_PNG ON CACHE BOOL "")
+set(FT_DISABLE_BROTLI ON CACHE BOOL "")
+set(FT_DISABLE_HARFBUZZ ON CACHE BOOL "")
+FetchContent_Declare(
+    Freetype
+    URL https://github.com/libsdl-org/freetype/archive/9973564cfa63763a3e4ac67c09147899539b1e07.tar.gz
+    URL_HASH SHA256=026a05a49d114a1235d2926f4c03a9330e4b1a6efe7c217ec9607904c32907d4
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    SOURCE_DIR "${CMAKE_SOURCE_DIR}/thirdparty/freetype-src"
+    OVERRIDE_FIND_PACKAGE
+)
+FetchContent_MakeAvailable(Freetype)
+add_library(Freetype::Freetype ALIAS freetype)
+
+set(SDLTTF_VENDORED OFF CACHE BOOL "")
+set(SDLTTF_HARFBUZZ OFF CACHE BOOL "")
+set(SDLTTF_PLUTOSVG OFF CACHE BOOL "")
+set(SDLTTF_SAMPLES OFF CACHE BOOL "")
+FetchContent_Declare(
+    SDL3_ttf
+    URL https://github.com/libsdl-org/SDL_ttf/releases/download/release-3.2.2/SDL3_ttf-3.2.2.tar.gz
+    URL_HASH SHA256=63547d58d0185c833213885b635a2c0548201cc8f301e6587c0be1a67e1e045d
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    SOURCE_DIR "${CMAKE_SOURCE_DIR}/thirdparty/sdl3_ttf-src"
+)
+FetchContent_MakeAvailable(SDL3_ttf)
+
 set(SDLMIXER_TESTS OFF CACHE BOOL "")
 set(SDLMIXER_EXAMPLES OFF CACHE BOOL "")
 set(SDLMIXER_DEPS_SHARED OFF CACHE BOOL "")
@@ -138,6 +167,8 @@ target_sources(
         src/geometry.cpp
         src/input.cpp
         src/kinematic_system.cpp
+        src/MenuUtilities/font_manager.cpp
+        src/MenuUtilities/font_manager_internal.hpp
         src/network/network_client.cpp
         src/network/network_message.cpp
         src/network/network_replication.cpp
@@ -176,6 +207,8 @@ target_sources(
             include/svanes/geometry.hpp
             include/svanes/input.hpp
             include/svanes/kinematic_system.hpp
+            include/svanes/MenuUtilities/font_manager.hpp
+            include/svanes/MenuUtilities/text_label.hpp
             include/svanes/network/msg_pipe.hpp
             include/svanes/network/network_client.hpp
             include/svanes/network/network_message.hpp
@@ -201,7 +234,7 @@ target_compile_features(svanes_engine PUBLIC cxx_std_23)
 target_link_libraries(
     svanes_engine
     PUBLIC SDL3::SDL3 cppzmq-static Threads::Threads
-    PRIVATE SDL3_image::SDL3_image SDL3_mixer::SDL3_mixer
+    PRIVATE SDL3_image::SDL3_image SDL3_mixer::SDL3_mixer SDL3_ttf::SDL3_ttf
 )
 
 if(MSVC)
@@ -265,6 +298,8 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/geometry.hpp
     include/svanes/input.hpp
     include/svanes/kinematic_system.hpp
+    include/svanes/MenuUtilities/font_manager.hpp
+    include/svanes/MenuUtilities/text_label.hpp
     include/svanes/network/msg_pipe.hpp
     include/svanes/network/network_client.hpp
     include/svanes/network/network_message.hpp
@@ -299,6 +334,8 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/geometry.cpp
     src/input.cpp
     src/kinematic_system.cpp
+    src/MenuUtilities/font_manager.cpp
+    src/MenuUtilities/font_manager_internal.hpp
     src/network/network_client.cpp
     src/network/network_message.cpp
     src/network/network_replication.cpp

@@ -28,6 +28,24 @@ constexpr float kCollisionFlashInitialRadius = 4000.0F;
 constexpr float kCollisionFlashExpansionRadius = 8000.0F;
 
 /**
+ * Helper function to create an entity with a Timeline component that is a
+ * child of the provided gameplay_timeline entity. This is useful for creating
+ * entities that should be synchronized with the main gameplay timeline.
+ *
+ * @param world The registry in which to create the entity.
+ * @param gameplay_timeline The parent timeline entity to which the new entity's
+ * Timeline will be linked.
+ *
+ * @return The newly created entity with a Timeline component.
+ */
+static svanes::Entity CreateTimedEntity(svanes::Registry &world,
+                                        svanes::Entity gameplay_timeline) {
+    const svanes::Entity entity = world.CreateEntity();
+    world.AddComponent<svanes::Timeline>(entity, gameplay_timeline);
+    return entity;
+}
+
+/**
  * Helper for the planet's gravitational field.
  * Returns the acceleration vector at a given offset from the planet's center.
  *
@@ -102,16 +120,19 @@ UpdateCollisionFlashes(svanes::Registry &world,
  * Its Timeline supplies the elapsed lifetime; there is no second accumulator.
  *
  * @param world The registry to create the collision flash entity in.
+ * @param gameplay_timeline The parent timeline entity to which the new flash's
+ * Timeline will be linked.
  * @param collision_flashes The list to which the new collision flash will be
  * added.
  * @param contact_point The world-space point at which the collision flash will
  * be drawn.
  */
 static void CreateCollisionFlash(svanes::Registry &world,
+                                 svanes::Entity gameplay_timeline,
                                  std::vector<svanes::Entity> &collision_flashes,
                                  svanes::Vector2D contact_point) {
 
-    const svanes::Entity flash = world.CreateEntity();
+    const svanes::Entity flash = CreateTimedEntity(world, gameplay_timeline);
     world.AddComponent<svanes::Transform>(
         flash, svanes::Transform{contact_point.x, contact_point.y});
 
@@ -126,7 +147,6 @@ static void CreateCollisionFlash(svanes::Registry &world,
                    .blend_mode = svanes::BlendMode::Additive,
                });
 
-    world.AddComponent<svanes::Timeline>(flash);
     collision_flashes.push_back(flash);
 }
 
@@ -136,17 +156,18 @@ static void CreateCollisionFlash(svanes::Registry &world,
  * facing the shape it collided with.
  *
  * @param world The registry containing the colliding entities.
+ * @param gameplay_timeline The parent timeline entity to which the new flash's
+ * Timelines will be linked.
  * @param a The first entity in the collision pair.
  * @param b The second entity in the collision pair.
  * @param collisions The collisions detected between the two entities.
  * @param collision_flashes The list to which newly created flashes will be
  * added.
  */
-static void
-CreateCollisionFlashes(svanes::Registry &world, svanes::Entity a,
-                       svanes::Entity b,
-                       const std::vector<svanes::Collision2D> &collisions,
-                       std::vector<svanes::Entity> &collision_flashes) {
+static void CreateCollisionFlashes(
+    svanes::Registry &world, svanes::Entity gameplay_timeline, svanes::Entity a,
+    svanes::Entity b, const std::vector<svanes::Collision2D> &collisions,
+    std::vector<svanes::Entity> &collision_flashes) {
     // only the planet has a PointAttractor2D component, so if either entity has
     // one, the planet is involved in the collision and we don't want to create
     // flashes for it.
@@ -182,7 +203,7 @@ CreateCollisionFlashes(svanes::Registry &world, svanes::Entity a,
                 transform_a.y + circle_a->y,
             };
 
-            CreateCollisionFlash(world, collision_flashes,
+            CreateCollisionFlash(world, gameplay_timeline, collision_flashes,
                                  center - collision.normal * circle_a->radius);
         }
         if (circle_b != nullptr) {
@@ -191,7 +212,7 @@ CreateCollisionFlashes(svanes::Registry &world, svanes::Entity a,
                 transform_b.y + circle_b->y,
             };
 
-            CreateCollisionFlash(world, collision_flashes,
+            CreateCollisionFlash(world, gameplay_timeline, collision_flashes,
                                  center + collision.normal * circle_b->radius);
         }
     }
@@ -203,16 +224,17 @@ CreateCollisionFlashes(svanes::Registry &world, svanes::Entity a,
  * direction of the collision normal.
  *
  * @param world The registry containing the entities.
+ * @param gameplay_timeline The parent timeline entity to which any new
+ * entities' Timelines will be linked.
  * @param a The first entity.
  * @param b The second entity.
  * @param collision_flashes The list to which flashes created by the collisions
  * will be added.
  */
-static void
-ApplyCollisionAcceleration(svanes::Registry &world, svanes::Entity a,
-                           svanes::Entity b,
-                           const std::vector<svanes::Collision2D> &collisions,
-                           std::vector<svanes::Entity> &collision_flashes) {
+static void ApplyCollisionAcceleration(
+    svanes::Registry &world, svanes::Entity gameplay_timeline, svanes::Entity a,
+    svanes::Entity b, const std::vector<svanes::Collision2D> &collisions,
+    std::vector<svanes::Entity> &collision_flashes) {
     for (const svanes::Collision2D &collision : collisions) {
         const bool a_is_planet =
             world.HasComponent<svanes::PointAttractor2D>(a);
@@ -233,13 +255,16 @@ ApplyCollisionAcceleration(svanes::Registry &world, svanes::Entity a,
         }
     }
 
-    CreateCollisionFlashes(world, a, b, collisions, collision_flashes);
+    CreateCollisionFlashes(world, gameplay_timeline, a, b, collisions,
+                           collision_flashes);
 }
 
 /**
  * Applies collision acceleration to all pairs of entities in the provided list.
  *
  * @param world The registry containing the entities.
+ * @param gameplay_timeline The parent timeline entity to which any new
+ * entities' Timelines will be linked.
  * @param entities The list of entities to check for collisions and apply
  * acceleration.
  * @param collision_flashes The list to which flashes created by the collisions
@@ -247,12 +272,13 @@ ApplyCollisionAcceleration(svanes::Registry &world, svanes::Entity a,
  */
 static void
 ApplyCollisionAcceleration(svanes::Registry &world,
+                           svanes::Entity gameplay_timeline,
                            const std::vector<svanes::Entity> &entities,
                            std::vector<svanes::Entity> &collision_flashes) {
     const auto collisions = svanes::DetectEntityCollisions(world, entities);
     for (const svanes::EntityCollision2D &pair : collisions) {
-        ApplyCollisionAcceleration(world, pair.a, pair.b, pair.collisions,
-                                   collision_flashes);
+        ApplyCollisionAcceleration(world, gameplay_timeline, pair.a, pair.b,
+                                   pair.collisions, collision_flashes);
     }
 }
 
@@ -374,10 +400,10 @@ void OrbitalEscalationGame::CreateNonPlayerNonPlanetEntities(
         const float x = std::cos(angle) * (kPlanetRadius + distance);
         const float y = std::sin(angle) * (kPlanetRadius + distance);
 
-        svanes::Entity entity = world.CreateEntity();
+        svanes::Entity entity =
+            CreateTimedEntity(world, gameplay_timeline_entity);
         world.AddComponent<svanes::Transform>(entity, svanes::Transform{x, y});
         world.AddComponent<svanes::Kinematic2D>(entity);
-        world.AddComponent<svanes::Timeline>(entity);
 
         // Set the initial velocity tangent to the vector from the planet to the
         // entity
@@ -435,6 +461,11 @@ void OrbitalEscalationGame::CreateNonPlayerNonPlanetEntities(
 }
 
 void OrbitalEscalationGame::Initialize(svanes::GameContext &context) {
+    // Create the overarching gameplay timeline entity, which we can use
+    // to pause all gameplay, or speedup/slowdown all gameplay.
+    gameplay_timeline_entity = context.world.CreateEntity();
+    context.world.AddComponent<svanes::Timeline>(gameplay_timeline_entity);
+
     // number of logical cores
     // this number includes the main thread, which is also treated as a worker
     // thread, so we don't need to add 1 to it.
@@ -467,11 +498,10 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext &context) {
                                                svanes::ZOrder{-100});
 
 
-    square_entity = context.world.CreateEntity();
+    square_entity = CreateTimedEntity(context.world, gameplay_timeline_entity);
     context.world.AddComponent<svanes::Collider2D>(
         square_entity, svanes::Collider2D{square_geometry});
     context.world.AddComponent<svanes::Kinematic2D>(square_entity);
-    context.world.AddComponent<svanes::Timeline>(square_entity);
     context.world.GetComponent<svanes::Kinematic2D>(square_entity).velocity_x =
         svanes::PerSecondToPerTic(3000.0F);
     context.world.AddComponent<svanes::Transform>(square_entity, player_start);
@@ -532,6 +562,17 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext &frame) {
         should_quit = true;
     }
 
+    // Pauses the simulation
+    if (frame.input.WasPressed(svanes::Key::P)) {
+        auto &timeline = frame.world.GetComponent<svanes::Timeline>(
+            gameplay_timeline_entity);
+        if (timeline.IsPaused()) {
+            timeline.Unpause();
+        } else {
+            timeline.Pause();
+        }
+    }
+
     if (frame.input.WasPressed(svanes::Key::Tab)) {
         frame.camera.scale_mode =
             frame.camera.scale_mode == svanes::ScaleMode::Constant
@@ -581,6 +622,13 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext &frame) {
 
 void OrbitalEscalationGame::PhysicsUpdate(
     const svanes::PhysicsContext &physics) {
+
+    // No physics update should occur if the gameplay timeline is paused.
+    if (physics.world.GetComponent<svanes::Timeline>(gameplay_timeline_entity)
+            .IsPaused()) {
+        return;
+    }
+
     if (physics.world.HasComponent<svanes::Kinematic2D>(square_entity)) {
         svanes::Kinematic2D &motion =
             physics.world.GetComponent<svanes::Kinematic2D>(square_entity);
@@ -626,8 +674,9 @@ void OrbitalEscalationGame::PhysicsUpdate(
                         .geometry,
                     physics.world.GetComponent<svanes::Transform>(boundary));
                 if (!collisions.empty()) {
-                    CreateCollisionFlashes(physics.world, entity, boundary,
-                                           collisions, collision_flashes);
+                    CreateCollisionFlashes(
+                        physics.world, gameplay_timeline_entity, entity,
+                        boundary, collisions, collision_flashes);
                     destroyed_entities.push_back(entity);
                     break;
                 }
@@ -639,8 +688,8 @@ void OrbitalEscalationGame::PhysicsUpdate(
         std::erase(non_planet_non_player_entities, entity);
     }
 
-    ApplyCollisionAcceleration(physics.world, collidable_entities,
-                               collision_flashes);
+    ApplyCollisionAcceleration(physics.world, gameplay_timeline_entity,
+                               collidable_entities, collision_flashes);
 }
 
 bool OrbitalEscalationGame::ShouldQuit() const { return should_quit; }

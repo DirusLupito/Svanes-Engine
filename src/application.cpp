@@ -15,6 +15,7 @@
 #include <svanes/timeline_system.hpp>
 #include <svanes/vector2d.hpp>
 
+#include "MenuUtilities/font_manager_internal.hpp"
 #include "audio/audio_manager_internal.hpp"
 #include "input_manager_internal.hpp"
 #include "render/render_queue_executor.hpp"
@@ -49,6 +50,7 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
 
     TextureManager texture_manager = TextureManagerInternal::Create(renderer);
     AudioManager audio_manager = AudioManagerInternal::Create();
+    FontManager font_manager = FontManagerInternal::Create();
     RenderQueueExecutor render_queue_executor{renderer, texture_manager};
     RenderQueue render_queue;
     InputManager input;
@@ -62,9 +64,9 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
                                  std::string{SDL_GetError()});
     }
     camera.SetOutputSize(output_width, output_height);
-    GameContext game_context{world,  texture_manager, audio_manager,
-                             camera, output_width,    output_height,
-                             gravity};
+    GameContext game_context{world,         texture_manager, audio_manager,
+                             font_manager,  camera,          output_width,
+                             output_height, gravity};
 
     // Custom initialization of the game. Implemented by the user of the engine.
 

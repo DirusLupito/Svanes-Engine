@@ -82,7 +82,7 @@ else
     ok=0
 fi
 
-for dependency in SDL3_mixer:sdl3_mixer-src ZeroMQ:zeromq-src cppzmq:cppzmq-src; do
+for dependency in SDL3_ttf:sdl3_ttf-src FreeType:freetype-src SDL3_mixer:sdl3_mixer-src ZeroMQ:zeromq-src cppzmq:cppzmq-src; do
     name="${dependency%%:*}"
     directory="${dependency#*:}"
     if [ -d "$repo_root/thirdparty/$directory" ]; then

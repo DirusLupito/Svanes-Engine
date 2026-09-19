@@ -39,6 +39,11 @@ public:
     bool ShouldQuit() const override;
 
 private:
+    // The overarching timeline entity for which all other timelines are
+    // children.
+    svanes::Entity gameplay_timeline_entity = 0;
+
+
     svanes::Entity background_entity = 0;
     svanes::Entity square_entity = 0;
     svanes::Entity planet_entity = 0;

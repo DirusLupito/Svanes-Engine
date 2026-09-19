@@ -5,7 +5,7 @@
 namespace svanes {
 
 /**
- * 
+ *
  */
 class MsgPipe {
 public:
@@ -23,7 +23,6 @@ public:
      *
      */
     virtual bool Receive(NetworkMessage &message) = 0;
-
 };
 
 } // namespace svanes

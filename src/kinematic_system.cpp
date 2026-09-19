@@ -184,7 +184,7 @@ void AdvanceKinematics(Registry &world, Vector2D gravity,
         std::max<size_t>(1, items.size() / (driver.GetConcurrency()));
 
     // We wrap our actual work function in a lambda which forwards the work to
-    // the AdvanceKinematic function to allow us to match the signature 
+    // the AdvanceKinematic function to allow us to match the signature
     // expected by the AsyncParallelForDriver's ParallelFor method.
     driver.ParallelFor(items.size(), batch_size,
                        [&](std::size_t begin, std::size_t end, std::uint32_t) {

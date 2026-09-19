@@ -28,7 +28,7 @@ struct EntityCollision2D {
 /**
  * Given a list of entities, detects all collisions between them and returns a
  * vector of EntityCollision2D objects representing the collisions.
- * 
+ *
  * @param world The registry containing the entities and their components.
  * @param entities A vector of entities to check for collisions.
  * @return A vector of EntityCollision2D objects representing the detected

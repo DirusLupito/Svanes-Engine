@@ -11,3 +11,5 @@ Currently vendored here:
 
 - **SDL3** - This is the actual SDL3 for windows and rectangles and whatever.
 - **SDL3_image** - 
+- **SDL3_ttf** - Font loading and text rasterization.
+- **FreeType** - Font rasterizer used by SDL3_ttf.
