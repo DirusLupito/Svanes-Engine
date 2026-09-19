@@ -208,6 +208,7 @@ target_sources(
             include/svanes/input.hpp
             include/svanes/kinematic_system.hpp
             include/svanes/MenuUtilities/font_manager.hpp
+            include/svanes/MenuUtilities/text_label.hpp
             include/svanes/network/msg_pipe.hpp
             include/svanes/network/network_client.hpp
             include/svanes/network/network_message.hpp
@@ -298,6 +299,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/input.hpp
     include/svanes/kinematic_system.hpp
     include/svanes/MenuUtilities/font_manager.hpp
+    include/svanes/MenuUtilities/text_label.hpp
     include/svanes/network/msg_pipe.hpp
     include/svanes/network/network_client.hpp
     include/svanes/network/network_message.hpp

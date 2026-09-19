@@ -64,9 +64,9 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
                                  std::string{SDL_GetError()});
     }
     camera.SetOutputSize(output_width, output_height);
-    GameContext game_context{world,   texture_manager, audio_manager,
-                             camera,  output_width,    output_height,
-                             gravity, font_manager};
+    GameContext game_context{world,         texture_manager, audio_manager,
+                             font_manager,  camera,          output_width,
+                             output_height, gravity};
 
     // Custom initialization of the game. Implemented by the user of the engine.
 
