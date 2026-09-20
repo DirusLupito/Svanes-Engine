@@ -42,6 +42,8 @@ private:
     // The overarching timeline entity for which all other timelines are
     // children.
     svanes::Entity gameplay_timeline_entity = 0;
+
+    svanes::Entity pause_timeline_entity = 0;
     svanes::Entity pause_label_entity = 0;
 
 
