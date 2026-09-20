@@ -9,6 +9,7 @@ namespace svanes {
 TcpMsgPipe::TcpMsgPipe(std::uint16_t local_port)
     : socket(context, zmq::socket_type::router), listening(true) {
     socket.set(zmq::sockopt::linger, 0);
+    socket.set(zmq::sockopt::router_mandatory, 1);
     socket.bind(MakeTcpEndpoint("*", local_port));
 }
 
@@ -17,9 +18,11 @@ TcpMsgPipe::TcpMsgPipe(const std::string &remote_host,
     : socket(context, zmq::socket_type::dealer), listening(false) {
     socket.set(zmq::sockopt::linger, 0);
     socket.connect(MakeTcpEndpoint(remote_host, remote_port));
+    RememberConnection(MakeTcpEndpoint(remote_host, remote_port));
 }
 
-bool TcpMsgPipe::Send(const NetworkMessage &message) {
+bool TcpMsgPipe::Send(ConnectionId destination, const NetworkMessage &message) {
+    const auto &route = Route(destination);
     const zmq::const_buffer body =
         zmq::buffer(message.bytes.data(), message.bytes.size());
 
@@ -27,35 +30,28 @@ bool TcpMsgPipe::Send(const NetworkMessage &message) {
         return socket.send(body, zmq::send_flags::dontwait).has_value();
     }
 
-    if (peers.empty()) {
+    // A listener prefixes the payload with the client's ZeroMQ routing identity.
+    if (!socket.send(zmq::buffer(route),
+                     zmq::send_flags::sndmore | zmq::send_flags::dontwait)) {
         return false;
     }
-
-    for (const std::string &peer : peers) {
-        const zmq::send_result_t address_sent =
-            socket.send(zmq::buffer(peer),
-                        zmq::send_flags::sndmore | zmq::send_flags::dontwait);
-        if (!address_sent.has_value()) {
-            continue;
-        }
-
-        socket.send(body, zmq::send_flags::none);
+    if (!socket.send(body, zmq::send_flags::dontwait)) {
+        throw std::runtime_error("TcpMsgPipe: could not complete a routed send.");
     }
-
     return true;
 }
 
-bool TcpMsgPipe::Receive(NetworkMessage &message) {
+bool TcpMsgPipe::Receive(ReceivedMessage &received) {
     zmq::message_t frame;
     if (!socket.recv(frame, zmq::recv_flags::dontwait).has_value()) {
         return false;
     }
 
     if (listening) {
-        const std::string peer = frame.to_string();
-        if (std::find(peers.begin(), peers.end(), peer) == peers.end()) {
-            peers.push_back(peer);
+        if (!frame.more()) {
+            throw std::runtime_error("TcpMsgPipe: routing identity has no body.");
         }
+        received.source = RememberConnection(frame.to_string());
 
         zmq::message_t body;
         if (!socket.recv(body, zmq::recv_flags::none).has_value()) {
@@ -63,10 +59,22 @@ bool TcpMsgPipe::Receive(NetworkMessage &message) {
                 "TcpMsgPipe: received an identity frame without a body frame.");
         }
         frame = std::move(body);
+    } else {
+        // A client registers its only connection, the server, during construction.
+        received.source = ConnectionId{1};
+    }
+    if (frame.more()) {
+        // Drain the rejected message so the next receive starts at a new message.
+        while (frame.more()) {
+            if (!socket.recv(frame, zmq::recv_flags::dontwait)) {
+                throw std::runtime_error("TcpMsgPipe: incomplete multipart message.");
+            }
+        }
+        throw std::runtime_error("TcpMsgPipe: expected exactly one payload frame.");
     }
 
     const auto *bytes = frame.data<std::byte>();
-    message =
+    received.message =
         NetworkMessage{std::vector<std::byte>(bytes, bytes + frame.size())};
     return true;
 }

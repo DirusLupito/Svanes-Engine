@@ -172,7 +172,10 @@ target_sources(
         src/MenuUtilities/text_label_renderer.cpp
         src/MenuUtilities/text_label_renderer.hpp
         src/network/network_client.cpp
+        src/network/msg_pipe.cpp
+        src/network/message_serialization.cpp
         src/network/network_message.cpp
+        src/network/network_session.cpp
         src/network/network_replication.cpp
         src/network/network_server.cpp
         src/network/tcp_msg_pipe.cpp
@@ -212,8 +215,10 @@ target_sources(
             include/svanes/MenuUtilities/font_manager.hpp
             include/svanes/MenuUtilities/text_label.hpp
             include/svanes/network/msg_pipe.hpp
+            include/svanes/network/message_serialization.hpp
             include/svanes/network/network_client.hpp
             include/svanes/network/network_message.hpp
+            include/svanes/network/network_session.hpp
             include/svanes/network/network_replication.hpp
             include/svanes/network/network_server.hpp
             include/svanes/network/tcp_msg_pipe.hpp
@@ -303,8 +308,10 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/MenuUtilities/font_manager.hpp
     include/svanes/MenuUtilities/text_label.hpp
     include/svanes/network/msg_pipe.hpp
+    include/svanes/network/message_serialization.hpp
     include/svanes/network/network_client.hpp
     include/svanes/network/network_message.hpp
+    include/svanes/network/network_session.hpp
     include/svanes/network/network_replication.hpp
     include/svanes/network/network_server.hpp
     include/svanes/network/tcp_msg_pipe.hpp
@@ -341,7 +348,10 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/MenuUtilities/text_label_renderer.cpp
     src/MenuUtilities/text_label_renderer.hpp
     src/network/network_client.cpp
+    src/network/msg_pipe.cpp
+    src/network/message_serialization.cpp
     src/network/network_message.cpp
+    src/network/network_session.cpp
     src/network/network_replication.cpp
     src/network/network_server.cpp
     src/network/tcp_msg_pipe.cpp

@@ -1,47 +1,71 @@
 #include <svanes/network/udp_msg_pipe.hpp>
 
 #include <algorithm>
+#include <charconv>
 #include <stdexcept>
+#include <string_view>
 
 namespace svanes {
 
 UdpMsgPipe::UdpMsgPipe(std::uint16_t local_port)
     : socket(context, zmq::socket_type::dgram) {
+    socket.set(zmq::sockopt::linger, 0);
     socket.bind(MakeUdpEndpoint("*", local_port));
 }
 
 UdpMsgPipe::UdpMsgPipe(std::uint16_t local_port, const std::string &remote_host,
                        std::uint16_t remote_port)
     : UdpMsgPipe(local_port) {
-    if (remote_host.find_first_not_of("0123456789.") != std::string::npos) {
-        throw std::invalid_argument("UdpMsgPipe: remote host '" + remote_host +
-                                    "' must be a numeric IPv4 address.");
-    }
-
-    peers.push_back(remote_host + ":" + std::to_string(remote_port));
+    AddRemote(remote_host, remote_port);
 }
 
-bool UdpMsgPipe::Send(const NetworkMessage &message) {
-    if (peers.empty()) {
+ConnectionId UdpMsgPipe::AddRemote(const std::string &host, std::uint16_t port) {
+    if (port == 0) {
+        throw std::invalid_argument("UdpMsgPipe: remote port must be nonzero.");
+    }
+    // Normalize each octet so configured and received addresses use the same text.
+    std::string canonical;
+    std::string_view remaining = host;
+    for (std::uint32_t index = 0; index < 4; ++index) {
+        const auto separator = remaining.find('.');
+        const auto part = remaining.substr(0, separator);
+        std::uint32_t octet = 0;
+        const auto parsed = std::from_chars(part.data(), part.data() + part.size(), octet);
+        if (part.empty() || parsed.ec != std::errc{} ||
+            parsed.ptr != part.data() + part.size() || octet > 255 ||
+            (index < 3 && separator == std::string_view::npos) ||
+            (index == 3 && separator != std::string_view::npos)) {
+            throw std::invalid_argument("UdpMsgPipe: expected a numeric IPv4 address: " + host);
+        }
+        if (index != 0) {
+            canonical += '.';
+        }
+        canonical += std::to_string(octet);
+        if (index < 3) {
+            remaining.remove_prefix(separator + 1);
+        }
+    }
+    return RememberConnection(canonical + ":" + std::to_string(port));
+}
+
+bool UdpMsgPipe::Send(ConnectionId destination, const NetworkMessage &message) {
+    const auto &route = Route(destination);
+    if (message.bytes.size() > 65507) {
+        throw std::length_error("UdpMsgPipe: payload exceeds the IPv4 UDP datagram limit.");
+    }
+    // ZeroMQ expects the destination address followed by the datagram payload.
+    if (!socket.send(zmq::buffer(route),
+                     zmq::send_flags::sndmore | zmq::send_flags::dontwait)) {
         return false;
     }
-
-    for (const std::string &peer : peers) {
-        const zmq::send_result_t address_sent =
-            socket.send(zmq::buffer(peer),
-                        zmq::send_flags::sndmore | zmq::send_flags::dontwait);
-        if (!address_sent.has_value()) {
-            continue;
-        }
-
-        socket.send(zmq::buffer(message.bytes.data(), message.bytes.size()),
-                    zmq::send_flags::none);
+    if (!socket.send(zmq::buffer(message.bytes.data(), message.bytes.size()),
+                     zmq::send_flags::dontwait)) {
+        throw std::runtime_error("UdpMsgPipe: could not complete a datagram send.");
     }
-
     return true;
 }
 
-bool UdpMsgPipe::Receive(NetworkMessage &message) {
+bool UdpMsgPipe::Receive(ReceivedMessage &received) {
     zmq::message_t address;
     if (!socket.recv(address, zmq::recv_flags::dontwait).has_value()) {
         return false;
@@ -53,13 +77,14 @@ bool UdpMsgPipe::Receive(NetworkMessage &message) {
             "UdpMsgPipe: received an address frame without a body frame.");
     }
 
-    const std::string peer = address.to_string();
-    if (std::find(peers.begin(), peers.end(), peer) == peers.end()) {
-        peers.push_back(peer);
+    // ZeroMQ includes a terminating null byte that configured addresses lack.
+    std::string route = address.to_string();
+    if (!route.empty() && route.back() == '\0') {
+        route.pop_back();
     }
-
+    received.source = RememberConnection(route);
     const auto *bytes = body.data<std::byte>();
-    message =
+    received.message =
         NetworkMessage{std::vector<std::byte>(bytes, bytes + body.size())};
     return true;
 }
