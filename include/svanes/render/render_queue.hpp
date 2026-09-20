@@ -79,6 +79,10 @@ public:
     /**
      * Adds a command to draw a texture to the render queue.
      * This will draw the entire texture to the specified destination rectangle.
+     * The texture's color and alpha channels are multiplied by the
+     * corresponding channels in tint before the texture is combined with the
+     * screen.
+     *
      * @param texture The handle of the texture to draw.
      * @param destination The destination rectangle where the texture will be
      * drawn.
@@ -86,15 +90,23 @@ public:
      * @param z_order The z order to draw the texture at (default is 0).
      * @param blend_mode The blending mode used to combine the texture with the
      * existing screen color (default is BlendMode::Alpha).
+     * @param tint The color and opacity multiplier applied to the texture.
+     *             White with full opacity leaves the texture unchanged.
+     *             Other values tint the texture or make it more transparent.
+     *             Default is {255, 255, 255, 255}.
      */
     void DrawTexture(TextureHandle texture, Rectangle2D destination,
                      float rotation = 0.0F, std::int32_t z_order = 0,
-                     BlendMode blend_mode = BlendMode::Alpha);
+                     BlendMode blend_mode = BlendMode::Alpha,
+                     Color tint = {255, 255, 255, 255});
 
     /**
      * Adds a command to draw a texture to the render queue with a specified
      * source rectangle. This will draw only the source region of the texture to
-     * the specified destination rectangle.
+     * the specified destination rectangle. The texture's color and alpha
+     * channels are multiplied by the corresponding channels in tint before the
+     * texture is combined with the screen.
+     *
      * @param texture The handle of the texture to draw.
      * @param source The source rectangle from the texture to draw.
      * @param destination The destination rectangle where the texture will be
@@ -103,11 +115,16 @@ public:
      * @param z_order The z order to draw the texture at (default is 0).
      * @param blend_mode The blending mode used to combine the texture with the
      * existing screen color (default is BlendMode::Alpha).
+     * @param tint The color and opacity multiplier applied to the texture.
+     *             White with full opacity leaves the texture unchanged.
+     *             Other values tint the texture or make it more transparent
+     *             Default is {255, 255, 255, 255}.
      */
     void DrawTexture(TextureHandle texture, Rectangle2D source,
                      Rectangle2D destination, float rotation = 0.0F,
                      std::int32_t z_order = 0,
-                     BlendMode blend_mode = BlendMode::Alpha);
+                     BlendMode blend_mode = BlendMode::Alpha,
+                     Color tint = {255, 255, 255, 255});
 
     /**
      * Resets the render queue by clearing all commands.
@@ -208,6 +225,20 @@ private:
         BlendMode blend_mode;
     };
 
+    // An aside on...
+    // ... tinting:
+    //
+    // Tinting here is a per channel multiplier applied before blending.
+    // texture RGB * tint RGB
+    // texture alpha * tint alpha
+    //
+    // A tint of ... will affect the texture as follows:
+    //
+    // {255, 255, 255, 255}: unchanged
+    // {255, 0, 0, 255}: removes green and blue, making the texture red-tinted
+    // {128, 128, 128, 255}: darkens the texture
+    // {255, 255, 255, 128}: makes the texture 50% as opaque
+
     /**
      * Represents a command to draw a texture, optionally specifying a source
      * rectangle. If the source rectangle is not provided, the entire texture
@@ -221,6 +252,7 @@ private:
      * - z_order: The z order the texture is drawn at.
      * - blend_mode: The blending mode used to combine the texture with the
      * existing screen color.
+     * - tint: The color and opacity multiplier applied to the texture.
      */
     struct TextureCommand {
         TextureHandle texture;
@@ -229,6 +261,7 @@ private:
         float rotation;
         std::int32_t z_order;
         BlendMode blend_mode;
+        Color tint;
     };
 
     /**

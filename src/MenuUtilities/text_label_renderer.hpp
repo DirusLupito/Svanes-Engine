@@ -75,13 +75,13 @@ public:
 private:
     /**
      * Represents a cached text label. Whereas a text label is defined by its
-     * text, font, and color, a cached label also includes the texture generated
-     * for rendering, as well as its width and height in pixels.
+     * text, font, and color, a cached label stores the text and font with a
+     * white texture, as well as its width and height in pixels. Color is
+     * applied when drawing the texture.
      *
      * FIELDS:
      * - text: The string content of the label.
      * - font: A handle to the font used for rendering the text.
-     * - color: The color of the text, including alpha for transparency.
      * - texture: An owning handle to the texture generated for rendering the
      * text. Erasing or replacing the cache entry releases this texture.
      * - width: The width of the rendered text in pixels.
@@ -90,7 +90,6 @@ private:
     struct CachedLabel {
         std::string text;
         FontHandle font;
-        Color color;
         OwnedTexture texture;
         std::int32_t width = 0;
         std::int32_t height = 0;
@@ -98,8 +97,8 @@ private:
 
     /**
      * Prepares a CachedLabel for the given entity and TextLabel. If a cached
-     * label already exists for the entity, it will be updated if the text,
-     * font, or color has changed. If no cached label exists, a new one will be
+     * label already exists for the entity, it will be updated if the text or
+     * font has changed. If no cached label exists, a new one will be
      * created.
      *
      * @param entity The entity for which to prepare the cached label.

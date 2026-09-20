@@ -29,18 +29,17 @@ TextLabelRenderer::Prepare(Entity entity, const TextLabel &label) {
         const auto &cached = found->second;
 
         // Sure we found the label according to the entity, but is it the same
-        // label? If the text, font, or color has changed, we need to redo it.
-        if (cached.text == label.text && cached.font.id == label.font.id &&
-            cached.color.red == label.color.red &&
-            cached.color.green == label.color.green &&
-            cached.color.blue == label.color.blue &&
-            cached.color.alpha == label.color.alpha) {
+        // label? If the text or font has changed, we need to redo it.
+        if (cached.text == label.text && cached.font.id == label.font.id) {
             return cached;
         }
     }
 
-    const SDL_Color color{label.color.red, label.color.green, label.color.blue,
-                          label.color.alpha};
+    // We use white text because we can tint it to any color we want when
+    // drawing the texture. This also means when changing the color of a text
+    // label, we don't need to re-render the texture, as the cached texture is
+    // always white and the color is applied at draw time.
+    const SDL_Color color{255, 255, 255, 255};
 
     // unique_ptr for the SDL_Surface returned by TTF_RenderText_Blended_Wrapped
     // using SDL_DestroySurface as the deleter.
@@ -56,13 +55,10 @@ TextLabelRenderer::Prepare(Entity entity, const TextLabel &label) {
     }
 
     CachedLabel replacementOrNewLabel{
-        label.text,
-        label.font,
-        label.color,
+        label.text, label.font,
         OwnedTexture{textures, TextureManagerInternal::CreateFromSurface(
                                    textures, surface.get())},
-        surface->w,
-        surface->h};
+        surface->w, surface->h};
 
     return labels.insert_or_assign(entity, std::move(replacementOrNewLabel))
         .first->second;
@@ -160,7 +156,7 @@ void TextLabelRenderer::Submit(const Registry &world, RenderQueue &queue,
                 : 0;
 
         queue.DrawTexture(cached.texture.GetHandle(), destination, 0.0F,
-                          z_order);
+                          z_order, BlendMode::Alpha, label.color);
     });
 }
 

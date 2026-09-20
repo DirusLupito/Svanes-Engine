@@ -52,16 +52,17 @@ void RenderQueue::DrawConvexPolygon(const ConvexPolygon2D &destination,
 
 void RenderQueue::DrawTexture(TextureHandle texture, Rectangle2D destination,
                               float rotation, std::int32_t z_order,
-                              BlendMode blend_mode) {
+                              BlendMode blend_mode, Color tint) {
     commands.emplace_back(TextureCommand{texture, std::nullopt, destination,
-                                         rotation, z_order, blend_mode});
+                                         rotation, z_order, blend_mode, tint});
 }
 
 void RenderQueue::DrawTexture(TextureHandle texture, Rectangle2D source,
                               Rectangle2D destination, float rotation,
-                              std::int32_t z_order, BlendMode blend_mode) {
+                              std::int32_t z_order, BlendMode blend_mode,
+                              Color tint) {
     commands.emplace_back(TextureCommand{texture, source, destination, rotation,
-                                         z_order, blend_mode});
+                                         z_order, blend_mode, tint});
 }
 
 // Except for reset which just clears the command queue
