@@ -28,12 +28,12 @@ enum class TextAlignment : std::uint8_t {
  *
  * FIELDS:
  * - text: The string content of the label.
- * - position: The position of the label in world coordinates. This is the
- * top-left corner of the text for left alignment, the center for center
- * alignment, and the top-right corner for right alignment.
+ * - position: The position in pixels relative to the viewport's top-left
+ * corner. This is the text's top-left for left alignment, top-center for
+ * center alignment, and top-right for right alignment.
  * - color: The color of the text, including alpha for transparency.
  * - font: A handle to the font used for rendering the text.
- * - alignment: The horizontal alignment of the text relative to its position.
+ * - xAlignment: The horizontal alignment of the text relative to its position.
  * - visible: A flag indicating whether the label should be rendered.
  */
 struct TextLabel {
@@ -41,7 +41,7 @@ struct TextLabel {
     Vector2D position{};
     Color color{};
     FontHandle font{};
-    TextAlignment alignment = TextAlignment::Left;
+    TextAlignment xAlignment = TextAlignment::Left;
     bool visible = true;
 };
 

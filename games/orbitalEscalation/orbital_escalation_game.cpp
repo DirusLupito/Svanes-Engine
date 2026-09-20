@@ -1,4 +1,5 @@
 #include "orbital_escalation_game.hpp"
+#include <svanes/MenuUtilities/text_label.hpp>
 
 #include <svanes/attractor_system.hpp>
 #include <svanes/camera2d.hpp>
@@ -466,6 +467,19 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext &context) {
     gameplay_timeline_entity = context.world.CreateEntity();
     context.world.AddComponent<svanes::Timeline>(gameplay_timeline_entity);
 
+    pause_label_entity = context.world.CreateEntity();
+    context.world.AddComponent<svanes::TextLabel>(
+        pause_label_entity,
+        svanes::TextLabel{
+            .text = "PAUSED",
+            .position = {context.camera.Viewport().width * 0.5F, 16.0F},
+            .color = {255, 0, 0, 255},
+            .font = context.fonts.LoadFont(
+                "games/orbitalEscalation/assets/fonts/consola.ttf", 24.0F),
+            .xAlignment = svanes::TextAlignment::Center,
+            .visible = false,
+        });
+
     // number of logical cores
     // this number includes the main thread, which is also treated as a worker
     // thread, so we don't need to add 1 to it.
@@ -579,6 +593,17 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext &frame) {
                 ? svanes::ScaleMode::Proportional
                 : svanes::ScaleMode::Constant;
     }
+
+    auto &pause_label =
+        frame.world.GetComponent<svanes::TextLabel>(pause_label_entity);
+
+    pause_label.visible =
+        frame.world.GetComponent<svanes::Timeline>(gameplay_timeline_entity)
+            .IsPaused();
+
+    // Adjust for any changes in the camera, especially regarding proportional
+    // scaling.
+    pause_label.position.x = frame.camera.Viewport().width * 0.5F;
 
     // 1.1^delta
     // Rolling harder on the mouse wheel will zoom in and out

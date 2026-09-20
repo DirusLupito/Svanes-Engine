@@ -169,6 +169,8 @@ target_sources(
         src/kinematic_system.cpp
         src/MenuUtilities/font_manager.cpp
         src/MenuUtilities/font_manager_internal.hpp
+        src/MenuUtilities/text_label_renderer.cpp
+        src/MenuUtilities/text_label_renderer.hpp
         src/network/network_client.cpp
         src/network/network_message.cpp
         src/network/network_replication.cpp
@@ -336,6 +338,8 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/kinematic_system.cpp
     src/MenuUtilities/font_manager.cpp
     src/MenuUtilities/font_manager_internal.hpp
+    src/MenuUtilities/text_label_renderer.cpp
+    src/MenuUtilities/text_label_renderer.hpp
     src/network/network_client.cpp
     src/network/network_message.cpp
     src/network/network_replication.cpp

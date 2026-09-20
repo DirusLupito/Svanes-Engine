@@ -62,6 +62,24 @@ TextureHandle TextureManager::Store(TexturePointer texture) {
 
 TextureManager::~TextureManager() = default;
 
+TextureHandle internal::TextureManagerInternal::CreateFromSurface(
+    TextureManager &texture_manager, SDL_Surface *surface) {
+    TextureManager::TexturePointer texture{
+        SDL_CreateTextureFromSurface(texture_manager.renderer, surface)};
+    if (!texture) {
+        throw std::runtime_error("Could not create texture from surface: " +
+                                 std::string{SDL_GetError()});
+    }
+    return texture_manager.Store(std::move(texture));
+}
+
+void internal::TextureManagerInternal::Destroy(TextureManager &texture_manager,
+                                               TextureHandle handle) {
+    if (texture_manager.textures.erase(handle.id) == 0) {
+        throw std::invalid_argument("Texture handle does not exist.");
+    }
+}
+
 TextureHandle TextureManager::LoadTexture(std::string_view path) {
     if (path.empty()) {
         throw std::invalid_argument("Texture path cannot be empty.");
@@ -147,5 +165,42 @@ internal::TextureManagerInternal::Resolve(const TextureManager &texture_manager,
 
     return texture->second.get();
 }
+
+namespace internal {
+
+OwnedTexture::OwnedTexture(TextureManager &manager,
+                           TextureHandle handle) noexcept
+    : manager(&manager), handle(handle) {}
+
+OwnedTexture::~OwnedTexture() { Reset(); }
+
+OwnedTexture::OwnedTexture(OwnedTexture &&other) noexcept
+    : manager(other.manager),
+      handle(std::exchange(other.handle, TextureHandle{})) {}
+
+OwnedTexture &OwnedTexture::operator=(OwnedTexture &&other) noexcept {
+    if (this != &other) {
+        // Whatever we were currently managing, it'd better have been given to
+        // someone else or else no longer be needed...
+        Reset();
+
+        // The handle we are now managing will not make sense in the context of
+        // our previous manager.
+        manager = other.manager;
+        handle = std::exchange(other.handle, TextureHandle{});
+    }
+    return *this;
+}
+
+TextureHandle OwnedTexture::GetHandle() const { return handle; }
+
+void OwnedTexture::Reset() noexcept {
+    if (handle.id != 0) {
+        TextureManagerInternal::Destroy(*manager, handle);
+        handle = {};
+    }
+}
+
+} // namespace internal
 
 } // namespace svanes
