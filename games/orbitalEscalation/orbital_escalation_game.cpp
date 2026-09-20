@@ -476,7 +476,7 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext &context) {
             .color = {255, 0, 0, 255},
             .font = context.fonts.LoadFont(
                 "games/orbitalEscalation/assets/fonts/consola.ttf", 24.0F),
-            .xAlignment = svanes::TextAlignment::Center,
+            .alignment = svanes::TextAlignment::TopCenter,
             .visible = false,
         });
 

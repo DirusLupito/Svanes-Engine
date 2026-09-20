@@ -10,17 +10,30 @@
 namespace svanes {
 
 /**
- * Enumeration for horizontal text alignment options.
+ * Enumeration for positioning the text around the specified position.
  *
  * MEMBERS:
- * - Left: Aligns the text to the left edge of the specified position.
- * - Center: Centers the text horizontally around the specified position.
- * - Right: Aligns the text to the right edge of the specified position.
+ * - TopLeft: Places the top-left corner at the specified position.
+ * - TopCenter: Places the center of the top edge at the specified position.
+ * - TopRight: Places the top-right corner at the specified position.
+ * - CenterLeft: Places the center of the left edge at the specified position.
+ * - Center: Places the center of the text at the specified position.
+ * - CenterRight: Places the center of the right edge at the specified position.
+ * - BottomLeft: Places the bottom-left corner at the specified position.
+ * - BottomCenter: Places the center of the bottom edge at the specified
+ * position.
+ * - BottomRight: Places the bottom-right corner at the specified position.
  */
 enum class TextAlignment : std::uint8_t {
-    Left,
+    TopLeft,
+    TopCenter,
+    TopRight,
+    CenterLeft,
     Center,
-    Right,
+    CenterRight,
+    BottomLeft,
+    BottomCenter,
+    BottomRight,
 };
 
 /**
@@ -28,12 +41,12 @@ enum class TextAlignment : std::uint8_t {
  *
  * FIELDS:
  * - text: The string content of the label.
- * - position: The position in pixels relative to the viewport's top-left
- * corner. This is the text's top-left for left alignment, top-center for
- * center alignment, and top-right for right alignment.
+ * - position: Position at which to place the corner, edge midpoint, or center
+ *   selected by alignment. For example, TopCenter places the midpoint
+ *   of the text rectangle's top edge here.
  * - color: The color of the text, including alpha for transparency.
  * - font: A handle to the font used for rendering the text.
- * - xAlignment: The horizontal alignment of the text relative to its position.
+ * - alignment: The horizontal and vertical alignment relative to position.
  * - visible: A flag indicating whether the label should be rendered.
  */
 struct TextLabel {
@@ -41,7 +54,7 @@ struct TextLabel {
     Vector2D position{};
     Color color{};
     FontHandle font{};
-    TextAlignment xAlignment = TextAlignment::Left;
+    TextAlignment alignment = TextAlignment::TopLeft;
     bool visible = true;
 };
 

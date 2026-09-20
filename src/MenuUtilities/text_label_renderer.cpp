@@ -92,15 +92,38 @@ void TextLabelRenderer::Submit(const Registry &world, RenderQueue &queue,
             throw std::invalid_argument("Text label position must be finite.");
         }
 
-        float alignment = 0.0F;
-        switch (label.xAlignment) {
-        case TextAlignment::Left:
+        float xAlignment = 0.0F;
+        float yAlignment = 0.0F;
+        switch (label.alignment) {
+        case TextAlignment::TopLeft:
+            break;
+        case TextAlignment::TopCenter:
+            xAlignment = 0.5F;
+            break;
+        case TextAlignment::TopRight:
+            xAlignment = 1.0F;
+            break;
+        case TextAlignment::CenterLeft:
+            yAlignment = 0.5F;
             break;
         case TextAlignment::Center:
-            alignment = 0.5F;
+            xAlignment = 0.5F;
+            yAlignment = 0.5F;
             break;
-        case TextAlignment::Right:
-            alignment = 1.0F;
+        case TextAlignment::CenterRight:
+            xAlignment = 1.0F;
+            yAlignment = 0.5F;
+            break;
+        case TextAlignment::BottomLeft:
+            yAlignment = 1.0F;
+            break;
+        case TextAlignment::BottomCenter:
+            xAlignment = 0.5F;
+            yAlignment = 1.0F;
+            break;
+        case TextAlignment::BottomRight:
+            xAlignment = 1.0F;
+            yAlignment = 1.0F;
             break;
         default:
             throw std::invalid_argument("Unknown text alignment.");
@@ -115,20 +138,21 @@ void TextLabelRenderer::Submit(const Registry &world, RenderQueue &queue,
         const float height = static_cast<float>(cached.height);
 
         // Begin at the viewport center and subtract half its dimensions to
-        // get the viewport's lower-left corner. Add the label position to get
-        // the label's anchor point, then shift by half the label width so the
-        // anchor becomes the rectangle center.
+        // get the viewport's top-left corner. Add the label position to get
+        // the label's anchor point, then shift by half the label dimensions so
+        // the anchor becomes the rectangle center.
         //
-        // Now introduce the alignment value. It will change that shift so the
-        // anchor is the left, center, or right edge. The vertical position uses
-        // the same lower-left origin and adds half the label height because
-        // Rectangle2D stores its center position.
-        const Rectangle2D destination{viewport.x - viewport.width * 0.5F +
-                                          label.position.x +
-                                          (0.5F - alignment) * width,
-                                      viewport.y - viewport.height * 0.5F +
-                                          label.position.y + height * 0.5F,
-                                      width, height};
+        // Now introduce the alignment values. They change those shifts so the
+        // anchor is at the selected corner, edge center, or center of the text.
+        // Subtracting xAlignment times the width and yAlignment times the
+        // height accounts for how far the anchor is from the text's top-left
+        // corner. Rectangle2D still receives the resulting center position.
+        const Rectangle2D destination{
+            viewport.x - viewport.width * 0.5F + label.position.x +
+                (0.5F - xAlignment) * width,
+            viewport.y - viewport.height * 0.5F + label.position.y +
+                (0.5F - yAlignment) * height,
+            width, height};
 
         const std::int32_t z_order =
             world.HasComponent<ZOrder>(entity)
