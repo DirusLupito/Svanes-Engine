@@ -43,6 +43,9 @@ private:
     // children.
     svanes::Entity gameplay_timeline_entity = 0;
 
+    svanes::Entity pause_timeline_entity = 0;
+    svanes::Entity pause_label_entity = 0;
+
 
     svanes::Entity background_entity = 0;
     svanes::Entity square_entity = 0;

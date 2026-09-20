@@ -345,6 +345,16 @@ void RenderQueueExecutor::Execute(
     SDL_Texture *resolved_texture =
         TextureManagerInternal::Resolve(texture_manager, command.texture);
 
+    // SDL_SetTextureColorMod will control the RGB tint while
+    // SDL_SetTextureAlphaMod similarly applies the tinting formula to the alpha
+    // channel, multiplying the texture's alpha by the tint's alpha.
+    if (!SDL_SetTextureColorMod(resolved_texture, command.tint.red,
+                                command.tint.green, command.tint.blue) ||
+        !SDL_SetTextureAlphaMod(resolved_texture, command.tint.alpha)) {
+        throw std::runtime_error("Could not set texture tint: " +
+                                 std::string{SDL_GetError()});
+    }
+
     if (!SDL_SetTextureBlendMode(resolved_texture,
                                  ToSDLBlendMode(command.blend_mode))) {
         throw std::runtime_error("Could not set texture blending: " +

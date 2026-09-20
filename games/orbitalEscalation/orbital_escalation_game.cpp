@@ -1,4 +1,5 @@
 #include "orbital_escalation_game.hpp"
+#include <svanes/MenuUtilities/text_label.hpp>
 
 #include <svanes/attractor_system.hpp>
 #include <svanes/camera2d.hpp>
@@ -26,6 +27,8 @@ const svanes::TicCount kCollisionFlashExpansionTime =
     svanes::SecondsToTics(0.5);
 constexpr float kCollisionFlashInitialRadius = 4000.0F;
 constexpr float kCollisionFlashExpansionRadius = 8000.0F;
+const svanes::TicCount kPauseFlashPeriod = svanes::SecondsToTics(1.0);
+constexpr std::uint8_t kPauseLabelMinimumAlpha = 64;
 
 /**
  * Helper function to create an entity with a Timeline component that is a
@@ -466,6 +469,22 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext &context) {
     gameplay_timeline_entity = context.world.CreateEntity();
     context.world.AddComponent<svanes::Timeline>(gameplay_timeline_entity);
 
+    pause_timeline_entity = context.world.CreateEntity();
+    context.world.AddComponent<svanes::Timeline>(pause_timeline_entity);
+
+    pause_label_entity = context.world.CreateEntity();
+    context.world.AddComponent<svanes::TextLabel>(
+        pause_label_entity,
+        svanes::TextLabel{
+            .text = "PAUSED",
+            .position = {context.camera.Viewport().width * 0.5F, 16.0F},
+            .color = {255, 0, 0, 255},
+            .font = context.fonts.LoadFont(
+                "games/orbitalEscalation/assets/fonts/consola.ttf", 24.0F),
+            .alignment = svanes::TextAlignment::TopCenter,
+            .visible = false,
+        });
+
     // number of logical cores
     // this number includes the main thread, which is also treated as a worker
     // thread, so we don't need to add 1 to it.
@@ -579,6 +598,35 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext &frame) {
                 ? svanes::ScaleMode::Proportional
                 : svanes::ScaleMode::Constant;
     }
+
+    auto &pause_label =
+        frame.world.GetComponent<svanes::TextLabel>(pause_label_entity);
+
+    pause_label.visible =
+        frame.world.GetComponent<svanes::Timeline>(gameplay_timeline_entity)
+            .IsPaused();
+
+    // I use a cosine wave to make the pause label flash while the game is
+    // paused.
+    const svanes::TicCount pause_tics =
+        frame.world.GetComponent<svanes::Timeline>(pause_timeline_entity)
+            .GetTotalTics() %
+        kPauseFlashPeriod;
+
+    const float pause_flash_phase = 2.0F * std::numbers::pi_v<float> *
+                                    static_cast<float>(pause_tics) /
+                                    static_cast<float>(kPauseFlashPeriod);
+
+    const float pause_flash_amount =
+        0.5F * (1.0F + std::cos(pause_flash_phase));
+
+    pause_label.color.alpha = static_cast<std::uint8_t>(
+        std::lerp(static_cast<float>(kPauseLabelMinimumAlpha), 255.0F,
+                  pause_flash_amount));
+
+    // Adjust for any changes in the camera, especially regarding proportional
+    // scaling.
+    pause_label.position.x = frame.camera.Viewport().width * 0.5F;
 
     // 1.1^delta
     // Rolling harder on the mouse wheel will zoom in and out

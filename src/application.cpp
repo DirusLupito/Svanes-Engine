@@ -16,6 +16,7 @@
 #include <svanes/vector2d.hpp>
 
 #include "MenuUtilities/font_manager_internal.hpp"
+#include "MenuUtilities/text_label_renderer.hpp"
 #include "audio/audio_manager_internal.hpp"
 #include "input_manager_internal.hpp"
 #include "render/render_queue_executor.hpp"
@@ -51,6 +52,7 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
     TextureManager texture_manager = TextureManagerInternal::Create(renderer);
     AudioManager audio_manager = AudioManagerInternal::Create();
     FontManager font_manager = FontManagerInternal::Create();
+    TextLabelRenderer text_label_renderer{texture_manager, font_manager};
     RenderQueueExecutor render_queue_executor{renderer, texture_manager};
     RenderQueue render_queue;
     InputManager input;
@@ -221,6 +223,16 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
             camera.scale_mode == ScaleMode::Proportional
                 ? std::optional{camera.Viewport()}
                 : std::nullopt);
+
+        //
+        // USER INTERFACE RENDERING
+        //
+
+        // We clear the render queue then submit user interface elements to
+        // render them on top of the game world.
+        render_queue.Reset();
+        text_label_renderer.Submit(world, render_queue, camera.Viewport());
+        render_queue_executor.Execute(render_queue, camera.Viewport());
 
         SDL_RenderPresent(renderer);
 
