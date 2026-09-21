@@ -265,19 +265,19 @@ add_executable(
 )
 target_link_libraries(svanes_game_orbital_escalation PRIVATE Svanes::Engine)
 
-add_executable(svanes_game_chris games/chris-placeholder/main.cpp games/chris-placeholder/chris_game.cpp)
-target_link_libraries(svanes_game_chris PRIVATE Svanes::Engine)
-target_compile_definitions(svanes_game_chris PRIVATE
-    CHRIS_GAME_ASSETS_DIR="${CMAKE_SOURCE_DIR}/games/chris-placeholder/assets"
+add_executable(svanes_game_double_time games/doubleTime/main.cpp games/doubleTime/chris_game.cpp)
+target_link_libraries(svanes_game_double_time PRIVATE Svanes::Engine)
+target_compile_definitions(svanes_game_double_time PRIVATE
+    DOUBLE_TIME_GAME_ASSETS_DIR="${CMAKE_SOURCE_DIR}/games/doubleTime/assets"
 )
 
-add_executable(svanes_game_chris_server games/chris-placeholder/server_main.cpp)
-target_link_libraries(svanes_game_chris_server PRIVATE Svanes::Engine)
+add_executable(svanes_game_double_time_server games/doubleTime/server_main.cpp)
+target_link_libraries(svanes_game_double_time_server PRIVATE Svanes::Engine)
 
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT svanes_game_orbital_escalation)
 
 set_target_properties(
-    svanes_engine svanes_game_erik svanes_game_orbital_escalation svanes_game_chris svanes_game_chris_server
+    svanes_engine svanes_game_erik svanes_game_orbital_escalation svanes_game_double_time svanes_game_double_time_server
     PROPERTIES
         CXX_EXTENSIONS OFF
         ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/$<CONFIG>"

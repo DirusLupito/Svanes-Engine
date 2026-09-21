@@ -72,9 +72,9 @@ void ChrisGame::Initialize(svanes::GameContext &context) {
     );
     context.world.AddComponent<svanes::ZOrder>(ground_entity, svanes::ZOrder{kGroundZOrder});
 
-    idle_texture = context.assets.LoadTexture(std::string{CHRIS_GAME_ASSETS_DIR} + "/" + kIdleSpriteSheetFilename);
+    idle_texture = context.assets.LoadTexture(std::string{DOUBLE_TIME_GAME_ASSETS_DIR} + "/" + kIdleSpriteSheetFilename);
     running_texture =
-        context.assets.LoadTexture(std::string{CHRIS_GAME_ASSETS_DIR} + "/" + kRunningSpriteSheetFilename);
+        context.assets.LoadTexture(std::string{DOUBLE_TIME_GAME_ASSETS_DIR} + "/" + kRunningSpriteSheetFilename);
 }
 
 svanes::Entity ChrisGame::SpawnCharacter(svanes::Registry &world, svanes::Transform initial_transform) {

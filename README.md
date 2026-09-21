@@ -34,5 +34,5 @@ Regardless of whether or not you use Visual Studio, you can launch the games fro
 just run
 just run erik
 just run orbitalEscalation
-just run chris
+just run doubleTime
 ```
