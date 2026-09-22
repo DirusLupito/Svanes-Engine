@@ -2,9 +2,61 @@
 
 #include <svanes/geometry.hpp>
 
+#include <algorithm>
 #include <cmath>
+#include <limits>
+#include <stdexcept>
 
 namespace svanes {
+
+Rectangle2D internal::BoundsFromExtents(double min_x, double min_y,
+                                        double max_x, double max_y) {
+    if (min_x > max_x) {
+        std::swap(min_x, max_x);
+    }
+
+    if (min_y > max_y) {
+        std::swap(min_y, max_y);
+    }
+
+    const double center_x = (min_x + max_x) * 0.5;
+    const double center_y = (min_y + max_y) * 0.5;
+    if (!std::isfinite(center_x) || !std::isfinite(center_y) ||
+        std::abs(center_x) > std::numeric_limits<float>::max() ||
+        std::abs(center_y) > std::numeric_limits<float>::max()) {
+        throw std::overflow_error(
+            "Geometry bounds exceed the representable coordinates.");
+    }
+
+    const double width = max_x - min_x;
+    const double height = max_y - min_y;
+    if (!std::isfinite(width) || !std::isfinite(height) ||
+        width > std::numeric_limits<float>::max() ||
+        height > std::numeric_limits<float>::max()) {
+        throw std::overflow_error(
+            "Geometry bounds exceed the representable dimensions.");
+    }
+
+    const float x = static_cast<float>(center_x);
+    const float y = static_cast<float>(center_y);
+
+    // The midpoint is equally distant from min and max BEFORE rounding.
+    // But storing the center and dimension as two floats can move an edge
+    // slightly inward. For example, consider
+
+    // minimum = 1.00000000000000000000000,
+    //
+    // maximum = 1.00000011920928955078125
+    //
+    // Then center  = 1.000000059604644775390625, but this cannot be represented
+    // as a float, and it will round to 1.0, meaning that we lost a tiny amount
+    // of the bounding box. As floating values increase, so too will the
+    // magnitude of the rounding error. It's probably not a big deal right now,
+    // but if that becomes a problem, use twice the larger distance from the
+    // rounded center to either endpoint, then round the dimension upward to a
+    // representable float.
+    return {x, y, static_cast<float>(width), static_cast<float>(height)};
+}
 
 Rectangle2D TransformRectangle(Rectangle2D rectangle,
                                const Transform &transform) {
@@ -74,11 +126,23 @@ Rectangle2D RectangleGeometry::Bounds() const {
     // bounding circle is rotation invariant.
 
 
-    const float extent_x =
-        half_width * std::abs(cosine) + half_height * std::abs(sine);
-    const float extent_y =
-        half_width * std::abs(sine) + half_height * std::abs(cosine);
-    return {center_x, center_y, extent_x * 2.0F, extent_y * 2.0F};
+    if (!std::isfinite(center_x) || !std::isfinite(center_y) ||
+        !std::isfinite(half_width) || !std::isfinite(half_height) ||
+        !std::isfinite(cosine) || !std::isfinite(sine) || half_width <= 0.0F ||
+        half_height <= 0.0F) {
+        throw std::invalid_argument("Rectangle bounds require finite "
+                                    "coordinates and positive dimensions.");
+    }
+
+    const float x_cosine = half_width * std::abs(cosine);
+    const float x_sine = half_width * std::abs(sine);
+    const float y_cosine = half_height * std::abs(cosine);
+    const float y_sine = half_height * std::abs(sine);
+
+
+    return internal::BoundsFromExtents(
+        center_x - x_cosine - y_sine, center_y - x_sine - y_cosine,
+        center_x + x_cosine + y_sine, center_y + x_sine + y_cosine);
 }
 
 std::array<Vector2D, 4> RectangleGeometry::Corners() const {

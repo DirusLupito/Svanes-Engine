@@ -142,12 +142,8 @@ Rectangle2D ConvexPolygon2D::Bounds() const {
         maximum.x = std::max(maximum.x, vertex.x);
         maximum.y = std::max(maximum.y, vertex.y);
     }
-    return {
-        minimum.x * 0.5F + maximum.x * 0.5F,
-        minimum.y * 0.5F + maximum.y * 0.5F,
-        maximum.x - minimum.x,
-        maximum.y - minimum.y,
-    };
+    return internal::BoundsFromExtents(minimum.x, minimum.y, maximum.x,
+                                       maximum.y);
 }
 
 ConvexPolygon2D TransformConvexPolygon(const ConvexPolygon2D &polygon,
@@ -163,17 +159,22 @@ ConvexPolygon2D TransformConvexPolygon(const ConvexPolygon2D &polygon,
     const float cosine = std::cos(transform.rotation);
     const float sine = std::sin(transform.rotation);
 
-    std::vector<Vector2D> vertices = polygon.Vertices();
+    ConvexPolygon2D result = polygon;
 
-    for (Vector2D &vertex : vertices) {
+    for (Vector2D &vertex : result.vertices) {
         const Vector2D local = vertex;
         vertex = {
             transform.x + (local.x * cosine - local.y * sine) * scale,
             transform.y + (local.x * sine + local.y * cosine) * scale,
         };
+
+        if (!std::isfinite(vertex.x) || !std::isfinite(vertex.y)) {
+            throw std::invalid_argument(
+                "Transformed convex polygon vertices must be finite.");
+        }
     }
 
-    return ConvexPolygon2D{std::move(vertices)};
+    return result;
 }
 
 } // namespace svanes

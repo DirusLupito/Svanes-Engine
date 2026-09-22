@@ -42,6 +42,10 @@ struct Triangle2D {
  */
 Triangle2D TransformTriangle(Triangle2D triangle, const Transform &transform);
 
+/**
+ * Represents a triangle in 2D space and provides methods to get its
+ * vertices and bounding box. The triangle is defined by its three vertices.
+ */
 class TriangleGeometry final {
 public:
     /**

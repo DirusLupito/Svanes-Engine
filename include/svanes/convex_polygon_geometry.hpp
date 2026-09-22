@@ -47,6 +47,20 @@ public:
     Rectangle2D Bounds() const;
 
 private:
+    // Declaring TransformConvexPolygon as a friend function allows it to access
+    // the private members of ConvexPolygon2D, specifically the vertices vector.
+    // This is necessary because TransformConvexPolygon needs to modify the
+    // vertices of the polygon during the transformation process to skip
+    // re-validating the convexity of the polygon after transformation. The
+    // (previously existing) alternative approach is to construct a new
+    // ConvexPolygon2D object with the transformed vertices, which would send
+    // the vertices through the convexity validation logic again. Which is
+    // pointless because convexity is preserved under translation, rotation, and
+    // uniform scaling.
+    friend ConvexPolygon2D
+    TransformConvexPolygon(const ConvexPolygon2D &polygon,
+                           const Transform &transform, float scale);
+
     // The vertices of the convex polygon, stored in the order they were
     // provided.
     std::vector<Vector2D> vertices;

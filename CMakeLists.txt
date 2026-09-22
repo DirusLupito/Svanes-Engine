@@ -160,6 +160,7 @@ target_sources(
         src/audio/audio_manager.cpp
         src/audio/audio_manager_internal.hpp
         src/camera2d.cpp
+        src/composite_geometry.cpp
         src/circle_geometry.cpp
         src/convex_polygon_geometry.cpp
         src/collision_system.cpp
@@ -201,6 +202,7 @@ target_sources(
             include/svanes/audio/audio_manager.hpp
             include/svanes/camera2d.hpp
             include/svanes/circle_geometry.hpp
+            include/svanes/composite_geometry.hpp
             include/svanes/convex_polygon_geometry.hpp
             include/svanes/collision_system.hpp
             include/svanes/collision_pass.hpp
@@ -218,6 +220,7 @@ target_sources(
             include/svanes/network/network_server.hpp
             include/svanes/network/tcp_msg_pipe.hpp
             include/svanes/network/udp_msg_pipe.hpp
+            include/svanes/primitive_geometry.hpp
             include/svanes/physics_system.hpp
             include/svanes/rectangle_geometry.hpp
             include/svanes/triangle_geometry.hpp
@@ -292,6 +295,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/audio/audio_manager.hpp
     include/svanes/camera2d.hpp
     include/svanes/circle_geometry.hpp
+    include/svanes/composite_geometry.hpp
     include/svanes/convex_polygon_geometry.hpp
     include/svanes/collision_system.hpp
     include/svanes/collision_pass.hpp
@@ -309,6 +313,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/network/network_server.hpp
     include/svanes/network/tcp_msg_pipe.hpp
     include/svanes/network/udp_msg_pipe.hpp
+    include/svanes/primitive_geometry.hpp
     include/svanes/physics_system.hpp
     include/svanes/rectangle_geometry.hpp
     include/svanes/triangle_geometry.hpp
@@ -329,6 +334,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/audio/audio_manager.cpp
     src/audio/audio_manager_internal.hpp
     src/camera2d.cpp
+    src/composite_geometry.cpp
     src/circle_geometry.cpp
     src/convex_polygon_geometry.cpp
     src/collision_system.cpp

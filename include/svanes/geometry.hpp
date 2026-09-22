@@ -1,83 +1,76 @@
 #pragma once
 
-#include <svanes/circle_geometry.hpp>
-#include <svanes/convex_polygon_geometry.hpp>
-#include <svanes/rectangle_geometry.hpp>
-#include <svanes/triangle_geometry.hpp>
+#include <svanes/composite_geometry.hpp>
 
+#include <optional>
 #include <variant>
-#include <vector>
 
 namespace svanes {
-
-/**
- * Represents the position and rotation of an entity's local origin in 2D space.
- * This component is used to determine where to place the entity's geometry in
- * the world.
- *
- * FIELDS:
- * - x: The x-coordinate of the entity's position.
- * - y: The y-coordinate of the entity's position.
- * - rotation: The rotation in radians.
- */
-struct Transform {
-    float x = 0.0F;
-    float y = 0.0F;
-    float rotation = 0.0F;
-};
-
-/**
- * Composes two transforms, applying the local transform relative to the parent
- * transform. The resulting transform represents the combined effect of both
- * transforms.
- *
- * @param parent The parent transform, representing the position and rotation of
- * the parent entity.
- * @param local The local transform, representing the position and rotation of
- * the child entity relative to the parent.
- *
- * @return The composed transform, representing the position and rotation of the
- * child entity in world coordinates.
- */
-Transform ComposeTransforms(const Transform &parent, const Transform &local);
-
-// The basic geometric primitives that can be immediately rendered or used for
-// collision detection without needing to decompose them into simpler shapes.
-using Primitive2D =
-    std::variant<Rectangle2D, Triangle2D, Circle2D, ConvexPolygon2D>;
-
-/**
- * Represents a part of a composite shape, consisting of a geometric primitive
- * and its associated transform. This structure is used to define complex shapes
- * that are composed of multiple simpler shapes.
- *
- * FIELDS:
- * - shape: The geometric primitive that makes up this part of the composite
- * shape.
- * - transform: The transform that specifies the position and rotation of this
- * part relative to the composite shape's local origin.
- */
-struct GeometryPart2D {
-    Primitive2D shape;
-    Transform transform;
-};
-
-/**
- * Represents a composite shape made up of multiple geometric parts, each with
- * its own transform. This structure allows for the creation of complex shapes
- * that can be treated as a single entity for rendering or collision detection
- * purposes.
- *
- * FIELDS:
- * - parts: A vector of GeometryPart2D objects that make up the composite shape.
- */
-struct CompositeShape2D {
-    std::vector<GeometryPart2D> parts;
-};
 
 // Represents any 2D geometric shape that can be used for rendering or collision
 // detection.
 using Geometry2D = std::variant<Rectangle2D, Triangle2D, Circle2D,
                                 ConvexPolygon2D, CompositeShape2D>;
 
+/**
+ * Computes the axis-aligned bounding box of a 2D geometry after applying a
+ * transform.
+ *
+ * @param geometry The 2D geometry to compute the bounding box for.
+ * @param transform The transform to apply to the geometry before computing
+ * the bounding box.
+ *
+ * @return An optional Rectangle2D representing the axis-aligned bounding
+ * box of the transformed geometry. In the case of a composite shape with
+ * no parts, std::nullopt is returned to indicate that there is no bounding
+ * box.
+ *
+ * @throws std::invalid_argument if the transform is not finite or if the
+ * geometry is invalid.
+ */
+std::optional<Rectangle2D> ComputeBounds(const Geometry2D &geometry,
+                                         const Transform &transform);
+
 } // namespace svanes
+
+namespace svanes::internal {
+
+/**
+ * Computes the axis-aligned bounding box from the given minimum and maximum
+ * coordinates. The resulting bounding box is represented as a Rectangle2D
+ * with its center at the midpoint of the minimum and maximum coordinates and
+ * its width and height equal to the distance between the minimum and maximum
+ * coordinates.
+ *
+ * @param min_x The minimum x-coordinate of the bounding box.
+ * @param min_y The minimum y-coordinate of the bounding box.
+ * @param max_x The maximum x-coordinate of the bounding box.
+ * @param max_y The maximum y-coordinate of the bounding box.
+ *
+ * @return A Rectangle2D representing the axis-aligned bounding box.
+ *
+ * @throws std::overflow_error if the computed center or dimensions exceed
+ * the representable range of float.
+ */
+Rectangle2D BoundsFromExtents(double min_x, double min_y, double max_x,
+                              double max_y);
+
+/**
+ * Computes the axis-aligned bounding box of a geometric primitive after
+ * applying a transform. The primitive can be a rectangle, triangle, circle,
+ * or convex polygon.
+ *
+ * @param geometry The geometric primitive to compute the bounding box for.
+ * @param transform The transform to apply to the primitive before computing
+ * the bounding box.
+ *
+ * @return A Rectangle2D representing the axis-aligned bounding box of the
+ * transformed primitive.
+ *
+ * @throws std::invalid_argument if the transform is not finite or if the
+ * geometry is invalid.
+ */
+Rectangle2D ComputePrimitiveBounds(const Primitive2D &geometry,
+                                   const Transform &transform);
+
+} // namespace svanes::internal
