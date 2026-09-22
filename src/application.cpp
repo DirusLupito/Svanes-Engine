@@ -12,6 +12,7 @@
 #include <svanes/render/render_queue.hpp>
 #include <svanes/render/render_system.hpp>
 #include <svanes/sprite_animation_system.hpp>
+#include <svanes/tilemaps/tilemap.hpp>
 #include <svanes/timeline_system.hpp>
 #include <svanes/vector2d.hpp>
 

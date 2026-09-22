@@ -8,18 +8,6 @@
 
 namespace svanes {
 
-struct TileMap;
-
-/**
- * Combines adjacent collidable tiles into larger rectangles in order to reduce
- * the total number of collision objects to check later on. Scans the tilemap 
- * row by row in order to find large areas that can be combined into larger
- * rectangles.
- * 
- * @param tile_map The tilemap having its collision cache constructed
- */
-void BuildTileMapCollisionCache(TileMap &tile_map);
-
 /**
  * Component for 2D entity collision detection.
  *
@@ -64,21 +52,5 @@ std::vector<Collision2D> DetectCollisions(const Geometry2D &a,
                                           const Transform &transform_a,
                                           const Geometry2D &b,
                                           const Transform &transform_b);
-
-/**
- * Detects all collisions between a tilemap and another generic 2D geometry.
- * 
- * @param geometry The entity geometry to test for collisions.
- * @param transform The transform to apply to the geometry.
- * @param tile_map The tilemap to test for collisions.
- * @param tile_map_transform The transform of the tile map.
- * 
- * @return A vector of Collision2D objects representing the detected collisions.
- * If no collisions are detected, the vector will be empty.
- */
-std::vector<Collision2D>
-DetectTileMapCollisions(const Geometry2D &geometry, const Transform &transform,
-                        const TileMap &tile_map,
-                        const Transform &tile_map_transform);
 
 } // namespace svanes

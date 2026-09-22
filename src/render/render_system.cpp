@@ -1,4 +1,5 @@
 #include <svanes/render/render_system.hpp>
+#include <svanes/tilemaps/tilemap.hpp>
 
 #include <svanes/camera2d.hpp>
 #include <svanes/registry.hpp>
