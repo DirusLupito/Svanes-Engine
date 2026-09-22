@@ -70,7 +70,7 @@ public:
      * and the message itself.
      *
      * @param received Receives the source and bytes when a message is available.
-     * @return Whether a message was received; false means none is available.
+     * @return Whether a message was received. False means none is available.
      */
     virtual bool Receive(ReceivedMessage &received) = 0;
 
