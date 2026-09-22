@@ -1,6 +1,6 @@
-#include <svanes/circle_geometry.hpp>
+#include <svanes/geometry/circle_geometry.hpp>
 
-#include <svanes/geometry.hpp>
+#include <svanes/geometry/geometry.hpp>
 
 #include <cmath>
 #include <stdexcept>

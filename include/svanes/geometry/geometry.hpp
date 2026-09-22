@@ -1,6 +1,6 @@
 #pragma once
 
-#include <svanes/composite_geometry.hpp>
+#include <svanes/geometry/composite_geometry.hpp>
 
 #include <optional>
 #include <variant>

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <svanes/primitive_geometry.hpp>
+#include <svanes/geometry/primitive_geometry.hpp>
 
 #include <optional>
 #include <vector>

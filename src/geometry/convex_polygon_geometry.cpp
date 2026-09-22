@@ -1,6 +1,6 @@
-#include <svanes/convex_polygon_geometry.hpp>
+#include <svanes/geometry/convex_polygon_geometry.hpp>
 
-#include <svanes/geometry.hpp>
+#include <svanes/geometry/geometry.hpp>
 
 #include <algorithm>
 #include <cmath>

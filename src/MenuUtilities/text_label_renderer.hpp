@@ -4,7 +4,7 @@
 
 #include <svanes/MenuUtilities/text_label.hpp>
 #include <svanes/entity.hpp>
-#include <svanes/rectangle_geometry.hpp>
+#include <svanes/geometry/rectangle_geometry.hpp>
 
 #include <unordered_map>
 

@@ -1,6 +1,6 @@
-#include <svanes/rectangle_geometry.hpp>
+#include <svanes/geometry/rectangle_geometry.hpp>
 
-#include <svanes/geometry.hpp>
+#include <svanes/geometry/geometry.hpp>
 
 #include <algorithm>
 #include <cmath>

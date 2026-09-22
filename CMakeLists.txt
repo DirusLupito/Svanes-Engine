@@ -160,12 +160,12 @@ target_sources(
         src/audio/audio_manager.cpp
         src/audio/audio_manager_internal.hpp
         src/camera2d.cpp
-        src/composite_geometry.cpp
-        src/circle_geometry.cpp
-        src/convex_polygon_geometry.cpp
+        src/geometry/composite_geometry.cpp
+        src/geometry/circle_geometry.cpp
+        src/geometry/convex_polygon_geometry.cpp
         src/collision_system.cpp
         src/collision_pass.cpp
-        src/geometry.cpp
+        src/geometry/geometry.cpp
         src/input.cpp
         src/kinematic_system.cpp
         src/MenuUtilities/font_manager.cpp
@@ -179,8 +179,8 @@ target_sources(
         src/network/tcp_msg_pipe.cpp
         src/network/udp_msg_pipe.cpp
         src/physics_system.cpp
-        src/rectangle_geometry.cpp
-        src/triangle_geometry.cpp
+        src/geometry/rectangle_geometry.cpp
+        src/geometry/triangle_geometry.cpp
         src/input_manager_internal.hpp
         src/render/render_queue.cpp
         src/render/render_queue_executor.cpp
@@ -201,14 +201,14 @@ target_sources(
             include/svanes/attractor_system.hpp
             include/svanes/audio/audio_manager.hpp
             include/svanes/camera2d.hpp
-            include/svanes/circle_geometry.hpp
-            include/svanes/composite_geometry.hpp
-            include/svanes/convex_polygon_geometry.hpp
+            include/svanes/geometry/circle_geometry.hpp
+            include/svanes/geometry/composite_geometry.hpp
+            include/svanes/geometry/convex_polygon_geometry.hpp
             include/svanes/collision_system.hpp
             include/svanes/collision_pass.hpp
             include/svanes/entity.hpp
             include/svanes/game.hpp
-            include/svanes/geometry.hpp
+            include/svanes/geometry/geometry.hpp
             include/svanes/input.hpp
             include/svanes/kinematic_system.hpp
             include/svanes/MenuUtilities/font_manager.hpp
@@ -220,10 +220,10 @@ target_sources(
             include/svanes/network/network_server.hpp
             include/svanes/network/tcp_msg_pipe.hpp
             include/svanes/network/udp_msg_pipe.hpp
-            include/svanes/primitive_geometry.hpp
+            include/svanes/geometry/primitive_geometry.hpp
             include/svanes/physics_system.hpp
-            include/svanes/rectangle_geometry.hpp
-            include/svanes/triangle_geometry.hpp
+            include/svanes/geometry/rectangle_geometry.hpp
+            include/svanes/geometry/triangle_geometry.hpp
             include/svanes/render/basic_render_types.hpp
             include/svanes/render/render_queue.hpp
             include/svanes/render/render_system.hpp
@@ -294,14 +294,14 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/attractor_system.hpp
     include/svanes/audio/audio_manager.hpp
     include/svanes/camera2d.hpp
-    include/svanes/circle_geometry.hpp
-    include/svanes/composite_geometry.hpp
-    include/svanes/convex_polygon_geometry.hpp
+    include/svanes/geometry/circle_geometry.hpp
+    include/svanes/geometry/composite_geometry.hpp
+    include/svanes/geometry/convex_polygon_geometry.hpp
     include/svanes/collision_system.hpp
     include/svanes/collision_pass.hpp
     include/svanes/entity.hpp
     include/svanes/game.hpp
-    include/svanes/geometry.hpp
+    include/svanes/geometry/geometry.hpp
     include/svanes/input.hpp
     include/svanes/kinematic_system.hpp
     include/svanes/MenuUtilities/font_manager.hpp
@@ -313,10 +313,10 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/network/network_server.hpp
     include/svanes/network/tcp_msg_pipe.hpp
     include/svanes/network/udp_msg_pipe.hpp
-    include/svanes/primitive_geometry.hpp
+    include/svanes/geometry/primitive_geometry.hpp
     include/svanes/physics_system.hpp
-    include/svanes/rectangle_geometry.hpp
-    include/svanes/triangle_geometry.hpp
+    include/svanes/geometry/rectangle_geometry.hpp
+    include/svanes/geometry/triangle_geometry.hpp
     include/svanes/render/basic_render_types.hpp
     include/svanes/render/render_queue.hpp
     include/svanes/render/render_system.hpp
@@ -334,12 +334,12 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/audio/audio_manager.cpp
     src/audio/audio_manager_internal.hpp
     src/camera2d.cpp
-    src/composite_geometry.cpp
-    src/circle_geometry.cpp
-    src/convex_polygon_geometry.cpp
+    src/geometry/composite_geometry.cpp
+    src/geometry/circle_geometry.cpp
+    src/geometry/convex_polygon_geometry.cpp
     src/collision_system.cpp
     src/collision_pass.cpp
-    src/geometry.cpp
+    src/geometry/geometry.cpp
     src/input.cpp
     src/kinematic_system.cpp
     src/MenuUtilities/font_manager.cpp
@@ -353,8 +353,8 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/network/tcp_msg_pipe.cpp
     src/network/udp_msg_pipe.cpp
     src/physics_system.cpp
-    src/rectangle_geometry.cpp
-    src/triangle_geometry.cpp
+    src/geometry/rectangle_geometry.cpp
+    src/geometry/triangle_geometry.cpp
     src/input_manager_internal.hpp
     src/render/render_queue.cpp
     src/render/render_queue_executor.cpp

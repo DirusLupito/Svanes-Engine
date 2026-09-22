@@ -1,6 +1,6 @@
 #pragma once
 
-#include <svanes/rectangle_geometry.hpp>
+#include <svanes/geometry/rectangle_geometry.hpp>
 
 namespace svanes {
 

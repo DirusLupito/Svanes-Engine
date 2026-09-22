@@ -1,6 +1,6 @@
 #include <svanes/attractor_system.hpp>
 
-#include <svanes/geometry.hpp>
+#include <svanes/geometry/geometry.hpp>
 #include <svanes/kinematic_system.hpp>
 #include <svanes/registry.hpp>
 

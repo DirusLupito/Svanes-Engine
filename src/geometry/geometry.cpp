@@ -1,5 +1,5 @@
-#include <svanes/composite_geometry.hpp>
-#include <svanes/geometry.hpp>
+#include <svanes/geometry/composite_geometry.hpp>
+#include <svanes/geometry/geometry.hpp>
 
 #include <cmath>
 #include <stdexcept>

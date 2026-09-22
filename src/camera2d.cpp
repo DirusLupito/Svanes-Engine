@@ -1,8 +1,8 @@
 #include <svanes/camera2d.hpp>
 
-#include <svanes/geometry.hpp>
-#include <svanes/rectangle_geometry.hpp>
-#include <svanes/triangle_geometry.hpp>
+#include <svanes/geometry/geometry.hpp>
+#include <svanes/geometry/rectangle_geometry.hpp>
+#include <svanes/geometry/triangle_geometry.hpp>
 
 #include <algorithm>
 #include <cmath>

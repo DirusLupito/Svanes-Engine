@@ -1,6 +1,6 @@
-#include <svanes/triangle_geometry.hpp>
+#include <svanes/geometry/triangle_geometry.hpp>
 
-#include <svanes/geometry.hpp>
+#include <svanes/geometry/geometry.hpp>
 
 #include <algorithm>
 #include <cmath>

@@ -1,9 +1,9 @@
 #pragma once
 
-#include <svanes/circle_geometry.hpp>
-#include <svanes/convex_polygon_geometry.hpp>
-#include <svanes/rectangle_geometry.hpp>
-#include <svanes/triangle_geometry.hpp>
+#include <svanes/geometry/circle_geometry.hpp>
+#include <svanes/geometry/convex_polygon_geometry.hpp>
+#include <svanes/geometry/rectangle_geometry.hpp>
+#include <svanes/geometry/triangle_geometry.hpp>
 
 #include <variant>
 
