@@ -270,12 +270,17 @@ target_link_libraries(svanes_game_orbital_escalation PRIVATE Svanes::Engine)
 
 add_executable(svanes_game_double_time games/doubleTime/main.cpp games/doubleTime/chris_game.cpp)
 target_link_libraries(svanes_game_double_time PRIVATE Svanes::Engine)
+target_link_libraries(svanes_game_double_time PRIVATE SDL3_image::SDL3_image)
 target_compile_definitions(svanes_game_double_time PRIVATE
     DOUBLE_TIME_GAME_ASSETS_DIR="${CMAKE_SOURCE_DIR}/games/doubleTime/assets"
 )
 
 add_executable(svanes_game_double_time_server games/doubleTime/server_main.cpp)
 target_link_libraries(svanes_game_double_time_server PRIVATE Svanes::Engine)
+target_link_libraries(svanes_game_double_time_server PRIVATE SDL3_image::SDL3_image)
+target_compile_definitions(svanes_game_double_time_server PRIVATE
+    DOUBLE_TIME_GAME_ASSETS_DIR="${CMAKE_SOURCE_DIR}/games/doubleTime/assets"
+)
 
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT svanes_game_orbital_escalation)
 

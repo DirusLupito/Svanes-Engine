@@ -214,6 +214,7 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
 
         SubmitShapes(world, render_queue, camera);
         SubmitSprites(world, render_queue, camera);
+        SubmitTileMaps(world, render_queue, camera);
         SubmitRadialGradients(world, render_queue, camera);
 
         render_queue_executor.Execute(
