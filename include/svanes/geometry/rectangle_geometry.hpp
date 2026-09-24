@@ -76,6 +76,9 @@ public:
      * @return A Rectangle2D representing the axis-aligned bounding box of the
      * rotated rectangle.
      *
+     * @throws std::invalid_argument if the rectangle's center coordinates or
+     * dimensions are not finite or if the dimensions are not positive.
+     *
      */
     Rectangle2D Bounds() const;
 

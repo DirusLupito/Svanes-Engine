@@ -1,6 +1,6 @@
-#include <svanes/triangle_geometry.hpp>
+#include <svanes/geometry/triangle_geometry.hpp>
 
-#include <svanes/geometry.hpp>
+#include <svanes/geometry/geometry.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -89,12 +89,8 @@ Rectangle2D TriangleGeometry::Bounds() const {
         maximum.y = std::max(maximum.y, vertex.y);
     }
 
-    return {
-        minimum.x * 0.5F + maximum.x * 0.5F,
-        minimum.y * 0.5F + maximum.y * 0.5F,
-        maximum.x - minimum.x,
-        maximum.y - minimum.y,
-    };
+    return internal::BoundsFromExtents(minimum.x, minimum.y, maximum.x,
+                                       maximum.y);
 }
 
 } // namespace svanes

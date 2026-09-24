@@ -2,7 +2,7 @@
 
 #include <svanes/async/async_parallel_for_driver.hpp>
 #include <svanes/attractor_system.hpp>
-#include <svanes/geometry.hpp>
+#include <svanes/geometry/geometry.hpp>
 #include <svanes/registry.hpp>
 
 #include <algorithm>

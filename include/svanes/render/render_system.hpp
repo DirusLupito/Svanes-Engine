@@ -1,6 +1,6 @@
 #pragma once
 
-#include <svanes/geometry.hpp>
+#include <svanes/geometry/geometry.hpp>
 #include <svanes/render/basic_render_types.hpp>
 #include <svanes/vector2d.hpp>
 
