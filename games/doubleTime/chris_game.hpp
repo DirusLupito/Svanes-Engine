@@ -3,6 +3,7 @@
 #include "network_protocol.hpp"
 
 #include <svanes/entity.hpp>
+#include <svanes/audio/audio_manager.hpp>
 #include <svanes/game.hpp>
 #include <svanes/geometry/geometry.hpp>
 #include <svanes/network/network_client.hpp>
@@ -34,6 +35,7 @@ private:
 
     svanes::TextureHandle idle_texture{};
     svanes::TextureHandle running_texture{};
+    svanes::MusicHandle music{};
 
     float input_send_timer = 0.0F;
     bool action_requested_since_last_send = false;

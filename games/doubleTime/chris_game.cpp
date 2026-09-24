@@ -74,6 +74,9 @@ void ChrisGame::Initialize(svanes::GameContext &context) {
     running_texture =
         context.assets.LoadTexture(std::string{DOUBLE_TIME_GAME_ASSETS_DIR} +
                                    "/" + kRunningSpriteSheetFilename);
+    music = context.audio.LoadMusic(std::string{DOUBLE_TIME_GAME_ASSETS_DIR} +
+                                    "/" + kChrisMusicFilename);
+    context.audio.PlayMusic(music);
 
     const svanes::TextureHandle test_tile_set = context.assets.LoadTexture(
         std::string{DOUBLE_TIME_GAME_ASSETS_DIR} + "/" + kTestTileSetFilename);
