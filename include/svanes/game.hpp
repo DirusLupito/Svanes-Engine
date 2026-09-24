@@ -42,6 +42,9 @@ class TextureManager;
  * A source tic is one tic from the shared simulation clock, measured in
  * microseconds here. Defaults to DefaultPhysicsStepTics. Set this during
  * Initialize.
+ * - automatic_simulation: Whether the application advances timelines, physics,
+ * and sprite animations before Update(). Set false during Initialize when the
+ * game controls simulation steps itself.
  */
 struct GameContext {
     Registry &world;
@@ -54,6 +57,7 @@ struct GameContext {
     Vector2D &gravity;
     std::uint32_t concurrency = 1;
     TicCount physics_step_tics = DefaultPhysicsStepTics;
+    bool automatic_simulation = true;
 };
 
 /**
@@ -66,7 +70,8 @@ struct GameContext {
  * used to update entity state directly, as it does not account for entity
  * relative time scaling or simulation slowdown.
  *
- * A rendered frame runs zero or one simulation steps.
+ * With automatic_simulation enabled, a rendered frame runs zero or one
+ * simulation steps. Otherwise the game decides when to advance simulation.
  *
  * FIELDS:
  * - world: The engine owned registry containing the game's entities and

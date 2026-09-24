@@ -3,10 +3,13 @@
 #include "game_components.hpp"
 
 #include <svanes/entity.hpp>
+#include <svanes/kinematic_system.hpp>
 #include <svanes/render/basic_render_types.hpp>
+#include <svanes/sprite_animation_system.hpp>
 #include <svanes/vector2d.hpp>
 
 #include <cstdint>
+#include <optional>
 
 namespace svanes {
 
@@ -58,6 +61,41 @@ enum class GooseState : std::uint8_t {
 };
 
 /**
+ * Local snapshot of a goose, including the engine components changed by simulation.
+ * Texture handles refer to this process's assets and are not network identifiers.
+ *
+ * FIELDS:
+ * - transform: Position and orientation.
+ * - motion: Velocity, acceleration, and motion limits.
+ * - timeline: Local clock and its accumulated progress.
+ * - sprite: The displayed texture and source rectangle.
+ * - animation: Animation progress, or empty for an idle sprite.
+ * - state: The chosen animation state.
+ * - grounded: Whether the last collision pass found supporting ground.
+ * - fly_time_remaining: Remaining flight budget in timeline tics.
+ * - dash_timer: Remaining dash duration in timeline tics.
+ * - dash_cooldown: Time before another dash, in timeline tics.
+ * - fire_cooldown: Time before another shot, in timeline tics.
+ * - knockback_timer: Remaining loss of control, in timeline tics.
+ * - invincible_timer: Remaining protection from knockback, in timeline tics.
+ */
+struct GooseSnapshot {
+    svanes::Transform transform;
+    svanes::Kinematic2D motion;
+    svanes::Timeline timeline;
+    svanes::Sprite sprite;
+    std::optional<svanes::SpriteAnimation> animation;
+    GooseState state;
+    bool grounded;
+    svanes::TicCount fly_time_remaining;
+    svanes::TicCount dash_timer;
+    svanes::TicCount dash_cooldown;
+    svanes::TicCount fire_cooldown;
+    svanes::TicCount knockback_timer;
+    svanes::TicCount invincible_timer;
+};
+
+/**
  * The player character. Owns one entity and moves it by writing to the engine's
  * Kinematic2D component, letting Gravity and AdvanceKinematics do the integration.
  *
@@ -89,6 +127,33 @@ public:
      * @throws std::logic_error if the goose has not been spawned.
      */
     void Update(const svanes::FrameContext& frame, const GooseIntent& intent);
+
+    /**
+     * Applies input and advances timers after a physics step. Receives elapsed
+     * simulation time explicitly so the same step can be replayed.
+     * @param world The registry containing the goose.
+     * @param intent The input for this step.
+     * @param delta_tics The goose's elapsed local timeline tics.
+     * @throws std::logic_error if the goose has not been spawned.
+     */
+    void Advance(svanes::Registry& world, const GooseIntent& intent,
+                 svanes::TicCount delta_tics);
+
+    /**
+     * Captures the controller and engine state needed to replay movement.
+     * @param world The registry containing the goose.
+     * @return A local snapshot of this goose.
+     * @throws std::logic_error if the goose has not been spawned.
+     */
+    GooseSnapshot Capture(const svanes::Registry& world) const;
+
+    /**
+     * Restores a snapshot onto the same goose without spawning another entity.
+     * @param world The registry containing the goose.
+     * @param snapshot A snapshot previously captured from this goose.
+     * @throws std::logic_error if the goose has not been spawned.
+     */
+    void Restore(svanes::Registry& world, const GooseSnapshot& snapshot);
 
     /**
      * Switches the goose to an animation state, swapping the texture and attaching
@@ -129,7 +194,6 @@ private:
     svanes::TextureHandle walk_texture{};
 
     GooseState state = GooseState::Idle;
-    float time_in_state = 0.0F;
 
     // whether the goose is standing on solid geometry, recalculated every frame
     // from the collision normals in ResolveCollisions
@@ -145,24 +209,24 @@ private:
     float fly_rise_acceleration = 4600.0F;
 
     // flight is a budget rather than a cooldown: it drains while flying and
-    // refills to max_fly_seconds on landing, so the goose cannot hover forever
-    float max_fly_seconds = 2.0F;
-    float fly_time_remaining = 0.0F;
+    // refills to max_fly_tics on landing, so the goose cannot hover forever
+    svanes::TicCount max_fly_tics = svanes::SecondsToTics(2.0);
+    svanes::TicCount fly_time_remaining = 0;
 
     float dash_speed = 1400.0F;
-    float dash_seconds = 0.15F;
-    float dash_cooldown_seconds = 1.0F;
+    svanes::TicCount dash_tics = svanes::SecondsToTics(0.15);
+    svanes::TicCount dash_cooldown_tics = svanes::SecondsToTics(1.0);
 
     // counts down while a dash is running, during which horizontal input is ignored
-    float dash_timer = 0.0F;
+    svanes::TicCount dash_timer = 0;
 
-    float dash_cooldown = 0.0F;
-    float fire_cooldown = 0.0F;
+    svanes::TicCount dash_cooldown = 0;
+    svanes::TicCount fire_cooldown = 0;
 
     // counts down while the goose is being knocked back, during which it ignores
     // player input so a hit cannot be immediately walked off
-    float knockback_timer = 0.0F;
+    svanes::TicCount knockback_timer = 0;
 
     // counts down after a hit, during which further knockback is ignored
-    float invincible_timer = 0.0F;
+    svanes::TicCount invincible_timer = 0;
 };

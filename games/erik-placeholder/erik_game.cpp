@@ -30,8 +30,10 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 #include <string>
 #include <variant>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -119,6 +121,11 @@ void CreateSolidBlock(
 
 }
 
+ErikGame::ErikGame(std::optional<GooseNetworkConfiguration> configuration)
+    : network_configuration(std::move(configuration))
+{
+}
+
 void ErikGame::Initialize(svanes::GameContext& context)
 {
     // the world gravity vector, applied by the engine every frame to any entity
@@ -195,6 +202,15 @@ void ErikGame::Initialize(svanes::GameContext& context)
     context.world.GetComponent<svanes::Sprite>(orb).source = svanes::Rectangle2D{
         64.0F, 64.0F, 128.0F, 128.0F};
 
+    if (network_configuration) {
+        network = std::make_unique<GooseNetwork>(*network_configuration);
+        simulation = std::make_unique<GooseSimulation>();
+        simulation->Initialize(context, network->Peers());
+        initial_state_hash = GooseSimulation::Hash(simulation->Capture(context.world));
+        rollback = std::make_unique<GooseRollback>(*simulation, *network);
+        return;
+    }
+
     // TASK 2C, auto-moving entity: the enemy. It takes no input, and is walked
     // along its path by the game in Update.
     enemy.Spawn(context.world, {kEnemyPathCenterX, kEnemyPathY}, kEnemySize, kEnemyHealth);
@@ -218,6 +234,30 @@ void ErikGame::Update(const svanes::FrameContext& frame)
         frame.camera.scale_mode = frame.camera.scale_mode == svanes::ScaleMode::Constant
             ? svanes::ScaleMode::Proportional
             : svanes::ScaleMode::Constant;
+    }
+
+    if (network) {
+        if (frame.input.WasPressed(svanes::Key::Enter)) {
+            network->RequestReady(initial_state_hash);
+        }
+        network->Update();
+        rollback->Update(frame);
+        const auto status = rollback->Status();
+        if (status != last_network_status) {
+            std::cout << "Peer " << network->LocalPeer().value << ": " << status << '\n';
+            last_network_status = status;
+        }
+        if (network->IsReady()) {
+            network_diagnostic_tics += std::min(frame.real_delta_tics,
+                svanes::TicsPerSecond - network_diagnostic_tics);
+            if (network_diagnostic_tics >= svanes::TicsPerSecond) {
+                std::cout << "Peer " << network->LocalPeer().value << ": "
+                    << rollback->Diagnostics() << '\n';
+                network_diagnostic_tics = 0;
+            }
+        }
+        UpdateCamera(frame, simulation->PlayerEntity(network->LocalPeer()));
+        return;
     }
 
     // TASK 4, controls: the raw keyboard and mouse state is read into a GooseIntent
@@ -266,32 +306,7 @@ void ErikGame::Update(const svanes::FrameContext& frame)
 
     goose.Update(frame, intent);
 
-    // the camera follows by finding which world position currently sits at the
-    // anchor point on screen, then shifting by however far the goose is from it.
-    // Working through the anchor this way keeps the follow correct at any zoom,
-    // scale mode or window size, since the camera itself does that conversion.
-    const svanes::Transform& goose_transform = frame.world.GetComponent<svanes::Transform>(goose.GetEntity());
-    const svanes::Rectangle2D anchor = frame.camera.ScreenToWorld(
-        {frame.output_width * kCameraAnchorX, frame.output_height * kCameraAnchorY, 0.0F, 0.0F}
-    );
-
-    frame.camera.x += goose_transform.x - anchor.x;
-    frame.camera.y += goose_transform.y - anchor.y;
-
-    const svanes::Rectangle2D view = frame.camera.ScreenToWorld({
-        frame.output_width * 0.5F, frame.output_height * 0.5F,
-        static_cast<float>(frame.output_width), static_cast<float>(frame.output_height)
-    });
-
-    svanes::Transform& sky = frame.world.GetComponent<svanes::Transform>(background);
-    sky.x = view.x;
-    sky.y = view.y;
-
-    svanes::Rectangle2D& sky_body = std::get<svanes::Rectangle2D>(
-        frame.world.GetComponent<svanes::SolidShape>(background).geometry
-    );
-    sky_body.width = view.width * kSkyMargin;
-    sky_body.height = view.height * kSkyMargin;
+    UpdateCamera(frame, goose.GetEntity());
 
     elapsed_seconds += delta_seconds;
 
@@ -334,6 +349,38 @@ void ErikGame::Update(const svanes::FrameContext& frame)
             goose.ApplyKnockback(frame.world, contact[0].normal, kContactKnockback);
         }
     }
+}
+
+void ErikGame::UpdateCamera(const svanes::FrameContext& frame, svanes::Entity player)
+{
+
+    // the camera follows by finding which world position currently sits at the
+    // anchor point on screen, then shifting by however far the goose is from it.
+    // Working through the anchor this way keeps the follow correct at any zoom,
+    // scale mode or window size, since the camera itself does that conversion.
+    const svanes::Transform& goose_transform = frame.world.GetComponent<svanes::Transform>(player);
+    const svanes::Rectangle2D anchor = frame.camera.ScreenToWorld(
+        {frame.output_width * kCameraAnchorX, frame.output_height * kCameraAnchorY, 0.0F, 0.0F}
+    );
+
+    frame.camera.x += goose_transform.x - anchor.x;
+    frame.camera.y += goose_transform.y - anchor.y;
+
+    const svanes::Rectangle2D view = frame.camera.ScreenToWorld({
+        frame.output_width * 0.5F, frame.output_height * 0.5F,
+        static_cast<float>(frame.output_width), static_cast<float>(frame.output_height)
+    });
+
+    svanes::Transform& sky = frame.world.GetComponent<svanes::Transform>(background);
+    sky.x = view.x;
+    sky.y = view.y;
+
+    svanes::Rectangle2D& sky_body = std::get<svanes::Rectangle2D>(
+        frame.world.GetComponent<svanes::SolidShape>(background).geometry
+    );
+    sky_body.width = view.width * kSkyMargin;
+    sky_body.height = view.height * kSkyMargin;
+
 }
 
 bool ErikGame::ShouldQuit() const

@@ -255,6 +255,9 @@ add_executable(
     games/erik-placeholder/main.cpp
     games/erik-placeholder/erik_game.cpp
     games/erik-placeholder/goose.cpp
+    games/erik-placeholder/goose_simulation.cpp
+    games/erik-placeholder/goose_network.cpp
+    games/erik-placeholder/goose_rollback.cpp
     games/erik-placeholder/enemy.cpp
     games/erik-placeholder/bullets.cpp
 )

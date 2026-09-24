@@ -5,9 +5,18 @@
 
 #include "enemy.hpp"
 #include "goose.hpp"
+#include "goose_network.hpp"
+#include "goose_simulation.hpp"
+#include "goose_rollback.hpp"
 
 class ErikGame final : public svanes::IGame {
 public:
+    /**
+     * Selects single-player combat or a fixed-roster multiplayer movement session.
+     * @param configuration The network roster, or empty for single-player.
+     */
+    explicit ErikGame(std::optional<GooseNetworkConfiguration> configuration = std::nullopt);
+
     /**
      * Builds the starting world: gravity, the background, the static geometry, and
      * the entities the game begins with.
@@ -31,6 +40,21 @@ public:
     bool ShouldQuit() const override;
 
 private:
+    /**
+     * Keeps the camera on the local player and sizes the sky to the view.
+     * @param frame The current rendering context.
+     * @param player The local goose entity to follow.
+     */
+    void UpdateCamera(const svanes::FrameContext& frame, svanes::Entity player);
+
+    std::optional<GooseNetworkConfiguration> network_configuration;
+    std::unique_ptr<GooseNetwork> network;
+    std::unique_ptr<GooseSimulation> simulation;
+    std::unique_ptr<GooseRollback> rollback;
+    std::uint64_t initial_state_hash = 0;
+    std::string last_network_status;
+    svanes::TicCount network_diagnostic_tics = 0;
+
     svanes::Entity orb{};
 
     // the sky, kept centered on the camera and sized to cover the view every frame

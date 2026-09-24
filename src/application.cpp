@@ -80,6 +80,7 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
     // game context after initialization. Each rendered frame runs zero or one
     // steps. Slow frames slow simulated time without changing step size.
     const TicCount physics_step_tics = game_context.physics_step_tics;
+    const bool automatic_simulation = game_context.automatic_simulation;
 
     if (physics_step_tics == 0) {
         throw std::invalid_argument("The physics step must be positive.");
@@ -127,7 +128,9 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
         const TicCount real_delta_tics = current_tics - previous_tics;
         previous_tics = current_tics;
 
-        pending_tics += real_delta_tics;
+        if (automatic_simulation) {
+            pending_tics += real_delta_tics;
+        }
 
 
         //
@@ -176,7 +179,7 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
         // the same number of simulation steps. ONLY their local elapsed time
         // differ. Normal rate timelines follow completed simulation time,
         // not real time. Discarded steps never advance the simulation.
-        if (pending_tics >= physics_step_tics) {
+        if (automatic_simulation && pending_tics >= physics_step_tics) {
             AdvanceTimelines(world, physics_step_tics);
             AdvancePhysics(world, gravity, parallel_for,
                            [&](std::span<const PhysicsTimeStep> steps) {
