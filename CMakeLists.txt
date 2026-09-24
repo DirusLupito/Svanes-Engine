@@ -160,11 +160,13 @@ target_sources(
         src/audio/audio_manager.cpp
         src/audio/audio_manager_internal.hpp
         src/camera2d.cpp
-        src/circle_geometry.cpp
-        src/convex_polygon_geometry.cpp
+        src/geometry/composite_geometry.cpp
+        src/geometry/circle_geometry.cpp
+        src/geometry/convex_polygon_geometry.cpp
         src/collision_system.cpp
+        src/tilemaps/tilemap.cpp
         src/collision_pass.cpp
-        src/geometry.cpp
+        src/geometry/geometry.cpp
         src/input.cpp
         src/kinematic_system.cpp
         src/MenuUtilities/font_manager.cpp
@@ -181,8 +183,8 @@ target_sources(
         src/network/tcp_msg_pipe.cpp
         src/network/udp_msg_pipe.cpp
         src/physics_system.cpp
-        src/rectangle_geometry.cpp
-        src/triangle_geometry.cpp
+        src/geometry/rectangle_geometry.cpp
+        src/geometry/triangle_geometry.cpp
         src/input_manager_internal.hpp
         src/render/render_queue.cpp
         src/render/render_queue_executor.cpp
@@ -203,13 +205,15 @@ target_sources(
             include/svanes/attractor_system.hpp
             include/svanes/audio/audio_manager.hpp
             include/svanes/camera2d.hpp
-            include/svanes/circle_geometry.hpp
-            include/svanes/convex_polygon_geometry.hpp
+            include/svanes/geometry/circle_geometry.hpp
+            include/svanes/geometry/composite_geometry.hpp
+            include/svanes/geometry/convex_polygon_geometry.hpp
             include/svanes/collision_system.hpp
+            include/svanes/tilemaps/tilemap.hpp
             include/svanes/collision_pass.hpp
             include/svanes/entity.hpp
             include/svanes/game.hpp
-            include/svanes/geometry.hpp
+            include/svanes/geometry/geometry.hpp
             include/svanes/input.hpp
             include/svanes/kinematic_system.hpp
             include/svanes/MenuUtilities/font_manager.hpp
@@ -223,9 +227,10 @@ target_sources(
             include/svanes/network/network_server.hpp
             include/svanes/network/tcp_msg_pipe.hpp
             include/svanes/network/udp_msg_pipe.hpp
+            include/svanes/geometry/primitive_geometry.hpp
             include/svanes/physics_system.hpp
-            include/svanes/rectangle_geometry.hpp
-            include/svanes/triangle_geometry.hpp
+            include/svanes/geometry/rectangle_geometry.hpp
+            include/svanes/geometry/triangle_geometry.hpp
             include/svanes/render/basic_render_types.hpp
             include/svanes/render/render_queue.hpp
             include/svanes/render/render_system.hpp
@@ -273,19 +278,24 @@ add_executable(
 )
 target_link_libraries(svanes_game_orbital_escalation PRIVATE Svanes::Engine)
 
-add_executable(svanes_game_chris games/chris-placeholder/main.cpp games/chris-placeholder/chris_game.cpp)
-target_link_libraries(svanes_game_chris PRIVATE Svanes::Engine)
-target_compile_definitions(svanes_game_chris PRIVATE
-    CHRIS_GAME_ASSETS_DIR="${CMAKE_SOURCE_DIR}/games/chris-placeholder/assets"
+add_executable(svanes_game_double_time games/doubleTime/main.cpp games/doubleTime/chris_game.cpp)
+target_link_libraries(svanes_game_double_time PRIVATE Svanes::Engine)
+target_link_libraries(svanes_game_double_time PRIVATE SDL3_image::SDL3_image)
+target_compile_definitions(svanes_game_double_time PRIVATE
+    DOUBLE_TIME_GAME_ASSETS_DIR="${CMAKE_SOURCE_DIR}/games/doubleTime/assets"
 )
 
-add_executable(svanes_game_chris_server games/chris-placeholder/server_main.cpp)
-target_link_libraries(svanes_game_chris_server PRIVATE Svanes::Engine)
+add_executable(svanes_game_double_time_server games/doubleTime/server_main.cpp)
+target_link_libraries(svanes_game_double_time_server PRIVATE Svanes::Engine)
+target_link_libraries(svanes_game_double_time_server PRIVATE SDL3_image::SDL3_image)
+target_compile_definitions(svanes_game_double_time_server PRIVATE
+    DOUBLE_TIME_GAME_ASSETS_DIR="${CMAKE_SOURCE_DIR}/games/doubleTime/assets"
+)
 
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT svanes_game_orbital_escalation)
 
 set_target_properties(
-    svanes_engine svanes_game_erik svanes_game_orbital_escalation svanes_game_chris svanes_game_chris_server
+    svanes_engine svanes_game_erik svanes_game_orbital_escalation svanes_game_double_time svanes_game_double_time_server
     PROPERTIES
         CXX_EXTENSIONS OFF
         ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/$<CONFIG>"
@@ -299,13 +309,15 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/attractor_system.hpp
     include/svanes/audio/audio_manager.hpp
     include/svanes/camera2d.hpp
-    include/svanes/circle_geometry.hpp
-    include/svanes/convex_polygon_geometry.hpp
+    include/svanes/geometry/circle_geometry.hpp
+    include/svanes/geometry/composite_geometry.hpp
+    include/svanes/geometry/convex_polygon_geometry.hpp
     include/svanes/collision_system.hpp
+    include/svanes/tilemaps/tilemap.hpp
     include/svanes/collision_pass.hpp
     include/svanes/entity.hpp
     include/svanes/game.hpp
-    include/svanes/geometry.hpp
+    include/svanes/geometry/geometry.hpp
     include/svanes/input.hpp
     include/svanes/kinematic_system.hpp
     include/svanes/MenuUtilities/font_manager.hpp
@@ -319,9 +331,10 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/network/network_server.hpp
     include/svanes/network/tcp_msg_pipe.hpp
     include/svanes/network/udp_msg_pipe.hpp
+    include/svanes/geometry/primitive_geometry.hpp
     include/svanes/physics_system.hpp
-    include/svanes/rectangle_geometry.hpp
-    include/svanes/triangle_geometry.hpp
+    include/svanes/geometry/rectangle_geometry.hpp
+    include/svanes/geometry/triangle_geometry.hpp
     include/svanes/render/basic_render_types.hpp
     include/svanes/render/render_queue.hpp
     include/svanes/render/render_system.hpp
@@ -339,11 +352,13 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/audio/audio_manager.cpp
     src/audio/audio_manager_internal.hpp
     src/camera2d.cpp
-    src/circle_geometry.cpp
-    src/convex_polygon_geometry.cpp
+    src/geometry/composite_geometry.cpp
+    src/geometry/circle_geometry.cpp
+    src/geometry/convex_polygon_geometry.cpp
     src/collision_system.cpp
+    src/tilemaps/tilemap.cpp
     src/collision_pass.cpp
-    src/geometry.cpp
+    src/geometry/geometry.cpp
     src/input.cpp
     src/kinematic_system.cpp
     src/MenuUtilities/font_manager.cpp
@@ -360,8 +375,8 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/network/tcp_msg_pipe.cpp
     src/network/udp_msg_pipe.cpp
     src/physics_system.cpp
-    src/rectangle_geometry.cpp
-    src/triangle_geometry.cpp
+    src/geometry/rectangle_geometry.cpp
+    src/geometry/triangle_geometry.cpp
     src/input_manager_internal.hpp
     src/render/render_queue.cpp
     src/render/render_queue_executor.cpp

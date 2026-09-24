@@ -12,17 +12,23 @@
 namespace svanes {
 
 /**
- *
+ * Concrete implementation of a MsgPipe using TCP protocol.
+ * Uses ZMQ_ROUTER and ZMQ_DEALER socket types
  */
 class TcpMsgPipe final : public MsgPipe {
 public:
     /**
-     *
+     * Creates a router socket bound to the local port.
+     * 
+     * @param local_port The port number to bind the socket to.
      */
     explicit TcpMsgPipe(std::uint16_t local_port);
 
     /**
-     *
+     * Creates a dealer socket and connects to a remote host.
+     * 
+     * @param remote_host The hostname of the remote peer the socket will be bound to.
+     * @param remote_port The port number of the remote peer the socket will be bound to.
      */
     TcpMsgPipe(const std::string &remote_host, std::uint16_t remote_port);
 

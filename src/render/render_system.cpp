@@ -1,4 +1,5 @@
 #include <svanes/render/render_system.hpp>
+#include <svanes/tilemaps/tilemap.hpp>
 
 #include <svanes/camera2d.hpp>
 #include <svanes/registry.hpp>
@@ -7,6 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <stdexcept>
 #include <variant>
 
@@ -234,6 +236,89 @@ void SubmitSprites(const Registry &world, RenderQueue &render_queue,
                 render_queue.DrawTexture(sprite.texture, *destination,
                                          transform.rotation, z_order,
                                          sprite.blend_mode);
+            }
+        });
+}
+
+void SubmitTileMaps(const Registry &world, RenderQueue &render_queue,
+                    const Camera2D &camera) {
+    world.ForEach<Transform, TileMap>(
+        [&](Entity entity, const Transform &transform, const TileMap &tile_map) {
+            if (tile_map.columns == 0 || tile_map.rows == 0 ||
+                tile_map.tile_width == 0 || tile_map.tile_height == 0 ||
+                tile_map.atlas_tile_width == 0 ||
+                tile_map.atlas_tile_height == 0 ||
+                tile_map.atlas_columns == 0 || tile_map.atlas_rows == 0) {
+                throw std::invalid_argument(
+                    "TileMap dimensions and atlas layout must be positive.");
+            }
+
+            const std::uint64_t expected_cell_count =
+                static_cast<std::uint64_t>(tile_map.columns) * tile_map.rows;
+            if (expected_cell_count != tile_map.cells.size()) {
+                throw std::invalid_argument(
+                    "TileMap cell count must match its row and column counts.");
+            }
+
+            const std::uint64_t atlas_tile_count =
+                static_cast<std::uint64_t>(tile_map.atlas_columns) *
+                tile_map.atlas_rows;
+            const std::int32_t z_order = ZOrderOf(world, entity);
+
+            // Loop through and render each tile in the tilemap
+            for (std::uint32_t row = 0; row < tile_map.rows; ++row) {
+                for (std::uint32_t column = 0; column < tile_map.columns;
+                     ++column) {
+                    const std::size_t cell_index =
+                        static_cast<std::size_t>(row) * tile_map.columns +
+                        column;
+                    const TileId tile_id =
+                        tile_map.cells[cell_index].tile_id;
+                    
+                    // Skip empty cells
+                    if (tile_id == 0) {
+                        continue;
+                    }
+
+                    const std::uint64_t atlas_index = tile_id - 1;
+                    if (atlas_index >= atlas_tile_count) {
+                        throw std::invalid_argument(
+                            "TileMap cell references a tile outside its atlas.");
+                    }
+
+                    // Get the correct position in the tileset for the sprite we want
+                    // to render to this tile
+                    const std::uint32_t atlas_column =
+                        static_cast<std::uint32_t>(atlas_index %
+                                                   tile_map.atlas_columns);
+                    const std::uint32_t atlas_row =
+                        static_cast<std::uint32_t>(atlas_index /
+                                                   tile_map.atlas_columns);
+                    // Create a Rectangle2D for this tile and put it into the rendering pipeline
+                    const Rectangle2D source{
+                        (static_cast<float>(atlas_column) + 0.5F) *
+                            static_cast<float>(tile_map.atlas_tile_width),
+                        (static_cast<float>(atlas_row) + 0.5F) *
+                            static_cast<float>(tile_map.atlas_tile_height),
+                        static_cast<float>(tile_map.atlas_tile_width),
+                        static_cast<float>(tile_map.atlas_tile_height)};
+                    const Rectangle2D geometry{
+                        (static_cast<float>(column) + 0.5F) *
+                            static_cast<float>(tile_map.tile_width),
+                        (static_cast<float>(row) + 0.5F) *
+                            static_cast<float>(tile_map.tile_height),
+                        static_cast<float>(tile_map.tile_width),
+                        static_cast<float>(tile_map.tile_height)};
+                    const auto destination =
+                        camera.PrepareForRendering(transform, geometry);
+                    if (!destination) {
+                        continue;
+                    }
+
+                    render_queue.DrawTexture(tile_map.atlas, source,
+                                             *destination, transform.rotation,
+                                             z_order, tile_map.blend_mode);
+                }
             }
         });
 }

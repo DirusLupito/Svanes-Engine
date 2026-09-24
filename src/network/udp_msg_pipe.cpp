@@ -8,6 +8,8 @@
 namespace svanes {
 
 UdpMsgPipe::UdpMsgPipe(std::uint16_t local_port)
+    // Binds the local port to a dgram socket.
+    // dgram is used to enable UDP
     : socket(context, zmq::socket_type::dgram) {
     socket.set(zmq::sockopt::linger, 0);
     socket.bind(MakeUdpEndpoint("*", local_port));
@@ -66,11 +68,14 @@ bool UdpMsgPipe::Send(ConnectionId destination, const NetworkMessage &message) {
 }
 
 bool UdpMsgPipe::Receive(ReceivedMessage &received) {
+    // Check if there is a packet waiting, if not returns false.
+    // If there is, pulls the address frame from the socket
     zmq::message_t address;
     if (!socket.recv(address, zmq::recv_flags::dontwait).has_value()) {
         return false;
     }
 
+    // Pulls the message content from the socket
     zmq::message_t body;
     if (!socket.recv(body, zmq::recv_flags::none).has_value()) {
         throw std::runtime_error(
@@ -83,6 +88,7 @@ bool UdpMsgPipe::Receive(ReceivedMessage &received) {
         route.pop_back();
     }
     received.source = RememberConnection(route);
+    // Reads the body into the message reference
     const auto *bytes = body.data<std::byte>();
     received.message =
         NetworkMessage{std::vector<std::byte>(bytes, bytes + body.size())};

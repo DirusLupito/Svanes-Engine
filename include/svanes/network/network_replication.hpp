@@ -1,7 +1,7 @@
 #pragma once
 
 #include <svanes/entity.hpp>
-#include <svanes/geometry.hpp>
+#include <svanes/geometry/geometry.hpp>
 #include <svanes/registry.hpp>
 
 #include <functional>

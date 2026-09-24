@@ -1,13 +1,14 @@
 #include <svanes/collision_system.hpp>
 
-#include <svanes/circle_geometry.hpp>
-#include <svanes/geometry.hpp>
-#include <svanes/rectangle_geometry.hpp>
-#include <svanes/triangle_geometry.hpp>
+#include <svanes/geometry/circle_geometry.hpp>
+#include <svanes/geometry/geometry.hpp>
+#include <svanes/geometry/rectangle_geometry.hpp>
+#include <svanes/geometry/triangle_geometry.hpp>
 
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <limits>
 #include <optional>
 #include <span>

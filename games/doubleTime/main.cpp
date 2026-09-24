@@ -27,7 +27,7 @@ int32_t main(int32_t argc, char **argv) {
     const ClientRole role = argc > 2 ? ParseRole(argv[2]) : ClientRole::Character;
 
     svanes::Application application({
-        .title = "Chris's Game",
+        .title = "Double Time",
         .width = 1920,
         .height = 1080,
     });

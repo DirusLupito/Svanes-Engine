@@ -8,6 +8,7 @@ namespace svanes {
 
 TcpMsgPipe::TcpMsgPipe(std::uint16_t local_port)
     : socket(context, zmq::socket_type::router), listening(true) {
+    // Binds the socket to the given local port
     socket.set(zmq::sockopt::linger, 0);
     socket.set(zmq::sockopt::router_mandatory, 1);
     socket.bind(MakeTcpEndpoint("*", local_port));
@@ -17,6 +18,7 @@ TcpMsgPipe::TcpMsgPipe(const std::string &remote_host,
                        std::uint16_t remote_port)
     : socket(context, zmq::socket_type::dealer), listening(false) {
     socket.set(zmq::sockopt::linger, 0);
+    // Connects the socket to the given remote host
     socket.connect(MakeTcpEndpoint(remote_host, remote_port));
     RememberConnection(MakeTcpEndpoint(remote_host, remote_port));
 }
@@ -26,6 +28,7 @@ bool TcpMsgPipe::Send(ConnectionId destination, const NetworkMessage &message) {
     const zmq::const_buffer body =
         zmq::buffer(message.bytes.data(), message.bytes.size());
 
+    // If this is a client pipe, send and return whether or not it was accepted
     if (!listening) {
         return socket.send(body, zmq::send_flags::dontwait).has_value();
     }
@@ -47,6 +50,7 @@ bool TcpMsgPipe::Receive(ReceivedMessage &received) {
         return false;
     }
 
+    // If this is a server pipe, get peer information and pull the message body
     if (listening) {
         if (!frame.more()) {
             throw std::runtime_error("TcpMsgPipe: routing identity has no body.");
@@ -73,6 +77,7 @@ bool TcpMsgPipe::Receive(ReceivedMessage &received) {
         throw std::runtime_error("TcpMsgPipe: expected exactly one payload frame.");
     }
 
+    // Read message content into the provided reference.
     const auto *bytes = frame.data<std::byte>();
     received.message =
         NetworkMessage{std::vector<std::byte>(bytes, bytes + frame.size())};

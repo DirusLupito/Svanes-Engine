@@ -12,6 +12,7 @@
 #include <svanes/render/render_queue.hpp>
 #include <svanes/render/render_system.hpp>
 #include <svanes/sprite_animation_system.hpp>
+#include <svanes/tilemaps/tilemap.hpp>
 #include <svanes/timeline_system.hpp>
 #include <svanes/vector2d.hpp>
 
@@ -217,6 +218,7 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
 
         SubmitShapes(world, render_queue, camera);
         SubmitSprites(world, render_queue, camera);
+        SubmitTileMaps(world, render_queue, camera);
         SubmitRadialGradients(world, render_queue, camera);
 
         render_queue_executor.Execute(
