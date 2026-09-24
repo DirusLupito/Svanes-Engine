@@ -3,8 +3,10 @@
 #include "game_components.hpp"
 
 #include <svanes/entity.hpp>
+#include <svanes/geometry.hpp>
 #include <svanes/render/basic_render_types.hpp>
 #include <svanes/vector2d.hpp>
+#include <svanes/timeline_system.hpp>
 
 namespace svanes {
 
@@ -34,12 +36,27 @@ struct EnemyIntent {
 };
 
 /**
+ * Captures the enemy's movement, health, and firing timer for replay.
+ * FIELDS:
+ * - transform: The enemy's position and orientation.
+ * - health: Its current and maximum hit points.
+ * - fire_cooldown: Timeline tics remaining before another shot.
+ * - alive: Whether the enemy is visible, collidable, and able to act.
+ */
+struct EnemySnapshot {
+    svanes::Transform transform;
+    Health health;
+    svanes::TicCount fire_cooldown = 0;
+    bool alive = true;
+};
+
+/**
  * A damageable enemy that moves toward a point and shoots. It moves by writing its
  * Transform directly rather than through Kinematic2D, so gravity does not apply and
  * it follows whatever path the game hands it.
  *
- * The enemy is destroyed once its Health runs out, after which it is no longer
- * alive and must not be asked for its position.
+ * When Health runs out, its render and collision components are removed. The
+ * entity stays reserved so rollback can revive it without changing shot ownership.
  */
 class Enemy final {
 public:
@@ -67,7 +84,30 @@ public:
     void Update(const svanes::FrameContext& frame, const EnemyIntent& intent);
 
     /**
-     * Subtracts from the enemy's health, destroying its entity if that brings it to
+     * Moves and fires using an explicit elapsed time, including during replay.
+     * @param world The registry holding the enemy.
+     * @param intent The destination and firing controls for this step.
+     * @param delta_tics The elapsed simulation time in timeline tics.
+     */
+    void Advance(svanes::Registry& world, const EnemyIntent& intent, svanes::TicCount delta_tics);
+
+    /**
+     * @param world The registry holding the enemy.
+     * @return The enemy's state at this simulation boundary, including death.
+     * @throws std::logic_error if the enemy has not been spawned.
+     */
+    EnemySnapshot Capture(const svanes::Registry& world) const;
+
+    /**
+     * Restores the enemy, reviving or hiding it without changing its entity identity.
+     * @param world The registry holding the enemy.
+     * @param snapshot The earlier state belonging to this enemy.
+     * @throws std::logic_error if the enemy has not been spawned.
+     */
+    void Restore(svanes::Registry& world, const EnemySnapshot& snapshot);
+
+    /**
+     * Subtracts from the enemy's health, hiding it and removing collision if it reaches
      * zero. Does nothing if the enemy is already dead.
      *
      * @param world The registry holding the enemy entity.
@@ -82,7 +122,7 @@ public:
      *
      * @return The enemy's current world position.
      *
-     * @throws std::logic_error if the enemy is dead, since its entity is gone.
+     * @throws std::logic_error if the enemy is dead.
      */
     svanes::Vector2D Position(svanes::Registry& world) const;
 
@@ -100,8 +140,10 @@ public:
 private:
     svanes::Entity entity = 0;
     float move_speed = 700.0F;
-    float fire_interval = 0.8F;
-    float fire_cooldown = 0.0F;
+    svanes::TicCount fire_interval = 800000;
+    svanes::TicCount fire_cooldown = 0;
     float bullet_speed = 600.0F;
     bool alive = false;
+    bool spawned = false;
+    float body_size = 0.0F;
 };

@@ -8,10 +8,10 @@
 #include <string>
 
 /**
- * Runs the movement simulation from tick-numbered player inputs.
+ * Runs the gameplay simulation from tick-numbered player inputs.
  * Local input is recorded and sent before advancing its tick. Missing remote
- * input repeats that player's last known held controls, with no repeated dash
- * press. When a received input differs from the input used, the controller
+ * input repeats that player's last known held controls and aim, with no repeated
+ * dash press. When a received input differs from the input used, the controller
  * restores the earliest affected snapshot and replays to the current tick.
  *
  * Prediction is limited to 30 ticks beyond confirmed input. History retains
@@ -28,7 +28,7 @@ class GooseRollback final {
 public:
     /**
      * Connects an initialized simulation to its fixed-roster network session.
-     * @param simulation The movement simulation whose tick begins at zero.
+     * @param simulation The gameplay simulation whose tick begins at zero.
      * @param network The session with the same player ordering.
      * @throws std::invalid_argument if the local peer is absent or simulation has advanced.
      */
@@ -88,6 +88,8 @@ private:
      * FIELDS:
      * - move: The latest held horizontal direction.
      * - jump: Whether jump is held.
+     * - fire: Whether the mouse button is held.
+     * - aim_point: The mouse position converted to world space before recording input.
      * - left_pressed: A left press observed since the last consumed input tick.
      * - right_pressed: A right press observed since the last consumed input tick.
      * - left_tap_ticks: Remaining ticks in the left double-tap window.
@@ -96,6 +98,8 @@ private:
     struct LocalControls {
         float move = 0.0F;
         bool jump = false;
+        bool fire = false;
+        svanes::Vector2D aim_point{};
         bool left_pressed = false;
         bool right_pressed = false;
         std::uint32_t left_tap_ticks = 0;
@@ -152,7 +156,7 @@ private:
 
     /**
      * Consumes latched local presses and advances double-tap timers by one tick.
-     * @return The local movement input for the next tick.
+     * @return The local movement and firing input for the next tick.
      */
     GooseIntent TakeLocalInput();
 

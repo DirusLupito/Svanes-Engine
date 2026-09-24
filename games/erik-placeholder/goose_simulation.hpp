@@ -1,6 +1,8 @@
 #pragma once
 
 #include "goose.hpp"
+#include "enemy.hpp"
+#include "bullets.hpp"
 
 #include <svanes/async/async_parallel_for_driver.hpp>
 #include <svanes/network/network_session.hpp>
@@ -12,15 +14,21 @@
 inline constexpr svanes::TicCount GooseStepTics = 10000;
 
 /**
- * Captures the moving players at the boundary before a simulation tick.
+ * Captures the players, enemy, and shots before a simulation tick.
  *
  * FIELDS:
  * - tick: The next input tick to simulate after restoring this snapshot.
  * - geese: Goose snapshots in the simulation's ascending peer order.
+ * - enemy: The enemy's position, health, firing timer, and life state.
+ * - bullets: Live shots in simulation order, with local owner references.
+ * - next_bullet_id: The next shot sequence number, restored before replay.
  */
 struct GooseWorldSnapshot {
     std::uint64_t tick;
     std::vector<GooseSnapshot> geese;
+    EnemySnapshot enemy;
+    std::vector<BulletSnapshot> bullets;
+    std::uint64_t next_bullet_id = 1;
 };
 
 /**
@@ -29,16 +37,19 @@ struct GooseWorldSnapshot {
  * every process applies the same inputs to the same players. A step advances
  * the geese's clocks and engine physics, then applies their controller input
  * and collision response. Render timing and keyboard sampling live outside it.
+ * The enemy follows a path derived from that same tick counter, so replaying
+ * a step gives it the same destination without exchanging enemy positions.
  *
  * Capture and Restore include controller timers, motion, clocks, and animation
- * progress. Restoring does not create entities or replace local texture handles
- * with identifiers from another process. The caller controls when to step,
- * including stepping again from a restored state during rollback.
+ * progress. Restore recreates bullets and restores enemy life while preserving
+ * player and enemy entity identities. Shot ids and ordered collision passes
+ * keep replay independent of the registry ids assigned to recreated bullets.
+ * The caller controls when to step, including replay from a restored state.
  */
 class GooseSimulation final {
 public:
     /**
-     * Spawns one goose for each peer and assigns this game control of simulation.
+     * Spawns one goose for each peer and an enemy, and takes control of simulation.
      * @param context The world and asset services used to create the geese.
      * @param roster The nonempty roster in ascending, unique peer id order.
      * @throws std::invalid_argument if the roster is empty, unsorted, or contains zero ids.
@@ -47,10 +58,10 @@ public:
     void Initialize(svanes::GameContext& context, std::span<const svanes::PeerId> roster);
 
     /**
-     * Advances one fixed movement step using inputs in roster order.
+     * Advances one fixed combat step using inputs in roster order.
      * @param world The registry containing the geese and static arena.
      * @param gravity The world gravity in units per timeline tic squared.
-     * @param inputs One movement intent for each peer. Fire must be false.
+     * @param inputs One movement and firing intent for each peer, with world-space aim.
      * @throws std::invalid_argument for a wrong input count or invalid movement inputs.
      * @throws std::logic_error if the simulation has not been initialized.
      * @throws std::overflow_error if the tick counter is exhausted.
@@ -67,15 +78,15 @@ public:
     GooseWorldSnapshot Capture(const svanes::Registry& world) const;
 
     /**
-     * Hashes movement state in snapshot order using explicit serialized fields.
+     * Hashes movement and combat state using explicit serialized fields in shot order.
      * Local entity ids, texture handles, and presentation state are excluded.
      * @param snapshot The tick boundary to compare across peers.
-     * @return A deterministic diagnostic hash of the recorded movement state.
+     * @return A deterministic diagnostic hash of the recorded gameplay state.
      */
     static std::uint64_t Hash(const GooseWorldSnapshot& snapshot);
 
     /**
-     * Restores the geese and tick counter to an earlier boundary.
+     * Restores the geese, enemy, shots, and tick counter to an earlier boundary.
      * @param world The registry containing the geese.
      * @param snapshot A snapshot captured from this simulation.
      * @throws std::invalid_argument if the snapshot has a different player count.
@@ -107,6 +118,8 @@ private:
     };
 
     std::vector<Player> players;
+    Enemy enemy;
+    std::uint64_t next_bullet_id = 1;
     svanes::AsyncParallelForDriver physics_driver{1};
     std::uint64_t tick = 0;
 };

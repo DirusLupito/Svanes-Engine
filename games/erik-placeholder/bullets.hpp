@@ -4,6 +4,9 @@
 #include <svanes/geometry.hpp>
 #include <svanes/render/basic_render_types.hpp>
 #include <svanes/vector2d.hpp>
+#include <svanes/kinematic_system.hpp>
+#include <svanes/collision_system.hpp>
+#include <svanes/render/render_system.hpp>
 
 #include <vector>
 
@@ -20,10 +23,52 @@ class Registry;
  *
  * FIELDS:
  * - owner: The entity that fired this bullet. Collisions against it are ignored.
+ * - id: The simulation's shot sequence number, or zero before assignment.
+ * - owner_key: The firing peer's id, with zero identifying the enemy.
  */
 struct Bullet {
     svanes::Entity owner = 0;
+    std::uint64_t id = 0;
+    std::uint32_t owner_key = 0;
 };
+
+/**
+ * Stores a shot independently of its temporary registry entity.
+ * FIELDS:
+ * - bullet: The shot's identity and owner.
+ * - transform: Its position and orientation.
+ * - motion: Its velocity and acceleration.
+ * - timeline: Its elapsed simulation time.
+ * - shape: Its rendered body.
+ * - collider: Its collision body.
+ */
+struct BulletSnapshot {
+    Bullet bullet;
+    svanes::Transform transform;
+    svanes::Kinematic2D motion;
+    svanes::Timeline timeline;
+    svanes::SolidShape shape;
+    svanes::Collider2D collider;
+};
+
+/**
+ * @param world The registry containing the shots.
+ * @return Bullet entities in shot order, using local creation order for unnumbered shots.
+ */
+std::vector<svanes::Entity> OrderedBullets(const svanes::Registry& world);
+
+/**
+ * @param world The registry containing the shots.
+ * @return All live shots in simulation order.
+ */
+std::vector<BulletSnapshot> CaptureBullets(const svanes::Registry& world);
+
+/**
+ * Replaces live shots with the saved set, including shots destroyed since capture.
+ * @param world The registry containing the shots and their unchanged owner entities.
+ * @param snapshots The shots to recreate in simulation order.
+ */
+void RestoreBullets(svanes::Registry& world, const std::vector<BulletSnapshot>& snapshots);
 
 /**
  * A single bullet-versus-entity collision reported back to the game. The bullet
@@ -63,8 +108,9 @@ void SpawnBullet(
 );
 
 /**
- * Advances every bullet in the world for one frame, destroying those that left the
- * bounds or struck something, and returns what they struck.
+ * Checks bullets after physics, destroying those that left the bounds or struck
+ * something, and returns what they struck. Shots are checked in simulation order
+ * and collision targets in entity order so replay resolves competing hits consistently.
  *
  * Hits are reported, not applied. The caller decides what being hit does to a
  * target, so the same bullet can knock the goose backwards and damage the enemy.
