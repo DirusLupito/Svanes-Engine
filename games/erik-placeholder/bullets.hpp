@@ -1,7 +1,7 @@
 #pragma once
 
 #include <svanes/entity.hpp>
-#include <svanes/geometry.hpp>
+#include <svanes/geometry/geometry.hpp>
 #include <svanes/render/basic_render_types.hpp>
 #include <svanes/vector2d.hpp>
 #include <svanes/kinematic_system.hpp>

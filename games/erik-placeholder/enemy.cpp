@@ -4,7 +4,7 @@
 
 #include <svanes/collision_system.hpp>
 #include <svanes/game.hpp>
-#include <svanes/geometry.hpp>
+#include <svanes/geometry/geometry.hpp>
 #include <svanes/registry.hpp>
 #include <svanes/render/render_system.hpp>
 
