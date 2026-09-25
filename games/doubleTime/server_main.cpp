@@ -9,18 +9,17 @@
 #include <svanes/network/udp_msg_pipe.hpp>
 #include <svanes/physics_system.hpp>
 #include <svanes/registry.hpp>
+#include <svanes/network/server_runtime.hpp>
 #include <svanes/timeline_system.hpp>
 #include <svanes/vector2d.hpp>
 
 #include <SDL3/SDL.h>
 
 #include <algorithm>
-#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <optional>
 #include <span>
-#include <thread>
 #include <variant>
 
 namespace {
@@ -289,23 +288,21 @@ int32_t main() {
     std::optional<ServerCharacter> character;
     bool platform_trigger_requested = false;
 
-    svanes::AsyncParallelForDriver driver(1);
     const svanes::Vector2D gravity{
         0.0F,
         svanes::PerSecondSquaredToPerTicSquared(kGravityPerSecondSquared)};
 
-    auto previous_tick = std::chrono::steady_clock::now();
-    svanes::TicCount pending_tics = 0;
-
-    while (true) {
-        for (const svanes::NetworkMessage &message :
-             network_server.PollInbound()) {
+    svanes::ServerRuntime runtime(network_server, world, gravity);
+    float character_start_y = 0.0F;
+    svanes::Transform platform_start_transform{};
+    runtime.Run(
+        [&](const svanes::NetworkMessage &message) {
             const PlayerInputMessage input = message.As<PlayerInputMessage>();
 
             if (input.role == ClientRole::Platform) {
                 platform_trigger_requested =
                     platform_trigger_requested || input.action_requested;
-                continue;
+                return;
             }
 
             if (!character.has_value()) {
@@ -324,35 +321,21 @@ int32_t main() {
             character->horizontal_input = input.horizontal;
             character->jump_requested =
                 character->jump_requested || input.action_requested;
-        }
-
-        const auto now = std::chrono::steady_clock::now();
-        pending_tics += static_cast<svanes::TicCount>(
-            std::chrono::duration_cast<std::chrono::microseconds>(now -
-                                                                  previous_tick)
-                .count());
-        previous_tick = now;
-
-        if (character.has_value()) {
-            svanes::Kinematic2D &motion =
-                world.GetComponent<svanes::Kinematic2D>(character->entity);
-            motion.velocity_x =
-                character->horizontal_input *
-                svanes::PerSecondToPerTic(kCharacterMoveSpeedPerSecond);
-        }
-
-        while (pending_tics >= svanes::DefaultPhysicsStepTics) {
-            svanes::AdvanceTimelines(world, svanes::DefaultPhysicsStepTics);
-            float character_start_y = 0.0F;
+        },
+        [&]() {
             if (character.has_value()) {
+                svanes::Kinematic2D &motion =
+                    world.GetComponent<svanes::Kinematic2D>(character->entity);
+                motion.velocity_x =
+                    character->horizontal_input *
+                    svanes::PerSecondToPerTic(kCharacterMoveSpeedPerSecond);
                 character_start_y =
                     world.GetComponent<svanes::Transform>(character->entity).y;
             }
-            const svanes::Transform platform_start_transform =
+            platform_start_transform =
                 world.GetComponent<svanes::Transform>(platform.entity);
-            svanes::AdvancePhysics(
-                world, gravity, driver,
-                [&](std::span<const svanes::PhysicsTimeStep>) {
+        },
+        [&](std::span<const svanes::PhysicsTimeStep>) {
                     AdvancePlatform(world, platform, platform_trigger_requested,
                                     platform_hold_tics);
                     platform_trigger_requested = false;
@@ -398,9 +381,8 @@ int32_t main() {
                         }
                         character->jump_requested = false;
                     }
-                });
-            pending_tics -= svanes::DefaultPhysicsStepTics;
-
+        },
+        [&]() {
             for (const svanes::EntityTransformState &state :
                  svanes::CollectTransformStates(world)) {
                 const bool movement_key_held =
@@ -410,8 +392,5 @@ int32_t main() {
                 network_server.Broadcast(DoubleTimeEntityState{
                     state.network_entity, state.transform, movement_key_held});
             }
-        }
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    }
+        });
 }

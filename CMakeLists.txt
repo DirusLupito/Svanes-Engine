@@ -177,6 +177,7 @@ target_sources(
         src/network/network_message.cpp
         src/network/network_replication.cpp
         src/network/network_server.cpp
+        src/network/server_runtime.cpp
         src/network/tcp_msg_pipe.cpp
         src/network/udp_msg_pipe.cpp
         src/physics_system.cpp
@@ -222,6 +223,7 @@ target_sources(
             include/svanes/network/network_message.hpp
             include/svanes/network/network_replication.hpp
             include/svanes/network/network_server.hpp
+            include/svanes/network/server_runtime.hpp
             include/svanes/network/tcp_msg_pipe.hpp
             include/svanes/network/udp_msg_pipe.hpp
             include/svanes/geometry/primitive_geometry.hpp
@@ -323,6 +325,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/network/network_message.hpp
     include/svanes/network/network_replication.hpp
     include/svanes/network/network_server.hpp
+    include/svanes/network/server_runtime.hpp
     include/svanes/network/tcp_msg_pipe.hpp
     include/svanes/network/udp_msg_pipe.hpp
     include/svanes/geometry/primitive_geometry.hpp
@@ -365,6 +368,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/network/network_message.cpp
     src/network/network_replication.cpp
     src/network/network_server.cpp
+    src/network/server_runtime.cpp
     src/network/tcp_msg_pipe.cpp
     src/network/udp_msg_pipe.cpp
     src/physics_system.cpp
