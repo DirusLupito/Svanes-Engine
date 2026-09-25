@@ -53,7 +53,7 @@ private:
     std::vector<svanes::Entity> boundary_entities;
 
     // How many NPC entities to spawn in orbit around the planet
-    uint32_t num_npc_entities_to_spawn = 120;
+    uint32_t num_npc_entities_to_spawn = 480;
 
     // The maximum magnitude of the initial velocity of the NPC entities
     // as given by the magnitude of the tangent to the vector from the planet to
