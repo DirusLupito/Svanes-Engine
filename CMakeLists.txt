@@ -191,7 +191,9 @@ target_sources(
         src/render/texture_manager_internal.hpp
         src/registry.cpp
         src/sprite_animation_system.cpp
+        src/spatial/hgrid2d.cpp
         src/timeline_system.cpp
+        src/utility/hash.cpp
         src/utility/rational_number.cpp
     PUBLIC
         FILE_SET HEADERS
@@ -232,7 +234,9 @@ target_sources(
             include/svanes/render/texture_manager.hpp
             include/svanes/registry.hpp
             include/svanes/sprite_animation_system.hpp
+            include/svanes/spatial/hgrid2d.hpp
             include/svanes/timeline_system.hpp
+            include/svanes/utility/hash.hpp
             include/svanes/utility/rational_number.hpp
             include/svanes/vector2d.hpp
 )
@@ -331,7 +335,9 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/render/texture_manager.hpp
     include/svanes/registry.hpp
     include/svanes/sprite_animation_system.hpp
+    include/svanes/spatial/hgrid2d.hpp
     include/svanes/timeline_system.hpp
+    include/svanes/utility/hash.hpp
     include/svanes/utility/rational_number.hpp
     include/svanes/vector2d.hpp
 )
@@ -373,6 +379,8 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/render/texture_manager_internal.hpp
     src/registry.cpp
     src/sprite_animation_system.cpp
+    src/spatial/hgrid2d.cpp
     src/timeline_system.cpp
+    src/utility/hash.cpp
     src/utility/rational_number.cpp
 )
