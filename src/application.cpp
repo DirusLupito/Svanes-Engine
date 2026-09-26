@@ -181,7 +181,8 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
             AdvanceTimelines(world, physics_step_tics);
             AdvancePhysics(world, gravity, parallel_for,
                            [&](std::span<const PhysicsTimeStep> steps) {
-                               game.PhysicsUpdate({world, input, steps});
+                               game.PhysicsUpdate(
+                                   {world, input, steps, parallel_for});
                            });
 
             // Animation uses the delta reported by this timeline pass.

@@ -272,13 +272,15 @@ static void ApplyCollisionAcceleration(
  * acceleration.
  * @param collision_flashes The list to which flashes created by the collisions
  * will be added.
+ * @param driver The driver used for broad and narrow phase collision work.
  */
 static void
 ApplyCollisionAcceleration(svanes::Registry &world,
                            svanes::Entity gameplay_timeline,
                            const std::vector<svanes::Entity> &entities,
-                           std::vector<svanes::Entity> &collision_flashes) {
-    auto collisions = svanes::DetectEntityCollisions(world, entities);
+                           std::vector<svanes::Entity> &collision_flashes,
+                           svanes::AsyncParallelForDriver &driver) {
+    auto collisions = svanes::DetectEntityCollisions(world, entities, driver);
 
     // For the sake of deterministic collision response across architectures
     // and the internet, we want all collisions to be processed in the same
@@ -752,7 +754,8 @@ void OrbitalEscalationGame::PhysicsUpdate(
     }
 
     ApplyCollisionAcceleration(physics.world, gameplay_timeline_entity,
-                               collidable_entities, collision_flashes);
+                               collidable_entities, collision_flashes,
+                               physics.parallel_for);
 }
 
 bool OrbitalEscalationGame::ShouldQuit() const { return should_quit; }

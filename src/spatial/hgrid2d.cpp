@@ -1,3 +1,4 @@
+#include <svanes/async/async_parallel_for_driver.hpp>
 #include <svanes/spatial/hgrid2d.hpp>
 #include <svanes/utility/hash.hpp>
 
@@ -266,7 +267,13 @@ std::vector<Entity> HGrid2D::Query(const Rectangle2D &bounds) const {
     return matches;
 }
 
-std::vector<std::pair<Entity, Entity>> HGrid2D::BuildCollisionPairs() const {
+std::vector<std::pair<Entity, Entity>>
+HGrid2D::BuildCollisionPairs(AsyncParallelForDriver &driver,
+                             std::size_t batch_size) const {
+
+    if (batch_size == 0) {
+        throw std::invalid_argument("Collision batch size must be positive.");
+    }
 
     // General idea: If we query every single entity in the HGrid, we will
     // be wasting several queries on entities that have already been checked,
@@ -308,10 +315,10 @@ std::vector<std::pair<Entity, Entity>> HGrid2D::BuildCollisionPairs() const {
         }
     }
 
-    // List of pairs of entity IDs to pass to the narrow phase
-    // collision detection. Will contain every pair of
-    // entities that the broad phase has determined could potentially collide.
-    std::vector<std::pair<Entity, Entity>> pairs;
+    // List of work items to distribute to the workers. Each work item is a pair
+    // of an index into the entries vector and the level that entry is on.
+    std::vector<std::pair<std::size_t, std::size_t>> work_items;
+    work_items.reserve(entries.size());
 
     // For every occupied level starting from the lowest...
     for (std::size_t i = 0; i < occupied_levels.size(); ++i) {
@@ -320,50 +327,114 @@ std::vector<std::pair<Entity, Entity>> HGrid2D::BuildCollisionPairs() const {
             // ... and for every entity in that cell...
             for (std::size_t a : indices) {
 
-                // Find all entities on the same level or above that could
-                // potentially collide with the current entity.
-
-                for (std::size_t j = i; j < occupied_levels.size(); ++j) {
-                    VisitCells(occupied_levels[j], entries[a].bounds,
-                               [&](const std::vector<std::size_t> &candidates) {
-                                   for (std::size_t b : candidates) {
-                                       // For every entity in the same level
-                                       // that could potentially collide with
-                                       // the current entity, it's a candidate
-                                       // for narrow phase collision detection
-                                       // if its index in the input vector is
-                                       // greater than the current entity's
-                                       // index. This ensures that we only check
-                                       // each pair of entities in the same
-                                       // level once in the narrow phase, and
-                                       // that we don't check an entity against
-                                       // itself.
-                                       if (i == j && b <= a) {
-                                           continue;
-                                       }
-
-                                       // Broad phase collision detection: is
-                                       // satisfied if the AABBs of the two
-                                       // entities intersect.
-                                       if (Intersects(entries[a].bounds,
-                                                      entries[b].bounds)) {
-                                           const Entity entity_a =
-                                               entries[a].entity;
-                                           const Entity entity_b =
-                                               entries[b].entity;
-
-                                           // For consistent narrow phase
-                                           // results, we always put the smaller
-                                           // entity ID first in the pair.
-                                           pairs.emplace_back(
-                                               std::min(entity_a, entity_b),
-                                               std::max(entity_a, entity_b));
-                                       }
-                                   }
-                               });
-                }
+                // ...we will do something!
+                // (naive way to amalgamate these 3 loops into one so we
+                // can pass it to a single parallel for loop)
+                work_items.emplace_back(a, i);
             }
         }
+    }
+
+    // Lists of pairs of entity IDs to pass to the narrow phase collision
+    // detection, one per worker. Together they contain every pair of entities
+    // that the broad phase has determined could potentially collide.
+    const std::uint32_t worker_count =
+        work_items.size() <= batch_size ? 1 : driver.GetConcurrency();
+
+    // Each worker will have its own vector of pairs to avoid contention on a
+    // single vector. We will merge them all together at the end.
+    std::vector<std::vector<std::pair<Entity, Entity>>> worker_pairs(
+        worker_count);
+
+    // The work function that will be executed by each worker. Each worker will
+    // be given a range of work items to process, and will append any pairs of
+    // entities that could potentially collide to its own vector of pairs.
+    const auto find_pairs = [&](std::size_t begin, std::size_t end,
+                                std::uint32_t worker_index) {
+        // Figure out which vector of pairs this worker should append to.
+        auto &pairs = worker_pairs[worker_index];
+
+        // For every work item in the range assigned to this worker...
+        for (std::size_t index = begin; index < end; ++index) {
+            const auto [a, i] = work_items[index];
+
+            // Find all entities on the same level or above that could
+            // potentially collide with the current entity.
+
+            for (std::size_t j = i; j < occupied_levels.size(); ++j) {
+                VisitCells(occupied_levels[j], entries[a].bounds,
+                           [&](const std::vector<std::size_t> &candidates) {
+                               for (std::size_t b : candidates) {
+                                   // For every entity in the same level
+                                   // that could potentially collide with
+                                   // the current entity, it's a candidate
+                                   // for narrow phase collision detection
+                                   // if its index in the input vector is
+                                   // greater than the current entity's
+                                   // index. This ensures that we only check
+                                   // each pair of entities in the same
+                                   // level once in the narrow phase, and
+                                   // that we don't check an entity against
+                                   // itself.
+                                   if (i == j && b <= a) {
+                                       continue;
+                                   }
+
+                                   // Broad phase collision detection: is
+                                   // satisfied if the AABBs of the two
+                                   // entities intersect.
+                                   if (Intersects(entries[a].bounds,
+                                                  entries[b].bounds)) {
+                                       const Entity entity_a =
+                                           entries[a].entity;
+                                       const Entity entity_b =
+                                           entries[b].entity;
+
+                                       // For consistent narrow phase
+                                       // results, we always put the smaller
+                                       // entity ID first in the pair.
+                                       pairs.emplace_back(
+                                           std::min(entity_a, entity_b),
+                                           std::max(entity_a, entity_b));
+                                   }
+                               }
+                           });
+            }
+        }
+    };
+
+
+    // If the number of work items is less than or equal to the batch size, we
+    // can just run the work function in the main thread without creating any
+    // worker threads.
+
+    if (work_items.size() <= batch_size) {
+        find_pairs(0, work_items.size(), 0);
+    } else {
+        // Otherwise, we make use of our driver.
+        driver.ParallelFor(work_items.size(), batch_size, find_pairs);
+    }
+
+    // If there is only one worker (i.e. we set up the driver with a concurrency
+    // of 1), there's no need to merge results, we simply move ownership and
+    // return.
+    if (worker_pairs.size() == 1) {
+        return std::move(worker_pairs.front());
+    }
+
+    // The number of potentially colliding pairs across all workers.
+    std::size_t pair_count = 0;
+    for (const auto &pairs : worker_pairs) {
+        pair_count += pairs.size();
+    }
+
+    // Now that we know exactly how many pairs there are, we can reserve space
+    // in the final vector and then fill it in with each worker's vector tacked
+    // onto the end of the previous one.
+    std::vector<std::pair<Entity, Entity>> pairs;
+    pairs.reserve(pair_count);
+    for (const auto &local_pairs : worker_pairs) {
+        pairs.insert(pairs.end(), local_pairs.begin(), local_pairs.end());
     }
 
     return pairs;

@@ -13,6 +13,8 @@
 
 namespace svanes {
 
+class AsyncParallelForDriver;
+
 /**
  * Represents an entry in a 2D hierarchical grid (HGrid) spatial partitioning
  * structure. Each entry consists of an entity and its associated axis-aligned
@@ -76,12 +78,18 @@ public:
      * Builds a list of all unique pairs of entities that have overlapping
      * bounding boxes in the grid. Each pair is represented as a std::pair of
      * entity IDs. Every pair puts the smaller entity ID first. The order of
-     * the pairs in the returned vector is unspecified.
+     * the pairs in the returned vector is unspecified. The grid must remain
+     * unchanged until this call returns.
      *
+     * @param driver The driver used to distribute entry searches.
+     * @param batch_size The maximum number of entries per parallel work batch.
+     * Must be positive. Defaults to 16.
      * @return A vector of unique pairs of entity IDs that have overlapping
      * bounding boxes.
      */
-    std::vector<std::pair<Entity, Entity>> BuildCollisionPairs() const;
+    std::vector<std::pair<Entity, Entity>>
+    BuildCollisionPairs(AsyncParallelForDriver &driver,
+                        std::size_t batch_size = 16) const;
 
 private:
     /**
