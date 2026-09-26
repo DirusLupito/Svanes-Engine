@@ -22,9 +22,9 @@
 
 constexpr std::int32_t kSquarePixels = 300;
 constexpr float kPlanetRadius = 4200.0F;
-const svanes::TicCount kCollisionFlashLifetime = svanes::SecondsToTics(5.0);
+const svanes::TicCount kCollisionFlashLifetime = svanes::SecondsToTics(0.5);
 const svanes::TicCount kCollisionFlashExpansionTime =
-    svanes::SecondsToTics(0.5);
+    svanes::SecondsToTics(0.05);
 constexpr float kCollisionFlashInitialRadius = 4000.0F;
 constexpr float kCollisionFlashExpansionRadius = 8000.0F;
 const svanes::TicCount kPauseFlashPeriod = svanes::SecondsToTics(1.0);
@@ -278,7 +278,22 @@ ApplyCollisionAcceleration(svanes::Registry &world,
                            svanes::Entity gameplay_timeline,
                            const std::vector<svanes::Entity> &entities,
                            std::vector<svanes::Entity> &collision_flashes) {
-    const auto collisions = svanes::DetectEntityCollisions(world, entities);
+    auto collisions = svanes::DetectEntityCollisions(world, entities);
+
+    // For the sake of deterministic collision response across architectures
+    // and the internet, we want all collisions to be processed in the same
+    // order. So we sort the pairs of colliding entities. It doesn't really
+    // matter how we sort them, so long as the order is consistent across
+    // platforms. In this case, we assume that entity IDs are consistent across
+    // platforms. If this is incorrect, collision will not necessarily produce
+    // the same results given the same inputs on two different platforms.
+
+    std::sort(collisions.begin(), collisions.end(),
+              [](const svanes::EntityCollision2D &a,
+                 const svanes::EntityCollision2D &b) {
+                  return a.a < b.a || (a.a == b.a && a.b < b.b);
+              });
+
     for (const svanes::EntityCollision2D &pair : collisions) {
         ApplyCollisionAcceleration(world, gameplay_timeline, pair.a, pair.b,
                                    pair.collisions, collision_flashes);

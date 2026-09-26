@@ -32,7 +32,9 @@ struct EntityCollision2D {
  * @param world The registry containing the entities and their components.
  * @param entities A vector of entities to check for collisions.
  * @return A vector of EntityCollision2D objects representing the detected
- * collisions between the entities.
+ * collisions between the entities, in unspecified order. Each pair puts the
+ * smaller entity ID first so games may choose to use this to sort the collisions
+ * in a consistent order if desired.
  */
 std::vector<EntityCollision2D>
 DetectEntityCollisions(const Registry &world,

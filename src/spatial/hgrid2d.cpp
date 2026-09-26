@@ -147,12 +147,110 @@ void HGrid2D::Rebuild(std::span<const HGridEntry2D> input) {
     levels.swap(rebuilt.levels);
 }
 
+// Could have done the exact same thing with a normal function that instead
+// took in a function pointer to a visitor. However, there are two reasons
+// why we use a template here instead:
+// 1. The visitor can be a lambda, meaning I as the programmer don't need to
+// figure out how to pass in the lambda's capture list to an actual function.
+// 2. From what I've read, the compiler can optimize this better via inlining,
+// although I think that's a load of malarkey. Really all I care about is the
+// fact that I can use a lambda.
+//
+// Also, this pattern is "the C++ way" to do things, it is used by the C++
+// standard. For instace: https://eel.is/c++draft/alg.foreach a for each
+// algorithm is something that iterates over a range and applies a function to
+// each element. As it is implemented by the official C++ standard, a template
+// is used, not a function pointer.
+
+template <typename Visitor>
+void HGrid2D::VisitCells(std::size_t level_index, const Rectangle2D &bounds,
+                         const Visitor &visit) const {
+
+    const Level &level = levels[level_index];
+
+    // We are only interested in levels that contain entries.
+    if (level.empty()) {
+        return;
+    }
+
+    // This level is not empty. First, we want to figure out how big the
+    // cells are at this level.
+    const double cell_width =
+        std::ldexp(1.0, static_cast<std::int32_t>(level_index));
+
+    // Now, we want to figure out which cells in this level could contain
+    // entries that intersect the query rectangle. We can do this by
+    // creating a new implicit rectangle with the same center, whose width
+    // is the width of the query rectangle plus the width of a cell, and
+    // whose height is likewise the height of the query rectangle plus the
+    // height of a cell.
+    //
+    // Why don't we just use the query rectangle itself? An entry is stored
+    // in the cell that contains its center, but its rectangle can extend
+    // outside that cell (imagine that part of the rectangle, up to half of
+    // its width and/or height, extend beyond the cell into some adjacent
+    // cell). If we used the query rectangle itself, we could miss entries
+    // whose centers are in cells outside the query rectangle, even though
+    // their rectangles intersect it. Each entry in this level has a width
+    // and height no greater than those of a cell, so its rectangle extends
+    // at most half a cell width from its center in each direction. By
+    // extending the query rectangle by half a cell width in all directions,
+    // we ensure that we find all cells containing entries that could
+    // intersect the query rectangle.
+    const double half_width = bounds.width * 0.5 + cell_width * 0.5;
+    const double half_height = bounds.height * 0.5 + cell_width * 0.5;
+    const auto min_x = CellCoordinate(bounds.x - half_width, cell_width);
+    const auto max_x = CellCoordinate(bounds.x + half_width, cell_width);
+    const auto min_y = CellCoordinate(bounds.y - half_height, cell_width);
+    const auto max_y = CellCoordinate(bounds.y + half_height, cell_width);
+
+
+    // If any of the min/max coordinates are out of range,
+    // we fall back to iterating over all cells in the level.
+    // Also, as an optimization, if the number of cells in the range is
+    // greater than the number of cells in the level, we again fall back to
+    // iterating over all cells in the level. This will skip querying some
+    // (and potentially several orders of magnitude more) cells which are
+    // guaranteed to not contain any entries.
+    if (!min_x || !max_x || !min_y || !max_y ||
+        (static_cast<double>(*max_x) - static_cast<double>(*min_x) + 1.0) *
+                (static_cast<double>(*max_y) - static_cast<double>(*min_y) +
+                 1.0) >
+            static_cast<double>(level.size())) {
+        for (const auto &[cell, indices] : level) {
+            visit(indices);
+        }
+        return;
+    }
+
+    // The core logic of the query: iterate over all cells in the range
+    // defined by the min/max coordinates, and for each cell, check if it is
+    // not empty. If so, we should check if any of the entries in that cell
+    // intersect the query rectangle, and take note of any entries that do
+    // intersect.
+    for (std::int64_t y = *min_y;; ++y) {
+        for (std::int64_t x = *min_x;; ++x) {
+            const auto found = level.find(Cell{x, y});
+            if (found != level.end()) {
+                visit(found->second);
+            }
+            if (x == *max_x) {
+                break;
+            }
+        }
+        if (y == *max_y) {
+            break;
+        }
+    }
+}
+
 std::vector<Entity> HGrid2D::Query(const Rectangle2D &bounds) const {
     ValidateBounds(bounds);
     std::vector<Entity> matches;
 
-    // Helper to check if the entries at the given indices intersect the query
-    // rectangle, and if so, append their entity IDs to the matches vector.
+    // Level vistor function to check if the entries at the given indices
+    // intersect the query rectangle, and if so, append their entity IDs to the
+    // matches vector.
     const auto append_matches = [&](const std::vector<std::size_t> &indices) {
         for (std::size_t index : indices) {
             const HGridEntry2D &entry = entries[index];
@@ -163,83 +261,112 @@ std::vector<Entity> HGrid2D::Query(const Rectangle2D &bounds) const {
     };
 
     for (std::size_t i = 0; i < levels.size(); ++i) {
-        const Level &level = levels[i];
+        VisitCells(i, bounds, append_matches);
+    }
+    return matches;
+}
 
-        // We are only interested in levels that contain entries.
-        if (level.empty()) {
-            continue;
+std::vector<std::pair<Entity, Entity>> HGrid2D::BuildCollisionPairs() const {
+
+    // General idea: If we query every single entity in the HGrid, we will
+    // be wasting several queries on entities that have already been checked,
+    // just by a different entity. For instance, if A is colliding with B,
+    // and we query A, we already found that we're colliding with B.
+    // We do still need to check B, but only if it's colliding with some other
+    // entity C that A is not colliding with.
+    //
+    // So let's query from the ground up. When querying an entity on level i,
+    // we will only check for collisions with entities on levels i and above.
+    // You can see why this works via an inductive argument.
+    // In the base case, we are on the lowest level, level 0.
+    // Everything is above us, so we check everything. Now, assume that we are
+    // on level i+1, and we have already checked all entities on levels 0
+    // through i.  Any collision between an entity on level i+1 and an entity on
+    // one of those lower levels would have already been found when we checked
+    // the lower entity, since level i+1 was above it. So we don't need to check
+    // those lower levels again. We only need to check level i+1 and above,
+    // which is the same rule we started with.
+    //
+    // This handles pairs of entities on different levels. For entities on
+    // the same level, we still need to avoid checking both A against B and
+    // B against A. We do this by only checking entities whose index in the
+    // entries vector is greater than the current entity's index.
+    // This also prevents an entity from checking itself.
+    //
+    // So every pair is considered once: from the lower level if the entities
+    // are on different levels, or from the lower index if they are on the
+    // same level.
+    //
+
+
+    // List of levels that contain at least one entry.
+    // Allows us to skip querying any of the 65 levels that are empty.
+    std::vector<std::size_t> occupied_levels;
+    for (std::size_t i = 0; i < levels.size(); ++i) {
+        if (!levels[i].empty()) {
+            occupied_levels.push_back(i);
         }
+    }
 
-        // This level is not empty. First, we want to figure out how big the
-        // cells are at this level.
-        const double cell_width = std::ldexp(1.0, static_cast<std::int32_t>(i));
+    // List of pairs of entity IDs to pass to the narrow phase
+    // collision detection. Will contain every pair of
+    // entities that the broad phase has determined could potentially collide.
+    std::vector<std::pair<Entity, Entity>> pairs;
 
-        // Now, we want to figure out which cells in this level could contain
-        // entries that intersect the query rectangle. We can do this by
-        // creating a new implicit rectangle with the same center, whose width
-        // is the width of the query rectangle plus the width of a cell, and
-        // whose height is likewise the height of the query rectangle plus the
-        // height of a cell.
-        //
-        // Why don't we just use the query rectangle itself? An entry is stored
-        // in the cell that contains its center, but its rectangle can extend
-        // outside that cell (imagine that part of the rectangle, up to half of
-        // its width and/or height, extend beyond the cell into some adjacent
-        // cell). If we used the query rectangle itself, we could miss entries
-        // whose centers are in cells outside the query rectangle, even though
-        // their rectangles intersect it. Each entry in this level has a width
-        // and height no greater than those of a cell, so its rectangle extends
-        // at most half a cell width from its center in each direction. By
-        // extending the query rectangle by half a cell width in all directions,
-        // we ensure that we find all cells containing entries that could
-        // intersect the query rectangle.
-        const double half_width = bounds.width * 0.5 + cell_width * 0.5;
-        const double half_height = bounds.height * 0.5 + cell_width * 0.5;
-        const auto min_x = CellCoordinate(bounds.x - half_width, cell_width);
-        const auto max_x = CellCoordinate(bounds.x + half_width, cell_width);
-        const auto min_y = CellCoordinate(bounds.y - half_height, cell_width);
-        const auto max_y = CellCoordinate(bounds.y + half_height, cell_width);
+    // For every occupied level starting from the lowest...
+    for (std::size_t i = 0; i < occupied_levels.size(); ++i) {
+        // ... and for every cell in that level...
+        for (const auto &[cell, indices] : levels[occupied_levels[i]]) {
+            // ... and for every entity in that cell...
+            for (std::size_t a : indices) {
 
+                // Find all entities on the same level or above that could
+                // potentially collide with the current entity.
 
-        // If any of the min/max coordinates are out of range,
-        // we fall back to iterating over all cells in the level.
-        // Also, as an optimization, if the number of cells in the range is
-        // greater than the number of cells in the level, we again fall back to
-        // iterating over all cells in the level. This will skip querying some
-        // (and potentially several orders of magnitude more) cells which are
-        // guaranteed to not contain any entries.
-        if (!min_x || !max_x || !min_y || !max_y ||
-            (static_cast<double>(*max_x) - static_cast<double>(*min_x) + 1.0) *
-                    (static_cast<double>(*max_y) - static_cast<double>(*min_y) +
-                     1.0) >
-                static_cast<double>(level.size())) {
-            for (const auto &[cell, indices] : level) {
-                append_matches(indices);
-            }
-            continue;
-        }
+                for (std::size_t j = i; j < occupied_levels.size(); ++j) {
+                    VisitCells(occupied_levels[j], entries[a].bounds,
+                               [&](const std::vector<std::size_t> &candidates) {
+                                   for (std::size_t b : candidates) {
+                                       // For every entity in the same level
+                                       // that could potentially collide with
+                                       // the current entity, it's a candidate
+                                       // for narrow phase collision detection
+                                       // if its index in the input vector is
+                                       // greater than the current entity's
+                                       // index. This ensures that we only check
+                                       // each pair of entities in the same
+                                       // level once in the narrow phase, and
+                                       // that we don't check an entity against
+                                       // itself.
+                                       if (i == j && b <= a) {
+                                           continue;
+                                       }
 
-        // The core logic of the query: iterate over all cells in the range
-        // defined by the min/max coordinates, and for each cell, check if it is
-        // not empty. If so, we should check if any of the entries in that cell
-        // intersect the query rectangle, and take note of any entries that do
-        // intersect.
-        for (std::int64_t y = *min_y;; ++y) {
-            for (std::int64_t x = *min_x;; ++x) {
-                const auto found = level.find(Cell{x, y});
-                if (found != level.end()) {
-                    append_matches(found->second);
+                                       // Broad phase collision detection: is
+                                       // satisfied if the AABBs of the two
+                                       // entities intersect.
+                                       if (Intersects(entries[a].bounds,
+                                                      entries[b].bounds)) {
+                                           const Entity entity_a =
+                                               entries[a].entity;
+                                           const Entity entity_b =
+                                               entries[b].entity;
+
+                                           // For consistent narrow phase
+                                           // results, we always put the smaller
+                                           // entity ID first in the pair.
+                                           pairs.emplace_back(
+                                               std::min(entity_a, entity_b),
+                                               std::max(entity_a, entity_b));
+                                       }
+                                   }
+                               });
                 }
-                if (x == *max_x) {
-                    break;
-                }
-            }
-            if (y == *max_y) {
-                break;
             }
         }
     }
-    return matches;
+
+    return pairs;
 }
 
 } // namespace svanes

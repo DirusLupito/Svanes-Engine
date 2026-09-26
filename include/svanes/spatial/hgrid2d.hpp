@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <span>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace svanes {
@@ -69,6 +70,19 @@ public:
      */
     std::vector<Entity> Query(const Rectangle2D &bounds) const;
 
+    /**
+     * Broad phase collision detection.
+     *
+     * Builds a list of all unique pairs of entities that have overlapping
+     * bounding boxes in the grid. Each pair is represented as a std::pair of
+     * entity IDs. Every pair puts the smaller entity ID first. The order of
+     * the pairs in the returned vector is unspecified.
+     *
+     * @return A vector of unique pairs of entity IDs that have overlapping
+     * bounding boxes.
+     */
+    std::vector<std::pair<Entity, Entity>> BuildCollisionPairs() const;
+
 private:
     /**
      * Represents a cell in the hierarchical grid. Each cell is identified by
@@ -123,6 +137,22 @@ private:
     // Represents a level in the hierarchical grid, which is a mapping from Cell
     // objects to vectors of indices of entries that occupy those cells.
     using Level = std::unordered_map<Cell, std::vector<std::size_t>, CellHash>;
+
+    /**
+     * Visits all cells in the specified level of the grid that intersect with
+     * the given query rectangle. For each cell, the provided visitor function
+     * is called with the indices of entries that occupy that cell.
+     *
+     * @tparam Visitor The type of the visitor function to call for each cell.
+     * @param level_index The index of the level to visit.
+     * @param bounds The axis-aligned bounding box (AABB) to query.
+     * @param visit A visitor function that takes a const reference to a vector
+     * of indices of entries in the visited cell, and performs some operation on
+     * them.
+     */
+    template <typename Visitor>
+    void VisitCells(std::size_t level_index, const Rectangle2D &bounds,
+                    const Visitor &visit) const;
 
     // Represents the entries in the hierarchical grid, where each entry
     // consists of an entity and its associated axis-aligned bounding box
