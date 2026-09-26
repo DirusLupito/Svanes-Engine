@@ -56,9 +56,13 @@ fetch-deps: configure
 build target="": (_check-target target) configure
     {{cmake}} --build --preset {{build-preset-prefix}}-debug --parallel {{ if target == "" { "" } else { "--target " + (if target == "erik" { "svanes_game_erik" } else if target == "orbitalEscalation" { "svanes_game_orbital_escalation" } else if target == "doubleTime-server" { "svanes_game_double_time_server" } else { "svanes_game_double_time" }) } }}
 
-# Configure and build all targets in Release mode.
-release: configure
-    {{cmake}} --build --preset {{build-preset-prefix}}-release --parallel
+# Build Release for one game, or all games when no target is given.
+release target="": (_check-target target) configure
+    {{cmake}} --build --preset {{build-preset-prefix}}-release --parallel {{ if target == "" { "" } else { "--target " + (if target == "erik" { "svanes_game_erik" } else if target == "orbitalEscalation" { "svanes_game_orbital_escalation" } else if target == "doubleTime-server" { "svanes_game_double_time_server" } else { "svanes_game_double_time" }) } }}
+
+# Package a native Release game with assets (Windows ZIP or Linux tar.gz).
+package target: (_check-target target) configure
+    {{cmake}} --build --preset {{build-preset-prefix}}-release --target package-{{target}} --parallel
 
 # Fail fast with a clear message if an unknown game target was given.
 _check-target target:

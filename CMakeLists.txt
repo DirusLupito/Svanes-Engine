@@ -268,7 +268,7 @@ add_executable(
 )
 target_link_libraries(svanes_game_erik PRIVATE Svanes::Engine)
 target_compile_definitions(svanes_game_erik PRIVATE
-    ERIK_GAME_ASSETS_DIR="${CMAKE_SOURCE_DIR}/games/erik-placeholder/assets"
+    ERIK_GAME_ASSETS_DIR="assets/erik"
 )
 
 add_executable(
@@ -282,14 +282,14 @@ add_executable(svanes_game_double_time games/doubleTime/main.cpp games/doubleTim
 target_link_libraries(svanes_game_double_time PRIVATE Svanes::Engine)
 target_link_libraries(svanes_game_double_time PRIVATE SDL3_image::SDL3_image)
 target_compile_definitions(svanes_game_double_time PRIVATE
-    DOUBLE_TIME_GAME_ASSETS_DIR="${CMAKE_SOURCE_DIR}/games/doubleTime/assets"
+    DOUBLE_TIME_GAME_ASSETS_DIR="assets/doubleTime"
 )
 
 add_executable(svanes_game_double_time_server games/doubleTime/server_main.cpp)
 target_link_libraries(svanes_game_double_time_server PRIVATE Svanes::Engine)
 target_link_libraries(svanes_game_double_time_server PRIVATE SDL3_image::SDL3_image)
 target_compile_definitions(svanes_game_double_time_server PRIVATE
-    DOUBLE_TIME_GAME_ASSETS_DIR="${CMAKE_SOURCE_DIR}/games/doubleTime/assets"
+    DOUBLE_TIME_GAME_ASSETS_DIR="assets/doubleTime"
 )
 
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT svanes_game_orbital_escalation)
@@ -389,3 +389,9 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/timeline_system.cpp
     src/utility/rational_number.cpp
 )
+
+include(cmake/game_packages.cmake)
+svanes_game_package(svanes_game_erik erik erik-placeholder erik)
+svanes_game_package(svanes_game_orbital_escalation orbitalEscalation orbitalEscalation orbitalEscalation)
+svanes_game_package(svanes_game_double_time doubleTime doubleTime doubleTime)
+svanes_game_package(svanes_game_double_time_server doubleTime-server doubleTime doubleTime)

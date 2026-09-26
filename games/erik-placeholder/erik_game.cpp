@@ -1,3 +1,5 @@
+#include <svanes/asset_path.hpp>
+
 /**
  * Where each of the six assigned tasks is implemented. Every entry is tagged inline
  * at the code it refers to, so searching this project for "TASK" finds all of them.
@@ -178,7 +180,7 @@ void ErikGame::Initialize(svanes::GameContext& context)
     );
 
     const svanes::TextureHandle orb_texture =
-        context.assets.LoadTexture(std::string{ERIK_GAME_ASSETS_DIR} + "/darkworld_spawn_swirlingorb_idle.png");
+        context.assets.LoadTexture(svanes::AssetPath(ERIK_GAME_ASSETS_DIR) + "/darkworld_spawn_swirlingorb_idle.png");
 
     orb = context.world.CreateEntity();
     context.world.AddComponent<svanes::Transform>(orb, svanes::Transform{

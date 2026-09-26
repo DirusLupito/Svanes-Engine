@@ -1,3 +1,5 @@
+#include <svanes/asset_path.hpp>
+
 #include "tilemap_parser.hpp"
 #include "network_protocol.hpp"
 
@@ -278,7 +280,7 @@ int32_t main() {
 
     const svanes::Entity ground_entity = world.CreateEntity();
     svanes::TileMap tile_map = CreateDoubleTimeTileMapFromPng(
-        std::string{DOUBLE_TIME_GAME_ASSETS_DIR} + "/" +
+        svanes::AssetPath(DOUBLE_TIME_GAME_ASSETS_DIR) + "/" +
         kChrisTileMapFilename);
     world.AddComponent<svanes::Transform>(
         ground_entity,

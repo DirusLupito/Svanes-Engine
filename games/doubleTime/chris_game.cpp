@@ -1,3 +1,5 @@
+#include <svanes/asset_path.hpp>
+
 #include "chris_game.hpp"
 #include "tilemap_parser.hpp"
 
@@ -69,20 +71,20 @@ void ChrisGame::Initialize(svanes::GameContext &context) {
                                                kChrisWorldHeight}});
 
     idle_texture =
-        context.assets.LoadTexture(std::string{DOUBLE_TIME_GAME_ASSETS_DIR} +
+        context.assets.LoadTexture(svanes::AssetPath(DOUBLE_TIME_GAME_ASSETS_DIR) +
                                    "/" + kIdleSpriteSheetFilename);
     running_texture =
-        context.assets.LoadTexture(std::string{DOUBLE_TIME_GAME_ASSETS_DIR} +
+        context.assets.LoadTexture(svanes::AssetPath(DOUBLE_TIME_GAME_ASSETS_DIR) +
                                    "/" + kRunningSpriteSheetFilename);
-    music = context.audio.LoadMusic(std::string{DOUBLE_TIME_GAME_ASSETS_DIR} +
+    music = context.audio.LoadMusic(svanes::AssetPath(DOUBLE_TIME_GAME_ASSETS_DIR) +
                                     "/" + kChrisMusicFilename);
     context.audio.PlayMusic(music);
 
     const svanes::TextureHandle test_tile_set = context.assets.LoadTexture(
-        std::string{DOUBLE_TIME_GAME_ASSETS_DIR} + "/" + kTestTileSetFilename);
+        svanes::AssetPath(DOUBLE_TIME_GAME_ASSETS_DIR) + "/" + kTestTileSetFilename);
     const svanes::Entity tile_map_entity = context.world.CreateEntity();
     svanes::TileMap tile_map = CreateDoubleTimeTileMapFromPng(
-        std::string{DOUBLE_TIME_GAME_ASSETS_DIR} + "/" +
+        svanes::AssetPath(DOUBLE_TIME_GAME_ASSETS_DIR) + "/" +
             kChrisTileMapFilename,
         test_tile_set);
     context.world.AddComponent<svanes::Transform>(

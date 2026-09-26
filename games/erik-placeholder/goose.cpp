@@ -1,3 +1,5 @@
+#include <svanes/asset_path.hpp>
+
 #include "goose.hpp"
 
 #include "bullets.hpp"
@@ -52,8 +54,8 @@ void Goose::Spawn(svanes::GameContext& context, float x, float y)
         throw std::logic_error("Goose::Spawn called twice on the same goose.");
     }
 
-    idle_texture = context.assets.LoadTexture(std::string{ERIK_GAME_ASSETS_DIR} + "/goose.png");
-    walk_texture = context.assets.LoadTexture(std::string{ERIK_GAME_ASSETS_DIR} + "/goose_walk.png");
+    idle_texture = context.assets.LoadTexture(svanes::AssetPath(ERIK_GAME_ASSETS_DIR) + "/goose.png");
+    walk_texture = context.assets.LoadTexture(svanes::AssetPath(ERIK_GAME_ASSETS_DIR) + "/goose_walk.png");
 
     const svanes::Rectangle2D body{
         .width = kBodyWidth,
