@@ -35,6 +35,7 @@ build-preset-prefix := if os() == "windows" {
 }
 
 bin-dir := "./out/build/" + configure-preset + "/bin/Debug/"
+release-bin-dir := "./out/build/" + configure-preset + "/bin/Release/"
 
 exe-suffix := if os() == "windows" { ".exe" } else { "" }
 
@@ -56,26 +57,29 @@ fetch-deps: configure
 build target="": (_check-target target) configure
     {{cmake}} --build --preset {{build-preset-prefix}}-debug --parallel {{ if target == "" { "" } else { "--target " + (if target == "erik" { "svanes_game_erik" } else if target == "orbitalEscalation" { "svanes_game_orbital_escalation" } else if target == "doubleTime-server" { "svanes_game_double_time_server" } else { "svanes_game_double_time" }) } }}
 
-# Configure and build all targets in Release mode.
-release: configure
-    {{cmake}} --build --preset {{build-preset-prefix}}-release --parallel
+# Configure and build in Release mode. Pass a target to build only that game; leave blank to build everything.
+release target="": (_check-target target) configure
+    {{cmake}} --build --preset {{build-preset-prefix}}-release --parallel {{ if target == "" { "" } else { "--target " + (if target == "erik" { "svanes_game_erik" } else if target == "orbitalEscalation" { "svanes_game_orbital_escalation" } else if target == "doubleTime-server" { "svanes_game_double_time_server" } else { "svanes_game_double_time" }) } }}
 
 # Fail fast with a clear message if an unknown game target was given.
 _check-target target:
     @{{ if target == "" { "" } else if target == "erik" { "" } else if target == "orbitalEscalation" { "" } else if target == "doubleTime" { "" } else if target == "doubleTime-server" { "" } else { error("no game named '" + target + "'. Try: doubleTime, doubleTime-server, erik, orbitalEscalation, or leave it blank.") } }}
 
-# Build and launch a game: doubleTime, doubleTime-server, erik, or orbitalEscalation. Leave blank for Orbital Escalation.
+# Build and launch an optimized game: doubleTime, doubleTime-server, erik, or orbitalEscalation. Leave blank for Orbital Escalation.
 # doubleTime launches two clients at once, since it's a two-player game - point doubleTime-server's
 # host at each other over a network to test with more than one machine.
-run target="": (_check-target target) (build if target == "" { "orbitalEscalation" } else { target })
+run target="": (_check-target target) (release if target == "" { "orbitalEscalation" } else { target })
+    {{ if target == "doubleTime" { "just _run-double-time-duo " + release-bin-dir } else { release-bin-dir + (if target == "" { "svanes_game_orbital_escalation" } else if target == "erik" { "svanes_game_erik" } else if target == "orbitalEscalation" { "svanes_game_orbital_escalation" } else if target == "doubleTime-server" { "svanes_game_double_time_server" } else { "svanes_game_double_time" }) + exe-suffix } }}
+
+debug target="": (_check-target target) (build if target == "" { "orbitalEscalation" } else { target })
     {{ if target == "doubleTime" { "just _run-double-time-duo" } else { bin-dir + (if target == "" { "svanes_game_orbital_escalation" } else if target == "erik" { "svanes_game_erik" } else if target == "orbitalEscalation" { "svanes_game_orbital_escalation" } else if target == "doubleTime-server" { "svanes_game_double_time_server" } else { "svanes_game_double_time" }) + exe-suffix } }}
 
 # Launch two doubleTime clients at once, one controlling the character and the other the
 # platform. The first is backgrounded so the second still blocks the terminal until you
 # close it; the first keeps running until you close its window too.
-_run-double-time-duo:
-    {{ if os() == "windows" { "Start-Process -FilePath " + bin-dir + "svanes_game_double_time" + exe-suffix + " -ArgumentList '127.0.0.1 character'" } else { bin-dir + "svanes_game_double_time" + exe-suffix + " 127.0.0.1 character &" } }}
-    {{ if os() == "windows" { "& " + bin-dir + "svanes_game_double_time" + exe-suffix + " 127.0.0.1 platform" } else { bin-dir + "svanes_game_double_time" + exe-suffix + " 127.0.0.1 platform" } }}
+_run-double-time-duo directory=bin-dir:
+    {{ if os() == "windows" { "Start-Process -FilePath " + directory + "svanes_game_double_time" + exe-suffix + " -ArgumentList '127.0.0.1 character'" } else { directory + "svanes_game_double_time" + exe-suffix + " 127.0.0.1 character &" } }}
+    {{ if os() == "windows" { "& " + directory + "svanes_game_double_time" + exe-suffix + " 127.0.0.1 platform" } else { directory + "svanes_game_double_time" + exe-suffix + " 127.0.0.1 platform" } }}
 
 # Remove compiled outputs while retaining the configured build tree.
 clean: configure
