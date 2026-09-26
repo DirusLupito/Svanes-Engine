@@ -165,7 +165,7 @@ SessionPacket DecodeSessionPacket(SessionId session,
                                   const NetworkMessage &message);
 
 /**
- * Sends and receives game messages through an owned MsgPipe using a fixed
+ * Sends and receives game messages through an owned MsgPipe using a configured
  * peer roster. Each participant has a PeerId shared across the session, and 
  * the roster maps remote peers to the local ConnectionIds used to reach them.
  * 
@@ -204,7 +204,7 @@ public:
     PeerId LocalPeer() const;
 
     /**
-     * @return A read-only view of the remote mappings, borrowed from the session.
+     * @return Known remote mappings, including retired routes, borrowed from the session.
      */
     std::span<const PeerConnection> RemotePeers() const;
 
@@ -261,6 +261,18 @@ public:
      */
     bool ReceivePeerFailure(PeerId &peer);
 
+    /**
+     * Stops new traffic to a departed peer while draining accepted sends.
+     * Late data is acknowledged and discarded so departure retries can finish.
+     * @param peer The configured remote identity to retire.
+     * @throws std::invalid_argument if the peer is not configured.
+     */
+    void RetirePeer(PeerId peer);
+
+    /** @return Whether every accepted outgoing message has left the retry queues. */
+    bool OutgoingDrained() const;
+
+
 private:
     /**
      * Retains one outgoing packet until its acknowledgment arrives.
@@ -283,6 +295,7 @@ private:
      * - received_through: Highest incoming id with every preceding id accepted.
      * - received_ahead: Accepted incoming ids above a gap, retained for duplicate checks.
      * - failed: Whether delivery timed out and further traffic is stopped.
+     * - retired: Whether new sends and game delivery are disabled after departure.
      */
     struct PeerState {
         MessageId next_message_id = 1;
@@ -290,6 +303,7 @@ private:
         MessageId received_through = 0;
         std::set<MessageId> received_ahead;
         bool failed = false;
+        bool retired = false;
     };
 
     /**

@@ -225,7 +225,11 @@ void ErikGame::Initialize(svanes::GameContext& context)
 void ErikGame::Update(const svanes::FrameContext& frame)
 {
     if (frame.input.WasPressed(svanes::Key::Escape)) {
-        should_quit = true;
+        if (network && network->IsReady()) {
+            rollback->RequestLeave();
+        } else {
+            should_quit = true;
+        }
     }
 
     // TASK 6, scaling: Tab switches the camera between the two scale modes.
@@ -258,7 +262,10 @@ void ErikGame::Update(const svanes::FrameContext& frame)
                 network_diagnostic_tics = 0;
             }
         }
-        UpdateCamera(frame, simulation->PlayerEntity(network->LocalPeer()));
+        should_quit = should_quit || rollback->CanClose();
+        if (!rollback->HasDeparted()) {
+            UpdateCamera(frame, simulation->PlayerEntity(network->LocalPeer()));
+        }
         return;
     }
 

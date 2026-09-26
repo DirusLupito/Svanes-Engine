@@ -3,6 +3,7 @@
 #include "goose_network.hpp"
 #include "goose_simulation.hpp"
 
+#include <chrono>
 #include <map>
 #include <optional>
 #include <string>
@@ -53,6 +54,16 @@ public:
 
     /** @return Tick progress per peer and the depth of the last rollback correction. */
     std::string Diagnostics() const;
+
+    /** Requests departure at the next coordinated roster boundary. */
+    void RequestLeave();
+
+    /** @return Whether the local goose has left the simulation. */
+    bool HasDeparted() const;
+
+    /** @return Whether the window can close after final deliveries, or after a failed session. */
+    bool CanClose() const;
+
 
 private:
     /**
@@ -174,6 +185,69 @@ private:
      * @return Twice the normal interval when ahead of remote progress, otherwise normal.
      */
     svanes::TicCount PacingStepTics() const;
+
+
+    /**
+     * Records a peer's frozen input boundary and its departure choice.
+     * FIELDS:
+     * - tick: The first tick for which that peer has not generated input.
+     * - leaving: Whether that peer is departing in this revision.
+     */
+    struct StopRecord {
+        std::uint64_t tick;
+        bool leaving;
+    };
+
+    /**
+     * Confirms the shared world and roster change at a pause boundary.
+     * FIELDS:
+     * - tick: The agreed boundary after all final inputs.
+     * - world_hash: The confirmed world before removing players.
+     * - roster_hash: The ordered stop records and current roster revision.
+     */
+    struct PreparedRecord {
+        std::uint64_t tick;
+        std::uint64_t world_hash;
+        std::uint64_t roster_hash;
+        bool operator==(const PreparedRecord&) const = default;
+    };
+
+    /**
+     * Collects a roster change without choosing an authoritative peer.
+     * FIELDS:
+     * - local_stop: The frozen local boundary and departure choice.
+     * - stops: Each peer's announced boundary, keyed by peer id.
+     * - prepared: Each peer's agreement on the final world and departure set.
+     * - stop_sent: Whether transport accepted the local stop announcement.
+     * - started_at: Real-time start used to report a stalled change.
+     */
+    struct RosterPause {
+        StopRecord local_stop;
+        std::map<std::uint32_t, StopRecord> stops;
+        std::map<std::uint32_t, PreparedRecord> prepared;
+        bool stop_sent = false;
+        std::chrono::steady_clock::time_point started_at;
+    };
+
+    /** Freezes local input generation and records the departure choice for this revision. */
+    void BeginRosterPause();
+
+    /**
+     * Records a stop or prepared message, allowing either to arrive first.
+     * @param message The current revision's roster-control message.
+     */
+    void ReceiveRosterMessage(const svanes::SessionMessage& message);
+
+    /**
+     * Catches up to the shared boundary, verifies agreement, and adopts departures.
+     * @param frame The world and physics context used for catch-up steps.
+     */
+    void UpdateRosterPause(const svanes::FrameContext& frame);
+
+    std::optional<RosterPause> roster_pause;
+    bool leave_requested = false;
+    bool departed = false;
+    bool force_close = false;
 
     GooseSimulation& simulation;
     GooseNetwork& network;

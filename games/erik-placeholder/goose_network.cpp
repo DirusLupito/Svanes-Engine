@@ -125,7 +125,7 @@ void GooseNetwork::Update()
             failure = "Peer " + std::to_string(failed_peer.value) + " stopped acknowledging messages. Restart the session.";
         }
     }
-    if (HasFailed()) {
+    if (HasFailed() || local_departed) {
         messages.clear();
         return;
     }
@@ -134,12 +134,37 @@ void GooseNetwork::Update()
     while (messages.size() < 256 && session->Receive(message)) {
         switch (static_cast<GooseMessageType>(message.type)) {
         case GooseMessageType::Ready:
-            ReadReady(message);
+            if (revision == 1) {
+                ReadReady(message);
+            }
             break;
         case GooseMessageType::Input:
         case GooseMessageType::StateHash:
-            messages.push_back(std::move(message));
+        case GooseMessageType::RosterStop:
+        case GooseMessageType::RosterPrepared: {
+            svanes::MessageReader reader(message.payload);
+            const auto message_revision = reader.ReadUint64();
+            if (message_revision < revision) {
+                break;
+            }
+            if (message_revision - revision > 1) {
+                throw std::invalid_argument("Goose message is beyond the next roster revision.");
+            }
+            const auto body = reader.ReadBytes(reader.Remaining());
+            svanes::NetworkMessage payload;
+            payload.bytes.assign(body.begin(), body.end());
+            message.payload = std::move(payload);
+            if (message_revision == revision) {
+                messages.push_back(std::move(message));
+            } else {
+                if (future_messages.size() >= 1024) {
+                    failure = "Next-roster message queue exceeded its limit. Simulation paused.";
+                    return;
+                }
+                future_messages.push_back(std::move(message));
+            }
             break;
+        }
         default:
             throw std::invalid_argument("GooseNetwork received an unknown game message type.");
         }
@@ -161,10 +186,14 @@ void GooseNetwork::Update()
 
 bool GooseNetwork::Broadcast(GooseMessageType type, const svanes::NetworkMessage& payload)
 {
-    if (type != GooseMessageType::Input && type != GooseMessageType::StateHash) {
-        throw std::invalid_argument("GooseNetwork::Broadcast requires Input or StateHash.");
+    if (type != GooseMessageType::Input && type != GooseMessageType::StateHash &&
+        type != GooseMessageType::RosterStop && type != GooseMessageType::RosterPrepared) {
+        throw std::invalid_argument("GooseNetwork::Broadcast requires a gameplay or roster-control type.");
     }
-    return IsReady() && session->Broadcast(static_cast<svanes::MessageType>(type), payload);
+    svanes::MessageWriter writer;
+    writer.WriteUint64(revision);
+    writer.WriteBytes(payload.bytes);
+    return !local_departed && IsReady() && session->Broadcast(static_cast<svanes::MessageType>(type), writer.Finish());
 }
 
 bool GooseNetwork::Receive(svanes::SessionMessage& message)
@@ -221,4 +250,36 @@ std::string GooseNetwork::Status() const
     }
     return std::to_string(count) + "/" + std::to_string(peers.size()) +
         " peers ready. " + (initial_hash ? "Waiting for other players." : "Open all windows, then press Enter in each.");
+}
+
+void GooseNetwork::ApplyDepartures(std::span<const svanes::PeerId> departing)
+{
+    if (revision == std::numeric_limits<std::uint64_t>::max()) {
+        throw std::overflow_error("Goose roster revision exhausted.");
+    }
+    local_departed = std::find(departing.begin(), departing.end(), LocalPeer()) != departing.end();
+    for (const auto& remote : session->RemotePeers()) {
+        if (local_departed || std::find(departing.begin(), departing.end(), remote.peer) != departing.end()) {
+            session->RetirePeer(remote.peer);
+        }
+    }
+    for (std::size_t index = peers.size(); index > 0; --index) {
+        if (std::find(departing.begin(), departing.end(), peers[index - 1]) != departing.end()) {
+            peers.erase(peers.begin() + static_cast<std::ptrdiff_t>(index - 1));
+            ready_hashes.erase(ready_hashes.begin() + static_cast<std::ptrdiff_t>(index - 1));
+        }
+    }
+    ++revision;
+    messages = std::move(future_messages);
+    future_messages.clear();
+}
+
+bool GooseNetwork::OutgoingDrained() const
+{
+    return session->OutgoingDrained();
+}
+
+std::uint64_t GooseNetwork::Revision() const
+{
+    return revision;
 }

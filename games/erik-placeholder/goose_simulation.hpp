@@ -105,6 +105,15 @@ public:
     /** @return The input tick that the next Step() will consume. */
     std::uint64_t Tick() const;
 
+    /**
+     * Removes a goose at an agreed roster boundary, leaving its existing shots alive.
+     * @param world The registry containing the goose.
+     * @param peer The departing player's identity.
+     * @throws std::invalid_argument if the peer is outside the roster.
+     */
+    void RemovePlayer(svanes::Registry& world, svanes::PeerId peer);
+
+
 private:
     /**
      * Associates the network player identity with its game controller.

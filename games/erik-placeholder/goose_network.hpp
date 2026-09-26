@@ -51,11 +51,15 @@ GooseNetworkConfiguration MakeLoopbackGooseConfiguration(
  * - Ready: Confirms the roster, simulation step, and initial state.
  * - Input: Carries a player's input for a simulation tick.
  * - StateHash: Reports a state hash at a confirmed tick boundary.
+ * - RosterStop: Announces a pause boundary and whether the sender is leaving.
+ * - RosterPrepared: Confirms the common pause tick, world hash, and departure set.
  */
 enum class GooseMessageType : svanes::MessageType {
     Ready = 1,
     Input = 2,
-    StateHash = 3
+    StateHash = 3,
+    RosterStop = 4,
+    RosterPrepared = 5
 };
 
 /**
@@ -93,10 +97,10 @@ public:
 
     /**
      * Queues a gameplay message for every peer after the roster is ready.
-     * @param type Input or StateHash.
+     * @param type The gameplay or roster-control message type.
      * @param payload The serialized game data.
      * @return Whether the message was accepted by the session.
-     * @throws std::invalid_argument for a type other than Input or StateHash.
+     * @throws std::invalid_argument for a type outside gameplay and roster control.
      */
     bool Broadcast(GooseMessageType type, const svanes::NetworkMessage& payload);
 
@@ -122,6 +126,20 @@ public:
     /** @return A short connection status for the game's display or console. */
     std::string Status() const;
 
+    /**
+     * Adopts an agreed departure set and advances the roster revision.
+     * Retired routes keep acknowledging retries while new traffic uses survivors.
+     * @param departing The peers removed at the agreed simulation boundary.
+     */
+    void ApplyDepartures(std::span<const svanes::PeerId> departing);
+
+    /** @return Whether all accepted outgoing messages have finished delivery. */
+    bool OutgoingDrained() const;
+
+    /** @return The revision attached to gameplay and roster-control messages. */
+    std::uint64_t Revision() const;
+
+
 private:
     /**
      * Validates and records a remote peer's readiness announcement.
@@ -137,4 +155,7 @@ private:
     bool ready_sent = false;
     std::string failure;
     std::deque<svanes::SessionMessage> messages;
+    std::deque<svanes::SessionMessage> future_messages;
+    std::uint64_t revision = 1;
+    bool local_departed = false;
 };

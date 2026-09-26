@@ -244,3 +244,14 @@ std::uint64_t GooseSimulation::Tick() const
 {
     return tick;
 }
+
+void GooseSimulation::RemovePlayer(svanes::Registry& world, svanes::PeerId peer)
+{
+    const auto found = std::find_if(players.begin(), players.end(),
+        [&](const auto& player) { return player.peer == peer; });
+    if (found == players.end()) {
+        throw std::invalid_argument("GooseSimulation::RemovePlayer: unknown peer.");
+    }
+    world.DestroyEntity(found->goose.GetEntity());
+    players.erase(found);
+}

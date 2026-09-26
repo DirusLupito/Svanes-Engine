@@ -75,6 +75,14 @@ void GooseRollback::ReceiveMessages()
 {
     svanes::SessionMessage message;
     while (network.Receive(message)) {
+        if (message.type == static_cast<svanes::MessageType>(GooseMessageType::RosterStop) ||
+            message.type == static_cast<svanes::MessageType>(GooseMessageType::RosterPrepared)) {
+            ReceiveRosterMessage(message);
+            if (!failure.empty()) {
+                return;
+            }
+            continue;
+        }
         if (message.type == static_cast<svanes::MessageType>(GooseMessageType::StateHash)) {
             ReceiveStateHash(message);
             if (!failure.empty()) {
@@ -302,7 +310,7 @@ void GooseRollback::PruneHistory()
 
 void GooseRollback::Update(const svanes::FrameContext& frame)
 {
-    if (network.HasFailed() || !failure.empty()) {
+    if (departed || network.HasFailed() || !failure.empty()) {
         return;
     }
     ReceiveMessages();
@@ -313,6 +321,9 @@ void GooseRollback::Update(const svanes::FrameContext& frame)
         pending_tics = 0;
         controls = {};
         return;
+    }
+    if (leave_requested && !roster_pause) {
+        BeginRosterPause();
     }
     const bool first_frame = !started;
     started = true;
@@ -331,6 +342,11 @@ void GooseRollback::Update(const svanes::FrameContext& frame)
             AdvanceTick(frame);
         }
         ++rollback_count;
+    }
+
+    if (roster_pause) {
+        UpdateRosterPause(frame);
+        return;
     }
 
     CheckStateHashes(frame);
@@ -411,6 +427,9 @@ std::string GooseRollback::Status() const
     if (!network.IsReady()) {
         return network.Status();
     }
+    if (departed) {
+        return "Departure agreed. Finishing final message delivery.";
+    }
     return waiting.empty() ? "Playing." : waiting;
 }
 
@@ -430,7 +449,7 @@ std::uint64_t GooseRollback::RollbackCount() const
 
 std::string GooseRollback::Diagnostics() const
 {
-    std::string result = "tick=" + std::to_string(simulation.Tick()) +
+    std::string result = "roster=" + std::to_string(network.Revision()) + " tick=" + std::to_string(simulation.Tick()) +
         " confirmed=" + std::to_string(ConfirmedTick()) +
         " verified=" + std::to_string(verified_tick);
     for (std::size_t index = 0; index < players.size(); ++index) {
@@ -446,4 +465,170 @@ std::string GooseRollback::Diagnostics() const
     }
     return result + " rollbacks=" + std::to_string(rollback_count) +
         " last-depth=" + std::to_string(last_rollback_depth);
+}
+
+void GooseRollback::RequestLeave()
+{
+    if (network.HasFailed() || !failure.empty()) {
+        force_close = true;
+    } else {
+        leave_requested = true;
+    }
+}
+
+bool GooseRollback::HasDeparted() const
+{
+    return departed;
+}
+
+bool GooseRollback::CanClose() const
+{
+    return force_close || (departed && network.OutgoingDrained());
+}
+
+void GooseRollback::BeginRosterPause()
+{
+    if (!roster_pause) {
+        roster_pause = RosterPause{{simulation.Tick(), leave_requested}, {}, {}, false,
+            std::chrono::steady_clock::now()};
+        pending_tics = 0;
+        controls = {};
+    }
+}
+
+void GooseRollback::ReceiveRosterMessage(const svanes::SessionMessage& message)
+{
+    if (message.sender == network.LocalPeer() ||
+        std::find(network.Peers().begin(), network.Peers().end(), message.sender) == network.Peers().end()) {
+        throw std::invalid_argument("Roster message has an invalid sender.");
+    }
+    BeginRosterPause();
+    svanes::MessageReader reader(message.payload);
+    const auto tick = reader.ReadUint64();
+    const auto current = simulation.Tick();
+    if ((tick > current && tick - current > HistoryTicks) ||
+        (tick < current && current - tick > HistoryTicks)) {
+        failure = "Roster pause is outside the retained tick range.";
+        return;
+    }
+    if (message.type == static_cast<svanes::MessageType>(GooseMessageType::RosterStop)) {
+        const bool leaving = reader.ReadBool();
+        const auto [entry, inserted] = roster_pause->stops.emplace(message.sender.value, StopRecord{tick, leaving});
+        if (!inserted && (entry->second.tick != tick || entry->second.leaving != leaving)) {
+            failure = "Peer changed its roster stop announcement.";
+        }
+    } else {
+        const PreparedRecord record{tick, reader.ReadUint64(), reader.ReadUint64()};
+        const auto [entry, inserted] = roster_pause->prepared.emplace(message.sender.value, record);
+        if (!inserted && entry->second != record) {
+            failure = "Peer changed its prepared roster state.";
+        }
+    }
+    if (reader.Remaining() != 0) {
+        throw std::invalid_argument("Roster message has trailing data.");
+    }
+}
+
+void GooseRollback::UpdateRosterPause(const svanes::FrameContext& frame)
+{
+    auto& pause = *roster_pause;
+    pending_tics = 0;
+    if (std::chrono::steady_clock::now() - pause.started_at > std::chrono::seconds(15)) {
+        failure = "Roster change stalled. Simulation paused. Press Escape to close.";
+        return;
+    }
+    waiting = "Pausing for roster change.";
+    if (!pause.stop_sent) {
+        svanes::MessageWriter writer;
+        writer.WriteUint64(pause.local_stop.tick);
+        writer.WriteBool(pause.local_stop.leaving);
+        if (!network.Broadcast(GooseMessageType::RosterStop, writer.Finish())) {
+            return;
+        }
+        pause.stop_sent = true;
+        pause.stops.emplace(network.LocalPeer().value, pause.local_stop);
+    }
+    if (pause.stops.size() != players.size()) {
+        return;
+    }
+    std::uint64_t boundary = 0;
+    std::vector<svanes::PeerId> departing;
+    svanes::MessageWriter roster_writer;
+    roster_writer.WriteUint64(network.Revision());
+    for (const auto& [id, stop] : pause.stops) {
+        boundary = std::max(boundary, stop.tick);
+        if (stop.leaving) {
+            departing.push_back({id});
+        }
+        roster_writer.WriteUint32(id);
+        roster_writer.WriteUint64(stop.tick);
+        roster_writer.WriteBool(stop.leaving);
+    }
+    if (departing.empty()) {
+        failure = "Roster pause has no departing players.";
+        return;
+    }
+    std::uint64_t roster_hash = 14695981039346656037ULL;
+    for (const auto byte : roster_writer.Finish().bytes) {
+        roster_hash ^= std::to_integer<std::uint8_t>(byte);
+        roster_hash *= 1099511628211ULL;
+    }
+    waiting = "Finishing inputs through roster boundary " + std::to_string(boundary) + ".";
+    for (std::uint32_t step = 0; simulation.Tick() < boundary && step < StepsPerFrame; ++step) {
+        const GooseIntent neutral{};
+        if (!network.Broadcast(GooseMessageType::Input, EncodeInput(simulation.Tick(), neutral))) {
+            return;
+        }
+        RecordInput(local_index, simulation.Tick(), neutral);
+        AdvanceTick(frame);
+    }
+    if (simulation.Tick() != boundary || ConfirmedTick() != boundary) {
+        return;
+    }
+    waiting = "Verifying world and departures at tick " + std::to_string(boundary) + ".";
+    const PreparedRecord local{boundary, GooseSimulation::Hash(simulation.Capture(frame.world)), roster_hash};
+    if (!pause.prepared.contains(network.LocalPeer().value)) {
+        svanes::MessageWriter writer;
+        writer.WriteUint64(local.tick);
+        writer.WriteUint64(local.world_hash);
+        writer.WriteUint64(local.roster_hash);
+        if (!network.Broadcast(GooseMessageType::RosterPrepared, writer.Finish())) {
+            return;
+        }
+        pause.prepared.emplace(network.LocalPeer().value, local);
+    }
+    for (const auto& [id, prepared] : pause.prepared) {
+        if (prepared != local) {
+            failure = "Roster state mismatch with peer " + std::to_string(id) +
+                " at tick " + std::to_string(boundary) + ". Simulation paused.";
+            return;
+        }
+    }
+    if (pause.prepared.size() != players.size()) {
+        return;
+    }
+    departed = pause.local_stop.leaving;
+    for (const auto peer : departing) {
+        simulation.RemovePlayer(frame.world, peer);
+        std::erase_if(players, [&](const auto& player) { return player.peer == peer; });
+    }
+    network.ApplyDepartures(departing);
+    history.clear();
+    checkpoints.clear();
+    correction_tick.reset();
+    hashed_tick = boundary - boundary % HashIntervalTicks;
+    verified_tick = hashed_tick;
+    for (auto& player : players) {
+        player.actual.clear();
+        player.preceding = {};
+        player.next_input_tick = boundary;
+        player.latest_input_tick = boundary;
+    }
+    const auto local_player = std::find_if(players.begin(), players.end(),
+        [&](const auto& player) { return player.peer == network.LocalPeer(); });
+    local_index = static_cast<std::size_t>(local_player - players.begin());
+    roster_pause.reset();
+    controls = {};
+    started = false;
+    waiting = "Roster change complete. " + std::to_string(players.size()) + " player(s) remain.";
 }

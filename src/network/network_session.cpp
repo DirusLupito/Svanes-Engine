@@ -148,18 +148,20 @@ bool NetworkSession::Broadcast(MessageType type, const NetworkMessage &payload) 
     }
     // Check every destination before accepting any part of the broadcast.
     for (const auto &peer : peers) {
-        if (!CanQueue(peer)) {
+        if (!peer.retired && !CanQueue(peer)) {
             return false;
         }
     }
     for (auto &peer : peers) {
-        QueueMessage(peer, type, payload);
+        if (!peer.retired) {
+            QueueMessage(peer, type, payload);
+        }
     }
     return true;
 }
 
 bool NetworkSession::CanQueue(const PeerState &peer) const {
-    if (peer.failed) {
+    if (peer.failed || peer.retired) {
         return false;
     }
     if (peer.next_message_id == 0) {
@@ -197,7 +199,7 @@ void NetworkSession::ProcessPacket(std::size_t index, SessionPacket packet) {
 
     const bool duplicate = packet.message_id <= peer.received_through ||
         peer.received_ahead.contains(packet.message_id);
-    if (!duplicate) {
+    if (!duplicate && !peer.retired) {
         if (packet.message_id - peer.received_through > settings.max_pending_per_peer ||
             incoming_messages.size() >= settings.max_incoming_messages) {
             // Leave unaccepted data unacknowledged so the sender retains it for retry.
@@ -254,7 +256,9 @@ void NetworkSession::Update() {
                         >= settings.delivery_timeout;
             });
         if (timed_out) {
-            failed_peers.push_back(configuration.remote_peers[index].peer);
+            if (!peer.retired) {
+                failed_peers.push_back(configuration.remote_peers[index].peer);
+            }
             peer.failed = true;
             peer.pending.clear();
             peer.received_ahead.clear();
@@ -292,6 +296,22 @@ bool NetworkSession::ReceivePeerFailure(PeerId &peer) {
     peer = failed_peers.front();
     failed_peers.pop_front();
     return true;
+}
+
+void NetworkSession::RetirePeer(PeerId id) {
+    for (std::size_t index = 0; index < configuration.remote_peers.size(); ++index) {
+        if (configuration.remote_peers[index].peer == id) {
+            peers[index].retired = true;
+            std::erase_if(incoming_messages, [&](const auto &message) { return message.sender == id; });
+            std::erase(failed_peers, id);
+            return;
+        }
+    }
+    throw std::invalid_argument("NetworkSession::RetirePeer: unknown peer.");
+}
+
+bool NetworkSession::OutgoingDrained() const {
+    return std::all_of(peers.begin(), peers.end(), [](const auto &peer) { return peer.pending.empty(); });
 }
 
 }
