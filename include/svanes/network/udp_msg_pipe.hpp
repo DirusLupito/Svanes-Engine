@@ -12,6 +12,18 @@
 namespace svanes {
 
 /**
+ * A remote UDP endpoint as the pipe knows it.
+ *
+ * FIELDS:
+ * - host: The normalized numeric IPv4 address.
+ * - port: The remote port.
+ */
+struct UdpAddress {
+    std::string host;
+    std::uint16_t port;
+};
+
+/**
  * Concrete implementation of a MsgPipe using UDP protocol.
  * Uses ZMQ_DGRAM socket to send raw packets
  */
@@ -47,6 +59,16 @@ public:
      * @throws std::invalid_argument if the address or port is invalid.
      */
     ConnectionId AddRemote(const std::string &host, std::uint16_t port);
+
+    /**
+     * Looks up the address behind a configured or received connection.
+     *
+     * @param connection The connection to look up.
+     * @return The host and port that the connection sends to.
+     * @throws std::invalid_argument if the connection id is unknown.
+     * @throws std::runtime_error if the stored route is not an IPv4 host and port.
+     */
+    UdpAddress RemoteAddress(ConnectionId connection) const;
 
     /**
      * Sends one datagram to the given connection id.

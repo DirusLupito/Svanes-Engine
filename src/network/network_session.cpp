@@ -3,6 +3,7 @@
 #include <svanes/network/message_serialization.hpp>
 
 #include <algorithm>
+#include <iostream>
 #include <limits>
 #include <stdexcept>
 #include <utility>
@@ -32,6 +33,24 @@ void ValidatePacket(SessionId session, const SessionPacket &packet) {
         (packet.type != 0 || !packet.payload.bytes.empty())) {
         throw std::invalid_argument("Session packet: acknowledgments cannot carry a game type or payload.");
     }
+}
+
+/**
+ * Recognizes a well-framed session packet that belongs to a different session.
+ * @param session The local session id.
+ * @param message The complete received bytes.
+ * @return Whether the protocol marker matches but the session id differs.
+ */
+bool BelongsToOtherSession(SessionId session, const NetworkMessage &message) {
+    if (message.bytes.size() < HeaderBytes) {
+        return false;
+    }
+    MessageReader reader(message);
+    if (reader.ReadUint32() != ProtocolMarker) {
+        return false;
+    }
+    reader.ReadUint16();
+    return reader.ReadUint64() != session;
 }
 
 }
@@ -225,26 +244,42 @@ void NetworkSession::Update() {
         if (!pipe->Receive(incoming)) {
             break;
         }
-        const auto found = std::find_if(configuration.remote_peers.begin(),
-                                       configuration.remote_peers.end(),
-                                       [&](const PeerConnection &entry) {
-                                           return entry.connection == incoming.source;
-                                       });
-        if (found == configuration.remote_peers.end()) {
-            throw std::invalid_argument("NetworkSession: message from a connection outside the roster.");
+        if (BelongsToOtherSession(configuration.session, incoming.message)) {
+            if (wrong_session_connections.insert(incoming.source.value).second) {
+                std::cerr << "NetworkSession: dropping packets from connection "
+                          << incoming.source.value << ", which uses a different session id.\n";
+            }
+            continue;
         }
+        const auto found = FindConnection(incoming.source);
         auto decoded = DecodeSessionPacket(configuration.session, incoming.message);
+        if (!found) {
+            if (decoded.kind != SessionPacketKind::Data) {
+                throw std::invalid_argument("NetworkSession: acknowledgment from a connection outside the roster.");
+            }
+            // Unacknowledged strangers retry, so a full queue loses nothing.
+            if (strangers.size() < settings.max_incoming_messages) {
+                strangers.push_back({incoming.source,
+                    {decoded.sender, decoded.type, std::move(decoded.payload)}});
+            }
+            continue;
+        }
         // The envelope's claimed sender must agree with the configured source route.
-        if (decoded.sender != found->peer) {
+        if (decoded.sender != configuration.remote_peers[*found].peer) {
             throw std::invalid_argument("NetworkSession: envelope sender does not match its configured connection.");
         }
-        const auto index = static_cast<std::size_t>(found - configuration.remote_peers.begin());
-        ProcessPacket(index, std::move(decoded));
+        ProcessPacket(*found, std::move(decoded));
     }
 
     const auto now = std::chrono::steady_clock::now();
     for (std::size_t index = 0; index < peers.size(); ++index) {
         auto &peer = peers[index];
+        // No retry in either direction outlives delivery_timeout, so the goodbye is over.
+        if (peer.retired && !peer.released && peer.pending.empty() &&
+            now - peer.retired_at >= settings.delivery_timeout) {
+            peer.released = true;
+            peer.received_ahead.clear();
+        }
         if (peer.failed) {
             continue;
         }
@@ -298,10 +333,61 @@ bool NetworkSession::ReceivePeerFailure(PeerId &peer) {
     return true;
 }
 
+bool NetworkSession::ReceiveStranger(StrangerMessage &stranger) {
+    if (strangers.empty()) {
+        return false;
+    }
+    stranger = std::move(strangers.front());
+    strangers.pop_front();
+    return true;
+}
+
+void NetworkSession::AddPeer(PeerConnection peer) {
+    const auto connections = pipe->Connections();
+    if (peer.peer.value == 0 || peer.peer == configuration.local_peer ||
+        std::find(connections.begin(), connections.end(), peer.connection) == connections.end()) {
+        throw std::invalid_argument("NetworkSession::AddPeer: invalid peer or connection.");
+    }
+    for (const auto &entry : configuration.remote_peers) {
+        if (entry.peer == peer.peer) {
+            throw std::invalid_argument("NetworkSession::AddPeer: peer id already used in this session.");
+        }
+    }
+    if (FindConnection(peer.connection)) {
+        throw std::invalid_argument("NetworkSession::AddPeer: connection already in roster.");
+    }
+    configuration.remote_peers.push_back(peer);
+    peers.emplace_back();
+    std::erase_if(strangers, [&](const auto &stranger) { return stranger.connection == peer.connection; });
+}
+
+bool NetworkSession::SendStranger(ConnectionId connection, MessageType type,
+                                  const NetworkMessage &payload) {
+    if (FindConnection(connection)) {
+        throw std::invalid_argument("NetworkSession::SendStranger: connection belongs to a roster peer.");
+    }
+    // Stranger replies are outside every reliable stream, so their message id is never tracked.
+    return pipe->Send(connection, EncodeSessionPacket(configuration.session,
+        {SessionPacketKind::Data, configuration.local_peer, 1, type, payload}));
+}
+
+std::optional<std::size_t> NetworkSession::FindConnection(ConnectionId connection) const {
+    for (std::size_t index = 0; index < configuration.remote_peers.size(); ++index) {
+        if (configuration.remote_peers[index].connection == connection && !peers[index].released) {
+            return index;
+        }
+    }
+    return std::nullopt;
+}
+
 void NetworkSession::RetirePeer(PeerId id) {
     for (std::size_t index = 0; index < configuration.remote_peers.size(); ++index) {
         if (configuration.remote_peers[index].peer == id) {
+            if (peers[index].retired) {
+                return;
+            }
             peers[index].retired = true;
+            peers[index].retired_at = std::chrono::steady_clock::now();
             std::erase_if(incoming_messages, [&](const auto &message) { return message.sender == id; });
             std::erase(failed_peers, id);
             return;

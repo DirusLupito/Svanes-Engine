@@ -50,6 +50,22 @@ ConnectionId UdpMsgPipe::AddRemote(const std::string &host, std::uint16_t port) 
     return RememberConnection(canonical + ":" + std::to_string(port));
 }
 
+UdpAddress UdpMsgPipe::RemoteAddress(ConnectionId connection) const {
+    const std::string_view route = Route(connection);
+    const auto colon = route.rfind(':');
+    std::uint32_t port = 0;
+    if (colon == std::string_view::npos || colon == 0) {
+        throw std::runtime_error("UdpMsgPipe: route has no host and port: " + std::string{route});
+    }
+    const auto text = route.substr(colon + 1);
+    const auto parsed = std::from_chars(text.data(), text.data() + text.size(), port);
+    if (text.empty() || parsed.ec != std::errc{} || parsed.ptr != text.data() + text.size() ||
+        port == 0 || port > 65535) {
+        throw std::runtime_error("UdpMsgPipe: route has an invalid port: " + std::string{route});
+    }
+    return {std::string{route.substr(0, colon)}, static_cast<std::uint16_t>(port)};
+}
+
 bool UdpMsgPipe::Send(ConnectionId destination, const NetworkMessage &message) {
     const auto &route = Route(destination);
     if (message.bytes.size() > 65507) {
