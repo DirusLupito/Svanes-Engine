@@ -123,16 +123,16 @@ void AdvanceKinematics(Registry &world, Vector2D gravity,
         throw std::invalid_argument("Kinematics gravity must be finite.");
     }
 
-    // Map of entity to the total acceleration applied to that entity by all
-    // attractors.
-    const auto attractions = EvaluateAttractors(world, entity_steps);
+    // Total acceleration applied by all attractors, in entity_steps order.
+    const auto attractions = EvaluateAttractors(world, entity_steps, driver);
 
     std::vector<WorkItem> items;
 
     // We need only update those entities we already know are participating in
     // this physics step, rather than iterating over all entities with a
     // transform, kinematic, and timeline.
-    for (const PhysicsTimeStep &step : entity_steps) {
+    for (std::size_t i = 0; i < entity_steps.size(); ++i) {
+        const PhysicsTimeStep &step = entity_steps[i];
         if (step.delta_tics == 0) {
             continue;
         }
@@ -148,11 +148,8 @@ void AdvanceKinematics(Registry &world, Vector2D gravity,
         // Contributions from point source attractors
         //
 
-        const auto attraction = attractions.find(entity);
-        if (attraction != attractions.end()) {
-            acceleration_x += attraction->second.x;
-            acceleration_y += attraction->second.y;
-        }
+        acceleration_x += attractions[i].x;
+        acceleration_y += attractions[i].y;
 
         //
         // Contributions from global acceleration fields

@@ -563,7 +563,8 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext &context) {
     context.world.AddComponent<svanes::PointAttractor2D>(
         planet_entity,
         svanes::PointAttractor2D{.accelerationField = AttractionField,
-                                 .cutoff_radius = std::nullopt});
+                                 .cutoff_radius = std::nullopt,
+                                 .allow_parallel = true});
 
     for (const svanes::Rectangle2D wall :
          {svanes::Rectangle2D{-200000.0F, 0.0F, 100000.0F, 500000.0F},
