@@ -54,6 +54,14 @@ svanes::UdpAddress ReadGooseAddress(svanes::MessageReader& reader)
     return address;
 }
 
+svanes::UdpAddress ResolveRelayedAddress(const svanes::UdpAddress& relayed, const std::string& relay_host)
+{
+    if (relayed.host.starts_with("127.")) {
+        return {relay_host, relayed.port};
+    }
+    return relayed;
+}
+
 svanes::NetworkMessage EncodeAssignment(const GooseAssignment& assignment)
 {
     svanes::MessageWriter writer;
@@ -98,9 +106,10 @@ GooseNetwork::GooseNetwork(GooseBoundPipe bound, svanes::ConnectionId sponsor_co
     svanes::SessionConfiguration configuration{GooseSession, assignment.local_peer, {}};
     configuration.remote_peers.push_back({assignment.sponsor, sponsor_connection});
     peers = {assignment.local_peer, assignment.sponsor};
+    const auto sponsor_host = pipe->RemoteAddress(sponsor_connection).host;
     for (const auto& endpoint : assignment.peers) {
-        configuration.remote_peers.push_back(
-            {endpoint.peer, pipe->AddRemote(endpoint.address.host, endpoint.address.port)});
+        const auto address = ResolveRelayedAddress(endpoint.address, sponsor_host);
+        configuration.remote_peers.push_back({endpoint.peer, pipe->AddRemote(address.host, address.port)});
         peers.push_back(endpoint.peer);
     }
     std::sort(peers.begin(), peers.end(), [](auto a, auto b) { return a.value < b.value; });
@@ -256,6 +265,16 @@ svanes::UdpAddress GooseNetwork::Address(svanes::ConnectionId connection) const
 std::optional<svanes::PeerId> GooseNetwork::ActivePeerAt(svanes::ConnectionId connection) const
 {
     return session->ActivePeerAt(connection);
+}
+
+svanes::UdpAddress GooseNetwork::PeerAddress(svanes::PeerId peer) const
+{
+    for (const auto& endpoint : RemoteEndpoints()) {
+        if (endpoint.peer == peer) {
+            return endpoint.address;
+        }
+    }
+    throw std::invalid_argument("GooseNetwork::PeerAddress: peer is not a remote member.");
 }
 
 std::vector<GoosePeerEndpoint> GooseNetwork::RemoteEndpoints() const

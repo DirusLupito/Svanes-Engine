@@ -110,6 +110,16 @@ void WriteGooseAddress(svanes::MessageWriter& writer, const svanes::UdpAddress& 
 svanes::UdpAddress ReadGooseAddress(svanes::MessageReader& reader);
 
 /**
+ * Interprets an address passed along by another member. A loopback address only
+ * means "on the relaying member's computer", so it is replaced by that member's
+ * host as this process reaches it, keeping the port.
+ * @param relayed The address as the relaying member announced it.
+ * @param relay_host The host this process uses to reach the relaying member.
+ * @return An address this process can reach.
+ */
+svanes::UdpAddress ResolveRelayedAddress(const svanes::UdpAddress& relayed, const std::string& relay_host);
+
+/**
  * What a sponsor tells an admitted joiner.
  * FIELDS:
  * - local_peer: The id assigned to the joiner.
@@ -155,6 +165,7 @@ public:
 
     /**
      * Joins a world after admission, connecting to every member it was told about.
+     * Loopback addresses in the assignment are resolved against the sponsor's host.
      * The complete world snapshot is then expected from the sponsor.
      * @param bound The pipe used during the join handshake.
      * @param sponsor_connection The pipe connection to the member that was contacted.
@@ -225,6 +236,13 @@ public:
      * @return The active member using it, if any.
      */
     std::optional<svanes::PeerId> ActivePeerAt(svanes::ConnectionId connection) const;
+
+    /**
+     * @param peer A current remote member.
+     * @return The address this process uses to reach it.
+     * @throws std::invalid_argument if the peer is not a remote member.
+     */
+    svanes::UdpAddress PeerAddress(svanes::PeerId peer) const;
 
     /**
      * @return Every current member except this process, with the address this process uses for it.

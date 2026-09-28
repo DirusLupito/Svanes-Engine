@@ -436,7 +436,6 @@ void GooseRollback::Update(const svanes::FrameContext& frame)
     if (!first_frame) {
         pending_tics += std::min(frame.real_delta_tics, MaximumBacklog - pending_tics);
     }
-    waiting.clear();
     for (std::uint32_t step = 0; step < StepsPerFrame; ++step) {
         const auto pacing_tics = PacingStepTics();
         if (pending_tics < pacing_tics) {
@@ -463,6 +462,7 @@ void GooseRollback::Update(const svanes::FrameContext& frame)
         RecordInput(local_index, simulation.Tick(), input);
         AdvanceTick(frame);
         pending_tics -= pacing_tics;
+        waiting.clear();
     }
     CheckStateHashes(frame);
     PruneHistory();
@@ -777,7 +777,10 @@ void GooseRollback::UpdateRosterPause(const svanes::FrameContext& frame)
             }
             id = svanes::PeerId{next_peer_id++};
             simulation.AddPlayer(frame.world, *id);
-            admitted.push_back({*id, joining[index].second});
+            const auto sponsor = joining[index].first;
+            admitted.push_back({*id, sponsor == network.LocalPeer().value
+                ? joining[index].second
+                : ResolveRelayedAddress(joining[index].second, network.PeerAddress({sponsor}).host)});
         }
         if (joining[index].first == network.LocalPeer().value) {
             const auto candidate = std::find_if(pause.sponsored.begin(), pause.sponsored.end(),
