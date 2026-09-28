@@ -67,6 +67,31 @@ policy: joining an ongoing world, joining only a lobby, or rejecting joins durin
 match. Erik's pause-and-snapshot procedure should not be mandatory for every game.
 The concrete engine interfaces remain undecided.
 
+### Who it's for
+
+- **doubleTime:** out of scope. Its owner is building client/server networking and
+  doesn't need peer-to-peer.
+- **orbitalEscalation:** its owner does care about peer-to-peer, so look at what his
+  game does before deciding what to extract. It's his game, though, and he builds
+  what it specifically needs. Don't build extra engine features for him. The goal is
+  to move into the engine the pieces our two games would share, which would otherwise
+  each be split between game and engine code.
+
+### What's engine-worthy and what's goose-specific
+
+`goose_rollback` and `goose_network` currently mix both.
+
+- **Likely engine-worthy:** fixed-tick input exchange, prediction by repeating the last
+  input, snapshot history with restore and replay, pacing against peer progress,
+  periodic state-hash checks, coordinated roster pauses, join admission through any
+  member with shared never-reused ids, chunked snapshot transfer, and leaving.
+- **Goose-specific:** `GooseIntent` and its encoding, `GooseIntentUse` and
+  `ChangesStep`, what a world snapshot contains and how it's rebuilt, the rules hash
+  contents, spawn points, and the player cap.
+
+The engine side should take the goose-specific parts as game-supplied types or
+callbacks, not hard-code them.
+
 ### Rolling back only on inputs that mattered
 
 A misprediction should only cost a rollback when the difference could have changed
