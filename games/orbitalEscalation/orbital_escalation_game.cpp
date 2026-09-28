@@ -1,4 +1,5 @@
 #include "orbital_escalation_game.hpp"
+#include "controls.hpp"
 
 #include <svanes/MenuUtilities/text_label.hpp>
 #include <svanes/camera2d.hpp>
@@ -7,15 +8,101 @@
 #include <svanes/kinematic_system.hpp>
 #include <svanes/registry.hpp>
 #include <svanes/render/render_system.hpp>
+#include <svanes/render/texture_manager.hpp>
 #include <svanes/timeline_system.hpp>
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <numbers>
 
+constexpr std::int32_t kSquarePixels = 300;
+constexpr float kPlanetRadius = 4200.0F;
 const svanes::TicCount kPauseFlashPeriod = svanes::SecondsToTics(1.0);
 constexpr std::uint8_t kPauseLabelMinimumAlpha = 64;
+
+/**
+ * Creates a gradient image of size kSquarePixels x kSquarePixels, where the
+ * color transitions from a light color in the top-left corner to a dark color
+ * in the bottom-right corner
+ *
+ * @return An ImageData object containing the generated gradient image.
+ */
+static svanes::ImageData CreateGradientImage() {
+    svanes::ImageData image{
+        .width = kSquarePixels,
+        .height = kSquarePixels,
+        .rgba_pixels = std::vector<std::uint8_t>(
+            static_cast<std::size_t>(kSquarePixels) * kSquarePixels * 4),
+    };
+
+    constexpr float start_r = 0xF0;
+    constexpr float start_g = 0xF0;
+    constexpr float start_b = 0xF0;
+    constexpr float end_r = 0x00;
+    constexpr float end_g = 0x00;
+    constexpr float end_b = 0xFE;
+
+    // We just linearly interpolate the color from the top-left corner to
+    // the bottom-right corner of the square.
+
+    for (std::int32_t y = 0; y < kSquarePixels; ++y) {
+        for (std::int32_t x = 0; x < kSquarePixels; ++x) {
+            // Measure distance with the 1-norm.
+            // Then we normalize it to the range [0, 1]
+            // so it can be used as a lerp parameter.
+            const float t =
+                static_cast<float>(x + y) / (2.0F * (kSquarePixels - 1));
+            const std::size_t offset =
+                (static_cast<std::size_t>(y) * kSquarePixels + x) * 4;
+            image.rgba_pixels[offset + 0] =
+                static_cast<std::uint8_t>(std::lerp(start_r, end_r, t));
+            image.rgba_pixels[offset + 1] =
+                static_cast<std::uint8_t>(std::lerp(start_g, end_g, t));
+            image.rgba_pixels[offset + 2] =
+                static_cast<std::uint8_t>(std::lerp(start_b, end_b, t));
+            image.rgba_pixels[offset + 3] = 0xFF;
+        }
+    }
+
+    return image;
+}
+
+/**
+ * Helper for the planet's gravitational field.
+ * Returns the acceleration vector at a given offset from the planet's center.
+ *
+ * @param offset_to_source The offset vector from the planet's center to the
+ * point of interest.
+ * @return The acceleration vector at the given offset, pointing towards the
+ * planet's center.
+ */
+static svanes::Vector2D AttractionField(svanes::Vector2D offset_to_source) {
+    const float distance = std::hypot(offset_to_source.x, offset_to_source.y);
+    if (distance == 0.0F) {
+        return {};
+    }
+    const float strength =
+        svanes::PerSecondSquaredToPerTicSquared(180000000.0F) /
+        (1.0F + distance * distance / kPlanetRadius);
+    return offset_to_source / distance * strength;
+}
+
+/**
+ * Creates a desert planet layer with a given radius, color, and z-order.
+ *
+ * @param radius The radius of the planet layer.
+ * @param color The color of the planet layer.
+ * @param z_order The z-order of the planet layer for rendering.
+ *
+ * @return The visual representing the planet layer.
+ */
+static Visual CreatePlanetLayer(float radius, svanes::Color color,
+                                std::int32_t z_order) {
+    return {svanes::SolidShape{color, svanes::Circle2D{0.0F, 0.0F, radius}},
+            z_order};
+}
 
 /**
  * Applies an acceleration to two entities based on their collision, if they
@@ -72,10 +159,49 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext &context) {
             .visible = false,
         });
 
-    planet.emplace(context.world);
-    const svanes::Transform player_start{0.0F, -planet->GetRadius() - 800.0F};
-    player_ship.emplace(context.world, context.assets, gameplay_timeline_entity,
-                        player_start);
+    planet.emplace(
+        context.world,
+        PlanetDefinition{
+            .attractor = {.accelerationField = AttractionField,
+                          .cutoff_radius = std::nullopt,
+                          .allow_parallel = true},
+            .collider = {svanes::Circle2D{0.0F, 0.0F, kPlanetRadius}},
+            .visuals = {CreatePlanetLayer(kPlanetRadius, {255, 127, 38, 255},
+                                          -3),
+                        CreatePlanetLayer(3900.0F, {185, 122, 87, 255}, -2),
+                        CreatePlanetLayer(3750.0F, {127, 127, 127, 255}, -1)},
+        });
+    planet->GetTransform(context.world) = {0.0F, 0.0F};
+    planet->UpdateVisuals(context.world);
+
+    const svanes::TextureHandle gradient_texture =
+        context.assets.CreateTexture(CreateGradientImage());
+    constexpr float square_size = static_cast<float>(kSquarePixels);
+    const svanes::Rectangle2D square_geometry{0.0F, 0.0F, square_size,
+                                              square_size};
+    player_ship.emplace(
+        context.world, gameplay_timeline_entity,
+        ShipDefinition{
+            .max_acceleration = 1000.0F,
+            .max_angular_acceleration = 100.0F,
+            .collider = {square_geometry},
+            .visuals =
+                {
+                    {svanes::Sprite{.texture = gradient_texture,
+                                    .geometry = square_geometry}},
+                    {svanes::RadialGradient2D{
+                        .geometry =
+                            svanes::Circle2D{0.0F, 0.0F, square_size * 5.0F},
+                        .center_color = svanes::Color{255, 255, 255, 160},
+                        .edge_color = svanes::Color{64, 128, 255, 0},
+                    }},
+                },
+        });
+    const svanes::Transform player_start{0.0F, -kPlanetRadius - 800.0F};
+    player_ship->GetTransform(context.world) = player_start;
+    player_ship->GetKinematic(context.world).velocity_x =
+        svanes::PerSecondToPerTic(3000.0F);
+    player_ship->UpdateVisuals(context.world);
     context.camera.zoom = 0.02F;
     context.camera.x = player_start.x;
     context.camera.y = player_start.y;
@@ -155,6 +281,14 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext &frame) {
     frame.camera.zoom = zoom;
 
 
+    // Visuals are entities that just have one single visual component, like a
+    // sprite or a solid shape. So even though the engine will update the ship
+    // entity and the planet entity, we need to update their visuals separately
+    // to make sure they are drawn correctly on the screen.
+
+    player_ship->UpdateVisuals(frame.world);
+    planet->UpdateVisuals(frame.world);
+
     // Camera follows the player, centered on the screen.
     if (frame.world.HasComponent<svanes::Transform>(player_ship->GetEntity())) {
         const svanes::Transform &player =
@@ -186,7 +320,16 @@ void OrbitalEscalationGame::PhysicsUpdate(
         return;
     }
 
-    player_ship->ApplyInput(physics.world, physics.input);
+    const ShipControls controls = ReadShipControls(physics.input);
+    const svanes::Vector2D acceleration =
+        controls.thrust *
+        svanes::PerSecondSquaredToPerTicSquared(player_ship->max_acceleration);
+    auto &motion = player_ship->GetKinematic(physics.world);
+    motion.acceleration_x = acceleration.x;
+    motion.acceleration_y = acceleration.y;
+    motion.angular_acceleration =
+        controls.rotation * svanes::PerSecondSquaredToPerTicSquared(
+                                player_ship->max_angular_acceleration);
     ApplyCollisionAcceleration(physics.world, player_ship->GetEntity(),
                                planet->GetEntity());
 }

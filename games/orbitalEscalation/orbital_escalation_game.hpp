@@ -1,7 +1,7 @@
 #pragma once
 
-#include "planet.hpp"
-#include "ship.hpp"
+#include "game_objects/dynamic_object/ship.hpp"
+#include "game_objects/planet.hpp"
 
 #include <svanes/entity.hpp>
 #include <svanes/game.hpp>
