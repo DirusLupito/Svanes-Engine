@@ -273,6 +273,10 @@ add_executable(
     svanes_game_orbital_escalation
     games/orbitalEscalation/main.cpp
     games/orbitalEscalation/orbital_escalation_game.cpp
+    games/orbitalEscalation/ship.cpp
+    games/orbitalEscalation/ship.hpp
+    games/orbitalEscalation/planet.cpp
+    games/orbitalEscalation/planet.hpp
 )
 target_link_libraries(svanes_game_orbital_escalation PRIVATE Svanes::Engine)
 
