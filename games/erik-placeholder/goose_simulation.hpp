@@ -90,12 +90,13 @@ public:
      * Advances one fixed combat step using inputs in roster order.
      * @param world The registry containing the geese and static arena.
      * @param gravity The world gravity in units per timeline tic squared.
-     * @param inputs One movement and firing intent for each peer, with world-space aim.
+     * @param inputs One movement and firing intent for each peer, with goose-relative aim.
+     * @return Which parts of each peer's intent the step depended on, in roster order.
      * @throws std::invalid_argument for a wrong input count or invalid movement inputs.
      * @throws std::logic_error if the simulation has not been initialized.
      * @throws std::overflow_error if the tick counter is exhausted.
      */
-    void Step(svanes::Registry& world, svanes::Vector2D gravity,
+    std::vector<GooseIntentUse> Step(svanes::Registry& world, svanes::Vector2D gravity,
               std::span<const GooseIntent> inputs);
 
     /**

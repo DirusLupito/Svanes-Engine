@@ -46,15 +46,35 @@ struct GooseTextures {
  *   sustains flight in the air for as long as flight time remains.
  * - fire: Whether the fire input is held. Firing is rate limited internally, so
  *   holding it produces a steady stream rather than one bullet per frame.
- * - aim_point: The world position bullets are fired toward.
+ * - aim: The direction bullets are fired toward, as an offset from the goose's position.
  */
 struct GooseIntent {
     svanes::Vector2D move;
     float dash = 0.0F;
     bool jump = false;
     bool fire = false;
-    svanes::Vector2D aim_point;
+    svanes::Vector2D aim;
 };
+
+/**
+ * Which parts of an intent a step depended on. Parts not listed here are read
+ * on every step, so a different value for them always could have changed it.
+ *
+ * FIELDS:
+ * - aim: Whether the aim was read. The goose only reads it when trying to fire.
+ */
+struct GooseIntentUse {
+    bool aim = false;
+};
+
+/**
+ * Whether a step that consumed one intent could have turned out differently with another.
+ * @param used The intent the step consumed.
+ * @param other The intent to compare against.
+ * @param use Which parts of the intent the step depended on.
+ * @return Whether any part the step depended on differs.
+ */
+bool ChangesStep(const GooseIntent& used, const GooseIntent& other, GooseIntentUse use);
 
 /**
  * Which animation the goose is currently showing. State is chosen fresh each frame
@@ -143,9 +163,10 @@ public:
      * @param world The registry containing the goose.
      * @param intent The input for this step.
      * @param delta_tics The goose's elapsed local timeline tics.
+     * @return Which parts of the intent this step depended on.
      * @throws std::logic_error if the goose has not been spawned.
      */
-    void Advance(svanes::Registry& world, const GooseIntent& intent,
+    GooseIntentUse Advance(svanes::Registry& world, const GooseIntent& intent,
                  svanes::TicCount delta_tics);
 
     /**

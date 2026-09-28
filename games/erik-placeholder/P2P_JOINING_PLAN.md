@@ -44,12 +44,20 @@ Bullets can outlive their shooter, so ownership must survive without a live goos
 Restore animation playback using local assets without advancing simulation time.
 Verify compatibility of fixed rules as well as agreement on the transferred state.
 
-## Still to decide
+## Complete
 
-- Exact snapshot fields, encoding, compatibility check, and verification coverage.
-- New-player identity, spawn state, admission limits, and concurrent membership requests.
-- Snapshot sender selection and agreement among existing peers.
-- Chunked transfer over bounded messages, failure handling, and the conditions for resuming.
+- `./game` starts a world as peer 1; `--join IPv4:PORT` joins through any member.
+- Joins batch into the existing roster pause. Ids come from a shared, only-increasing counter; retired ids are never reused. Player cap of 8, fixed spawn points.
+- The contacted member sends the joiner its id, member addresses, and a chunked snapshot; the joiner rebuilds and verifies it against the sponsor's hash. Rules hash, cap, and rejection reasons are checked before admission.
+- Engine: stranger/contact packets for pre-admission talk, `AddPeer` at runtime, retired connections released after the delivery timeout.
+- Verified across two machines, and with three players joining through a non-host.
+
+## Where to go from here
+
+- **Unexpected disconnects** (next): a crash, closed window, or dropped connection currently stalls or fails the world. Treat it as an unannounced departure.
+- **Port collisions**: ZeroMQ lets two processes share a UDP port silently, so copies on one machine need `--port`. Needs a transport that reports or picks a free port.
+- **Engine abstraction**: see below.
+- **Later**: pause-menu join instead of `--join`, LAN discovery, per-world session ids, and maybe if we decide we care, join passwords.
 
 ## Eventual engine abstraction
 
@@ -58,3 +66,21 @@ and membership operations should let games choose admission and initialization
 policy: joining an ongoing world, joining only a lobby, or rejecting joins during a
 match. Erik's pause-and-snapshot procedure should not be mandatory for every game.
 The concrete engine interfaces remain undecided.
+
+### Rolling back only on inputs that mattered
+
+A misprediction should only cost a rollback when the difference could have changed
+the world. Holding fire while moving used to mispredict nearly every tick, because aim
+changed constantly but is only read when a shot is attempted. Erik's game now sends aim
+relative to the goose, and `Goose::Advance` reports a `GooseIntentUse` saying which
+parts of the intent the step depended on. The rollback stores it per tick and asks
+`ChangesStep(used, actual, use)` whether a received input could have changed that tick,
+without knowing anything about aim itself. Two possible engine shapes:
+
+- **Manual:** the game supplies the comparison and the use report, as Erik's game does
+  now. Explicit and cheap, but the game must keep it correct.
+- **Automatic:** input fields sit behind accessors that record reads, so reading aim
+  marks it as read. Nothing can be forgotten, but every input type needs wrapping.
+
+Neither exists in the engine yet. Revisit once a second input field needs this or rollback moves
+into the engine.

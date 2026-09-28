@@ -56,6 +56,15 @@ GooseTextures Goose::LoadTextures(svanes::TextureManager& assets)
     };
 }
 
+bool ChangesStep(const GooseIntent& used, const GooseIntent& other, GooseIntentUse use)
+{
+    if (used.move.x != other.move.x || used.dash != other.dash || used.jump != other.jump ||
+        used.fire != other.fire) {
+        return true;
+    }
+    return use.aim && (used.aim.x != other.aim.x || used.aim.y != other.aim.y);
+}
+
 void Goose::Spawn(svanes::Registry& world, const GooseTextures& textures, float x, float y)
 {
     if (spawned) {
@@ -91,14 +100,14 @@ void Goose::Spawn(svanes::Registry& world, const GooseTextures& textures, float 
     spawned = true;
 }
 
-void Goose::Advance(svanes::Registry& world, const GooseIntent& intent,
+GooseIntentUse Goose::Advance(svanes::Registry& world, const GooseIntent& intent,
                     svanes::TicCount delta_tics)
 {
     if (!spawned) {
         throw std::logic_error("Goose::Advance called before Goose::Spawn.");
     }
     if (delta_tics == 0) {
-        return;
+        return {};
     }
     AdvanceCountdown(knockback_timer, delta_tics);
     AdvanceCountdown(invincible_timer, delta_tics);
@@ -148,10 +157,12 @@ void Goose::Advance(svanes::Registry& world, const GooseIntent& intent,
 
     AdvanceCountdown(fire_cooldown, delta_tics);
 
-    if (intent.fire && fire_cooldown == 0) {
+    GooseIntentUse use{};
+    use.aim = intent.fire && fire_cooldown == 0;
+    if (use.aim) {
         const svanes::Transform& transform = world.GetComponent<svanes::Transform>(entity);
         const svanes::Vector2D origin{transform.x, transform.y};
-        const svanes::Vector2D direction = intent.aim_point - origin;
+        const svanes::Vector2D direction = intent.aim;
 
         if (direction.x != 0.0F || direction.y != 0.0F) {
             SpawnBullet(world, entity, origin, direction, kBulletSpeed, kBulletColor);
@@ -167,6 +178,7 @@ void Goose::Advance(svanes::Registry& world, const GooseIntent& intent,
     }
 
     SetState(world, next);
+    return use;
 }
 
 // TASK 5, collision response: checks the goose against every Solid entity and

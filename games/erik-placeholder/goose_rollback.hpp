@@ -18,7 +18,8 @@ inline constexpr std::size_t GooseMaxPlayers = 8;
  * Local input is recorded and sent before advancing its tick. Missing remote
  * input repeats that player's last known held controls and aim, with no repeated
  * dash press. When a received input differs from the input used, the controller
- * restores the earliest affected snapshot and replays to the current tick.
+ * restores the earliest affected snapshot and replays to the current tick. Only
+ * the parts of an input that the simulated tick depended on are compared.
  *
  * Prediction is limited to 30 ticks beyond confirmed input. History retains
  * 256 ticks, and each rendered frame advances at most eight new ticks. Those
@@ -117,10 +118,12 @@ private:
      * FIELDS:
      * - before: The world at the boundary before applying this tick's inputs.
      * - used: The actual or predicted inputs that were applied, in peer order.
+     * - use: Which parts of each peer's input this tick depended on, in peer order.
      */
     struct TickRecord {
         GooseWorldSnapshot before;
         std::vector<GooseIntent> used;
+        std::vector<GooseIntentUse> use;
     };
 
     /**
@@ -129,7 +132,7 @@ private:
      * - move: The latest held horizontal direction.
      * - jump: Whether jump is held.
      * - fire: Whether the mouse button is held.
-     * - aim_point: The mouse position converted to world space before recording input.
+     * - aim: The mouse's world position relative to the local goose.
      * - left_pressed: A left press observed since the last consumed input tick.
      * - right_pressed: A right press observed since the last consumed input tick.
      * - left_tap_ticks: Remaining ticks in the left double-tap window.
@@ -139,7 +142,7 @@ private:
         float move = 0.0F;
         bool jump = false;
         bool fire = false;
-        svanes::Vector2D aim_point{};
+        svanes::Vector2D aim{};
         bool left_pressed = false;
         bool right_pressed = false;
         std::uint32_t left_tap_ticks = 0;

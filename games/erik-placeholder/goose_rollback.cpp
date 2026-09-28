@@ -4,6 +4,7 @@
 #include <svanes/camera2d.hpp>
 #include <svanes/input.hpp>
 #include <svanes/network/message_serialization.hpp>
+#include <svanes/registry.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -39,7 +40,7 @@ std::uint64_t HashBytes(const svanes::NetworkMessage& message)
 }
 
 /**
- * Compares movement and firing controls that affect simulation.
+ * Compares movement and firing controls, including aim while firing.
  * @param a The first input.
  * @param b The second input.
  * @return Whether both inputs produce the same controls.
@@ -47,13 +48,13 @@ std::uint64_t HashBytes(const svanes::NetworkMessage& message)
 bool SameInput(const GooseIntent& a, const GooseIntent& b)
 {
     return a.move.x == b.move.x && a.dash == b.dash && a.jump == b.jump &&
-        a.fire == b.fire && (!a.fire || (a.aim_point.x == b.aim_point.x && a.aim_point.y == b.aim_point.y));
+        a.fire == b.fire && (!a.fire || (a.aim.x == b.aim.x && a.aim.y == b.aim.y));
 }
 
 /**
  * Serializes one tick's controls, with movement directions encoded as 0, 1, and 2.
  * @param tick The simulation tick.
- * @param input The local movement, firing, and world-space aim controls.
+ * @param input The local movement, firing, and goose-relative aim controls.
  * @return The game payload for an Input message.
  */
 svanes::NetworkMessage EncodeInput(std::uint64_t tick, const GooseIntent& input)
@@ -64,8 +65,8 @@ svanes::NetworkMessage EncodeInput(std::uint64_t tick, const GooseIntent& input)
     writer.WriteUint8(static_cast<std::uint8_t>(input.dash + 1.0F));
     writer.WriteBool(input.jump);
     writer.WriteBool(input.fire);
-    writer.WriteFloat32(input.aim_point.x);
-    writer.WriteFloat32(input.aim_point.y);
+    writer.WriteFloat32(input.aim.x);
+    writer.WriteFloat32(input.aim.y);
     return writer.Finish();
 }
 
@@ -197,7 +198,7 @@ void GooseRollback::ReceiveMessages()
         input.dash = static_cast<float>(dash) - 1.0F;
         input.jump = jump;
         input.fire = fire;
-        input.aim_point = aim;
+        input.aim = aim;
         RecordInput(static_cast<std::size_t>(found - players.begin()), tick, input);
         if (!failure.empty()) {
             return;
@@ -295,7 +296,7 @@ void GooseRollback::RecordInput(std::size_t index, std::uint64_t tick, const Goo
     }
     player.latest_input_tick = std::max(player.latest_input_tick, tick + 1);
     const auto record = history.find(tick);
-    if (record != history.end() && !SameInput(record->second.used[index], input)) {
+    if (record != history.end() && ChangesStep(record->second.used[index], input, record->second.use[index])) {
         correction_tick = correction_tick ? std::min(*correction_tick, tick) : tick;
     }
 }
@@ -330,7 +331,7 @@ GooseIntent GooseRollback::TakeLocalInput()
     input.move.x = controls.move;
     input.jump = controls.jump;
     input.fire = controls.fire;
-    input.aim_point = controls.aim_point;
+    input.aim = controls.aim;
     if (controls.left_pressed) {
         if (controls.left_tap_ticks > 0) {
             input.dash = -1.0F;
@@ -359,8 +360,10 @@ void GooseRollback::AdvanceTick(const svanes::FrameContext& frame)
     for (std::size_t index = 0; index < players.size(); ++index) {
         inputs.push_back(InputFor(index, simulation.Tick()));
     }
-    history.insert_or_assign(simulation.Tick(), TickRecord{simulation.Capture(frame.world), inputs});
-    simulation.Step(frame.world, frame.gravity, inputs);
+    const auto tick = simulation.Tick();
+    auto before = simulation.Capture(frame.world);
+    auto use = simulation.Step(frame.world, frame.gravity, inputs);
+    history.insert_or_assign(tick, TickRecord{std::move(before), std::move(inputs), std::move(use)});
 }
 
 void GooseRollback::PruneHistory()
@@ -424,12 +427,13 @@ void GooseRollback::Update(const svanes::FrameContext& frame)
         - (frame.input.IsDown(svanes::Key::A) ? 1.0F : 0.0F);
     controls.jump = frame.input.IsDown(svanes::Key::Space);
     controls.fire = frame.input.IsMouseButtonDown(svanes::MouseButton::Left);
-    controls.aim_point = {};
+    controls.aim = {};
     if (controls.fire) {
         const auto mouse = frame.input.MousePosition();
         const auto aim = frame.camera.ScreenToWorld({mouse.x, mouse.y, 0.0F, 0.0F});
-        controls.aim_point = {std::clamp(aim.x, -100000.0F, 100000.0F),
-            std::clamp(aim.y, -100000.0F, 100000.0F)};
+        const auto& goose = frame.world.GetComponent<svanes::Transform>(simulation.PlayerEntity(network.LocalPeer()));
+        controls.aim = {std::clamp(aim.x - goose.x, -100000.0F, 100000.0F),
+            std::clamp(aim.y - goose.y, -100000.0F, 100000.0F)};
     }
     controls.left_pressed |= frame.input.WasPressed(svanes::Key::A);
     controls.right_pressed |= frame.input.WasPressed(svanes::Key::D);

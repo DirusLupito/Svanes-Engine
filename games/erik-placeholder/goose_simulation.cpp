@@ -140,7 +140,7 @@ void GooseSimulation::AddPlayer(svanes::Registry& world, svanes::PeerId peer)
     players.back().goose.Spawn(world, textures, spawn_x, kSpawnY);
 }
 
-void GooseSimulation::Step(svanes::Registry& world, svanes::Vector2D gravity,
+std::vector<GooseIntentUse> GooseSimulation::Step(svanes::Registry& world, svanes::Vector2D gravity,
                             std::span<const GooseIntent> inputs)
 {
     if (!initialized) {
@@ -159,8 +159,8 @@ void GooseSimulation::Step(svanes::Registry& world, svanes::Vector2D gravity,
         if ((input.move.x != -1.0F && input.move.x != 0.0F && input.move.x != 1.0F) ||
             input.move.y != 0.0F ||
             (input.dash != -1.0F && input.dash != 0.0F && input.dash != 1.0F) ||
-            !std::isfinite(input.aim_point.x) || !std::isfinite(input.aim_point.y) ||
-            std::abs(input.aim_point.x) > 100000.0F || std::abs(input.aim_point.y) > 100000.0F) {
+            !std::isfinite(input.aim.x) || !std::isfinite(input.aim.y) ||
+            std::abs(input.aim.x) > 100000.0F || std::abs(input.aim.y) > 100000.0F) {
             throw std::invalid_argument("GooseSimulation requires valid movement directions and finite, bounded aim.");
         }
     }
@@ -179,8 +179,10 @@ void GooseSimulation::Step(svanes::Registry& world, svanes::Vector2D gravity,
         steps.push_back({entity, timeline.GetDeltaTics()});
     }
     svanes::AdvanceKinematics(world, gravity, physics_driver, steps);
+    std::vector<GooseIntentUse> use;
+    use.reserve(players.size());
     for (std::size_t index = 0; index < players.size(); ++index) {
-        players[index].goose.Advance(world, inputs[index], steps[index].delta_tics);
+        use.push_back(players[index].goose.Advance(world, inputs[index], steps[index].delta_tics));
     }
     const double elapsed_seconds = static_cast<double>(tick + 1) *
         static_cast<double>(GooseStepTics) / static_cast<double>(svanes::TicsPerSecond);
@@ -242,6 +244,7 @@ void GooseSimulation::Step(svanes::Registry& world, svanes::Vector2D gravity,
     }
     svanes::AdvanceSpriteAnimations(world);
     ++tick;
+    return use;
 }
 
 GooseWorldSnapshot GooseSimulation::Capture(const svanes::Registry& world) const
