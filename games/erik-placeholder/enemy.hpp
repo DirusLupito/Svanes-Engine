@@ -75,15 +75,6 @@ public:
     void Spawn(svanes::Registry& world, svanes::Vector2D position, float size, float health);
 
     /**
-     * Advances the enemy by one frame, stepping it toward the intended position and
-     * firing if it is due. Does nothing if the enemy is dead.
-     *
-     * @param frame The frame context supplying the registry and the frame delta.
-     * @param intent What the enemy should attempt this frame.
-     */
-    void Update(const svanes::FrameContext& frame, const EnemyIntent& intent);
-
-    /**
      * Moves and fires using an explicit elapsed time, including during replay.
      * @param world The registry holding the enemy.
      * @param intent The destination and firing controls for this step.

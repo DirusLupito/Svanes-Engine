@@ -8,49 +8,41 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <optional>
 #include <utility>
-#include <vector>
 
 namespace {
 
 /**
- * Reads an unsigned command-line number without accepting a partial match.
- * @param text The argument text.
- * @return The parsed value.
- * @throws std::invalid_argument if the argument is not a representable unsigned integer.
+ * Reads a UDP port without accepting a partial match.
+ * @param text The port text.
+ * @return The port.
+ * @throws std::invalid_argument unless the text is a number from 1 to 65535.
  */
-std::uint64_t ReadNumber(std::string_view text)
+std::uint16_t ReadPort(std::string_view text)
 {
-    std::uint64_t value = 0;
-    const auto parsed = std::from_chars(text.data(), text.data() + text.size(), value);
-    if (text.empty() || parsed.ec != std::errc{} || parsed.ptr != text.data() + text.size()) {
-        throw std::invalid_argument("Expected an unsigned integer: " + std::string{text});
+    std::uint32_t port = 0;
+    const auto parsed = std::from_chars(text.data(), text.data() + text.size(), port);
+    if (text.empty() || parsed.ec != std::errc{} || parsed.ptr != text.data() + text.size() ||
+        port == 0 || port > std::numeric_limits<std::uint16_t>::max()) {
+        throw std::invalid_argument("Expected a port from 1 to 65535: " + std::string{text});
     }
-    return value;
+    return static_cast<std::uint16_t>(port);
 }
 
 /**
- * Reads one roster member from ID@IPv4:PORT.
- * @param text The command-line endpoint.
- * @return The peer identity and address, with IPv4 validation left to the UDP pipe.
- * @throws std::invalid_argument for missing fields or out-of-range ids and ports.
+ * Reads an address in IPv4:PORT form.
+ * @param text The command-line address.
+ * @return The host and port, with IPv4 validation left to the UDP pipe.
+ * @throws std::invalid_argument for a missing host or an invalid port.
  */
-GoosePeerEndpoint ReadEndpoint(std::string_view text)
+svanes::UdpAddress ReadAddress(std::string_view text)
 {
-    const auto at = text.find('@');
-    const auto colon = text.find(':');
-    if (at == std::string_view::npos || colon == std::string_view::npos ||
-        at == 0 || colon <= at + 1 || colon + 1 >= text.size()) {
-        throw std::invalid_argument("Expected an endpoint in ID@IPv4:PORT form: " + std::string{text});
+    const auto colon = text.rfind(':');
+    if (colon == std::string_view::npos || colon == 0 || colon + 1 >= text.size()) {
+        throw std::invalid_argument("Expected an address in IPv4:PORT form: " + std::string{text});
     }
-    const auto id = ReadNumber(text.substr(0, at));
-    const auto port = ReadNumber(text.substr(colon + 1));
-    if (id == 0 || id > std::numeric_limits<std::uint32_t>::max() ||
-        port == 0 || port > std::numeric_limits<std::uint16_t>::max()) {
-        throw std::invalid_argument("Endpoint requires a nonzero 32-bit peer id and a port from 1 to 65535.");
-    }
-    return {{static_cast<std::uint32_t>(id)}, std::string{text.substr(at + 1, colon - at - 1)},
-        static_cast<std::uint16_t>(port)};
+    return {std::string{text.substr(0, colon)}, ReadPort(text.substr(colon + 1))};
 }
 
 }
@@ -60,82 +52,41 @@ GoosePeerEndpoint ReadEndpoint(std::string_view text)
 int32_t main(int32_t argc, char** argv)
 {
     try {
-        std::uint32_t peer = 0;
-        std::uint32_t players = 3;
-        std::uint16_t port_base = 45000;
-        svanes::SessionId session = 1;
-        std::vector<GoosePeerEndpoint> endpoints;
-        bool loopback_options = false;
+        std::optional<svanes::UdpAddress> join_address;
+        std::optional<std::uint16_t> port;
         for (int32_t index = 1; index < argc; ++index) {
             const std::string_view option{argv[index]};
             if (option == "--help") {
-                std::cout << "Usage: svanes_game_erik [--peer N [--players N] [--port-base N] [--session N]]\n"
-                    << "LAN: svanes_game_erik --peer N --endpoint ID@IPv4:PORT --endpoint ID@IPv4:PORT ... [--session N]\n"
-                    << "No options starts single-player. Multiplayer defaults to 3 players on loopback.\n"
-                    << "Repeat --endpoint for every player, including yourself. Use the same roster on every computer.\n"
-                    << "Explicit endpoints determine the player count and cannot be combined with --players or --port-base.\n"
-                    << "Open every configured window, then press Enter in each to mark it ready.\n";
+                std::cout << "Usage: svanes_game_erik [--join IPv4:PORT] [--port N]\n"
+                    << "No options starts a new world that others can join on port 45000.\n"
+                    << "--join connects to any player already in a world, listening on port 45001.\n"
+                    << "--port chooses the local port. Every copy on one computer needs its own.\n";
                 return 0;
             }
-            if (option != "--peer" && option != "--players" &&
-                option != "--port-base" && option != "--session" && option != "--endpoint") {
-                throw std::invalid_argument("Unknown option: " + std::string{option});
-            }
-            if (++index >= argc) {
-                throw std::invalid_argument("Missing value for " + std::string{option});
-            }
-            if (option == "--endpoint") {
-                endpoints.push_back(ReadEndpoint(argv[index]));
+            if (option == "--port") {
+                if (++index >= argc || port) {
+                    throw std::invalid_argument("--port requires one value and may appear once.");
+                }
+                port = ReadPort(argv[index]);
                 continue;
             }
-            if (option == "--players" || option == "--port-base") {
-                loopback_options = true;
+            if (option != "--join") {
+                throw std::invalid_argument("Unknown option: " + std::string{option});
             }
-            const auto value = ReadNumber(argv[index]);
-            if (option == "--session") {
-                session = value;
-            } else if (option == "--port-base") {
-                if (value > std::numeric_limits<std::uint16_t>::max()) {
-                    throw std::invalid_argument("Port base must fit in 16 bits.");
-                }
-                port_base = static_cast<std::uint16_t>(value);
-            } else {
-                if (value > std::numeric_limits<std::uint32_t>::max()) {
-                    throw std::invalid_argument("Peer id and player count must fit in 32 bits.");
-                }
-                if (option == "--peer") {
-                    peer = static_cast<std::uint32_t>(value);
-                } else {
-                    players = static_cast<std::uint32_t>(value);
-                }
+            if (++index >= argc || join_address) {
+                throw std::invalid_argument("--join requires one address and may appear once.");
             }
-        }
-
-        std::optional<GooseNetworkConfiguration> configuration;
-        if (argc > 1) {
-            if (endpoints.empty()) {
-                configuration = MakeLoopbackGooseConfiguration({peer}, players, port_base, session);
-            } else {
-                if (loopback_options) {
-                    throw std::invalid_argument("Use --endpoint or --players/--port-base, not both.");
-                }
-                configuration = GooseNetworkConfiguration{session, {peer}, std::move(endpoints)};
-            }
-            std::cout << "Session " << configuration->session << ", local peer " << peer << '\n';
-            for (const auto& endpoint : configuration->peers) {
-                std::cout << "  Peer " << endpoint.peer.value << " at " << endpoint.host << ':' << endpoint.port
-                    << (endpoint.peer.value == peer ? " (local)" : "") << '\n';
-            }
+            join_address = ReadAddress(argv[index]);
         }
         svanes::Application application({
-            .title = configuration
-                ? "Erik's Game - Peer " + std::to_string(peer) + " (" + std::to_string(configuration->peers.size()) + " players)"
+            .title = join_address
+                ? "Erik's Game - joining " + join_address->host + ":" + std::to_string(join_address->port)
                 : "Erik's Game",
             .width = 640,
             .height = 900,
         });
 
-        ErikGame game(std::move(configuration));
+        ErikGame game(port.value_or(join_address ? GooseJoinPort : GooseHostPort), std::move(join_address));
         return application.run(game);
     } catch (const std::exception& error) {
         std::cerr << "Erik's Game: " << error.what() << '\n';

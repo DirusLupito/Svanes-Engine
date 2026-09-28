@@ -12,8 +12,6 @@
 
 namespace {
 
-constexpr float kBulletSize = 8.0F;
-
 bool IsOutsideBounds(const svanes::Transform& transform, const svanes::Rectangle2D& bounds)
 {
     const float half_width = bounds.width * 0.5F;
@@ -46,8 +44,8 @@ void SpawnBullet(
         svanes::PerSecondToPerTic(speed);
 
     const svanes::Rectangle2D body{
-        .width = kBulletSize,
-        .height = kBulletSize,
+        .width = BulletSize,
+        .height = BulletSize,
     };
 
     const svanes::Entity bullet = world.CreateEntity();
@@ -118,16 +116,9 @@ void RestoreBullets(svanes::Registry& world, const std::vector<BulletSnapshot>& 
     }
 }
 
-std::vector<BulletHit> UpdateBullets(svanes::Registry& world, const svanes::Rectangle2D& bounds)
+std::vector<BulletHit> UpdateBullets(svanes::Registry& world, const svanes::Rectangle2D& bounds,
+                                     std::span<const svanes::Entity> targets)
 {
-    std::vector<svanes::Entity> targets;
-    world.ForEach<svanes::Transform, svanes::Collider2D>(
-        [&](svanes::Entity entity, const svanes::Transform&, const svanes::Collider2D&) {
-            if (!world.HasComponent<Bullet>(entity)) {
-                targets.push_back(entity);
-            }
-        });
-    std::sort(targets.begin(), targets.end());
     std::vector<BulletHit> hits;
     for (const auto entity : OrderedBullets(world)) {
         const auto& bullet = world.GetComponent<Bullet>(entity);

@@ -61,11 +61,6 @@ void Enemy::Spawn(svanes::Registry& world, svanes::Vector2D position, float size
     fire_cooldown = 0;
 }
 
-void Enemy::Update(const svanes::FrameContext& frame, const EnemyIntent& intent)
-{
-    Advance(frame.world, intent, frame.real_delta_tics);
-}
-
 void Enemy::Advance(svanes::Registry& world, const EnemyIntent& intent, svanes::TicCount delta_tics)
 {
     if (!alive || delta_tics == 0) {

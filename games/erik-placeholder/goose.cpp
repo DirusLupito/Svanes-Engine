@@ -48,44 +48,47 @@ void AdvanceCountdown(svanes::TicCount& remaining, svanes::TicCount delta_tics)
 
 }
 
-void Goose::Spawn(svanes::GameContext& context, float x, float y)
+GooseTextures Goose::LoadTextures(svanes::TextureManager& assets)
+{
+    return {
+        assets.LoadTexture(svanes::AssetPath(ERIK_GAME_ASSETS_DIR) + "/goose.png"),
+        assets.LoadTexture(svanes::AssetPath(ERIK_GAME_ASSETS_DIR) + "/goose_walk.png"),
+    };
+}
+
+void Goose::Spawn(svanes::Registry& world, const GooseTextures& textures, float x, float y)
 {
     if (spawned) {
         throw std::logic_error("Goose::Spawn called twice on the same goose.");
     }
 
-    idle_texture = context.assets.LoadTexture(svanes::AssetPath(ERIK_GAME_ASSETS_DIR) + "/goose.png");
-    walk_texture = context.assets.LoadTexture(svanes::AssetPath(ERIK_GAME_ASSETS_DIR) + "/goose_walk.png");
+    idle_texture = textures.idle;
+    walk_texture = textures.walk;
 
     const svanes::Rectangle2D body{
         .width = kBodyWidth,
         .height = kBodyHeight,
     };
 
-    entity = context.world.CreateEntity();
-    context.world.AddComponent<svanes::Transform>(entity, svanes::Transform{
+    entity = world.CreateEntity();
+    world.AddComponent<svanes::Transform>(entity, svanes::Transform{
         .x = x,
         .y = y,
     });
-    context.world.AddComponent<svanes::Sprite>(entity, svanes::Sprite{
+    world.AddComponent<svanes::Sprite>(entity, svanes::Sprite{
         .texture = idle_texture,
         .geometry = body,
     });
-    context.world.AddComponent<svanes::Timeline>(entity);
+    world.AddComponent<svanes::Timeline>(entity);
     // TASK 3, physics: these two components are what put the goose under the
     // engine's physics. Kinematic2D holds its velocity and acceleration, and
     // Gravity opts it into the world gravity vector set in ErikGame::Initialize
-    context.world.AddComponent<svanes::Kinematic2D>(entity);
-    context.world.AddComponent<svanes::Gravity>(entity);
-    context.world.AddComponent<svanes::Collider2D>(entity, svanes::Collider2D{body});
+    world.AddComponent<svanes::Kinematic2D>(entity);
+    world.AddComponent<svanes::Gravity>(entity);
+    world.AddComponent<svanes::Collider2D>(entity, svanes::Collider2D{body});
 
     fly_time_remaining = max_fly_tics;
     spawned = true;
-}
-
-void Goose::Update(const svanes::FrameContext& frame, const GooseIntent& intent)
-{
-    Advance(frame.world, intent, frame.real_delta_tics);
 }
 
 void Goose::Advance(svanes::Registry& world, const GooseIntent& intent,
@@ -244,7 +247,9 @@ void Goose::Restore(svanes::Registry& world, const GooseSnapshot& snapshot)
     world.GetComponent<svanes::Transform>(entity) = snapshot.transform;
     world.GetComponent<svanes::Kinematic2D>(entity) = snapshot.motion;
     world.GetComponent<svanes::Timeline>(entity) = snapshot.timeline;
-    world.GetComponent<svanes::Sprite>(entity) = snapshot.sprite;
+    auto& sprite = world.GetComponent<svanes::Sprite>(entity);
+    sprite.texture = snapshot.state == GooseState::Idle ? idle_texture : walk_texture;
+    sprite.source = snapshot.sprite.source;
     if (snapshot.animation) {
         world.AddComponent<svanes::SpriteAnimation>(entity, *snapshot.animation);
     } else {

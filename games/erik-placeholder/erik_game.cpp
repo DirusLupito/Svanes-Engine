@@ -57,36 +57,6 @@ constexpr float kSkyMargin = 1.5F;
 constexpr float kCameraAnchorX = 0.5F;
 constexpr float kCameraAnchorY = 0.68F;
 
-// how long after tapping A or D a second tap still counts as a dash
-constexpr float kDoubleTapWindow = 0.25F;
-
-// bullets are destroyed once they leave this region, which is larger than the world
-// so they expire out of sight rather than at the walls
-constexpr svanes::Rectangle2D kBulletBounds{3000.0F, -60.0F, 6600.0F, 2800.0F};
-
-constexpr float kEnemySize = 120.0F;
-constexpr float kEnemyHealth = 10.0F;
-constexpr float kBulletDamage = 1.0F;
-
-// how far below itself the enemy aims, so it fires downward at the ground
-constexpr float kEnemyAimDistance = 1000.0F;
-
-// the enemy sweeps back and forth across kEnemyPathRadius either side of
-// kEnemyPathCenterX, staying at a fixed height
-constexpr float kEnemyPathCenterX = 1600.0F;
-constexpr float kEnemyPathY = 300.0F;
-constexpr float kEnemyPathRadius = 700.0F;
-constexpr float kEnemyPathSpeed = 0.8F;
-
-constexpr float kBulletKnockback = 350.0F;
-constexpr float kContactKnockback = 550.0F;
-
-float FrameSeconds(const svanes::FrameContext& frame)
-{
-    return static_cast<float>(frame.real_delta_tics) /
-        static_cast<float>(svanes::TicsPerSecond);
-}
-
 /**
  * Creates one piece of immovable world geometry, drawn as a colored rectangle and
  * tagged Solid so the goose collides with it.
@@ -123,8 +93,8 @@ void CreateSolidBlock(
 
 }
 
-ErikGame::ErikGame(std::optional<GooseNetworkConfiguration> configuration)
-    : network_configuration(std::move(configuration))
+ErikGame::ErikGame(std::uint16_t port, std::optional<svanes::UdpAddress> join_address)
+    : port(port), join_address(std::move(join_address))
 {
 }
 
@@ -132,7 +102,7 @@ void ErikGame::Initialize(svanes::GameContext& context)
 {
     // the world gravity vector, applied by the engine every frame to any entity
     // holding both Kinematic2D and Gravity. Positive y is down
-    context.gravity = {0.0F, svanes::PerSecondSquaredToPerTicSquared(2000.0F)};
+    context.gravity = {0.0F, svanes::PerSecondSquaredToPerTicSquared(GooseGravity)};
 
     background = context.world.CreateEntity();
     context.world.AddComponent<svanes::Transform>(background, svanes::Transform{
@@ -204,28 +174,22 @@ void ErikGame::Initialize(svanes::GameContext& context)
     context.world.GetComponent<svanes::Sprite>(orb).source = svanes::Rectangle2D{
         64.0F, 64.0F, 128.0F, 128.0F};
 
-    if (network_configuration) {
-        network = std::make_unique<GooseNetwork>(*network_configuration);
-        simulation = std::make_unique<GooseSimulation>();
-        simulation->Initialize(context, network->Peers());
-        initial_state_hash = GooseSimulation::Hash(simulation->Capture(context.world));
-        rollback = std::make_unique<GooseRollback>(*simulation, *network);
+    simulation = std::make_unique<GooseSimulation>();
+    simulation->Initialize(context);
+    if (join_address) {
+        join = std::make_unique<GooseJoin>(*join_address, port, GooseRollback::RulesHash());
         return;
     }
-
-    // TASK 2C, auto-moving entity: the enemy. It takes no input, and is walked
-    // along its path by the game in Update.
-    enemy.Spawn(context.world, {kEnemyPathCenterX, kEnemyPathY}, kEnemySize, kEnemyHealth);
-
-    // TASK 2B, controllable entity: the goose. Built in Goose::Spawn, and driven
-    // each frame by the player's input in Update.
-    goose.Spawn(context, 400.0F, 700.0F);
+    network = std::make_unique<GooseNetwork>(BindGoosePipe(port));
+    simulation->AddPlayer(context.world, network->LocalPeer());
+    rollback = std::make_unique<GooseRollback>(*simulation, *network);
+    std::cout << "Started a new world. Others can join on port " << network->Port() << ".\n";
 }
 
 void ErikGame::Update(const svanes::FrameContext& frame)
 {
     if (frame.input.WasPressed(svanes::Key::Escape)) {
-        if (network && network->IsReady()) {
+        if (rollback) {
             rollback->RequestLeave();
         } else {
             should_quit = true;
@@ -242,121 +206,52 @@ void ErikGame::Update(const svanes::FrameContext& frame)
             : svanes::ScaleMode::Constant;
     }
 
-    if (network) {
-        if (frame.input.WasPressed(svanes::Key::Enter)) {
-            network->RequestReady(initial_state_hash);
-        }
-        network->Update();
-        rollback->Update(frame);
-        const auto status = rollback->Status();
-        if (status != last_network_status) {
-            std::cout << "Peer " << network->LocalPeer().value << ": " << status << '\n';
-            last_network_status = status;
-        }
-        if (network->IsReady()) {
-            network_diagnostic_tics += std::min(frame.real_delta_tics,
-                svanes::TicsPerSecond - network_diagnostic_tics);
-            if (network_diagnostic_tics >= svanes::TicsPerSecond) {
-                std::cout << "Peer " << network->LocalPeer().value << ": "
-                    << rollback->Diagnostics() << '\n';
-                network_diagnostic_tics = 0;
-            }
-        }
-        should_quit = should_quit || rollback->CanClose();
-        if (!rollback->HasDeparted()) {
-            UpdateCamera(frame, simulation->PlayerEntity(network->LocalPeer()));
+    if (!rollback) {
+        UpdateJoining(frame);
+        return;
+    }
+    network->Update();
+    rollback->Update(frame);
+    ReportStatus("Peer " + std::to_string(network->LocalPeer().value) + ": " + rollback->Status());
+    network_diagnostic_tics += std::min(frame.real_delta_tics,
+        svanes::TicsPerSecond - network_diagnostic_tics);
+    if (network_diagnostic_tics >= svanes::TicsPerSecond) {
+        std::cout << "Peer " << network->LocalPeer().value << ": "
+            << rollback->Diagnostics() << '\n';
+        network_diagnostic_tics = 0;
+    }
+    should_quit = should_quit || rollback->CanClose();
+    if (!rollback->HasDeparted()) {
+        UpdateCamera(frame, simulation->PlayerEntity(network->LocalPeer()));
+    }
+}
+
+void ErikGame::UpdateJoining(const svanes::FrameContext& frame)
+{
+    if (join) {
+        join->Update();
+        ReportStatus(join->Status());
+        if (join->IsAssigned()) {
+            network = join->Admit();
+            join.reset();
         }
         return;
     }
-
-    // TASK 4, controls: the raw keyboard and mouse state is read into a GooseIntent
-    // here, and the goose acts on that instead of on the input device.
-    GooseIntent intent{};
-    if (frame.input.IsDown(svanes::Key::D)) {
-        intent.move.x += 1.0F;
+    network->Update();
+    ReportStatus("Peer " + std::to_string(network->LocalPeer().value) + ": " +
+        (network->HasFailed() ? network->Status() : "Receiving the world."));
+    if (auto snapshot = network->TakeSnapshot()) {
+        rollback = std::make_unique<GooseRollback>(*simulation, *network, frame.world, *snapshot);
+        std::cout << "Joined at tick " << simulation->Tick() << " with "
+            << network->Peers().size() << " player(s). Others can join on port " << network->Port() << ".\n";
     }
-    if (frame.input.IsDown(svanes::Key::A)) {
-        intent.move.x -= 1.0F;
-    }
-    // a dash is a double tap of A or D. The first press starts that direction's
-    // timer, and a second press while the timer is still running becomes the dash
-    // instead
-    const float delta_seconds = FrameSeconds(frame);
-    left_tap_timer = std::max(left_tap_timer - delta_seconds, 0.0F);
-    right_tap_timer = std::max(right_tap_timer - delta_seconds, 0.0F);
+}
 
-    if (frame.input.WasPressed(svanes::Key::A)) {
-        if (left_tap_timer > 0.0F) {
-            intent.dash = -1.0F;
-            left_tap_timer = 0.0F;
-        } else {
-            left_tap_timer = kDoubleTapWindow;
-        }
-    }
-
-    if (frame.input.WasPressed(svanes::Key::D)) {
-        if (right_tap_timer > 0.0F) {
-            intent.dash = 1.0F;
-            right_tap_timer = 0.0F;
-        } else {
-            right_tap_timer = kDoubleTapWindow;
-        }
-    }
-
-    intent.jump = frame.input.IsDown(svanes::Key::Space);
-    intent.fire = frame.input.IsMouseButtonDown(svanes::MouseButton::Left);
-
-    // the mouse arrives in screen coordinates, but the goose aims in world
-    // coordinates, so the cursor is converted through the camera before being
-    // handed over
-    const svanes::Vector2D mouse = frame.input.MousePosition();
-    const svanes::Rectangle2D aim = frame.camera.ScreenToWorld({mouse.x, mouse.y, 0.0F, 0.0F});
-    intent.aim_point = {aim.x, aim.y};
-
-    goose.Update(frame, intent);
-
-    UpdateCamera(frame, goose.GetEntity());
-
-    elapsed_seconds += delta_seconds;
-
-    // TASK 2C, auto-moving entity: the enemy's motion for this frame. Its position
-    // is a sine wave over elapsed time, sweeping it back and forth above the arena
-    // while it fires downward
-    if (enemy.IsAlive()) {
-        const svanes::Vector2D enemy_position = enemy.Position(frame.world);
-
-        EnemyIntent enemy_intent{};
-        enemy_intent.move_to = {
-            kEnemyPathCenterX + std::sin(elapsed_seconds * kEnemyPathSpeed) * kEnemyPathRadius,
-            kEnemyPathY,
-        };
-        enemy_intent.fire = true;
-        enemy_intent.aim_point = {enemy_position.x, enemy_position.y + kEnemyAimDistance};
-
-        enemy.Update(frame, enemy_intent);
-    }
-
-    // UpdateBullets moves and destroys the bullets and reports what they struck,
-    // leaving the game to decide what a hit means
-    for (const BulletHit& hit : UpdateBullets(frame.world, kBulletBounds)) {
-        if (hit.target == goose.GetEntity()) {
-            goose.ApplyKnockback(frame.world, hit.direction, kBulletKnockback);
-        } else if (enemy.IsAlive() && hit.target == enemy.GetEntity()) {
-            enemy.ApplyDamage(frame.world, kBulletDamage);
-        }
-    }
-
-    if (enemy.IsAlive()) {
-        const std::vector<svanes::Collision2D> contact = svanes::DetectCollisions(
-            frame.world.GetComponent<svanes::Collider2D>(goose.GetEntity()).geometry,
-            frame.world.GetComponent<svanes::Transform>(goose.GetEntity()),
-            frame.world.GetComponent<svanes::Collider2D>(enemy.GetEntity()).geometry,
-            frame.world.GetComponent<svanes::Transform>(enemy.GetEntity())
-        );
-
-        if (!contact.empty()) {
-            goose.ApplyKnockback(frame.world, contact[0].normal, kContactKnockback);
-        }
+void ErikGame::ReportStatus(const std::string& status)
+{
+    if (status != last_network_status) {
+        std::cout << status << '\n';
+        last_network_status = status;
     }
 }
 

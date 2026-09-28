@@ -1,119 +1,110 @@
 #include "goose_network.hpp"
 
-#include "goose_simulation.hpp"
-
-#include <svanes/network/message_serialization.hpp>
-#include <svanes/network/udp_msg_pipe.hpp>
-
 #include <algorithm>
 #include <limits>
 #include <stdexcept>
 #include <utility>
 
-GooseNetworkConfiguration MakeLoopbackGooseConfiguration(
-    svanes::PeerId local_peer, std::uint32_t player_count,
-    std::uint16_t port_base, svanes::SessionId session)
-{
-    if (session == 0 || local_peer.value == 0 || local_peer.value > player_count ||
-        player_count == 0 || player_count > 65535U - port_base) {
-        throw std::invalid_argument("Goose roster requires a nonzero session, a local id in the player range, and ports below 65536.");
-    }
-    GooseNetworkConfiguration configuration{session, local_peer, {}};
-    configuration.peers.reserve(player_count);
-    for (std::uint32_t id = 1; id <= player_count; ++id) {
-        configuration.peers.push_back({{id}, "127.0.0.1", static_cast<std::uint16_t>(port_base + id)});
-    }
-    return configuration;
+namespace {
+
+constexpr std::size_t kSnapshotChunkBytes = 1024;
+constexpr std::uint32_t kMaximumSnapshotChunks = 4096;
+constexpr std::size_t kMaximumQueuedMessages = 4096;
+constexpr auto kJoinRequestInterval = std::chrono::milliseconds(250);
+constexpr auto kJoinTimeout = std::chrono::seconds(15);
+
 }
 
-GooseNetwork::GooseNetwork(GooseNetworkConfiguration configuration)
+GooseBoundPipe BindGoosePipe(std::uint16_t port)
 {
-    if (configuration.session == 0 || configuration.local_peer.value == 0 ||
-        configuration.peers.empty() || configuration.peers.size() > std::numeric_limits<std::uint32_t>::max()) {
-        throw std::invalid_argument("GooseNetwork requires a session, a local identity, and a nonempty roster.");
+    return {std::make_unique<svanes::UdpMsgPipe>(port), port};
+}
+
+void WriteGooseText(svanes::MessageWriter& writer, std::string_view text)
+{
+    if (text.size() > std::numeric_limits<std::uint16_t>::max()) {
+        throw std::length_error("Goose text exceeds 65535 bytes.");
     }
-    std::sort(configuration.peers.begin(), configuration.peers.end(),
-        [](const auto& a, const auto& b) { return a.peer.value < b.peer.value; });
-    for (std::size_t index = 0; index < configuration.peers.size(); ++index) {
-        const auto& endpoint = configuration.peers[index];
-        if (endpoint.peer.value == 0 || endpoint.port == 0 || endpoint.host.empty() ||
-            (index > 0 && endpoint.peer == configuration.peers[index - 1].peer)) {
-            throw std::invalid_argument("GooseNetwork requires unique nonzero peer ids and valid endpoints.");
-        }
+    writer.WriteUint16(static_cast<std::uint16_t>(text.size()));
+    writer.WriteBytes(std::as_bytes(std::span{text.data(), text.size()}));
+}
+
+std::string ReadGooseText(svanes::MessageReader& reader)
+{
+    const auto bytes = reader.ReadBytes(reader.ReadUint16());
+    std::string text;
+    for (const auto byte : bytes) {
+        text.push_back(static_cast<char>(byte));
+    }
+    return text;
+}
+
+void WriteGooseAddress(svanes::MessageWriter& writer, const svanes::UdpAddress& address)
+{
+    WriteGooseText(writer, address.host);
+    writer.WriteUint16(address.port);
+}
+
+svanes::UdpAddress ReadGooseAddress(svanes::MessageReader& reader)
+{
+    svanes::UdpAddress address{ReadGooseText(reader), reader.ReadUint16()};
+    if (address.host.empty() || address.port == 0) {
+        throw std::invalid_argument("Goose address requires a host and a nonzero port.");
+    }
+    return address;
+}
+
+svanes::NetworkMessage EncodeAssignment(const GooseAssignment& assignment)
+{
+    svanes::MessageWriter writer;
+    writer.WriteUint32(assignment.local_peer.value);
+    writer.WriteUint32(assignment.sponsor.value);
+    writer.WriteUint64(assignment.revision);
+    writer.WriteUint32(static_cast<std::uint32_t>(assignment.peers.size()));
+    for (const auto& endpoint : assignment.peers) {
+        writer.WriteUint32(endpoint.peer.value);
+        WriteGooseAddress(writer, endpoint.address);
+    }
+    return writer.Finish();
+}
+
+GooseAssignment DecodeAssignment(const svanes::NetworkMessage& payload)
+{
+    svanes::MessageReader reader(payload);
+    GooseAssignment assignment{{reader.ReadUint32()}, {reader.ReadUint32()}, reader.ReadUint64(), {}};
+    const auto count = reader.ReadUint32();
+    for (std::uint32_t index = 0; index < count; ++index) {
+        const svanes::PeerId peer{reader.ReadUint32()};
+        assignment.peers.push_back({peer, ReadGooseAddress(reader)});
+    }
+    if (reader.Remaining() != 0 || assignment.local_peer.value == 0 ||
+        assignment.sponsor.value == 0 || assignment.revision == 0) {
+        throw std::invalid_argument("Goose assignment has invalid ids, revision, or length.");
+    }
+    return assignment;
+}
+
+GooseNetwork::GooseNetwork(GooseBoundPipe bound)
+    : pipe(bound.pipe.get()), port(bound.port), peers{{1}}
+{
+    session = std::make_unique<svanes::NetworkSession>(std::move(bound.pipe),
+        svanes::SessionConfiguration{GooseSession, {1}, {}});
+}
+
+GooseNetwork::GooseNetwork(GooseBoundPipe bound, svanes::ConnectionId sponsor_connection,
+                           const GooseAssignment& assignment)
+    : pipe(bound.pipe.get()), port(bound.port), revision(assignment.revision), awaiting_snapshot(true)
+{
+    svanes::SessionConfiguration configuration{GooseSession, assignment.local_peer, {}};
+    configuration.remote_peers.push_back({assignment.sponsor, sponsor_connection});
+    peers = {assignment.local_peer, assignment.sponsor};
+    for (const auto& endpoint : assignment.peers) {
+        configuration.remote_peers.push_back(
+            {endpoint.peer, pipe->AddRemote(endpoint.address.host, endpoint.address.port)});
         peers.push_back(endpoint.peer);
     }
-    const auto local = std::find_if(configuration.peers.begin(), configuration.peers.end(),
-        [&](const auto& endpoint) { return endpoint.peer == configuration.local_peer; });
-    if (local == configuration.peers.end()) {
-        throw std::invalid_argument("GooseNetwork local peer is not in the roster.");
-    }
-    auto pipe = std::make_unique<svanes::UdpMsgPipe>(local->port);
-    const auto local_connection = pipe->AddRemote(local->host, local->port);
-    svanes::SessionConfiguration session_configuration{
-        configuration.session, configuration.local_peer, {}};
-    for (const auto& endpoint : configuration.peers) {
-        if (endpoint.peer != configuration.local_peer) {
-            const auto connection = pipe->AddRemote(endpoint.host, endpoint.port);
-            if (connection == local_connection) {
-                throw std::invalid_argument("GooseNetwork remote peer uses the local endpoint.");
-            }
-            session_configuration.remote_peers.push_back({endpoint.peer, connection});
-        }
-    }
-    session = std::make_unique<svanes::NetworkSession>(std::move(pipe), std::move(session_configuration));
-    ready_hashes.resize(peers.size());
-
-    svanes::MessageWriter writer;
-    writer.WriteUint32(static_cast<std::uint32_t>(peers.size()));
-    for (const auto peer : peers) {
-        writer.WriteUint32(peer.value);
-    }
-    // FNV-1a over the canonical roster detects different participant lists.
-    roster_hash = 14695981039346656037ULL;
-    for (const auto byte : writer.Finish().bytes) {
-        roster_hash ^= std::to_integer<std::uint8_t>(byte);
-        roster_hash *= 1099511628211ULL;
-    }
-}
-
-void GooseNetwork::RequestReady(std::uint64_t initial_state_hash)
-{
-    if (initial_hash && *initial_hash != initial_state_hash) {
-        throw std::logic_error("GooseNetwork readiness cannot change the initial state.");
-    }
-    initial_hash = initial_state_hash;
-    for (const auto& hash : ready_hashes) {
-        if (hash && *hash != initial_state_hash) {
-            failure = "Initial state differs between peers.";
-        }
-    }
-}
-
-void GooseNetwork::ReadReady(const svanes::SessionMessage& message)
-{
-    svanes::MessageReader reader(message.payload);
-    const auto count = reader.ReadUint32();
-    const auto roster = reader.ReadUint64();
-    const auto step = reader.ReadUint64();
-    const auto hash = reader.ReadUint64();
-    if (reader.Remaining() != 0) {
-        throw std::invalid_argument("Goose Ready message has trailing data.");
-    }
-    if (count != peers.size() || roster != roster_hash || step != GooseStepTics) {
-        failure = "Peers disagree on the roster or simulation step.";
-        return;
-    }
-    const auto found = std::find(peers.begin(), peers.end(), message.sender);
-    if (found == peers.end() || message.sender == LocalPeer()) {
-        throw std::invalid_argument("Goose Ready message has an invalid sender.");
-    }
-    const auto index = static_cast<std::size_t>(found - peers.begin());
-    if ((ready_hashes[index] && *ready_hashes[index] != hash) ||
-        (initial_hash && *initial_hash != hash)) {
-        failure = "Initial state differs between peers.";
-        return;
-    }
-    ready_hashes[index] = hash;
+    std::sort(peers.begin(), peers.end(), [](auto a, auto b) { return a.value < b.value; });
+    session = std::make_unique<svanes::NetworkSession>(std::move(bound.pipe), std::move(configuration));
 }
 
 void GooseNetwork::Update()
@@ -122,7 +113,7 @@ void GooseNetwork::Update()
     svanes::PeerId failed_peer;
     while (session->ReceivePeerFailure(failed_peer)) {
         if (failure.empty()) {
-            failure = "Peer " + std::to_string(failed_peer.value) + " stopped acknowledging messages. Restart the session.";
+            failure = "Peer " + std::to_string(failed_peer.value) + " stopped acknowledging messages. Restart the game.";
         }
     }
     if (HasFailed() || local_departed) {
@@ -131,13 +122,8 @@ void GooseNetwork::Update()
     }
 
     svanes::SessionMessage message;
-    while (messages.size() < 256 && session->Receive(message)) {
+    while (session->Receive(message)) {
         switch (static_cast<GooseMessageType>(message.type)) {
-        case GooseMessageType::Ready:
-            if (revision == 1) {
-                ReadReady(message);
-            }
-            break;
         case GooseMessageType::Input:
         case GooseMessageType::StateHash:
         case GooseMessageType::RosterStop:
@@ -154,34 +140,45 @@ void GooseNetwork::Update()
             svanes::NetworkMessage payload;
             payload.bytes.assign(body.begin(), body.end());
             message.payload = std::move(payload);
-            if (message_revision == revision) {
-                messages.push_back(std::move(message));
-            } else {
-                if (future_messages.size() >= 1024) {
-                    failure = "Next-roster message queue exceeded its limit. Simulation paused.";
-                    return;
-                }
-                future_messages.push_back(std::move(message));
+            auto& queue = message_revision == revision ? messages : future_messages;
+            if (queue.size() >= kMaximumQueuedMessages) {
+                failure = "Incoming message queue exceeded its limit. Simulation paused.";
+                messages.clear();
+                return;
             }
+            queue.push_back(std::move(message));
             break;
         }
+        case GooseMessageType::SnapshotChunk:
+            ReadSnapshotChunk(message);
+            break;
         default:
             throw std::invalid_argument("GooseNetwork received an unknown game message type.");
         }
-        if (HasFailed()) {
-            messages.clear();
-            return;
-        }
     }
 
-    if (initial_hash && !ready_sent) {
-        svanes::MessageWriter writer;
-        writer.WriteUint32(static_cast<std::uint32_t>(peers.size()));
-        writer.WriteUint64(roster_hash);
-        writer.WriteUint64(GooseStepTics);
-        writer.WriteUint64(*initial_hash);
-        ready_sent = session->Broadcast(static_cast<svanes::MessageType>(GooseMessageType::Ready), writer.Finish());
+    for (auto& outgoing : outgoing_snapshots) {
+        while (outgoing.next < outgoing.chunks.size() &&
+               session->Send(outgoing.peer, static_cast<svanes::MessageType>(GooseMessageType::SnapshotChunk),
+                   outgoing.chunks[outgoing.next])) {
+            ++outgoing.next;
+        }
     }
+    std::erase_if(outgoing_snapshots, [](const auto& outgoing) { return outgoing.next == outgoing.chunks.size(); });
+}
+
+void GooseNetwork::ReadSnapshotChunk(const svanes::SessionMessage& message)
+{
+    svanes::MessageReader reader(message.payload);
+    const auto index = reader.ReadUint32();
+    const auto count = reader.ReadUint32();
+    const auto body = reader.ReadBytes(reader.Remaining());
+    if (!awaiting_snapshot || count == 0 || count > kMaximumSnapshotChunks || index >= count ||
+        (snapshot_chunk_count && *snapshot_chunk_count != count)) {
+        throw std::invalid_argument("Unexpected or inconsistent snapshot chunk.");
+    }
+    snapshot_chunk_count = count;
+    snapshot_chunks.emplace(index, std::vector<std::byte>(body.begin(), body.end()));
 }
 
 bool GooseNetwork::Broadcast(GooseMessageType type, const svanes::NetworkMessage& payload)
@@ -193,7 +190,8 @@ bool GooseNetwork::Broadcast(GooseMessageType type, const svanes::NetworkMessage
     svanes::MessageWriter writer;
     writer.WriteUint64(revision);
     writer.WriteBytes(payload.bytes);
-    return !local_departed && IsReady() && session->Broadcast(static_cast<svanes::MessageType>(type), writer.Finish());
+    return !local_departed && !HasFailed() &&
+        session->Broadcast(static_cast<svanes::MessageType>(type), writer.Finish());
 }
 
 bool GooseNetwork::Receive(svanes::SessionMessage& message)
@@ -206,6 +204,102 @@ bool GooseNetwork::Receive(svanes::SessionMessage& message)
     return true;
 }
 
+void GooseNetwork::SendSnapshot(svanes::PeerId peer, const svanes::NetworkMessage& snapshot)
+{
+    const auto count = (snapshot.bytes.size() + kSnapshotChunkBytes - 1) / kSnapshotChunkBytes;
+    if (count == 0 || count > kMaximumSnapshotChunks) {
+        throw std::length_error("World snapshot is empty or too large to send.");
+    }
+    OutgoingSnapshot outgoing{peer, {}, 0};
+    for (std::size_t index = 0; index < count; ++index) {
+        const auto begin = index * kSnapshotChunkBytes;
+        const auto length = std::min(kSnapshotChunkBytes, snapshot.bytes.size() - begin);
+        svanes::MessageWriter writer;
+        writer.WriteUint32(static_cast<std::uint32_t>(index));
+        writer.WriteUint32(static_cast<std::uint32_t>(count));
+        writer.WriteBytes(std::span{snapshot.bytes}.subspan(begin, length));
+        outgoing.chunks.push_back(writer.Finish());
+    }
+    outgoing_snapshots.push_back(std::move(outgoing));
+}
+
+std::optional<svanes::NetworkMessage> GooseNetwork::TakeSnapshot()
+{
+    if (!awaiting_snapshot || !snapshot_chunk_count || snapshot_chunks.size() != *snapshot_chunk_count) {
+        return std::nullopt;
+    }
+    svanes::NetworkMessage snapshot;
+    for (const auto& [index, bytes] : snapshot_chunks) {
+        snapshot.bytes.insert(snapshot.bytes.end(), bytes.begin(), bytes.end());
+    }
+    awaiting_snapshot = false;
+    snapshot_chunks.clear();
+    return snapshot;
+}
+
+bool GooseNetwork::ReceiveStranger(svanes::StrangerMessage& stranger)
+{
+    return session->ReceiveStranger(stranger);
+}
+
+void GooseNetwork::SendStranger(svanes::ConnectionId connection, GooseMessageType type,
+                                const svanes::NetworkMessage& payload)
+{
+    static_cast<void>(session->SendStranger(connection, static_cast<svanes::MessageType>(type), payload));
+}
+
+svanes::UdpAddress GooseNetwork::Address(svanes::ConnectionId connection) const
+{
+    return pipe->RemoteAddress(connection);
+}
+
+std::optional<svanes::PeerId> GooseNetwork::ActivePeerAt(svanes::ConnectionId connection) const
+{
+    return session->ActivePeerAt(connection);
+}
+
+std::vector<GoosePeerEndpoint> GooseNetwork::RemoteEndpoints() const
+{
+    std::vector<GoosePeerEndpoint> endpoints;
+    for (const auto& remote : session->RemotePeers()) {
+        if (std::find(peers.begin(), peers.end(), remote.peer) != peers.end()) {
+            endpoints.push_back({remote.peer, pipe->RemoteAddress(remote.connection)});
+        }
+    }
+    return endpoints;
+}
+
+void GooseNetwork::ApplyRosterChange(std::span<const svanes::PeerId> departing,
+                                     std::span<const GoosePeerEndpoint> joining)
+{
+    if (revision == std::numeric_limits<std::uint64_t>::max()) {
+        throw std::overflow_error("Goose roster revision exhausted.");
+    }
+    local_departed = std::find(departing.begin(), departing.end(), LocalPeer()) != departing.end();
+    std::vector<svanes::PeerId> retiring;
+    for (const auto& remote : session->RemotePeers()) {
+        if (local_departed || std::find(departing.begin(), departing.end(), remote.peer) != departing.end()) {
+            retiring.push_back(remote.peer);
+        }
+    }
+    for (const auto peer : retiring) {
+        session->RetirePeer(peer);
+    }
+    std::erase_if(peers, [&](auto peer) {
+        return std::find(departing.begin(), departing.end(), peer) != departing.end();
+    });
+    if (!local_departed) {
+        for (const auto& endpoint : joining) {
+            session->AddPeer({endpoint.peer, pipe->AddRemote(endpoint.address.host, endpoint.address.port)});
+            peers.push_back(endpoint.peer);
+        }
+        std::sort(peers.begin(), peers.end(), [](auto a, auto b) { return a.value < b.value; });
+    }
+    ++revision;
+    messages = std::move(future_messages);
+    future_messages.clear();
+}
+
 std::span<const svanes::PeerId> GooseNetwork::Peers() const
 {
     return peers;
@@ -216,17 +310,9 @@ svanes::PeerId GooseNetwork::LocalPeer() const
     return session->LocalPeer();
 }
 
-bool GooseNetwork::IsReady() const
+std::uint16_t GooseNetwork::Port() const
 {
-    if (HasFailed() || !ready_sent) {
-        return false;
-    }
-    for (std::size_t index = 0; index < peers.size(); ++index) {
-        if (peers[index] != LocalPeer() && !ready_hashes[index]) {
-            return false;
-        }
-    }
-    return true;
+    return port;
 }
 
 bool GooseNetwork::HasFailed() const
@@ -236,42 +322,7 @@ bool GooseNetwork::HasFailed() const
 
 std::string GooseNetwork::Status() const
 {
-    if (HasFailed()) {
-        return failure;
-    }
-    if (IsReady()) {
-        return "All peers ready.";
-    }
-    std::size_t count = ready_sent ? 1 : 0;
-    for (const auto& hash : ready_hashes) {
-        if (hash) {
-            ++count;
-        }
-    }
-    return std::to_string(count) + "/" + std::to_string(peers.size()) +
-        " peers ready. " + (initial_hash ? "Waiting for other players." : "Open all windows, then press Enter in each.");
-}
-
-void GooseNetwork::ApplyDepartures(std::span<const svanes::PeerId> departing)
-{
-    if (revision == std::numeric_limits<std::uint64_t>::max()) {
-        throw std::overflow_error("Goose roster revision exhausted.");
-    }
-    local_departed = std::find(departing.begin(), departing.end(), LocalPeer()) != departing.end();
-    for (const auto& remote : session->RemotePeers()) {
-        if (local_departed || std::find(departing.begin(), departing.end(), remote.peer) != departing.end()) {
-            session->RetirePeer(remote.peer);
-        }
-    }
-    for (std::size_t index = peers.size(); index > 0; --index) {
-        if (std::find(departing.begin(), departing.end(), peers[index - 1]) != departing.end()) {
-            peers.erase(peers.begin() + static_cast<std::ptrdiff_t>(index - 1));
-            ready_hashes.erase(ready_hashes.begin() + static_cast<std::ptrdiff_t>(index - 1));
-        }
-    }
-    ++revision;
-    messages = std::move(future_messages);
-    future_messages.clear();
+    return HasFailed() ? failure : "Connected.";
 }
 
 bool GooseNetwork::OutgoingDrained() const
@@ -282,4 +333,90 @@ bool GooseNetwork::OutgoingDrained() const
 std::uint64_t GooseNetwork::Revision() const
 {
     return revision;
+}
+
+GooseJoin::GooseJoin(svanes::UdpAddress entry, std::uint16_t port, std::uint64_t rules_hash)
+    : bound(BindGoosePipe(port)), entry(std::move(entry)), rules_hash(rules_hash),
+      started_at(std::chrono::steady_clock::now())
+{
+    entry_connection = bound.pipe->AddRemote(this->entry.host, this->entry.port);
+}
+
+void GooseJoin::Update()
+{
+    if (assignment || HasFailed()) {
+        return;
+    }
+    const auto now = std::chrono::steady_clock::now();
+    if (now - started_at > kJoinTimeout) {
+        failure = answered
+            ? "Not admitted within 15 seconds."
+            : "No reply from " + entry.host + ":" + std::to_string(entry.port) +
+                ". Check the address and that the game is running there.";
+        return;
+    }
+    if (!last_request || now - *last_request >= kJoinRequestInterval) {
+        svanes::MessageWriter writer;
+        writer.WriteUint64(rules_hash);
+        static_cast<void>(bound.pipe->Send(entry_connection, svanes::EncodeSessionPacket(GooseSession,
+            {svanes::SessionPacketKind::Contact, GooseUnassignedPeer, 1,
+             static_cast<svanes::MessageType>(GooseMessageType::JoinRequest), writer.Finish()})));
+        last_request = now;
+    }
+    svanes::ReceivedMessage received;
+    while (!assignment && !HasFailed() && bound.pipe->Receive(received)) {
+        if (received.source != entry_connection) {
+            continue;
+        }
+        const auto packet = svanes::DecodeSessionPacket(GooseSession, received.message);
+        if (packet.kind != svanes::SessionPacketKind::Contact) {
+            continue;
+        }
+        svanes::MessageReader reader(packet.payload);
+        switch (static_cast<GooseMessageType>(packet.type)) {
+        case GooseMessageType::JoinPending:
+            answered = true;
+            break;
+        case GooseMessageType::JoinRejected:
+            failure = "Join rejected: " + ReadGooseText(reader);
+            break;
+        case GooseMessageType::JoinAssigned:
+            assignment = DecodeAssignment(packet.payload);
+            if (assignment->sponsor != packet.sender) {
+                throw std::invalid_argument("Goose assignment names a different sponsor than its sender.");
+            }
+            break;
+        default:
+            throw std::invalid_argument("GooseJoin received an unexpected contact message.");
+        }
+    }
+}
+
+bool GooseJoin::IsAssigned() const
+{
+    return assignment.has_value();
+}
+
+bool GooseJoin::HasFailed() const
+{
+    return !failure.empty();
+}
+
+std::string GooseJoin::Status() const
+{
+    if (HasFailed()) {
+        return failure;
+    }
+    if (assignment) {
+        return "Admitted as peer " + std::to_string(assignment->local_peer.value) + ". Receiving the world.";
+    }
+    return answered ? "Waiting to be admitted." : "Contacting " + entry.host + ":" + std::to_string(entry.port) + ".";
+}
+
+std::unique_ptr<GooseNetwork> GooseJoin::Admit()
+{
+    if (!assignment) {
+        throw std::logic_error("GooseJoin::Admit called before an assignment arrived.");
+    }
+    return std::make_unique<GooseNetwork>(std::move(bound), entry_connection, *assignment);
 }

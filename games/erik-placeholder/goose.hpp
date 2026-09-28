@@ -13,11 +13,23 @@
 
 namespace svanes {
 
-struct GameContext;
 struct FrameContext;
 class Registry;
+class TextureManager;
 
 }
+
+/**
+ * The textures every goose draws with, loaded once and shared between geese.
+ *
+ * FIELDS:
+ * - idle: The single standing frame.
+ * - walk: The walk-cycle sprite sheet, also used while flying.
+ */
+struct GooseTextures {
+    svanes::TextureHandle idle{};
+    svanes::TextureHandle walk{};
+};
 
 /**
  * What the goose should attempt over a single frame. The game fills this in from
@@ -62,7 +74,8 @@ enum class GooseState : std::uint8_t {
 
 /**
  * Local snapshot of a goose, including the engine components changed by simulation.
- * Texture handles refer to this process's assets and are not network identifiers.
+ * Texture handles refer to this process's assets and are not network identifiers,
+ * so Restore chooses the texture from the state rather than from the sprite.
  *
  * FIELDS:
  * - transform: Position and orientation.
@@ -106,27 +119,23 @@ struct GooseSnapshot {
 class Goose final {
 public:
     /**
-     * Creates the goose entity, loads its textures, and places it in the world.
+     * Loads the textures a goose draws with.
+     * @param assets The texture manager to load through.
+     * @return The loaded handles, to be passed to Spawn.
+     */
+    static GooseTextures LoadTextures(svanes::TextureManager& assets);
+
+    /**
+     * Creates the goose entity and places it in the world.
      *
-     * @param context The game context supplying the registry and texture loader.
+     * @param world The registry the goose entity is created in.
+     * @param textures Textures from LoadTextures.
      * @param x The world x position to spawn at.
      * @param y The world y position to spawn at.
      *
      * @throws std::logic_error if the goose has already been spawned.
      */
-    void Spawn(svanes::GameContext& context, float x, float y);
-
-    /**
-     * Advances the goose by one frame: resolves collisions against solid geometry,
-     * applies the intent to its velocity, fires any bullets that are due, and picks
-     * the animation state to match.
-     *
-     * @param frame The frame context supplying the registry and the frame delta.
-     * @param intent What the goose should attempt this frame.
-     *
-     * @throws std::logic_error if the goose has not been spawned.
-     */
-    void Update(const svanes::FrameContext& frame, const GooseIntent& intent);
+    void Spawn(svanes::Registry& world, const GooseTextures& textures, float x, float y);
 
     /**
      * Applies input and advances timers after a physics step. Receives elapsed
@@ -148,9 +157,10 @@ public:
     GooseSnapshot Capture(const svanes::Registry& world) const;
 
     /**
-     * Restores a snapshot onto the same goose without spawning another entity.
+     * Restores a snapshot onto a goose without spawning another entity. The sprite's
+     * texture follows the snapshot's state, and its geometry is left unchanged.
      * @param world The registry containing the goose.
-     * @param snapshot A snapshot previously captured from this goose.
+     * @param snapshot A snapshot captured from this goose or received for it.
      * @throws std::logic_error if the goose has not been spawned.
      */
     void Restore(svanes::Registry& world, const GooseSnapshot& snapshot);

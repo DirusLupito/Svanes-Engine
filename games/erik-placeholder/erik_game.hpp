@@ -12,10 +12,11 @@
 class ErikGame final : public svanes::IGame {
 public:
     /**
-     * Selects single-player combat or a fixed-roster multiplayer movement session.
-     * @param configuration The network roster, or empty for single-player.
+     * Starts a new world open for others to join, or joins an existing one.
+     * @param port The local UDP port this process listens on.
+     * @param join_address A player already in the world to join, or empty to start a new world.
      */
-    explicit ErikGame(std::optional<GooseNetworkConfiguration> configuration = std::nullopt);
+    explicit ErikGame(std::uint16_t port, std::optional<svanes::UdpAddress> join_address = std::nullopt);
 
     /**
      * Builds the starting world: gravity, the background, the static geometry, and
@@ -47,11 +48,24 @@ private:
      */
     void UpdateCamera(const svanes::FrameContext& frame, svanes::Entity player);
 
-    std::optional<GooseNetworkConfiguration> network_configuration;
+    /**
+     * Advances the join handshake and, once admitted, waits for the world snapshot.
+     * @param frame The current frame, whose world receives the joined players.
+     */
+    void UpdateJoining(const svanes::FrameContext& frame);
+
+    /**
+     * Prints a status line when it differs from the last one printed.
+     * @param status The current status.
+     */
+    void ReportStatus(const std::string& status);
+
+    std::uint16_t port;
+    std::optional<svanes::UdpAddress> join_address;
+    std::unique_ptr<GooseJoin> join;
     std::unique_ptr<GooseNetwork> network;
     std::unique_ptr<GooseSimulation> simulation;
     std::unique_ptr<GooseRollback> rollback;
-    std::uint64_t initial_state_hash = 0;
     std::string last_network_status;
     svanes::TicCount network_diagnostic_tics = 0;
 
@@ -59,17 +73,6 @@ private:
 
     // the sky, kept centered on the camera and sized to cover the view every frame
     svanes::Entity background{};
-
-    Enemy enemy;
-    Goose goose;
-
-    // total time the game has been running, used to place the enemy along its path
-    float elapsed_seconds = 0.0F;
-
-    // time left to press A or D a second time and turn it into a dash, counted
-    // down separately per direction so a left tap cannot complete a right dash
-    float left_tap_timer = 0.0F;
-    float right_tap_timer = 0.0F;
 
     bool should_quit = false;
 };

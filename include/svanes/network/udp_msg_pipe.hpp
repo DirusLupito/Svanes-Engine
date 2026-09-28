@@ -21,6 +21,11 @@ namespace svanes {
 struct UdpAddress {
     std::string host;
     std::uint16_t port;
+
+    /**
+     * @return Whether both addresses have the same host and port.
+     */
+    bool operator==(const UdpAddress &) const = default;
 };
 
 /**

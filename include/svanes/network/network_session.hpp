@@ -107,7 +107,8 @@ struct SessionMessage {
 };
 
 /**
- * A data message from a connection outside the roster, reported without acknowledgment.
+ * A message outside every reliable stream: a contact packet from any connection,
+ * or data from a connection outside the roster, which is left unacknowledged.
  *
  * FIELDS:
  * - connection: The local transport handle the message arrived on.
@@ -127,10 +128,13 @@ using MessageId = std::uint64_t;
  * Identifies what a session packet carries.
  * - Data: A game message with an id assigned by its sender.
  * - Acknowledgment: Confirmation that the recipient accepted the given message id.
+ * - Contact: An unreliable game message outside every peer's stream, never
+ *   acknowledged or deduplicated. Used to talk to peers that are not yet admitted.
  */
 enum class SessionPacketKind : std::uint8_t {
     Data = 1,
-    Acknowledgment = 2
+    Acknowledgment = 2,
+    Contact = 3
 };
 
 /**
@@ -194,8 +198,10 @@ SessionPacket DecodeSessionPacket(SessionId session,
  *
  * Data from a connection outside the roster is reported by ReceiveStranger()
  * but not acknowledged, so the stranger keeps retrying. Once the game admits it
- * with AddPeer(), the next retry is acknowledged and delivered normally. Packets
- * carrying a different session id are dropped and logged once per connection.
+ * with AddPeer(), the next retry is acknowledged and delivered normally. Contact
+ * packets, sent with SendStranger(), are always reported by ReceiveStranger(),
+ * whether or not their connection is in the roster. Packets carrying a
+ * different session id are dropped and logged once per connection.
  *
  * The game defines the payload contents and decides how they affect its world.
  * The caller supplies the initial roster when constructing the session.
@@ -281,8 +287,8 @@ public:
     bool ReceivePeerFailure(PeerId &peer);
 
     /**
-     * Takes the next data message that arrived from a connection outside the roster.
-     * The stranger retries unacknowledged messages, so one may be reported repeatedly.
+     * Takes the next contact packet, or data message from a connection outside the roster.
+     * A stranger retries unacknowledged data, so one may be reported repeatedly.
      * @param stranger Receives the connection and message when a report is available.
      * @return Whether a report was available.
      */
@@ -291,19 +297,27 @@ public:
     /**
      * Adds a remote peer to the roster, typically a stranger the game admitted.
      * @param peer The new peer's id and the pipe connection used to reach it.
+     * A retired peer still holding the connection is released immediately, since
+     * a new process now owns that address.
      * @throws std::invalid_argument for a zero or local id, an unknown connection,
-     * or a peer id or connection already in the roster.
+     * a peer id already used in this session, or a connection held by an active peer.
      */
     void AddPeer(PeerConnection peer);
 
     /**
-     * Sends one data packet to a connection outside the roster, without retries
-     * or acknowledgment. Used to answer strangers before they are admitted.
-     * @param connection The stranger's connection, as reported by ReceiveStranger().
+     * @param connection The connection to look up.
+     * @return The active (not retired) roster peer using the connection, if any.
+     */
+    std::optional<PeerId> ActivePeerAt(ConnectionId connection) const;
+
+    /**
+     * Sends one contact packet to any known connection, without retries or
+     * acknowledgment. Used to talk with peers before they are admitted.
+     * @param connection The destination, such as one reported by ReceiveStranger().
      * @param type The game-defined payload type.
      * @param payload The bytes to send, up to MaxSessionPayloadBytes.
      * @return Whether the transport accepted the datagram, not whether it arrived.
-     * @throws std::invalid_argument if the connection belongs to an unreleased roster peer.
+     * @throws std::invalid_argument if the connection is unknown to the pipe.
      * @throws std::length_error if the payload is too large.
      */
     bool SendStranger(ConnectionId connection, MessageType type, const NetworkMessage &payload);

@@ -8,6 +8,7 @@
 #include <svanes/collision_system.hpp>
 #include <svanes/render/render_system.hpp>
 
+#include <span>
 #include <vector>
 
 namespace svanes {
@@ -15,6 +16,9 @@ namespace svanes {
 class Registry;
 
 }
+
+/** The width and height of every bullet's square body. */
+inline constexpr float BulletSize = 8.0F;
 
 /**
  * Tag component marking an entity as a projectile, along with the entity that
@@ -109,16 +113,18 @@ void SpawnBullet(
 
 /**
  * Checks bullets after physics, destroying those that left the bounds or struck
- * something, and returns what they struck. Shots are checked in simulation order
- * and collision targets in entity order so replay resolves competing hits consistently.
+ * something, and returns what they struck. Shots are checked in simulation order.
+ * A bullet overlapping several targets strikes the first one in the caller's order,
+ * so peers whose registries assign different entity ids can still agree on hits.
  *
  * Hits are reported, not applied. The caller decides what being hit does to a
  * target, so the same bullet can knock the goose backwards and damage the enemy.
  *
- * @param world The registry containing the bullets and everything they may hit.
- * @param bounds The world region bullets remain alive inside. Bullets outside it
- * are destroyed without reporting a hit.
+ * @param world The registry containing the bullets and targets.
+ * @param bounds The world region bullets remain alive inside.
+ * @param targets Every entity bullets can strike, each with a Transform and Collider2D.
  *
  * @return One BulletHit per bullet that struck something this frame.
  */
-std::vector<BulletHit> UpdateBullets(svanes::Registry& world, const svanes::Rectangle2D& bounds);
+std::vector<BulletHit> UpdateBullets(svanes::Registry& world, const svanes::Rectangle2D& bounds,
+                                     std::span<const svanes::Entity> targets);

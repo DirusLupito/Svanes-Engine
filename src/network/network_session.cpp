@@ -26,7 +26,8 @@ void ValidatePacket(SessionId session, const SessionPacket &packet) {
         throw std::invalid_argument("Session packet: session, sender, and message ids must be nonzero.");
     }
     if (packet.kind != SessionPacketKind::Data &&
-        packet.kind != SessionPacketKind::Acknowledgment) {
+        packet.kind != SessionPacketKind::Acknowledgment &&
+        packet.kind != SessionPacketKind::Contact) {
         throw std::invalid_argument("Session packet: unknown packet kind.");
     }
     if (packet.kind == SessionPacketKind::Acknowledgment &&
@@ -253,11 +254,10 @@ void NetworkSession::Update() {
         }
         const auto found = FindConnection(incoming.source);
         auto decoded = DecodeSessionPacket(configuration.session, incoming.message);
-        if (!found) {
-            if (decoded.kind != SessionPacketKind::Data) {
+        if (!found || decoded.kind == SessionPacketKind::Contact) {
+            if (decoded.kind == SessionPacketKind::Acknowledgment) {
                 throw std::invalid_argument("NetworkSession: acknowledgment from a connection outside the roster.");
             }
-            // Unacknowledged strangers retry, so a full queue loses nothing.
             if (strangers.size() < settings.max_incoming_messages) {
                 strangers.push_back({incoming.source,
                     {decoded.sender, decoded.type, std::move(decoded.payload)}});
@@ -274,7 +274,6 @@ void NetworkSession::Update() {
     const auto now = std::chrono::steady_clock::now();
     for (std::size_t index = 0; index < peers.size(); ++index) {
         auto &peer = peers[index];
-        // No retry in either direction outlives delivery_timeout, so the goodbye is over.
         if (peer.retired && !peer.released && peer.pending.empty() &&
             now - peer.retired_at >= settings.delivery_timeout) {
             peer.released = true;
@@ -353,22 +352,31 @@ void NetworkSession::AddPeer(PeerConnection peer) {
             throw std::invalid_argument("NetworkSession::AddPeer: peer id already used in this session.");
         }
     }
-    if (FindConnection(peer.connection)) {
-        throw std::invalid_argument("NetworkSession::AddPeer: connection already in roster.");
+    if (const auto holder = FindConnection(peer.connection)) {
+        if (!peers[*holder].retired) {
+            throw std::invalid_argument("NetworkSession::AddPeer: connection held by an active peer.");
+        }
+        peers[*holder].released = true;
+        peers[*holder].pending.clear();
+        peers[*holder].received_ahead.clear();
     }
     configuration.remote_peers.push_back(peer);
     peers.emplace_back();
     std::erase_if(strangers, [&](const auto &stranger) { return stranger.connection == peer.connection; });
 }
 
+std::optional<PeerId> NetworkSession::ActivePeerAt(ConnectionId connection) const {
+    const auto found = FindConnection(connection);
+    if (!found || peers[*found].retired) {
+        return std::nullopt;
+    }
+    return configuration.remote_peers[*found].peer;
+}
+
 bool NetworkSession::SendStranger(ConnectionId connection, MessageType type,
                                   const NetworkMessage &payload) {
-    if (FindConnection(connection)) {
-        throw std::invalid_argument("NetworkSession::SendStranger: connection belongs to a roster peer.");
-    }
-    // Stranger replies are outside every reliable stream, so their message id is never tracked.
     return pipe->Send(connection, EncodeSessionPacket(configuration.session,
-        {SessionPacketKind::Data, configuration.local_peer, 1, type, payload}));
+        {SessionPacketKind::Contact, configuration.local_peer, 1, type, payload}));
 }
 
 std::optional<std::size_t> NetworkSession::FindConnection(ConnectionId connection) const {
