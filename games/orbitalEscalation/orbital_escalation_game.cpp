@@ -3,6 +3,7 @@
 #include "serialization/ship_serialization.hpp"
 
 #include <svanes/MenuUtilities/text_label.hpp>
+#include <svanes/asset_path.hpp>
 #include <svanes/camera2d.hpp>
 #include <svanes/collision_system.hpp>
 #include <svanes/input.hpp>
@@ -106,7 +107,8 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext &context) {
             .position = {context.camera.Viewport().width * 0.5F, 16.0F},
             .color = {255, 0, 0, 255},
             .font = context.fonts.LoadFont(
-                "games/orbitalEscalation/assets/fonts/consola.ttf", 24.0F),
+                svanes::AssetPath("assets/orbitalEscalation/fonts/consola.ttf"),
+                24.0F),
             .alignment = svanes::TextAlignment::TopCenter,
             .visible = false,
         });
@@ -126,9 +128,9 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext &context) {
     planet->GetTransform(context.world) = {0.0F, 0.0F};
     planet->UpdateVisuals(context.world);
 
-    player_ship.emplace(
-        context.world, gameplay_timeline_entity,
-        LoadShip("games/orbitalEscalation/assets/ships/player.json"));
+    player_ship.emplace(context.world, gameplay_timeline_entity,
+                        LoadShip(svanes::AssetPath(
+                            "assets/orbitalEscalation/ships/player.json")));
     const svanes::Transform player_start{0.0F, -kPlanetRadius - 800.0F};
     player_ship->GetTransform(context.world) = player_start;
     player_ship->GetKinematic(context.world).velocity_x =
