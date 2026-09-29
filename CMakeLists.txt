@@ -289,6 +289,10 @@ target_compile_definitions(svanes_game_erik PRIVATE
 
 add_executable(
     svanes_game_orbital_escalation
+    games/orbitalEscalation/combat/damage_system.cpp
+    games/orbitalEscalation/combat/damage_system.hpp
+    games/orbitalEscalation/game_objects/owned_entity.cpp
+    games/orbitalEscalation/game_objects/owned_entity.hpp
     games/orbitalEscalation/serialization/geometry_serialization.cpp
     games/orbitalEscalation/serialization/geometry_serialization.hpp
     games/orbitalEscalation/serialization/json.cpp

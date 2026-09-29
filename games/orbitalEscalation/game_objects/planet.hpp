@@ -68,8 +68,8 @@ public:
     void UpdateVisuals(svanes::Registry &world) const;
 
 private:
-    // The unique identifier of the planet entity in the registry.
-    svanes::Entity entity;
+    // The owner of the planet entity in the registry.
+    OwnedEntity entity;
 
     // The Visuals object that manages the visual representation of the planet
     // entity.

@@ -1,4 +1,5 @@
 #include "orbital_escalation_game.hpp"
+#include "combat/damage_system.hpp"
 #include "controls.hpp"
 #include "serialization/ship_serialization.hpp"
 
@@ -19,6 +20,8 @@
 #include <numbers>
 
 constexpr float kPlanetRadius = 4200.0F;
+constexpr float kPlayerHealth = 100.0F;
+constexpr float kPlanetImpactDamage = 25.0F;
 const svanes::TicCount kPauseFlashPeriod = svanes::SecondsToTics(1.0);
 constexpr std::uint8_t kPauseLabelMinimumAlpha = 64;
 
@@ -66,7 +69,7 @@ static Visual CreatePlanetLayer(float radius, svanes::Color color,
  * @param a The first entity.
  * @param b The second entity.
  */
-static void ApplyCollisionAcceleration(svanes::Registry &world,
+static bool ApplyCollisionAcceleration(svanes::Registry &world,
                                        svanes::Entity a, svanes::Entity b) {
     const auto collisions = svanes::DetectCollisions(
         world.GetComponent<svanes::Collider2D>(a).geometry,
@@ -88,6 +91,7 @@ static void ApplyCollisionAcceleration(svanes::Registry &world,
             motion.acceleration_y -= acceleration.y;
         }
     }
+    return !collisions.empty();
 }
 
 void OrbitalEscalationGame::Initialize(svanes::GameContext &context) {
@@ -131,10 +135,12 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext &context) {
     player_ship.emplace(context.world, gameplay_timeline_entity,
                         LoadShip(svanes::AssetPath(
                             "assets/orbitalEscalation/ships/player.json")));
+    context.world.AddComponent<Health>(player_ship->GetEntity(),
+                                       Health{kPlayerHealth});
     const svanes::Transform player_start{0.0F, -kPlanetRadius - 800.0F};
     player_ship->GetTransform(context.world) = player_start;
     player_ship->GetKinematic(context.world).velocity_x =
-        svanes::PerSecondToPerTic(3000.0F);
+        svanes::PerSecondToPerTic(300.0F);
     player_ship->UpdateVisuals(context.world);
     context.camera.zoom = 0.02F;
     context.camera.x = player_start.x;
@@ -220,11 +226,13 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext &frame) {
     // entity and the planet entity, we need to update their visuals separately
     // to make sure they are drawn correctly on the screen.
 
-    player_ship->UpdateVisuals(frame.world);
+    if (player_ship) {
+        player_ship->UpdateVisuals(frame.world);
+    }
     planet->UpdateVisuals(frame.world);
 
     // Camera follows the player, centered on the screen.
-    if (frame.world.HasComponent<svanes::Transform>(player_ship->GetEntity())) {
+    if (player_ship) {
         const svanes::Transform &player =
             frame.world.GetComponent<svanes::Transform>(
                 player_ship->GetEntity());
@@ -254,6 +262,10 @@ void OrbitalEscalationGame::PhysicsUpdate(
         return;
     }
 
+    if (!player_ship) {
+        return;
+    }
+
     const ShipControls controls = ReadShipControls(physics.input);
     const svanes::Vector2D acceleration =
         controls.thrust *
@@ -264,8 +276,14 @@ void OrbitalEscalationGame::PhysicsUpdate(
     motion.angular_acceleration =
         controls.rotation * svanes::PerSecondSquaredToPerTicSquared(
                                 player_ship->max_angular_acceleration);
-    ApplyCollisionAcceleration(physics.world, player_ship->GetEntity(),
-                               planet->GetEntity());
+    const bool touching_planet = ApplyCollisionAcceleration(
+        physics.world, player_ship->GetEntity(), planet->GetEntity());
+    if (touching_planet && !player_touching_planet &&
+        ApplyDamage(physics.world, player_ship->GetEntity(),
+                    kPlanetImpactDamage)) {
+        player_ship.reset();
+    }
+    player_touching_planet = touching_planet;
 }
 
 bool OrbitalEscalationGame::ShouldQuit() const { return should_quit; }

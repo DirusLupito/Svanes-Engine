@@ -1,5 +1,7 @@
 #pragma once
 
+#include "owned_entity.hpp"
+
 #include <svanes/entity.hpp>
 #include <svanes/render/render_system.hpp>
 
@@ -42,6 +44,42 @@ public:
     Visuals(svanes::Registry &world, std::vector<Visual> parts);
 
     /**
+     * Override of the copy constructor to prevent copying of Visuals
+     * instances. This prevents something like:
+     *
+     * Visuals visuals1(...);
+     * Visuals visuals2 = visuals1;
+     */
+    Visuals(const Visuals &) = delete;
+
+    /**
+     * Override of the copy assignment operator to prevent copying of Visuals
+     * instances. This prevents something like:
+     *
+     * Visuals visuals1(...);
+     * Visuals visuals2(...);
+     * visuals2 = visuals1;
+     */
+    Visuals &operator=(const Visuals &) = delete;
+
+    /**
+     * Move constructor for transferring ownership of the visual entities from
+     * another Visuals instance.
+     *
+     * @param other The other Visuals instance to move from.
+     */
+    Visuals(Visuals &&) noexcept = default;
+
+    /**
+     * Move assignment operator for transferring ownership of the visual
+     * entities from another Visuals instance.
+     *
+     * @param other The other Visuals instance to move from.
+     * @return A reference to this Visuals instance after the move.
+     */
+    Visuals &operator=(Visuals &&) noexcept = default;
+
+    /**
      * Updates the transform of the visual components in the registry to match
      * the provided transform.
      *
@@ -54,5 +92,5 @@ public:
 private:
     // A list of entities in the registry that represent the visual components
     // of the game object.
-    std::vector<svanes::Entity> entities;
+    std::vector<OwnedEntity> entities;
 };

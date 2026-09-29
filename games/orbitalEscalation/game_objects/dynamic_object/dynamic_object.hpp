@@ -53,6 +53,42 @@ public:
     // classes should be able to do that.
 protected:
     /**
+     * Override of the copy constructor to prevent copying of DynamicObject
+     * instances. This prevents something like:
+     *
+     * DynamicObject object1(...);
+     * DynamicObject object2 = object1;
+     */
+    DynamicObject(const DynamicObject &) = delete;
+
+    /**
+     * Override of the copy assignment operator to prevent copying of
+     * DynamicObject instances. This prevents something like:
+     *
+     * DynamicObject object1(...);
+     * DynamicObject object2(...);
+     * object2 = object1;
+     */
+    DynamicObject &operator=(const DynamicObject &) = delete;
+
+    /**
+     * Move constructor for transferring ownership of the dynamic object entity
+     * and visuals from another DynamicObject instance.
+     *
+     * @param other The other DynamicObject instance to move from.
+     */
+    DynamicObject(DynamicObject &&) noexcept = default;
+
+    /**
+     * Move assignment operator for transferring ownership of the dynamic
+     * object entity and visuals from another DynamicObject instance.
+     *
+     * @param other The other DynamicObject instance to move from.
+     * @return A reference to this DynamicObject instance after the move.
+     */
+    DynamicObject &operator=(DynamicObject &&) noexcept = default;
+
+    /**
      * Constructs a DynamicObject entity in the provided registry.
      *
      * @param world The registry in which to create the dynamic object entity
@@ -74,8 +110,8 @@ protected:
     ~DynamicObject() = default;
 
 private:
-    // The unique identifier of the dynamic object entity in the registry.
-    svanes::Entity entity;
+    // The owner of the dynamic object entity in the registry.
+    OwnedEntity entity;
 
     // The Visuals object that manages the visual representation of the dynamic
     // object entity.

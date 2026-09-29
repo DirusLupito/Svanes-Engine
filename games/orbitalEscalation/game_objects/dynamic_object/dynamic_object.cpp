@@ -16,10 +16,10 @@
  *
  * @return The newly created entity with a Timeline component.
  */
-static svanes::Entity CreateTimedEntity(svanes::Registry &world,
-                                        svanes::Entity gameplay_timeline) {
-    const svanes::Entity entity = world.CreateEntity();
-    world.AddComponent<svanes::Timeline>(entity, gameplay_timeline);
+static OwnedEntity CreateTimedEntity(svanes::Registry &world,
+                                     svanes::Entity gameplay_timeline) {
+    OwnedEntity entity(world);
+    world.AddComponent<svanes::Timeline>(entity.Get(), gameplay_timeline);
     return entity;
 }
 
@@ -31,20 +31,20 @@ DynamicObject::DynamicObject(svanes::Registry &world,
                              std::vector<Visual> visuals)
     : entity(CreateTimedEntity(world, gameplay_timeline)),
       visuals(world, std::move(visuals)) {
-    world.AddComponent<svanes::Collider2D>(entity, std::move(collider));
-    world.AddComponent<svanes::Kinematic2D>(entity);
-    world.AddComponent<svanes::Transform>(entity);
+    world.AddComponent<svanes::Collider2D>(entity.Get(), std::move(collider));
+    world.AddComponent<svanes::Kinematic2D>(entity.Get());
+    world.AddComponent<svanes::Transform>(entity.Get());
 }
 
-svanes::Entity DynamicObject::GetEntity() const { return entity; }
+svanes::Entity DynamicObject::GetEntity() const { return entity.Get(); }
 
 svanes::Kinematic2D &
 DynamicObject::GetKinematic(svanes::Registry &world) const {
-    return world.GetComponent<svanes::Kinematic2D>(entity);
+    return world.GetComponent<svanes::Kinematic2D>(entity.Get());
 }
 
 svanes::Transform &DynamicObject::GetTransform(svanes::Registry &world) const {
-    return world.GetComponent<svanes::Transform>(entity);
+    return world.GetComponent<svanes::Transform>(entity.Get());
 }
 
 void DynamicObject::UpdateVisuals(svanes::Registry &world) const {

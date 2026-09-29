@@ -53,6 +53,7 @@ private:
     svanes::Entity background_entity = 0;
     std::optional<Ship> player_ship;
     std::optional<Planet> planet;
+    bool player_touching_planet = false;
 
     bool should_quit = false;
 };
