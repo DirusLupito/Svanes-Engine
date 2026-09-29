@@ -1,5 +1,3 @@
-#include <svanes/asset_path.hpp>
-
 #include "orbital_escalation_game.hpp"
 #include "controls.hpp"
 #include "serialization/ship_serialization.hpp"
@@ -108,7 +106,7 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext &context) {
             .position = {context.camera.Viewport().width * 0.5F, 16.0F},
             .color = {255, 0, 0, 255},
             .font = context.fonts.LoadFont(
-                svanes::AssetPath("assets/orbitalEscalation/fonts/consola.ttf"), 24.0F),
+                "games/orbitalEscalation/assets/fonts/consola.ttf", 24.0F),
             .alignment = svanes::TextAlignment::TopCenter,
             .visible = false,
         });
