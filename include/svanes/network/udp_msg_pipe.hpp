@@ -1,5 +1,6 @@
 #pragma once
 
+#include <svanes/network/message_serialization.hpp>
 #include <svanes/network/msg_pipe.hpp>
 #include <svanes/network/network_message.hpp>
 
@@ -76,6 +77,11 @@ public:
     UdpAddress RemoteAddress(ConnectionId connection) const;
 
     /**
+     * @return The local port the socket is bound to.
+     */
+    std::uint16_t LocalPort() const;
+
+    /**
      * Sends one datagram to the given connection id.
      *
      * @param destination The connection to send to.
@@ -98,6 +104,21 @@ public:
 private:
     zmq::context_t context;
     zmq::socket_t socket;
+    std::uint16_t local_port;
 };
+
+/**
+ * Writes a host and port.
+ * @param writer The message to append to.
+ * @param address The address to write.
+ */
+void WriteAddress(MessageWriter &writer, const UdpAddress &address);
+
+/**
+ * @param reader The message positioned at an address written by WriteAddress.
+ * @return The address.
+ * @throws std::invalid_argument for an empty host or a zero port.
+ */
+UdpAddress ReadAddress(MessageReader &reader);
 
 } // namespace svanes

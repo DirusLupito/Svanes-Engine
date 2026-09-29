@@ -10,7 +10,7 @@ namespace svanes {
 UdpMsgPipe::UdpMsgPipe(std::uint16_t local_port)
     // Binds the local port to a dgram socket.
     // dgram is used to enable UDP
-    : socket(context, zmq::socket_type::dgram) {
+    : socket(context, zmq::socket_type::dgram), local_port(local_port) {
     socket.set(zmq::sockopt::linger, 0);
     socket.bind(MakeUdpEndpoint("*", local_port));
 }
@@ -66,6 +66,8 @@ UdpAddress UdpMsgPipe::RemoteAddress(ConnectionId connection) const {
     return {std::string{route.substr(0, colon)}, static_cast<std::uint16_t>(port)};
 }
 
+std::uint16_t UdpMsgPipe::LocalPort() const { return local_port; }
+
 bool UdpMsgPipe::Send(ConnectionId destination, const NetworkMessage &message) {
     const auto &route = Route(destination);
     if (message.bytes.size() > 65507) {
@@ -109,6 +111,19 @@ bool UdpMsgPipe::Receive(ReceivedMessage &received) {
     received.message =
         NetworkMessage{std::vector<std::byte>(bytes, bytes + body.size())};
     return true;
+}
+
+void WriteAddress(MessageWriter &writer, const UdpAddress &address) {
+    writer.WriteText(address.host);
+    writer.WriteUint16(address.port);
+}
+
+UdpAddress ReadAddress(MessageReader &reader) {
+    UdpAddress address{reader.ReadText(), reader.ReadUint16()};
+    if (address.host.empty() || address.port == 0) {
+        throw std::invalid_argument("ReadAddress: address requires a host and a nonzero port.");
+    }
+    return address;
 }
 
 } // namespace svanes

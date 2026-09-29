@@ -164,6 +164,8 @@ target_sources(
         src/geometry/circle_geometry.cpp
         src/geometry/convex_polygon_geometry.cpp
         src/collision_system.cpp
+    src/deterministic_math.cpp
+        src/deterministic_math.cpp
         src/tilemaps/tilemap.cpp
         src/collision_pass.cpp
         src/geometry/geometry.cpp
@@ -209,6 +211,8 @@ target_sources(
             include/svanes/geometry/composite_geometry.hpp
             include/svanes/geometry/convex_polygon_geometry.hpp
             include/svanes/collision_system.hpp
+    include/svanes/deterministic_math.hpp
+            include/svanes/deterministic_math.hpp
             include/svanes/tilemaps/tilemap.hpp
             include/svanes/collision_pass.hpp
             include/svanes/entity.hpp
@@ -253,6 +257,7 @@ if(MSVC)
     target_compile_options(svanes_engine PRIVATE /W4 /permissive-)
 else()
     target_compile_options(svanes_engine PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(svanes_engine PUBLIC -ffp-contract=off)
 endif()
 
 add_executable(
@@ -313,6 +318,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/geometry/composite_geometry.hpp
     include/svanes/geometry/convex_polygon_geometry.hpp
     include/svanes/collision_system.hpp
+    include/svanes/deterministic_math.hpp
     include/svanes/tilemaps/tilemap.hpp
     include/svanes/collision_pass.hpp
     include/svanes/entity.hpp
@@ -356,6 +362,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/geometry/circle_geometry.cpp
     src/geometry/convex_polygon_geometry.cpp
     src/collision_system.cpp
+    src/deterministic_math.cpp
     src/tilemaps/tilemap.cpp
     src/collision_pass.cpp
     src/geometry/geometry.cpp

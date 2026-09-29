@@ -180,7 +180,7 @@ void ErikGame::Initialize(svanes::GameContext& context)
         join = std::make_unique<GooseJoin>(*join_address, port, GooseRollback::RulesHash());
         return;
     }
-    network = std::make_unique<GooseNetwork>(BindGoosePipe(port));
+    network = std::make_unique<GooseNetwork>(std::make_unique<svanes::UdpMsgPipe>(port));
     simulation->AddPlayer(context.world, network->LocalPeer());
     rollback = std::make_unique<GooseRollback>(*simulation, *network);
     std::cout << "Started a new world. Others can join on port " << network->Port() << ".\n";

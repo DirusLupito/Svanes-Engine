@@ -1,5 +1,6 @@
 #include <svanes/attractor_system.hpp>
 
+#include <svanes/deterministic_math.hpp>
 #include <svanes/geometry/geometry.hpp>
 #include <svanes/kinematic_system.hpp>
 #include <svanes/registry.hpp>
@@ -80,7 +81,7 @@ EvaluateAttractors(const Registry &world,
                 // nullopt cutoff radius means the attractor affects all
                 // entities, regardless of distance.
                 if (attractor.cutoff_radius &&
-                    std::hypot(offset_to_source.x, offset_to_source.y) >=
+                    Length(offset_to_source.x, offset_to_source.y) >=
                         *attractor.cutoff_radius) {
                     continue;
                 }

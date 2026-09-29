@@ -1,5 +1,6 @@
 #include "goose_simulation.hpp"
 
+#include <svanes/deterministic_math.hpp>
 #include <svanes/game.hpp>
 #include <svanes/network/message_serialization.hpp>
 #include <svanes/registry.hpp>
@@ -129,7 +130,7 @@ void GooseSimulation::AddPlayer(svanes::Registry& world, svanes::PeerId peer)
     for (const auto x : kSpawnX) {
         const bool occupied = std::any_of(players.begin(), players.end(), [&](const auto& player) {
             const auto& transform = world.GetComponent<svanes::Transform>(player.goose.GetEntity());
-            return std::hypot(transform.x - x, transform.y - kSpawnY) < kSpawnClearance;
+            return svanes::Length(transform.x - x, transform.y - kSpawnY) < kSpawnClearance;
         });
         if (!occupied) {
             spawn_x = x;
@@ -188,7 +189,7 @@ std::vector<GooseIntentUse> GooseSimulation::Step(svanes::Registry& world, svane
         static_cast<double>(GooseStepTics) / static_cast<double>(svanes::TicsPerSecond);
     EnemyIntent enemy_intent{};
     enemy_intent.move_to = {
-        1600.0F + static_cast<float>(std::sin(elapsed_seconds * 0.8) * 700.0),
+        1600.0F + svanes::Sin(static_cast<float>(elapsed_seconds * 0.8)) * 700.0F,
         300.0F
     };
     if (enemy.IsAlive()) {
@@ -389,13 +390,7 @@ std::uint64_t GooseSimulation::Hash(const GooseWorldSnapshot& snapshot)
 {
     svanes::MessageWriter writer;
     Encode(writer, snapshot);
-    // FNV-1a operates on values, never struct padding or process-local handles.
-    std::uint64_t hash = 14695981039346656037ULL;
-    for (const auto byte : writer.Finish().bytes) {
-        hash ^= std::to_integer<std::uint8_t>(byte);
-        hash *= 1099511628211ULL;
-    }
-    return hash;
+    return svanes::HashBytes(writer.Finish().bytes);
 }
 
 void GooseSimulation::Restore(svanes::Registry& world, const GooseWorldSnapshot& snapshot)

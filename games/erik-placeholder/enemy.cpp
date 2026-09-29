@@ -3,6 +3,7 @@
 #include "bullets.hpp"
 
 #include <svanes/collision_system.hpp>
+#include <svanes/deterministic_math.hpp>
 #include <svanes/game.hpp>
 #include <svanes/geometry/geometry.hpp>
 #include <svanes/registry.hpp>
@@ -70,7 +71,7 @@ void Enemy::Advance(svanes::Registry& world, const EnemyIntent& intent, svanes::
     svanes::Transform& transform = world.GetComponent<svanes::Transform>(entity);
 
     const svanes::Vector2D offset{intent.move_to.x - transform.x, intent.move_to.y - transform.y};
-    const float distance = std::hypot(offset.x, offset.y);
+    const float distance = svanes::Length(offset.x, offset.y);
     const float delta_seconds = static_cast<float>(delta_tics) /
         static_cast<float>(svanes::TicsPerSecond);
     const float step = move_speed * delta_seconds;

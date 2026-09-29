@@ -2,6 +2,7 @@
 
 #include <svanes/async/async_parallel_for_driver.hpp>
 #include <svanes/attractor_system.hpp>
+#include <svanes/deterministic_math.hpp>
 #include <svanes/geometry/geometry.hpp>
 #include <svanes/registry.hpp>
 
@@ -42,7 +43,7 @@ static void ValidateLimit(std::optional<float> limit) {
 static void ClampMagnitude(float &x, float &y, std::optional<float> limit) {
     ValidateLimit(limit);
     if (limit) {
-        const float magnitude = std::hypot(x, y);
+        const float magnitude = Length(x, y);
         if (magnitude > *limit) {
             const float scale = *limit / magnitude;
             x *= scale;

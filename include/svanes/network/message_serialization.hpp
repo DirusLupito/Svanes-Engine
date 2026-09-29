@@ -3,6 +3,8 @@
 #include <svanes/network/network_message.hpp>
 
 #include <span>
+#include <string>
+#include <string_view>
 
 namespace svanes {
 
@@ -67,6 +69,13 @@ public:
      * @param bytes The bytes to copy into the message.
      */
     void WriteBytes(std::span<const std::byte> bytes);
+
+    /**
+     * Writes text as a 16-bit length followed by its bytes.
+     * @param text The text to append, at most 65535 bytes.
+     * @throws std::length_error if the text is too long.
+     */
+    void WriteText(std::string_view text);
 
     /**
      * Returns the completed message and resets the writer for reuse.
@@ -157,6 +166,12 @@ public:
     std::span<const std::byte> ReadBytes(std::size_t count);
 
     /**
+     * @return The next text written by MessageWriter::WriteText.
+     * @throws std::invalid_argument if the text is truncated.
+     */
+    std::string ReadText();
+
+    /**
      * @return The number of unread bytes in the source message.
      */
     std::size_t Remaining() const;
@@ -171,5 +186,13 @@ private:
     std::span<const std::byte> bytes;
     std::size_t cursor = 0;
 };
+
+/**
+ * Hashes bytes with 64-bit FNV-1a. The result depends only on the bytes, so
+ * peers can compare hashes of values they encoded the same way.
+ * @param bytes The bytes to hash.
+ * @return The hash.
+ */
+std::uint64_t HashBytes(std::span<const std::byte> bytes);
 
 }

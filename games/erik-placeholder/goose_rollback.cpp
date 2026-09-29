@@ -21,23 +21,7 @@ constexpr std::uint64_t MaximumUncheckedTicks = 200;
 constexpr std::uint32_t StepsPerFrame = 8;
 constexpr std::uint32_t DoubleTapTicks = 25;
 constexpr svanes::TicCount MaximumBacklog = 25 * GooseStepTics;
-constexpr std::uint32_t ProtocolVersion = 1;
 constexpr auto AssignmentRetention = std::chrono::seconds(15);
-
-/**
- * Hashes a message's bytes with FNV-1a.
- * @param message The bytes to hash.
- * @return The 64-bit hash.
- */
-std::uint64_t HashBytes(const svanes::NetworkMessage& message)
-{
-    std::uint64_t hash = 14695981039346656037ULL;
-    for (const auto byte : message.bytes) {
-        hash ^= std::to_integer<std::uint8_t>(byte);
-        hash *= 1099511628211ULL;
-    }
-    return hash;
-}
 
 /**
  * Compares movement and firing controls, including aim while firing.
@@ -115,12 +99,11 @@ GooseRollback::GooseRollback(GooseSimulation& simulation, GooseNetwork& network,
 std::uint64_t GooseRollback::RulesHash()
 {
     svanes::MessageWriter writer;
-    writer.WriteUint32(ProtocolVersion);
     writer.WriteUint64(GooseStepTics);
     writer.WriteFloat32(GooseGravity);
     writer.WriteUint64(HashIntervalTicks);
     writer.WriteUint64(GooseMaxPlayers);
-    return HashBytes(writer.Finish());
+    return svanes::HashBytes(writer.Finish().bytes);
 }
 
 void GooseRollback::ResetPlayers()
@@ -616,7 +599,7 @@ void GooseRollback::HandleJoinRequests()
 void GooseRollback::RejectJoin(svanes::ConnectionId connection, std::string_view reason)
 {
     svanes::MessageWriter writer;
-    WriteGooseText(writer, reason);
+    writer.WriteText(reason);
     network.SendStranger(connection, GooseMessageType::JoinRejected, writer.Finish());
 }
 
@@ -657,7 +640,7 @@ void GooseRollback::ReceiveRosterMessage(const svanes::SessionMessage& message)
             throw std::invalid_argument("Roster stop admits too many players.");
         }
         for (std::uint32_t index = 0; index < count; ++index) {
-            record.joining.push_back(ReadGooseAddress(reader));
+            record.joining.push_back(svanes::ReadAddress(reader));
         }
         const auto [entry, inserted] = roster_pause->stops.emplace(message.sender.value, record);
         if (!inserted && entry->second != record) {
@@ -690,7 +673,7 @@ void GooseRollback::UpdateRosterPause(const svanes::FrameContext& frame)
         writer.WriteBool(pause.local_stop.leaving);
         writer.WriteUint32(static_cast<std::uint32_t>(pause.local_stop.joining.size()));
         for (const auto& address : pause.local_stop.joining) {
-            WriteGooseAddress(writer, address);
+            svanes::WriteAddress(writer, address);
         }
         if (!network.Broadcast(GooseMessageType::RosterStop, writer.Finish())) {
             return;
@@ -717,7 +700,7 @@ void GooseRollback::UpdateRosterPause(const svanes::FrameContext& frame)
         roster_writer.WriteBool(stop.leaving);
         roster_writer.WriteUint32(static_cast<std::uint32_t>(stop.joining.size()));
         for (const auto& address : stop.joining) {
-            WriteGooseAddress(roster_writer, address);
+            svanes::WriteAddress(roster_writer, address);
             joining.emplace_back(id, address);
         }
     }
@@ -725,7 +708,7 @@ void GooseRollback::UpdateRosterPause(const svanes::FrameContext& frame)
         failure = "Roster pause has no roster changes.";
         return;
     }
-    const auto roster_hash = HashBytes(roster_writer.Finish());
+    const auto roster_hash = svanes::HashBytes(roster_writer.Finish().bytes);
     waiting = "Finishing inputs through roster boundary " + std::to_string(boundary) + ".";
     for (std::uint32_t step = 0; simulation.Tick() < boundary && step < StepsPerFrame; ++step) {
         const GooseIntent neutral{};

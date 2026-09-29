@@ -1,5 +1,6 @@
 #include <svanes/collision_system.hpp>
 
+#include <svanes/deterministic_math.hpp>
 #include <svanes/geometry/circle_geometry.hpp>
 #include <svanes/geometry/geometry.hpp>
 #include <svanes/geometry/rectangle_geometry.hpp>
@@ -391,7 +392,7 @@ DetectConvexCollision(std::span<const Vector2D> a,
             // The modulo connects the final vertex back to the first.
             const Vector2D edge =
                 vertices[(i + 1) % vertices.size()] - vertices[i];
-            const float length = std::hypot(edge.x, edge.y);
+            const float length = Length(edge.x, edge.y);
             if (!std::isfinite(length) || length <= 0.0F) {
                 throw std::invalid_argument("Collision polygon edges require "
                                             "finite, positive lengths.");
@@ -616,7 +617,7 @@ DetectCirclePolygonCollision(const Circle2D &circle,
     for (std::size_t i = 0; i < polygon.size(); ++i) {
 
         const Vector2D offset = polygon[i] - center;
-        const float distance = std::hypot(offset.x, offset.y);
+        const float distance = Length(offset.x, offset.y);
 
         if (!std::isfinite(distance)) {
             throw std::invalid_argument(
@@ -632,7 +633,7 @@ DetectCirclePolygonCollision(const Circle2D &circle,
         // also build the edge normals during the same loop (after all, the
         // number of edges is equal to the number of vertices for a polygon).
         const Vector2D edge = polygon[(i + 1) % polygon.size()] - polygon[i];
-        const float length = std::hypot(edge.x, edge.y);
+        const float length = Length(edge.x, edge.y);
 
         if (!std::isfinite(length) || length <= 0.0F) {
             throw std::invalid_argument(
@@ -781,7 +782,7 @@ DetectCollision(const Circle2D &a, const Transform &transform_a,
 
     const Vector2D offset{world_a.x - world_b.x, world_a.y - world_b.y};
 
-    const float distance = std::hypot(offset.x, offset.y);
+    const float distance = Length(offset.x, offset.y);
     const float radii = world_a.radius + world_b.radius;
 
     if (!std::isfinite(distance) || !std::isfinite(radii)) {

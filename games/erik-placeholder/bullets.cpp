@@ -1,6 +1,7 @@
 #include "bullets.hpp"
 
 #include <svanes/collision_system.hpp>
+#include <svanes/deterministic_math.hpp>
 #include <svanes/kinematic_system.hpp>
 #include <svanes/registry.hpp>
 #include <svanes/render/render_system.hpp>
@@ -31,7 +32,7 @@ void SpawnBullet(
     float speed, svanes::Color color
 )
 {
-    const float length = std::hypot(direction.x, direction.y);
+    const float length = svanes::Length(direction.x, direction.y);
     if (!std::isfinite(length) || length <= 0.0F) {
         throw std::invalid_argument("SpawnBullet requires a finite and nonzero direction.");
     }

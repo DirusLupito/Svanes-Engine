@@ -37,6 +37,14 @@ void MessageWriter::WriteBytes(std::span<const std::byte> bytes) {
     message.bytes.insert(message.bytes.end(), bytes.begin(), bytes.end());
 }
 
+void MessageWriter::WriteText(std::string_view text) {
+    if (text.size() > std::numeric_limits<std::uint16_t>::max()) {
+        throw std::length_error("MessageWriter: text exceeds 65535 bytes.");
+    }
+    WriteUint16(static_cast<std::uint16_t>(text.size()));
+    WriteBytes(std::as_bytes(std::span{text.data(), text.size()}));
+}
+
 NetworkMessage MessageWriter::Finish() {
     return std::exchange(message, NetworkMessage{});
 }
@@ -94,6 +102,24 @@ bool MessageReader::ReadBool() {
     return value != 0;
 }
 
+std::string MessageReader::ReadText() {
+    const auto text = ReadBytes(ReadUint16());
+    std::string result;
+    for (const std::byte byte : text) {
+        result.push_back(static_cast<char>(byte));
+    }
+    return result;
+}
+
 std::size_t MessageReader::Remaining() const { return bytes.size() - cursor; }
+
+std::uint64_t HashBytes(std::span<const std::byte> bytes) {
+    std::uint64_t hash = 14695981039346656037ULL;
+    for (const std::byte byte : bytes) {
+        hash ^= std::to_integer<std::uint8_t>(byte);
+        hash *= 1099511628211ULL;
+    }
+    return hash;
+}
 
 }

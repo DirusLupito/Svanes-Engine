@@ -11,7 +11,6 @@
 #include <optional>
 #include <span>
 #include <string>
-#include <string_view>
 #include <vector>
 
 /** The session id every copy of the game uses. */
@@ -38,26 +37,6 @@ struct GoosePeerEndpoint {
 };
 
 /**
- * A UDP pipe bound to a local port.
- * FIELDS:
- * - pipe: The bound pipe.
- * - port: The local port it listens on.
- */
-struct GooseBoundPipe {
-    std::unique_ptr<svanes::UdpMsgPipe> pipe;
-    std::uint16_t port = 0;
-};
-
-/**
- * Binds a UDP pipe to a local port. The transport reuses addresses, so binding a
- * port another process already uses does not fail. Each copy of the game on one
- * computer needs its own port.
- * @param port The local port to listen on.
- * @return The bound pipe and its port.
- */
-GooseBoundPipe BindGoosePipe(std::uint16_t port);
-
-/**
  * Message types owned by Erik's game.
  * - Input: Carries a player's input for a simulation tick.
  * - StateHash: Reports a state hash at a confirmed tick boundary.
@@ -80,34 +59,6 @@ enum class GooseMessageType : svanes::MessageType {
     JoinAssigned = 9,
     SnapshotChunk = 10
 };
-
-/**
- * Writes a string as a 16-bit length followed by its bytes.
- * @param writer The message to append to.
- * @param text The text to write, at most 65535 bytes.
- * @throws std::length_error if the text is too long.
- */
-void WriteGooseText(svanes::MessageWriter& writer, std::string_view text);
-
-/**
- * @param reader The message positioned at text written by WriteGooseText.
- * @return The text.
- */
-std::string ReadGooseText(svanes::MessageReader& reader);
-
-/**
- * Writes a host and port.
- * @param writer The message to append to.
- * @param address The address to write.
- */
-void WriteGooseAddress(svanes::MessageWriter& writer, const svanes::UdpAddress& address);
-
-/**
- * @param reader The message positioned at an address written by WriteGooseAddress.
- * @return The address.
- * @throws std::invalid_argument for an empty host or a zero port.
- */
-svanes::UdpAddress ReadGooseAddress(svanes::MessageReader& reader);
 
 /**
  * Interprets an address passed along by another member. A loopback address only
@@ -159,19 +110,19 @@ class GooseNetwork final {
 public:
     /**
      * Starts a new world with this process as its only member, peer 1.
-     * @param bound The pipe this process listens on.
+     * @param bound_pipe The pipe this process listens on.
      */
-    explicit GooseNetwork(GooseBoundPipe bound);
+    explicit GooseNetwork(std::unique_ptr<svanes::UdpMsgPipe> bound_pipe);
 
     /**
      * Joins a world after admission, connecting to every member it was told about.
      * Loopback addresses in the assignment are resolved against the sponsor's host.
      * The complete world snapshot is then expected from the sponsor.
-     * @param bound The pipe used during the join handshake.
+     * @param bound_pipe The pipe used during the join handshake.
      * @param sponsor_connection The pipe connection to the member that was contacted.
      * @param assignment The id, revision, and members received from the sponsor.
      */
-    GooseNetwork(GooseBoundPipe bound, svanes::ConnectionId sponsor_connection,
+    GooseNetwork(std::unique_ptr<svanes::UdpMsgPipe> bound_pipe, svanes::ConnectionId sponsor_connection,
                  const GooseAssignment& assignment);
 
     /**
@@ -302,7 +253,6 @@ private:
 
     std::unique_ptr<svanes::NetworkSession> session;
     svanes::UdpMsgPipe* pipe = nullptr;
-    std::uint16_t port = 0;
     std::vector<svanes::PeerId> peers;
     std::string failure;
     std::deque<svanes::SessionMessage> messages;
@@ -354,7 +304,7 @@ public:
     std::unique_ptr<GooseNetwork> Admit();
 
 private:
-    GooseBoundPipe bound;
+    std::unique_ptr<svanes::UdpMsgPipe> pipe;
     svanes::UdpAddress entry;
     svanes::ConnectionId entry_connection;
     std::uint64_t rules_hash;

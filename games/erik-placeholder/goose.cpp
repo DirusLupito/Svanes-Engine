@@ -5,6 +5,7 @@
 #include "bullets.hpp"
 
 #include <svanes/collision_system.hpp>
+#include <svanes/deterministic_math.hpp>
 #include <svanes/game.hpp>
 #include <svanes/geometry/geometry.hpp>
 #include <svanes/kinematic_system.hpp>
@@ -330,7 +331,7 @@ void Goose::ApplyKnockback(svanes::Registry& world, svanes::Vector2D direction, 
         return;
     }
 
-    const float length = std::hypot(direction.x, direction.y);
+    const float length = svanes::Length(direction.x, direction.y);
     if (!std::isfinite(length) || length <= 0.0F) {
         throw std::invalid_argument("Goose::ApplyKnockback requires a finite and nonzero direction.");
     }

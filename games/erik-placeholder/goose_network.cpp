@@ -15,45 +15,6 @@ constexpr auto kJoinTimeout = std::chrono::seconds(15);
 
 }
 
-GooseBoundPipe BindGoosePipe(std::uint16_t port)
-{
-    return {std::make_unique<svanes::UdpMsgPipe>(port), port};
-}
-
-void WriteGooseText(svanes::MessageWriter& writer, std::string_view text)
-{
-    if (text.size() > std::numeric_limits<std::uint16_t>::max()) {
-        throw std::length_error("Goose text exceeds 65535 bytes.");
-    }
-    writer.WriteUint16(static_cast<std::uint16_t>(text.size()));
-    writer.WriteBytes(std::as_bytes(std::span{text.data(), text.size()}));
-}
-
-std::string ReadGooseText(svanes::MessageReader& reader)
-{
-    const auto bytes = reader.ReadBytes(reader.ReadUint16());
-    std::string text;
-    for (const auto byte : bytes) {
-        text.push_back(static_cast<char>(byte));
-    }
-    return text;
-}
-
-void WriteGooseAddress(svanes::MessageWriter& writer, const svanes::UdpAddress& address)
-{
-    WriteGooseText(writer, address.host);
-    writer.WriteUint16(address.port);
-}
-
-svanes::UdpAddress ReadGooseAddress(svanes::MessageReader& reader)
-{
-    svanes::UdpAddress address{ReadGooseText(reader), reader.ReadUint16()};
-    if (address.host.empty() || address.port == 0) {
-        throw std::invalid_argument("Goose address requires a host and a nonzero port.");
-    }
-    return address;
-}
-
 svanes::UdpAddress ResolveRelayedAddress(const svanes::UdpAddress& relayed, const std::string& relay_host)
 {
     if (relayed.host.starts_with("127.")) {
@@ -71,7 +32,7 @@ svanes::NetworkMessage EncodeAssignment(const GooseAssignment& assignment)
     writer.WriteUint32(static_cast<std::uint32_t>(assignment.peers.size()));
     for (const auto& endpoint : assignment.peers) {
         writer.WriteUint32(endpoint.peer.value);
-        WriteGooseAddress(writer, endpoint.address);
+        svanes::WriteAddress(writer, endpoint.address);
     }
     return writer.Finish();
 }
@@ -83,7 +44,7 @@ GooseAssignment DecodeAssignment(const svanes::NetworkMessage& payload)
     const auto count = reader.ReadUint32();
     for (std::uint32_t index = 0; index < count; ++index) {
         const svanes::PeerId peer{reader.ReadUint32()};
-        assignment.peers.push_back({peer, ReadGooseAddress(reader)});
+        assignment.peers.push_back({peer, svanes::ReadAddress(reader)});
     }
     if (reader.Remaining() != 0 || assignment.local_peer.value == 0 ||
         assignment.sponsor.value == 0 || assignment.revision == 0) {
@@ -92,16 +53,16 @@ GooseAssignment DecodeAssignment(const svanes::NetworkMessage& payload)
     return assignment;
 }
 
-GooseNetwork::GooseNetwork(GooseBoundPipe bound)
-    : pipe(bound.pipe.get()), port(bound.port), peers{{1}}
+GooseNetwork::GooseNetwork(std::unique_ptr<svanes::UdpMsgPipe> bound_pipe)
+    : pipe(bound_pipe.get()), peers{{1}}
 {
-    session = std::make_unique<svanes::NetworkSession>(std::move(bound.pipe),
+    session = std::make_unique<svanes::NetworkSession>(std::move(bound_pipe),
         svanes::SessionConfiguration{GooseSession, {1}, {}});
 }
 
-GooseNetwork::GooseNetwork(GooseBoundPipe bound, svanes::ConnectionId sponsor_connection,
+GooseNetwork::GooseNetwork(std::unique_ptr<svanes::UdpMsgPipe> bound_pipe, svanes::ConnectionId sponsor_connection,
                            const GooseAssignment& assignment)
-    : pipe(bound.pipe.get()), port(bound.port), revision(assignment.revision), awaiting_snapshot(true)
+    : pipe(bound_pipe.get()), revision(assignment.revision), awaiting_snapshot(true)
 {
     svanes::SessionConfiguration configuration{GooseSession, assignment.local_peer, {}};
     configuration.remote_peers.push_back({assignment.sponsor, sponsor_connection});
@@ -113,7 +74,7 @@ GooseNetwork::GooseNetwork(GooseBoundPipe bound, svanes::ConnectionId sponsor_co
         peers.push_back(endpoint.peer);
     }
     std::sort(peers.begin(), peers.end(), [](auto a, auto b) { return a.value < b.value; });
-    session = std::make_unique<svanes::NetworkSession>(std::move(bound.pipe), std::move(configuration));
+    session = std::make_unique<svanes::NetworkSession>(std::move(bound_pipe), std::move(configuration));
 }
 
 void GooseNetwork::Update()
@@ -331,7 +292,7 @@ svanes::PeerId GooseNetwork::LocalPeer() const
 
 std::uint16_t GooseNetwork::Port() const
 {
-    return port;
+    return pipe->LocalPort();
 }
 
 bool GooseNetwork::HasFailed() const
@@ -355,10 +316,10 @@ std::uint64_t GooseNetwork::Revision() const
 }
 
 GooseJoin::GooseJoin(svanes::UdpAddress entry, std::uint16_t port, std::uint64_t rules_hash)
-    : bound(BindGoosePipe(port)), entry(std::move(entry)), rules_hash(rules_hash),
+    : pipe(std::make_unique<svanes::UdpMsgPipe>(port)), entry(std::move(entry)), rules_hash(rules_hash),
       started_at(std::chrono::steady_clock::now())
 {
-    entry_connection = bound.pipe->AddRemote(this->entry.host, this->entry.port);
+    entry_connection = pipe->AddRemote(this->entry.host, this->entry.port);
 }
 
 void GooseJoin::Update()
@@ -377,13 +338,13 @@ void GooseJoin::Update()
     if (!last_request || now - *last_request >= kJoinRequestInterval) {
         svanes::MessageWriter writer;
         writer.WriteUint64(rules_hash);
-        static_cast<void>(bound.pipe->Send(entry_connection, svanes::EncodeSessionPacket(GooseSession,
+        static_cast<void>(pipe->Send(entry_connection, svanes::EncodeSessionPacket(GooseSession,
             {svanes::SessionPacketKind::Contact, GooseUnassignedPeer, 1,
              static_cast<svanes::MessageType>(GooseMessageType::JoinRequest), writer.Finish()})));
         last_request = now;
     }
     svanes::ReceivedMessage received;
-    while (!assignment && !HasFailed() && bound.pipe->Receive(received)) {
+    while (!assignment && !HasFailed() && pipe->Receive(received)) {
         if (received.source != entry_connection) {
             continue;
         }
@@ -397,7 +358,7 @@ void GooseJoin::Update()
             answered = true;
             break;
         case GooseMessageType::JoinRejected:
-            failure = "Join rejected: " + ReadGooseText(reader);
+            failure = "Join rejected: " + reader.ReadText();
             break;
         case GooseMessageType::JoinAssigned:
             assignment = DecodeAssignment(packet.payload);
@@ -437,5 +398,5 @@ std::unique_ptr<GooseNetwork> GooseJoin::Admit()
     if (!assignment) {
         throw std::logic_error("GooseJoin::Admit called before an assignment arrived.");
     }
-    return std::make_unique<GooseNetwork>(std::move(bound), entry_connection, *assignment);
+    return std::make_unique<GooseNetwork>(std::move(pipe), entry_connection, *assignment);
 }
