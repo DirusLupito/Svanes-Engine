@@ -1,7 +1,9 @@
 #include "goose_simulation.hpp"
 
+#include <svanes/camera2d.hpp>
 #include <svanes/deterministic_math.hpp>
 #include <svanes/game.hpp>
+#include <svanes/input.hpp>
 #include <svanes/network/component_serialization.hpp>
 #include <svanes/registry.hpp>
 
@@ -16,26 +18,22 @@ namespace {
 constexpr std::array<float, 8> kSpawnX{400.0F, 550.0F, 700.0F, 850.0F, 1000.0F, 1150.0F, 1300.0F, 1450.0F};
 constexpr float kSpawnY = 700.0F;
 constexpr float kSpawnClearance = 80.0F;
+constexpr std::uint32_t kDoubleTapTicks = 25;
+constexpr float kMaximumAim = 100000.0F;
 
 }
 
-void GooseSimulation::Initialize(svanes::GameContext& context)
+GooseSimulation::GooseSimulation(svanes::GameContext& context)
+    : world(context.world), gravity(context.gravity)
 {
-    if (initialized) {
-        throw std::logic_error("GooseSimulation has already been initialized.");
-    }
     context.automatic_simulation = false;
     textures = Goose::LoadTextures(context.assets);
-    enemy.Spawn(context.world, {1600.0F, 300.0F}, 120.0F, 10.0F, NextStableId());
-    departed_owner = context.world.CreateEntity();
-    initialized = true;
+    enemy.Spawn(world, {1600.0F, 300.0F}, 120.0F, 10.0F, NextStableId());
+    departed_owner = world.CreateEntity();
 }
 
-void GooseSimulation::AddPlayer(svanes::Registry& world, svanes::PeerId peer)
+void GooseSimulation::AddPlayer(svanes::PeerId peer)
 {
-    if (!initialized) {
-        throw std::logic_error("GooseSimulation::AddPlayer called before Initialize.");
-    }
     if (peer.value == 0 || (!players.empty() && players.back().peer.value >= peer.value)) {
         throw std::invalid_argument("GooseSimulation::AddPlayer requires a nonzero id above every current player.");
     }
@@ -54,12 +52,8 @@ void GooseSimulation::AddPlayer(svanes::Registry& world, svanes::PeerId peer)
     players.back().goose.Spawn(world, textures, spawn_x, kSpawnY, NextStableId());
 }
 
-std::vector<GooseIntentUse> GooseSimulation::Step(svanes::Registry& world, svanes::Vector2D gravity,
-                            std::span<const GooseIntent> inputs)
+std::vector<GooseIntentUse> GooseSimulation::Step(std::span<const GooseIntent> inputs)
 {
-    if (!initialized) {
-        throw std::logic_error("GooseSimulation::Step called before Initialize.");
-    }
     if (inputs.size() != players.size()) {
         throw std::invalid_argument("GooseSimulation requires one input per player.");
     }
@@ -74,7 +68,7 @@ std::vector<GooseIntentUse> GooseSimulation::Step(svanes::Registry& world, svane
             input.move.y != 0.0F ||
             (input.dash != -1.0F && input.dash != 0.0F && input.dash != 1.0F) ||
             !std::isfinite(input.aim.x) || !std::isfinite(input.aim.y) ||
-            std::abs(input.aim.x) > 100000.0F || std::abs(input.aim.y) > 100000.0F) {
+            std::abs(input.aim.x) > kMaximumAim || std::abs(input.aim.y) > kMaximumAim) {
             throw std::invalid_argument("GooseSimulation requires valid movement directions and finite, bounded aim.");
         }
     }
@@ -151,11 +145,8 @@ std::vector<GooseIntentUse> GooseSimulation::Step(svanes::Registry& world, svane
     return use;
 }
 
-GooseWorldSnapshot GooseSimulation::Capture(const svanes::Registry& world) const
+GooseWorldSnapshot GooseSimulation::Capture() const
 {
-    if (!initialized) {
-        throw std::logic_error("GooseSimulation::Capture called before Initialize.");
-    }
     GooseWorldSnapshot snapshot{tick, {}, enemy.Capture(world), CaptureBullets(world), next_stable_id};
     snapshot.geese.reserve(players.size());
     for (const auto& player : players) {
@@ -263,18 +254,8 @@ GooseWorldSnapshot GooseSimulation::Decode(svanes::MessageReader& reader) const
     return snapshot;
 }
 
-std::uint64_t GooseSimulation::Hash(const GooseWorldSnapshot& snapshot)
+void GooseSimulation::Restore(const GooseWorldSnapshot& snapshot)
 {
-    svanes::MessageWriter writer;
-    Encode(writer, snapshot);
-    return svanes::HashBytes(writer.Finish().bytes);
-}
-
-void GooseSimulation::Restore(svanes::Registry& world, const GooseWorldSnapshot& snapshot)
-{
-    if (!initialized) {
-        throw std::logic_error("GooseSimulation::Restore called before Initialize.");
-    }
     if (snapshot.geese.size() != players.size()) {
         throw std::invalid_argument("GooseSimulation snapshot does not match the player count.");
     }
@@ -297,21 +278,7 @@ svanes::Entity GooseSimulation::PlayerEntity(svanes::PeerId peer) const
     throw std::invalid_argument("GooseSimulation: peer is outside the roster.");
 }
 
-std::vector<svanes::PeerId> GooseSimulation::Roster() const
-{
-    std::vector<svanes::PeerId> roster;
-    for (const auto& player : players) {
-        roster.push_back(player.peer);
-    }
-    return roster;
-}
-
-std::uint64_t GooseSimulation::Tick() const
-{
-    return tick;
-}
-
-void GooseSimulation::RemovePlayer(svanes::Registry& world, svanes::PeerId peer)
+void GooseSimulation::RemovePlayer(svanes::PeerId peer)
 {
     const auto found = std::find_if(players.begin(), players.end(),
         [&](const auto& player) { return player.peer == peer; });
@@ -345,4 +312,113 @@ svanes::StableId GooseSimulation::NextStableId()
         throw std::overflow_error("GooseSimulation exhausted its stable ids.");
     }
     return {next_stable_id++};
+}
+
+svanes::NetworkMessage GooseSimulation::Save() const
+{
+    svanes::MessageWriter writer;
+    Encode(writer, Capture());
+    return writer.Finish();
+}
+
+void GooseSimulation::Load(std::span<const std::byte> saved)
+{
+    svanes::MessageReader reader(saved);
+    const auto snapshot = Decode(reader);
+    if (reader.Remaining() != 0) {
+        throw std::invalid_argument("Saved goose world has trailing data.");
+    }
+    Restore(snapshot);
+}
+
+void GooseSimulation::CaptureInput(const svanes::FrameContext& frame, svanes::PeerId local)
+{
+    controls.move = (frame.input.IsDown(svanes::Key::D) ? 1.0F : 0.0F)
+        - (frame.input.IsDown(svanes::Key::A) ? 1.0F : 0.0F);
+    controls.jump = frame.input.IsDown(svanes::Key::Space);
+    controls.fire = frame.input.IsMouseButtonDown(svanes::MouseButton::Left);
+    controls.aim = {};
+    if (controls.fire) {
+        const auto mouse = frame.input.MousePosition();
+        const auto aim = frame.camera.ScreenToWorld({mouse.x, mouse.y, 0.0F, 0.0F});
+        const auto& goose = world.GetComponent<svanes::Transform>(PlayerEntity(local));
+        controls.aim = {std::clamp(aim.x - goose.x, -kMaximumAim, kMaximumAim),
+            std::clamp(aim.y - goose.y, -kMaximumAim, kMaximumAim)};
+    }
+    controls.left_pressed |= frame.input.WasPressed(svanes::Key::A);
+    controls.right_pressed |= frame.input.WasPressed(svanes::Key::D);
+}
+
+GooseIntent GooseSimulation::TakeInput()
+{
+    if (controls.left_tap_ticks > 0) {
+        --controls.left_tap_ticks;
+    }
+    if (controls.right_tap_ticks > 0) {
+        --controls.right_tap_ticks;
+    }
+    GooseIntent input{};
+    input.move.x = controls.move;
+    input.jump = controls.jump;
+    input.fire = controls.fire;
+    input.aim = controls.aim;
+    if (controls.left_pressed) {
+        if (controls.left_tap_ticks > 0) {
+            input.dash = -1.0F;
+            controls.left_tap_ticks = 0;
+        } else {
+            controls.left_tap_ticks = kDoubleTapTicks;
+        }
+    }
+    if (controls.right_pressed) {
+        if (controls.right_tap_ticks > 0) {
+            input.dash = 1.0F;
+            controls.right_tap_ticks = 0;
+        } else {
+            controls.right_tap_ticks = kDoubleTapTicks;
+        }
+    }
+    controls.left_pressed = false;
+    controls.right_pressed = false;
+    return input;
+}
+
+void GooseSimulation::EncodeInput(svanes::MessageWriter& writer, const GooseIntent& input) const
+{
+    writer.WriteUint8(static_cast<std::uint8_t>(input.move.x + 1.0F));
+    writer.WriteUint8(static_cast<std::uint8_t>(input.dash + 1.0F));
+    writer.WriteBool(input.jump);
+    writer.WriteBool(input.fire);
+    writer.WriteFloat32(input.aim.x);
+    writer.WriteFloat32(input.aim.y);
+}
+
+GooseIntent GooseSimulation::DecodeInput(svanes::MessageReader& reader) const
+{
+    const auto move = reader.ReadUint8();
+    const auto dash = reader.ReadUint8();
+    GooseIntent input{};
+    input.jump = reader.ReadBool();
+    input.fire = reader.ReadBool();
+    input.aim = {reader.ReadFloat32(), reader.ReadFloat32()};
+    if (move > 2 || dash > 2 || !std::isfinite(input.aim.x) || !std::isfinite(input.aim.y) ||
+        std::abs(input.aim.x) > kMaximumAim || std::abs(input.aim.y) > kMaximumAim) {
+        throw std::invalid_argument("Goose input has an invalid direction or aim.");
+    }
+    input.move.x = static_cast<float>(move) - 1.0F;
+    input.dash = static_cast<float>(dash) - 1.0F;
+    return input;
+}
+
+GooseIntent GooseSimulation::Predict(const GooseIntent& last) const
+{
+    auto input = last;
+    input.dash = 0.0F;
+    return input;
+}
+
+bool GooseSimulation::ChangesStep(const GooseIntent& used, const GooseIntent& actual,
+                                  const GooseIntentUse& use) const
+{
+    return ::ChangesStep(used, actual, use);
 }

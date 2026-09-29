@@ -12,8 +12,8 @@
  *   along its path in Update below
  * - TASK 3, physics: world gravity in Initialize below, the goose's Gravity and
  *   Kinematic2D components in Goose::Spawn, and flight in Goose::Update
- * - TASK 4, controls: input read into a GooseIntent in Update below, and applied in
- *   Goose::Update in goose.cpp
+ * - TASK 4, controls: input read into a GooseIntent in GooseSimulation::CaptureInput
+ *   and TakeInput in goose_simulation.cpp, and applied in Goose::Update in goose.cpp
  * - TASK 5, collision response: Goose::ResolveCollisions in goose.cpp
  * - TASK 6, scaling: the Tab key in Update below
  */
@@ -89,6 +89,22 @@ void CreateSolidBlock(
     });
     world.AddComponent<svanes::Collider2D>(entity, svanes::Collider2D{body});
     world.AddComponent<Solid>(entity);
+}
+
+/**
+ * @param sync_settings The input sync pacing and limits.
+ * @return A hash of everything two builds must share to play together.
+ */
+std::uint64_t RulesHash(const svanes::SyncSettings& sync_settings)
+{
+    svanes::MessageWriter writer;
+    writer.WriteUint64(sync_settings.step_tics);
+    writer.WriteFloat32(GooseGravity);
+    writer.WriteUint64(sync_settings.prediction_ticks);
+    writer.WriteUint64(sync_settings.history_ticks);
+    writer.WriteUint64(sync_settings.hash_interval_ticks);
+    writer.WriteUint64(sync_settings.max_unchecked_ticks);
+    return svanes::HashBytes(writer.Finish().bytes);
 }
 
 }
@@ -174,25 +190,26 @@ void ErikGame::Initialize(svanes::GameContext& context)
     context.world.GetComponent<svanes::Sprite>(orb).source = svanes::Rectangle2D{
         64.0F, 64.0F, 128.0F, 128.0F};
 
-    simulation = std::make_unique<GooseSimulation>();
-    simulation->Initialize(context);
-    const svanes::PeerSettings settings{GooseSession, GooseMaxPlayers, GooseRollback::RulesHash()};
+    simulation = std::make_unique<GooseSimulation>(context);
+    const svanes::SyncSettings sync_settings{.step_tics = GooseStepTics};
+    const svanes::PeerSettings settings{GooseSession, GooseMaxPlayers, RulesHash(sync_settings)};
     auto pipe = std::make_unique<svanes::UdpMsgPipe>(port);
     if (join_address) {
         network = std::make_unique<svanes::PeerGroup>(std::move(pipe), *join_address, settings);
-        rollback = std::make_unique<GooseRollback>(*simulation, *network);
+    } else {
+        network = std::make_unique<svanes::PeerGroup>(std::move(pipe), settings);
+    }
+    sync = std::make_unique<svanes::InputSync<GooseIntent, GooseIntentUse>>(*network, *simulation, sync_settings);
+    if (join_address) {
         return;
     }
-    network = std::make_unique<svanes::PeerGroup>(std::move(pipe), settings);
-    simulation->AddPlayer(context.world, network->LocalPeer());
-    rollback = std::make_unique<GooseRollback>(*simulation, *network);
     std::cout << "Started a new world. Others can join on port " << network->Port() << ".\n";
 }
 
 void ErikGame::Update(const svanes::FrameContext& frame)
 {
     if (frame.input.WasPressed(svanes::Key::Escape)) {
-        rollback->RequestLeave();
+        sync->RequestLeave();
     }
 
     // TASK 6, scaling: Tab switches the camera between the two scale modes.
@@ -206,22 +223,22 @@ void ErikGame::Update(const svanes::FrameContext& frame)
     }
 
     const bool was_running = network->IsRunning();
-    rollback->Update(frame);
-    should_quit = should_quit || rollback->CanClose();
+    sync->Update(frame);
+    should_quit = should_quit || sync->CanClose();
     if (!was_running && network->IsRunning()) {
-        std::cout << "Joined at tick " << simulation->Tick() << " with "
+        std::cout << "Joined at tick " << sync->Tick() << " with "
             << network->Peers().size() << " player(s). Others can join on port " << network->Port() << ".\n";
     }
     if (!network->IsRunning()) {
-        ReportStatus(rollback->Status());
+        ReportStatus(sync->Status());
         return;
     }
-    ReportStatus("Peer " + std::to_string(network->LocalPeer().value) + ": " + rollback->Status());
+    ReportStatus("Peer " + std::to_string(network->LocalPeer().value) + ": " + sync->Status());
     network_diagnostic_tics += std::min(frame.real_delta_tics,
         svanes::TicsPerSecond - network_diagnostic_tics);
     if (network_diagnostic_tics >= svanes::TicsPerSecond) {
         std::cout << "Peer " << network->LocalPeer().value << ": "
-            << rollback->Diagnostics() << '\n';
+            << sync->Diagnostics() << '\n';
         network_diagnostic_tics = 0;
     }
     UpdateCamera(frame, simulation->PlayerEntity(network->LocalPeer()));

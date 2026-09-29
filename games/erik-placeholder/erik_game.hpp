@@ -2,12 +2,26 @@
 
 #include <svanes/entity.hpp>
 #include <svanes/game.hpp>
+#include <svanes/network/input_sync.hpp>
+#include <svanes/network/peer_group.hpp>
 
 #include "enemy.hpp"
 #include "goose.hpp"
-#include "goose_network.hpp"
 #include "goose_simulation.hpp"
-#include "goose_rollback.hpp"
+
+#include <cstdint>
+#include <memory>
+#include <optional>
+#include <string>
+
+/** The session id every copy of the game uses. */
+inline constexpr svanes::SessionId GooseSession = 1;
+
+/** The port a new world listens on unless another is chosen. */
+inline constexpr std::uint16_t GooseHostPort = 45000;
+
+/** The port a joining process listens on unless another is chosen. */
+inline constexpr std::uint16_t GooseJoinPort = 45001;
 
 class ErikGame final : public svanes::IGame {
 public:
@@ -58,7 +72,7 @@ private:
     std::optional<svanes::UdpAddress> join_address;
     std::unique_ptr<svanes::PeerGroup> network;
     std::unique_ptr<GooseSimulation> simulation;
-    std::unique_ptr<GooseRollback> rollback;
+    std::unique_ptr<svanes::InputSync<GooseIntent, GooseIntentUse>> sync;
     std::string last_network_status;
     svanes::TicCount network_diagnostic_tics = 0;
 
