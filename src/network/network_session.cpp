@@ -22,8 +22,11 @@ constexpr std::size_t HeaderBytes = 31;
  * @throws std::invalid_argument for invalid ids, kinds, or acknowledgment contents.
  */
 void ValidatePacket(SessionId session, const SessionPacket &packet) {
-    if (session == 0 || packet.sender.value == 0 || packet.message_id == 0) {
-        throw std::invalid_argument("Session packet: session, sender, and message ids must be nonzero.");
+    if (session == 0 || packet.message_id == 0) {
+        throw std::invalid_argument("Session packet: session and message ids must be nonzero.");
+    }
+    if (packet.sender.value == 0 && packet.kind != SessionPacketKind::Contact) {
+        throw std::invalid_argument("Session packet: only contact packets may omit the sender.");
     }
     if (packet.kind != SessionPacketKind::Data &&
         packet.kind != SessionPacketKind::Acknowledgment &&
@@ -108,9 +111,11 @@ NetworkSession::NetworkSession(std::unique_ptr<MsgPipe> pipe,
                                SessionConfiguration configuration,
                                ReliabilitySettings settings)
     : pipe(std::move(pipe)), configuration(std::move(configuration)), settings(settings) {
-    if (!this->pipe || this->configuration.session == 0 ||
-        this->configuration.local_peer.value == 0) {
-        throw std::invalid_argument("NetworkSession requires a pipe and nonzero session/local peer identifiers.");
+    if (!this->pipe || this->configuration.session == 0) {
+        throw std::invalid_argument("NetworkSession requires a pipe and a nonzero session identifier.");
+    }
+    if (this->configuration.local_peer.value == 0 && !this->configuration.remote_peers.empty()) {
+        throw std::invalid_argument("NetworkSession: a roster requires a local peer identifier.");
     }
     if (settings.retry_interval.count() <= 0 ||
         settings.delivery_timeout < settings.retry_interval ||
@@ -139,12 +144,27 @@ NetworkSession::NetworkSession(std::unique_ptr<MsgPipe> pipe,
 
 PeerId NetworkSession::LocalPeer() const { return configuration.local_peer; }
 
+bool NetworkSession::IsAdmitted() const { return configuration.local_peer.value != 0; }
+
+void NetworkSession::Admit(PeerId local_peer) {
+    if (local_peer.value == 0) {
+        throw std::invalid_argument("NetworkSession::Admit: peer id must be nonzero.");
+    }
+    if (IsAdmitted()) {
+        throw std::logic_error("NetworkSession::Admit: this process already has a peer id.");
+    }
+    configuration.local_peer = local_peer;
+}
+
 std::span<const PeerConnection> NetworkSession::RemotePeers() const {
     return configuration.remote_peers;
 }
 
 bool NetworkSession::Send(PeerId destination, MessageType type,
                           const NetworkMessage &payload) {
+    if (!IsAdmitted()) {
+        throw std::logic_error("NetworkSession::Send called before admission.");
+    }
     if (payload.bytes.size() > MaxSessionPayloadBytes) {
         throw std::length_error("NetworkSession::Send: payload exceeds MaxSessionPayloadBytes.");
     }
@@ -163,6 +183,9 @@ bool NetworkSession::Send(PeerId destination, MessageType type,
 }
 
 bool NetworkSession::Broadcast(MessageType type, const NetworkMessage &payload) {
+    if (!IsAdmitted()) {
+        throw std::logic_error("NetworkSession::Broadcast called before admission.");
+    }
     if (payload.bytes.size() > MaxSessionPayloadBytes) {
         throw std::length_error("NetworkSession::Broadcast: payload exceeds MaxSessionPayloadBytes.");
     }
@@ -246,21 +269,30 @@ void NetworkSession::Update() {
             break;
         }
         if (BelongsToOtherSession(configuration.session, incoming.message)) {
-            if (wrong_session_connections.insert(incoming.source.value).second) {
-                std::cerr << "NetworkSession: dropping packets from connection "
-                          << incoming.source.value << ", which uses a different session id.\n";
-            }
+            LogDroppedConnection(incoming.source, "it uses a different session id");
             continue;
         }
         const auto found = FindConnection(incoming.source);
-        auto decoded = DecodeSessionPacket(configuration.session, incoming.message);
+        SessionPacket decoded;
+        if (found) {
+            decoded = DecodeSessionPacket(configuration.session, incoming.message);
+        } else {
+            try {
+                decoded = DecodeSessionPacket(configuration.session, incoming.message);
+            } catch (const std::invalid_argument &error) {
+                LogDroppedConnection(incoming.source, error.what());
+                continue;
+            }
+        }
         if (!found || decoded.kind == SessionPacketKind::Contact) {
             if (decoded.kind == SessionPacketKind::Acknowledgment) {
-                throw std::invalid_argument("NetworkSession: acknowledgment from a connection outside the roster.");
+                LogDroppedConnection(incoming.source, "it sent an acknowledgment from outside the roster");
+                continue;
             }
             if (strangers.size() < settings.max_incoming_messages) {
+                const bool contact = decoded.kind == SessionPacketKind::Contact;
                 strangers.push_back({incoming.source,
-                    {decoded.sender, decoded.type, std::move(decoded.payload)}});
+                    {decoded.sender, decoded.type, std::move(decoded.payload)}, contact});
             }
             continue;
         }
@@ -342,6 +374,9 @@ bool NetworkSession::ReceiveStranger(StrangerMessage &stranger) {
 }
 
 void NetworkSession::AddPeer(PeerConnection peer) {
+    if (!IsAdmitted()) {
+        throw std::logic_error("NetworkSession::AddPeer called before admission.");
+    }
     const auto connections = pipe->Connections();
     if (peer.peer.value == 0 || peer.peer == configuration.local_peer ||
         std::find(connections.begin(), connections.end(), peer.connection) == connections.end()) {
@@ -377,6 +412,13 @@ bool NetworkSession::SendStranger(ConnectionId connection, MessageType type,
                                   const NetworkMessage &payload) {
     return pipe->Send(connection, EncodeSessionPacket(configuration.session,
         {SessionPacketKind::Contact, configuration.local_peer, 1, type, payload}));
+}
+
+void NetworkSession::LogDroppedConnection(ConnectionId connection, const std::string &reason) {
+    if (dropped_connections.insert(connection.value).second) {
+        std::cerr << "NetworkSession: dropping packets from connection "
+                  << connection.value << " (" << reason << ")\n";
+    }
 }
 
 std::optional<std::size_t> NetworkSession::FindConnection(ConnectionId connection) const {

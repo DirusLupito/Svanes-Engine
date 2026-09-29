@@ -759,7 +759,7 @@ void GooseRollback::UpdateRosterPause(const svanes::FrameContext& frame)
     for (std::size_t index = 0; index < joining.size(); ++index) {
         std::optional<svanes::PeerId> id;
         if (index < open_slots) {
-            if (next_peer_id >= GooseUnassignedPeer.value) {
+            if (next_peer_id == std::numeric_limits<std::uint32_t>::max()) {
                 throw std::overflow_error("Goose peer ids exhausted.");
             }
             id = svanes::PeerId{next_peer_id++};

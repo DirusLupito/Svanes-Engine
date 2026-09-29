@@ -22,9 +22,6 @@ inline constexpr std::uint16_t GooseHostPort = 45000;
 /** The port a joining process listens on unless another is chosen. */
 inline constexpr std::uint16_t GooseJoinPort = 45001;
 
-/** The sender id a joining process uses before it is assigned one. */
-inline constexpr svanes::PeerId GooseUnassignedPeer{0xFFFFFFFF};
-
 /**
  * The identity and address of one member of the world.
  * FIELDS:
@@ -118,12 +115,14 @@ public:
      * Joins a world after admission, connecting to every member it was told about.
      * Loopback addresses in the assignment are resolved against the sponsor's host.
      * The complete world snapshot is then expected from the sponsor.
-     * @param bound_pipe The pipe used during the join handshake.
+     * @param joined_session The session used during the join handshake, admitted
+     * under the assigned id and with no roster yet.
+     * @param joined_pipe The pipe owned by that session.
      * @param sponsor_connection The pipe connection to the member that was contacted.
      * @param assignment The id, revision, and members received from the sponsor.
      */
-    GooseNetwork(std::unique_ptr<svanes::UdpMsgPipe> bound_pipe, svanes::ConnectionId sponsor_connection,
-                 const GooseAssignment& assignment);
+    GooseNetwork(std::unique_ptr<svanes::NetworkSession> joined_session, svanes::UdpMsgPipe& joined_pipe,
+                 svanes::ConnectionId sponsor_connection, const GooseAssignment& assignment);
 
     /**
      * Pumps delivery, reports failures, sorts incoming messages by revision,
@@ -267,9 +266,9 @@ private:
 
 /**
  * Asks one member of an existing world to admit this process. Before admission
- * the process has no id and no session, so requests go out as contact packets
- * on a bare pipe, repeated until the member answers with an assignment or a
- * rejection. Admit() then hands the pipe to a GooseNetwork under the new id.
+ * the process has no id, so its session can only send contact packets. The
+ * request repeats until the member answers with an assignment or a rejection.
+ * Admit() then gives the session its id and hands it to a GooseNetwork.
  */
 class GooseJoin final {
 public:
@@ -297,14 +296,15 @@ public:
     std::string Status() const;
 
     /**
-     * Hands the pipe to a network session under the assigned id.
+     * Admits the session under the assigned id and hands it to a network.
      * @return The joined network, which then expects the world snapshot.
      * @throws std::logic_error if no assignment has arrived.
      */
     std::unique_ptr<GooseNetwork> Admit();
 
 private:
-    std::unique_ptr<svanes::UdpMsgPipe> pipe;
+    svanes::UdpMsgPipe* pipe = nullptr;
+    std::unique_ptr<svanes::NetworkSession> session;
     svanes::UdpAddress entry;
     svanes::ConnectionId entry_connection;
     std::uint64_t rules_hash;

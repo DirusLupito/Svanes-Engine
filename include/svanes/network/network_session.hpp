@@ -9,6 +9,7 @@
 #include <optional>
 #include <set>
 #include <span>
+#include <string>
 #include <vector>
 
 namespace svanes {
@@ -39,6 +40,12 @@ using SessionId = std::uint64_t;
 using MessageType = std::uint16_t;
 
 /**
+ * Message types at or above this value are reserved for engine systems built on
+ * the session. Games use lower values.
+ */
+inline constexpr MessageType FirstEngineMessageType = 0xFF00;
+
+/**
  * Leaves 31 bytes for the header within a 1200-byte session packet.
  * The 1200-byte max is taken from Gaffer to avoid IP fragmentation.
  * More information can be found below:
@@ -63,8 +70,9 @@ struct PeerConnection {
  *
  * FIELDS:
  * - session: The nonzero session id shared by all participants.
- * - local_peer: This process's peer id.
+ * - local_peer: This process's peer id, or zero for a process not yet admitted.
  * - remote_peers: Remote peer-to-connection mappings, excluding the local peer.
+ *   Must be empty for a process not yet admitted.
  */
 struct SessionConfiguration {
     SessionId session;
@@ -113,10 +121,12 @@ struct SessionMessage {
  * FIELDS:
  * - connection: The local transport handle the message arrived on.
  * - message: The claimed sender, game type, and payload.
+ * - contact: Whether it arrived as a contact packet rather than unacknowledged data.
  */
 struct StrangerMessage {
     ConnectionId connection;
     SessionMessage message;
+    bool contact;
 };
 
 /**
@@ -142,7 +152,8 @@ enum class SessionPacketKind : std::uint8_t {
  *
  * FIELDS:
  * - kind: Whether this packet carries data or acknowledges a data message.
- * - sender: The peer sending this packet, including for acknowledgments.
+ * - sender: The peer sending this packet, including for acknowledgments. Zero
+ *   only on contact packets from a process not yet admitted.
  * - message_id: The data message's id, echoed back by its acknowledgment.
  * - type: The game-defined payload type for data, or zero for acknowledgments.
  * - payload: The game bytes for data, or empty for acknowledgments.
@@ -201,7 +212,12 @@ SessionPacket DecodeSessionPacket(SessionId session,
  * with AddPeer(), the next retry is acknowledged and delivered normally. Contact
  * packets, sent with SendStranger(), are always reported by ReceiveStranger(),
  * whether or not their connection is in the roster. Packets carrying a
- * different session id are dropped and logged once per connection.
+ * different session id, and malformed packets or acknowledgments from outside
+ * the roster, are dropped and logged once per connection.
+ *
+ * A process not yet admitted has local peer id zero and no roster. It can only
+ * use SendStranger() and ReceiveStranger(), and its contact packets carry sender
+ * zero. Admit() gives it an id, after which AddPeer() builds its roster.
  *
  * The game defines the payload contents and decides how they affect its world.
  * The caller supplies the initial roster when constructing the session.
@@ -215,16 +231,30 @@ public:
      * @param configuration The session id, local peer, and remote mappings.
      * @param settings The retry intervals and queue limits.
      * @throws std::invalid_argument for a null pipe, invalid/duplicate mappings,
-     * nonpositive limits or intervals, or a timeout shorter than the retry interval.
+     * a roster without a local peer, nonpositive limits or intervals, or a
+     * timeout shorter than the retry interval.
      */
     NetworkSession(std::unique_ptr<MsgPipe> pipe,
                    SessionConfiguration configuration,
                    ReliabilitySettings settings = {});
 
     /**
-     * @return The peer id representing this process.
+     * @return The peer id representing this process, or zero before admission.
      */
     PeerId LocalPeer() const;
+
+    /**
+     * @return Whether this process has a peer id.
+     */
+    bool IsAdmitted() const;
+
+    /**
+     * Gives a process that was not yet admitted its peer id.
+     * @param local_peer The id assigned by the member that admitted it.
+     * @throws std::invalid_argument for a zero id.
+     * @throws std::logic_error if the process already has an id.
+     */
+    void Admit(PeerId local_peer);
 
     /**
      * @return Known remote mappings, including retired routes, borrowed from the session
@@ -240,6 +270,7 @@ public:
      * @param payload The bytes to send, up to MaxSessionPayloadBytes.
      * @return Whether the session accepted the message. Returns false for a failed peer
      * or a full send window. Acceptance does not confirm delivery.
+     * @throws std::logic_error before admission.
      * @throws std::invalid_argument if the destination is outside the roster.
      * @throws std::length_error if the payload is too large.
      * @throws std::overflow_error if this peer's message ids are exhausted.
@@ -254,6 +285,7 @@ public:
      * @param type The game-defined payload type.
      * @param payload The bytes to send, up to MaxSessionPayloadBytes.
      * @return Whether every peer's queue accepted the message. Returns true for an empty roster.
+     * @throws std::logic_error before admission.
      * @throws std::length_error if the payload is too large.
      * @throws std::overflow_error if a peer's message ids are exhausted.
      */
@@ -266,8 +298,8 @@ public:
      * New data is acknowledged only after entering the game-message queue.
      * Expired deliveries mark their peer as failed and queue one failure report.
      * Call each frame, independently of simulation time or pause state.
-     * @throws std::invalid_argument for invalid packets, a roster connection claiming
-     * another sender, or an acknowledgment from outside the roster.
+     * @throws std::invalid_argument for invalid packets from a roster connection, or
+     * a roster connection claiming another sender.
      */
     void Update();
 
@@ -301,6 +333,7 @@ public:
      * a new process now owns that address.
      * @throws std::invalid_argument for a zero or local id, an unknown connection,
      * a peer id already used in this session, or a connection held by an active peer.
+     * @throws std::logic_error before admission.
      */
     void AddPeer(PeerConnection peer);
 
@@ -404,6 +437,13 @@ private:
      */
     void ProcessPacket(std::size_t index, SessionPacket packet);
 
+    /**
+     * Logs the first packet dropped from a connection. Later drops are silent.
+     * @param connection The connection the packet arrived on.
+     * @param reason Why its packets are dropped.
+     */
+    void LogDroppedConnection(ConnectionId connection, const std::string &reason);
+
     std::unique_ptr<MsgPipe> pipe;
     SessionConfiguration configuration;
     ReliabilitySettings settings;
@@ -411,7 +451,7 @@ private:
     std::deque<SessionMessage> incoming_messages;
     std::deque<PeerId> failed_peers;
     std::deque<StrangerMessage> strangers;
-    std::set<std::uint32_t> wrong_session_connections;
+    std::set<std::uint32_t> dropped_connections;
 };
 
 }

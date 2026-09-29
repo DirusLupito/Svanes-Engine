@@ -60,21 +60,22 @@ GooseNetwork::GooseNetwork(std::unique_ptr<svanes::UdpMsgPipe> bound_pipe)
         svanes::SessionConfiguration{GooseSession, {1}, {}});
 }
 
-GooseNetwork::GooseNetwork(std::unique_ptr<svanes::UdpMsgPipe> bound_pipe, svanes::ConnectionId sponsor_connection,
-                           const GooseAssignment& assignment)
-    : pipe(bound_pipe.get()), revision(assignment.revision), awaiting_snapshot(true)
+GooseNetwork::GooseNetwork(std::unique_ptr<svanes::NetworkSession> joined_session, svanes::UdpMsgPipe& joined_pipe,
+                           svanes::ConnectionId sponsor_connection, const GooseAssignment& assignment)
+    : session(std::move(joined_session)), pipe(&joined_pipe), revision(assignment.revision), awaiting_snapshot(true)
 {
-    svanes::SessionConfiguration configuration{GooseSession, assignment.local_peer, {}};
-    configuration.remote_peers.push_back({assignment.sponsor, sponsor_connection});
+    if (session->LocalPeer() != assignment.local_peer) {
+        throw std::logic_error("GooseNetwork requires a session admitted under the assigned id.");
+    }
+    session->AddPeer({assignment.sponsor, sponsor_connection});
     peers = {assignment.local_peer, assignment.sponsor};
     const auto sponsor_host = pipe->RemoteAddress(sponsor_connection).host;
     for (const auto& endpoint : assignment.peers) {
         const auto address = ResolveRelayedAddress(endpoint.address, sponsor_host);
-        configuration.remote_peers.push_back({endpoint.peer, pipe->AddRemote(address.host, address.port)});
+        session->AddPeer({endpoint.peer, pipe->AddRemote(address.host, address.port)});
         peers.push_back(endpoint.peer);
     }
     std::sort(peers.begin(), peers.end(), [](auto a, auto b) { return a.value < b.value; });
-    session = std::make_unique<svanes::NetworkSession>(std::move(bound_pipe), std::move(configuration));
 }
 
 void GooseNetwork::Update()
@@ -316,10 +317,13 @@ std::uint64_t GooseNetwork::Revision() const
 }
 
 GooseJoin::GooseJoin(svanes::UdpAddress entry, std::uint16_t port, std::uint64_t rules_hash)
-    : pipe(std::make_unique<svanes::UdpMsgPipe>(port)), entry(std::move(entry)), rules_hash(rules_hash),
-      started_at(std::chrono::steady_clock::now())
+    : entry(std::move(entry)), rules_hash(rules_hash), started_at(std::chrono::steady_clock::now())
 {
+    auto bound_pipe = std::make_unique<svanes::UdpMsgPipe>(port);
+    pipe = bound_pipe.get();
     entry_connection = pipe->AddRemote(this->entry.host, this->entry.port);
+    session = std::make_unique<svanes::NetworkSession>(std::move(bound_pipe),
+        svanes::SessionConfiguration{GooseSession, {}, {}});
 }
 
 void GooseJoin::Update()
@@ -338,20 +342,17 @@ void GooseJoin::Update()
     if (!last_request || now - *last_request >= kJoinRequestInterval) {
         svanes::MessageWriter writer;
         writer.WriteUint64(rules_hash);
-        static_cast<void>(pipe->Send(entry_connection, svanes::EncodeSessionPacket(GooseSession,
-            {svanes::SessionPacketKind::Contact, GooseUnassignedPeer, 1,
-             static_cast<svanes::MessageType>(GooseMessageType::JoinRequest), writer.Finish()})));
+        static_cast<void>(session->SendStranger(entry_connection,
+            static_cast<svanes::MessageType>(GooseMessageType::JoinRequest), writer.Finish()));
         last_request = now;
     }
-    svanes::ReceivedMessage received;
-    while (!assignment && !HasFailed() && pipe->Receive(received)) {
-        if (received.source != entry_connection) {
+    session->Update();
+    svanes::StrangerMessage stranger;
+    while (!assignment && !HasFailed() && session->ReceiveStranger(stranger)) {
+        if (stranger.connection != entry_connection || !stranger.contact) {
             continue;
         }
-        const auto packet = svanes::DecodeSessionPacket(GooseSession, received.message);
-        if (packet.kind != svanes::SessionPacketKind::Contact) {
-            continue;
-        }
+        const auto& packet = stranger.message;
         svanes::MessageReader reader(packet.payload);
         switch (static_cast<GooseMessageType>(packet.type)) {
         case GooseMessageType::JoinPending:
@@ -398,5 +399,6 @@ std::unique_ptr<GooseNetwork> GooseJoin::Admit()
     if (!assignment) {
         throw std::logic_error("GooseJoin::Admit called before an assignment arrived.");
     }
-    return std::make_unique<GooseNetwork>(std::move(pipe), entry_connection, *assignment);
+    session->Admit(assignment->local_peer);
+    return std::make_unique<GooseNetwork>(std::move(session), *pipe, entry_connection, *assignment);
 }
