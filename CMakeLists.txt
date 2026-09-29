@@ -164,6 +164,7 @@ target_sources(
         src/geometry/circle_geometry.cpp
         src/geometry/convex_polygon_geometry.cpp
         src/collision_system.cpp
+        src/deterministic_math.cpp
         src/tilemaps/tilemap.cpp
         src/collision_pass.cpp
         src/geometry/geometry.cpp
@@ -173,8 +174,15 @@ target_sources(
         src/MenuUtilities/font_manager_internal.hpp
         src/MenuUtilities/text_label_renderer.cpp
         src/MenuUtilities/text_label_renderer.hpp
+        src/network/component_serialization.cpp
         src/network/network_client.cpp
+        src/network/msg_pipe.cpp
+        src/network/message_serialization.cpp
         src/network/network_message.cpp
+        src/network/network_session.cpp
+        src/network/peer_group.cpp
+        src/network/peer_join.hpp
+        src/network/peer_join.cpp
         src/network/network_replication.cpp
         src/network/network_server.cpp
         src/network/server_runtime.cpp
@@ -193,6 +201,7 @@ target_sources(
         src/registry.cpp
         src/sprite_animation_system.cpp
         src/spatial/hgrid2d.cpp
+        src/stable_id.cpp
         src/timeline_system.cpp
         src/utility/hash.cpp
         src/utility/rational_number.cpp
@@ -209,6 +218,7 @@ target_sources(
             include/svanes/geometry/composite_geometry.hpp
             include/svanes/geometry/convex_polygon_geometry.hpp
             include/svanes/collision_system.hpp
+            include/svanes/deterministic_math.hpp
             include/svanes/tilemaps/tilemap.hpp
             include/svanes/collision_pass.hpp
             include/svanes/entity.hpp
@@ -218,9 +228,14 @@ target_sources(
             include/svanes/kinematic_system.hpp
             include/svanes/MenuUtilities/font_manager.hpp
             include/svanes/MenuUtilities/text_label.hpp
+            include/svanes/network/component_serialization.hpp
             include/svanes/network/msg_pipe.hpp
+            include/svanes/network/message_serialization.hpp
             include/svanes/network/network_client.hpp
             include/svanes/network/network_message.hpp
+            include/svanes/network/network_session.hpp
+            include/svanes/network/input_sync.hpp
+            include/svanes/network/peer_group.hpp
             include/svanes/network/network_replication.hpp
             include/svanes/network/network_server.hpp
             include/svanes/network/server_runtime.hpp
@@ -237,6 +252,7 @@ target_sources(
             include/svanes/registry.hpp
             include/svanes/sprite_animation_system.hpp
             include/svanes/spatial/hgrid2d.hpp
+            include/svanes/stable_id.hpp
             include/svanes/timeline_system.hpp
             include/svanes/utility/hash.hpp
             include/svanes/utility/rational_number.hpp
@@ -254,6 +270,7 @@ if(MSVC)
     target_compile_options(svanes_engine PRIVATE /W4 /permissive-)
 else()
     target_compile_options(svanes_engine PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(svanes_engine PUBLIC -ffp-contract=off)
 endif()
 
 add_executable(
@@ -261,12 +278,13 @@ add_executable(
     games/erik-placeholder/main.cpp
     games/erik-placeholder/erik_game.cpp
     games/erik-placeholder/goose.cpp
+    games/erik-placeholder/goose_simulation.cpp
     games/erik-placeholder/enemy.cpp
     games/erik-placeholder/bullets.cpp
 )
 target_link_libraries(svanes_game_erik PRIVATE Svanes::Engine)
 target_compile_definitions(svanes_game_erik PRIVATE
-    ERIK_GAME_ASSETS_DIR="${CMAKE_SOURCE_DIR}/games/erik-placeholder/assets"
+    ERIK_GAME_ASSETS_DIR="assets/erik"
 )
 
 add_executable(
@@ -306,14 +324,14 @@ add_executable(svanes_game_double_time games/doubleTime/main.cpp games/doubleTim
 target_link_libraries(svanes_game_double_time PRIVATE Svanes::Engine)
 target_link_libraries(svanes_game_double_time PRIVATE SDL3_image::SDL3_image)
 target_compile_definitions(svanes_game_double_time PRIVATE
-    DOUBLE_TIME_GAME_ASSETS_DIR="${CMAKE_SOURCE_DIR}/games/doubleTime/assets"
+    DOUBLE_TIME_GAME_ASSETS_DIR="assets/doubleTime"
 )
 
 add_executable(svanes_game_double_time_server games/doubleTime/server_main.cpp)
 target_link_libraries(svanes_game_double_time_server PRIVATE Svanes::Engine)
 target_link_libraries(svanes_game_double_time_server PRIVATE SDL3_image::SDL3_image)
 target_compile_definitions(svanes_game_double_time_server PRIVATE
-    DOUBLE_TIME_GAME_ASSETS_DIR="${CMAKE_SOURCE_DIR}/games/doubleTime/assets"
+    DOUBLE_TIME_GAME_ASSETS_DIR="assets/doubleTime"
 )
 
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT svanes_game_orbital_escalation)
@@ -337,6 +355,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/geometry/composite_geometry.hpp
     include/svanes/geometry/convex_polygon_geometry.hpp
     include/svanes/collision_system.hpp
+    include/svanes/deterministic_math.hpp
     include/svanes/tilemaps/tilemap.hpp
     include/svanes/collision_pass.hpp
     include/svanes/entity.hpp
@@ -346,9 +365,14 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/kinematic_system.hpp
     include/svanes/MenuUtilities/font_manager.hpp
     include/svanes/MenuUtilities/text_label.hpp
+    include/svanes/network/component_serialization.hpp
     include/svanes/network/msg_pipe.hpp
+    include/svanes/network/message_serialization.hpp
     include/svanes/network/network_client.hpp
     include/svanes/network/network_message.hpp
+    include/svanes/network/network_session.hpp
+    include/svanes/network/input_sync.hpp
+    include/svanes/network/peer_group.hpp
     include/svanes/network/network_replication.hpp
     include/svanes/network/network_server.hpp
     include/svanes/network/server_runtime.hpp
@@ -365,6 +389,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/registry.hpp
     include/svanes/sprite_animation_system.hpp
     include/svanes/spatial/hgrid2d.hpp
+    include/svanes/stable_id.hpp
     include/svanes/timeline_system.hpp
     include/svanes/utility/hash.hpp
     include/svanes/utility/rational_number.hpp
@@ -381,6 +406,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/geometry/circle_geometry.cpp
     src/geometry/convex_polygon_geometry.cpp
     src/collision_system.cpp
+    src/deterministic_math.cpp
     src/tilemaps/tilemap.cpp
     src/collision_pass.cpp
     src/geometry/geometry.cpp
@@ -390,8 +416,15 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/MenuUtilities/font_manager_internal.hpp
     src/MenuUtilities/text_label_renderer.cpp
     src/MenuUtilities/text_label_renderer.hpp
+    src/network/component_serialization.cpp
     src/network/network_client.cpp
+    src/network/msg_pipe.cpp
+    src/network/message_serialization.cpp
     src/network/network_message.cpp
+    src/network/network_session.cpp
+    src/network/peer_group.cpp
+    src/network/peer_join.hpp
+    src/network/peer_join.cpp
     src/network/network_replication.cpp
     src/network/network_server.cpp
     src/network/server_runtime.cpp
@@ -410,7 +443,14 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/registry.cpp
     src/sprite_animation_system.cpp
     src/spatial/hgrid2d.cpp
+    src/stable_id.cpp
     src/timeline_system.cpp
     src/utility/hash.cpp
     src/utility/rational_number.cpp
 )
+
+include(cmake/game_packages.cmake)
+svanes_game_package(svanes_game_erik erik erik-placeholder erik)
+svanes_game_package(svanes_game_orbital_escalation orbitalEscalation orbitalEscalation orbitalEscalation)
+svanes_game_package(svanes_game_double_time doubleTime doubleTime doubleTime)
+svanes_game_package(svanes_game_double_time_server doubleTime-server doubleTime doubleTime)

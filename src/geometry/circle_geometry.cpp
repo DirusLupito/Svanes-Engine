@@ -1,5 +1,6 @@
 #include <svanes/geometry/circle_geometry.hpp>
 
+#include <svanes/deterministic_math.hpp>
 #include <svanes/geometry/geometry.hpp>
 
 #include <cmath>
@@ -42,8 +43,8 @@ Circle2D TransformCircle(Circle2D circle, const Transform &transform) {
     // If the circle's local origin is at its center,
     // then rotation does not affect the circle's position in world coordinates.
 
-    const float cosine = std::cos(transform.rotation);
-    const float sine = std::sin(transform.rotation);
+    const float cosine = Cos(transform.rotation);
+    const float sine = Sin(transform.rotation);
 
     const Vector2D center{circle.x, circle.y};
 

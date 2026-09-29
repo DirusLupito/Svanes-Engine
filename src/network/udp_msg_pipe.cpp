@@ -1,57 +1,91 @@
 #include <svanes/network/udp_msg_pipe.hpp>
 
 #include <algorithm>
+#include <charconv>
 #include <stdexcept>
+#include <string_view>
 
 namespace svanes {
 
 UdpMsgPipe::UdpMsgPipe(std::uint16_t local_port)
     // Binds the local port to a dgram socket.
     // dgram is used to enable UDP
-    : socket(context, zmq::socket_type::dgram) {
+    : socket(context, zmq::socket_type::dgram), local_port(local_port) {
+    socket.set(zmq::sockopt::linger, 0);
     socket.bind(MakeUdpEndpoint("*", local_port));
 }
 
 UdpMsgPipe::UdpMsgPipe(std::uint16_t local_port, const std::string &remote_host,
                        std::uint16_t remote_port)
-    : UdpMsgPipe(local_port) { // Calls the other constructor to create the pipe 
-    // Checks to make sure the remote host has a correctly formatted address
-    if (remote_host.find_first_not_of("0123456789.") != std::string::npos) {
-        throw std::invalid_argument("UdpMsgPipe: remote host '" + remote_host +
-                                    "' must be a numeric IPv4 address.");
-    }
-    // Stores the remote peer's address for later use in sending 
-    peers.push_back(remote_host + ":" + std::to_string(remote_port));
+    : UdpMsgPipe(local_port) {
+    AddRemote(remote_host, remote_port);
 }
 
-bool UdpMsgPipe::Send(const NetworkMessage &message) {
-    if (peers.empty()) { // If there are no peers stored, the message cannot be sent
+ConnectionId UdpMsgPipe::AddRemote(const std::string &host, std::uint16_t port) {
+    if (port == 0) {
+        throw std::invalid_argument("UdpMsgPipe: remote port must be nonzero.");
+    }
+    // Normalize each octet so configured and received addresses use the same text.
+    std::string canonical;
+    std::string_view remaining = host;
+    for (std::uint32_t index = 0; index < 4; ++index) {
+        const auto separator = remaining.find('.');
+        const auto part = remaining.substr(0, separator);
+        std::uint32_t octet = 0;
+        const auto parsed = std::from_chars(part.data(), part.data() + part.size(), octet);
+        if (part.empty() || parsed.ec != std::errc{} ||
+            parsed.ptr != part.data() + part.size() || octet > 255 ||
+            (index < 3 && separator == std::string_view::npos) ||
+            (index == 3 && separator != std::string_view::npos)) {
+            throw std::invalid_argument("UdpMsgPipe: expected a numeric IPv4 address: " + host);
+        }
+        if (index != 0) {
+            canonical += '.';
+        }
+        canonical += std::to_string(octet);
+        if (index < 3) {
+            remaining.remove_prefix(separator + 1);
+        }
+    }
+    return RememberConnection(canonical + ":" + std::to_string(port));
+}
+
+UdpAddress UdpMsgPipe::RemoteAddress(ConnectionId connection) const {
+    const std::string_view route = Route(connection);
+    const auto colon = route.rfind(':');
+    std::uint32_t port = 0;
+    if (colon == std::string_view::npos || colon == 0) {
+        throw std::runtime_error("UdpMsgPipe: route has no host and port: " + std::string{route});
+    }
+    const auto text = route.substr(colon + 1);
+    const auto parsed = std::from_chars(text.data(), text.data() + text.size(), port);
+    if (text.empty() || parsed.ec != std::errc{} || parsed.ptr != text.data() + text.size() ||
+        port == 0 || port > 65535) {
+        throw std::runtime_error("UdpMsgPipe: route has an invalid port: " + std::string{route});
+    }
+    return {std::string{route.substr(0, colon)}, static_cast<std::uint16_t>(port)};
+}
+
+std::uint16_t UdpMsgPipe::LocalPort() const { return local_port; }
+
+bool UdpMsgPipe::Send(ConnectionId destination, const NetworkMessage &message) {
+    const auto &route = Route(destination);
+    if (message.bytes.size() > 65507) {
+        throw std::length_error("UdpMsgPipe: payload exceeds the IPv4 UDP datagram limit.");
+    }
+    // ZeroMQ expects the destination address followed by the datagram payload.
+    if (!socket.send(zmq::buffer(route),
+                     zmq::send_flags::sndmore | zmq::send_flags::dontwait)) {
         return false;
     }
-
-    // Loop through all peers for this pipe.
-    // This allows us to broadcast to multiple clients from a server,
-    // or to send to a single peer if the pipe only has one
-    for (const std::string &peer : peers) { 
-        // First send the peer address to specify this messages destination
-        const zmq::send_result_t address_sent =
-            socket.send(zmq::buffer(peer),
-                        zmq::send_flags::sndmore | zmq::send_flags::dontwait);
-        if (!address_sent.has_value()) {
-            continue;
-        }
-        // Then send the actual message content
-        socket.send(zmq::buffer(message.bytes.data(), message.bytes.size()),
-                    zmq::send_flags::none);
+    if (!socket.send(zmq::buffer(message.bytes.data(), message.bytes.size()),
+                     zmq::send_flags::dontwait)) {
+        throw std::runtime_error("UdpMsgPipe: could not complete a datagram send.");
     }
-    // The dgram socket, necessary for UDP transmission, doesn't establish a persistent connection.
-    // As such, the address must be included with every message so that the socket knows where
-    // to send it.
-
     return true;
 }
 
-bool UdpMsgPipe::Receive(NetworkMessage &message) {
+bool UdpMsgPipe::Receive(ReceivedMessage &received) {
     // Check if there is a packet waiting, if not returns false.
     // If there is, pulls the address frame from the socket
     zmq::message_t address;
@@ -66,17 +100,30 @@ bool UdpMsgPipe::Receive(NetworkMessage &message) {
             "UdpMsgPipe: received an address frame without a body frame.");
     }
 
-    // If this is the first message from this address, adds it to the list of peers
-    const std::string peer = address.to_string();
-    if (std::find(peers.begin(), peers.end(), peer) == peers.end()) {
-        peers.push_back(peer);
+    // ZeroMQ includes a terminating null byte that configured addresses lack.
+    std::string route = address.to_string();
+    if (!route.empty() && route.back() == '\0') {
+        route.pop_back();
     }
-
+    received.source = RememberConnection(route);
     // Reads the body into the message reference
     const auto *bytes = body.data<std::byte>();
-    message =
+    received.message =
         NetworkMessage{std::vector<std::byte>(bytes, bytes + body.size())};
     return true;
+}
+
+void WriteAddress(MessageWriter &writer, const UdpAddress &address) {
+    writer.WriteText(address.host);
+    writer.WriteUint16(address.port);
+}
+
+UdpAddress ReadAddress(MessageReader &reader) {
+    UdpAddress address{reader.ReadText(), reader.ReadUint16()};
+    if (address.host.empty() || address.port == 0) {
+        throw std::invalid_argument("ReadAddress: address requires a host and a nonzero port.");
+    }
+    return address;
 }
 
 } // namespace svanes

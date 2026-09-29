@@ -1,3 +1,4 @@
+#include <svanes/deterministic_math.hpp>
 #include <svanes/geometry/composite_geometry.hpp>
 #include <svanes/geometry/geometry.hpp>
 
@@ -7,8 +8,8 @@
 namespace svanes {
 
 Transform ComposeTransforms(const Transform &parent, const Transform &local) {
-    const float cosine = std::cos(parent.rotation);
-    const float sine = std::sin(parent.rotation);
+    const float cosine = Cos(parent.rotation);
+    const float sine = Sin(parent.rotation);
     return {
         parent.x + local.x * cosine - local.y * sine,
         parent.y + local.x * sine + local.y * cosine,

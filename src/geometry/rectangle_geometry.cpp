@@ -1,5 +1,6 @@
 #include <svanes/geometry/rectangle_geometry.hpp>
 
+#include <svanes/deterministic_math.hpp>
 #include <svanes/geometry/geometry.hpp>
 
 #include <algorithm>
@@ -60,8 +61,8 @@ Rectangle2D internal::BoundsFromExtents(double min_x, double min_y,
 
 Rectangle2D TransformRectangle(Rectangle2D rectangle,
                                const Transform &transform) {
-    const float cosine = std::cos(transform.rotation);
-    const float sine = std::sin(transform.rotation);
+    const float cosine = Cos(transform.rotation);
+    const float sine = Sin(transform.rotation);
 
     const Vector2D center{rectangle.x, rectangle.y};
 
@@ -78,8 +79,8 @@ Rectangle2D TransformRectangle(Rectangle2D rectangle,
 
 RectangleGeometry::RectangleGeometry(Rectangle2D rectangle, float rotation)
     : half_width(rectangle.width * 0.5F), half_height(rectangle.height * 0.5F),
-      center_x(rectangle.x), center_y(rectangle.y), cosine(std::cos(rotation)),
-      sine(std::sin(rotation)) {}
+      center_x(rectangle.x), center_y(rectangle.y), cosine(Cos(rotation)),
+      sine(Sin(rotation)) {}
 
 Rectangle2D RectangleGeometry::Bounds() const {
 

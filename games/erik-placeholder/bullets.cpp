@@ -1,6 +1,7 @@
 #include "bullets.hpp"
 
 #include <svanes/collision_system.hpp>
+#include <svanes/deterministic_math.hpp>
 #include <svanes/kinematic_system.hpp>
 #include <svanes/registry.hpp>
 #include <svanes/render/render_system.hpp>
@@ -10,8 +11,6 @@
 #include <vector>
 
 namespace {
-
-constexpr float kBulletSize = 8.0F;
 
 bool IsOutsideBounds(const svanes::Transform& transform, const svanes::Rectangle2D& bounds)
 {
@@ -32,7 +31,7 @@ void SpawnBullet(
     float speed, svanes::Color color
 )
 {
-    const float length = std::hypot(direction.x, direction.y);
+    const float length = svanes::Length(direction.x, direction.y);
     if (!std::isfinite(length) || length <= 0.0F) {
         throw std::invalid_argument("SpawnBullet requires a finite and nonzero direction.");
     }
@@ -45,8 +44,8 @@ void SpawnBullet(
         svanes::PerSecondToPerTic(speed);
 
     const svanes::Rectangle2D body{
-        .width = kBulletSize,
-        .height = kBulletSize,
+        .width = BulletSize,
+        .height = BulletSize,
     };
 
     const svanes::Entity bullet = world.CreateEntity();
@@ -64,57 +63,82 @@ void SpawnBullet(
         .geometry = body,
     });
     world.AddComponent<svanes::Collider2D>(bullet, svanes::Collider2D{body});
-    world.AddComponent<Bullet>(bullet, Bullet{.owner = owner});
+    world.AddComponent<Bullet>(bullet, Bullet{
+        .owner = owner,
+        .owner_id = world.GetComponent<svanes::StableId>(owner).value,
+    });
 }
 
-std::vector<BulletHit> UpdateBullets(svanes::Registry& world, const svanes::Rectangle2D& bounds)
+std::vector<svanes::Entity> OrderedBullets(const svanes::Registry& world)
 {
-    std::vector<svanes::Entity> destroyed;
-    std::vector<BulletHit> hits;
+    return svanes::EntitiesByStableId<Bullet>(world);
+}
 
-    world.ForEach<Bullet, svanes::Transform, svanes::Collider2D, svanes::Kinematic2D>(
-        [&](svanes::Entity entity, Bullet& bullet, svanes::Transform& transform, svanes::Collider2D& collider, svanes::Kinematic2D& motion) {
-            if (IsOutsideBounds(transform, bounds)) {
-                destroyed.push_back(entity);
-                return;
-            }
+std::vector<BulletSnapshot> CaptureBullets(const svanes::Registry& world)
+{
+    std::vector<BulletSnapshot> snapshots;
+    for (const auto entity : OrderedBullets(world)) {
+        snapshots.push_back({world.GetComponent<svanes::StableId>(entity),
+            world.GetComponent<Bullet>(entity),
+            world.GetComponent<svanes::Transform>(entity),
+            world.GetComponent<svanes::Kinematic2D>(entity),
+            world.GetComponent<svanes::Timeline>(entity),
+            world.GetComponent<svanes::SolidShape>(entity),
+            world.GetComponent<svanes::Collider2D>(entity)});
+    }
+    return snapshots;
+}
 
-            bool hit = false;
-
-            world.ForEach<svanes::Transform, svanes::Collider2D>(
-                [&](svanes::Entity other, svanes::Transform& other_transform, svanes::Collider2D& other_collider) {
-                    if (hit || other == entity || other == bullet.owner) {
-                        return;
-                    }
-
-                    if (world.HasComponent<Bullet>(other)) {
-                        return;
-                    }
-
-                    const std::vector<svanes::Collision2D> collisions = svanes::DetectCollisions(
-                        collider.geometry, transform, other_collider.geometry, other_transform
-                    );
-
-                    if (!collisions.empty()) {
-                        hit = true;
-                        hits.push_back(BulletHit{
-                            .target = other,
-                            .owner = bullet.owner,
-                            .direction = {motion.velocity_x, motion.velocity_y},
-                        });
-                    }
-                }
-            );
-
-            if (hit) {
-                destroyed.push_back(entity);
-            }
-        }
-    );
-
-    for (const svanes::Entity entity : destroyed) {
+void RestoreBullets(svanes::Registry& world, const std::vector<BulletSnapshot>& snapshots,
+                    svanes::Entity departed_owner)
+{
+    std::vector<svanes::Entity> live;
+    world.ForEach<Bullet>([&](svanes::Entity entity, const Bullet&) {
+        live.push_back(entity);
+    });
+    for (const auto entity : live) {
         world.DestroyEntity(entity);
     }
+    for (const auto& snapshot : snapshots) {
+        Bullet bullet = snapshot.bullet;
+        bullet.owner = svanes::FindByStableId(world, bullet.owner_id).value_or(departed_owner);
+        const auto entity = world.CreateEntity();
+        world.AddComponent<svanes::StableId>(entity, snapshot.id);
+        world.AddComponent<Bullet>(entity, bullet);
+        world.AddComponent<svanes::Transform>(entity, snapshot.transform);
+        world.AddComponent<svanes::Kinematic2D>(entity, snapshot.motion);
+        world.AddComponent<svanes::Timeline>(entity, snapshot.timeline);
+        world.AddComponent<svanes::SolidShape>(entity, snapshot.shape);
+        world.AddComponent<svanes::Collider2D>(entity, snapshot.collider);
+    }
+}
 
+std::vector<BulletHit> UpdateBullets(svanes::Registry& world, const svanes::Rectangle2D& bounds,
+                                     std::span<const svanes::Entity> targets)
+{
+    std::vector<BulletHit> hits;
+    for (const auto entity : OrderedBullets(world)) {
+        const auto& bullet = world.GetComponent<Bullet>(entity);
+        const auto& transform = world.GetComponent<svanes::Transform>(entity);
+        if (IsOutsideBounds(transform, bounds)) {
+            world.DestroyEntity(entity);
+            continue;
+        }
+        const auto& collider = world.GetComponent<svanes::Collider2D>(entity);
+        const auto& motion = world.GetComponent<svanes::Kinematic2D>(entity);
+        for (const auto other : targets) {
+            if (other == bullet.owner) {
+                continue;
+            }
+            const auto collisions = svanes::DetectCollisions(collider.geometry, transform,
+                world.GetComponent<svanes::Collider2D>(other).geometry,
+                world.GetComponent<svanes::Transform>(other));
+            if (!collisions.empty()) {
+                hits.push_back({other, bullet.owner, {motion.velocity_x, motion.velocity_y}});
+                world.DestroyEntity(entity);
+                break;
+            }
+        }
+    }
     return hits;
 }

@@ -1,5 +1,6 @@
 #include <svanes/geometry/triangle_geometry.hpp>
 
+#include <svanes/deterministic_math.hpp>
 #include <svanes/geometry/geometry.hpp>
 
 #include <algorithm>
@@ -43,8 +44,8 @@ Triangle2D TransformTriangle(Triangle2D triangle, const Transform &transform) {
         !std::isfinite(transform.rotation)) {
         throw std::invalid_argument("Triangles require finite transforms.");
     }
-    const float cosine = std::cos(transform.rotation);
-    const float sine = std::sin(transform.rotation);
+    const float cosine = Cos(transform.rotation);
+    const float sine = Sin(transform.rotation);
     for (Vector2D &vertex : triangle.vertices) {
         const Vector2D local = vertex;
         vertex = {

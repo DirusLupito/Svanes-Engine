@@ -1,5 +1,6 @@
 #include <svanes/geometry/convex_polygon_geometry.hpp>
 
+#include <svanes/deterministic_math.hpp>
 #include <svanes/geometry/geometry.hpp>
 
 #include <algorithm>
@@ -156,8 +157,8 @@ ConvexPolygon2D TransformConvexPolygon(const ConvexPolygon2D &polygon,
                                     "and a finite, positive scale.");
     }
 
-    const float cosine = std::cos(transform.rotation);
-    const float sine = std::sin(transform.rotation);
+    const float cosine = Cos(transform.rotation);
+    const float sine = Sin(transform.rotation);
 
     ConvexPolygon2D result = polygon;
 

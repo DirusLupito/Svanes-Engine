@@ -155,6 +155,27 @@ public:
     TicCount GetDeltaTics() const;
 
     /**
+     * Gets the progress toward the next whole local tic, as a fraction of one
+     * local tic.
+     *
+     * @return The incomplete progress, at least zero and less than one.
+     */
+    RationalNumber GetIncompleteProgress() const;
+
+    /**
+     * Replaces the Timeline's elapsed time, for restoring a saved Timeline.
+     * Parent, tic size, and pause state are set separately.
+     *
+     * @param total The total number of local tics elapsed.
+     * @param delta The whole local tic delta of the most recent advance.
+     * @param incomplete The progress toward the next whole local tic.
+     *
+     * @throws std::invalid_argument if the delta exceeds the total or the
+     * incomplete progress is not less than one.
+     */
+    void SetProgress(TicCount total, TicCount delta, RationalNumber incomplete);
+
+    /**
      * Advances the Timeline by the given number of parent tics, updating the
      * total and delta tics accordingly. If the Timeline is paused, the delta
      * tics will be set to zero and the total tics will remain unchanged. The
