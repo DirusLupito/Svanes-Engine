@@ -175,7 +175,7 @@ target_sources(
         src/MenuUtilities/text_label_renderer.cpp
         src/MenuUtilities/text_label_renderer.hpp
         src/network/component_serialization.cpp
-    src/network/network_client.cpp
+        src/network/network_client.cpp
         src/network/msg_pipe.cpp
         src/network/message_serialization.cpp
         src/network/network_message.cpp
@@ -185,6 +185,7 @@ target_sources(
         src/network/peer_join.cpp
         src/network/network_replication.cpp
         src/network/network_server.cpp
+        src/network/server_runtime.cpp
         src/network/tcp_msg_pipe.cpp
         src/network/udp_msg_pipe.cpp
         src/physics_system.cpp
@@ -199,8 +200,10 @@ target_sources(
         src/render/texture_manager_internal.hpp
         src/registry.cpp
         src/sprite_animation_system.cpp
+        src/spatial/hgrid2d.cpp
         src/stable_id.cpp
         src/timeline_system.cpp
+        src/utility/hash.cpp
         src/utility/rational_number.cpp
     PUBLIC
         FILE_SET HEADERS
@@ -226,7 +229,7 @@ target_sources(
             include/svanes/MenuUtilities/font_manager.hpp
             include/svanes/MenuUtilities/text_label.hpp
             include/svanes/network/component_serialization.hpp
-    include/svanes/network/msg_pipe.hpp
+            include/svanes/network/msg_pipe.hpp
             include/svanes/network/message_serialization.hpp
             include/svanes/network/network_client.hpp
             include/svanes/network/network_message.hpp
@@ -235,6 +238,7 @@ target_sources(
             include/svanes/network/peer_group.hpp
             include/svanes/network/network_replication.hpp
             include/svanes/network/network_server.hpp
+            include/svanes/network/server_runtime.hpp
             include/svanes/network/tcp_msg_pipe.hpp
             include/svanes/network/udp_msg_pipe.hpp
             include/svanes/geometry/primitive_geometry.hpp
@@ -247,8 +251,10 @@ target_sources(
             include/svanes/render/texture_manager.hpp
             include/svanes/registry.hpp
             include/svanes/sprite_animation_system.hpp
+            include/svanes/spatial/hgrid2d.hpp
             include/svanes/stable_id.hpp
             include/svanes/timeline_system.hpp
+            include/svanes/utility/hash.hpp
             include/svanes/utility/rational_number.hpp
             include/svanes/vector2d.hpp
 )
@@ -283,10 +289,36 @@ target_compile_definitions(svanes_game_erik PRIVATE
 
 add_executable(
     svanes_game_orbital_escalation
+    games/orbitalEscalation/serialization/geometry_serialization.cpp
+    games/orbitalEscalation/serialization/geometry_serialization.hpp
+    games/orbitalEscalation/serialization/json.cpp
+    games/orbitalEscalation/serialization/json.hpp
+    games/orbitalEscalation/serialization/ship_serialization.cpp
+    games/orbitalEscalation/serialization/ship_serialization.hpp
     games/orbitalEscalation/main.cpp
     games/orbitalEscalation/orbital_escalation_game.cpp
+    games/orbitalEscalation/game_objects/dynamic_object/dynamic_object.cpp
+    games/orbitalEscalation/game_objects/dynamic_object/dynamic_object.hpp
+    games/orbitalEscalation/game_objects/dynamic_object/ship.cpp
+    games/orbitalEscalation/game_objects/dynamic_object/ship.hpp
+    games/orbitalEscalation/game_objects/planet.cpp
+    games/orbitalEscalation/game_objects/planet.hpp
+    games/orbitalEscalation/controls.cpp
+    games/orbitalEscalation/controls.hpp
+    games/orbitalEscalation/game_objects/visuals.cpp
+    games/orbitalEscalation/game_objects/visuals.hpp
 )
-target_link_libraries(svanes_game_orbital_escalation PRIVATE Svanes::Engine)
+FetchContent_Declare(
+    nlohmann_json
+    URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz
+    URL_HASH SHA256=42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    SOURCE_DIR "${CMAKE_SOURCE_DIR}/thirdparty/nlohmann_json-src"
+)
+FetchContent_MakeAvailable(nlohmann_json)
+target_link_libraries(svanes_game_orbital_escalation PRIVATE
+    Svanes::Engine nlohmann_json::nlohmann_json
+)
 
 add_executable(svanes_game_double_time games/doubleTime/main.cpp games/doubleTime/chris_game.cpp)
 target_link_libraries(svanes_game_double_time PRIVATE Svanes::Engine)
@@ -343,6 +375,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/network/peer_group.hpp
     include/svanes/network/network_replication.hpp
     include/svanes/network/network_server.hpp
+    include/svanes/network/server_runtime.hpp
     include/svanes/network/tcp_msg_pipe.hpp
     include/svanes/network/udp_msg_pipe.hpp
     include/svanes/geometry/primitive_geometry.hpp
@@ -355,8 +388,10 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/render/texture_manager.hpp
     include/svanes/registry.hpp
     include/svanes/sprite_animation_system.hpp
+    include/svanes/spatial/hgrid2d.hpp
     include/svanes/stable_id.hpp
     include/svanes/timeline_system.hpp
+    include/svanes/utility/hash.hpp
     include/svanes/utility/rational_number.hpp
     include/svanes/vector2d.hpp
 )
@@ -392,6 +427,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/network/peer_join.cpp
     src/network/network_replication.cpp
     src/network/network_server.cpp
+    src/network/server_runtime.cpp
     src/network/tcp_msg_pipe.cpp
     src/network/udp_msg_pipe.cpp
     src/physics_system.cpp
@@ -406,8 +442,10 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/render/texture_manager_internal.hpp
     src/registry.cpp
     src/sprite_animation_system.cpp
+    src/spatial/hgrid2d.cpp
     src/stable_id.cpp
     src/timeline_system.cpp
+    src/utility/hash.cpp
     src/utility/rational_number.cpp
 )
 

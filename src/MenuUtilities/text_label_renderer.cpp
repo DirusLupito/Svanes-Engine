@@ -79,7 +79,7 @@ void TextLabelRenderer::Submit(const Registry &world, RenderQueue &queue,
     // world. But for now, this is how we catch any newly added text labels or
     // labels with changed text, font, or color.
     world.ForEach<TextLabel>([&](Entity entity, const TextLabel &label) {
-        if (!label.visible || label.text.empty()) {
+        if (!label.visible || label.text.empty() || label.font.id == 0) {
             return;
         }
 

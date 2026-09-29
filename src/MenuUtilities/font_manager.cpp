@@ -55,8 +55,8 @@ FontHandle FontManager::LoadFont(std::string_view path, float size_points) {
     const std::string path_string{path};
     FontPointer font{TTF_OpenFont(path_string.c_str(), size_points)};
     if (font == nullptr) {
-        throw std::runtime_error("Could not load font '" + path_string +
-                                 "': " + SDL_GetError());
+        SDL_Log("Could not load font: %s", SDL_GetError());
+        return {};
     }
 
     const FontHandle handle{next_id};

@@ -89,12 +89,11 @@ public:
      * @param size_points The size of the font in points. Must be finite and
      * positive.
      *
-     * @return A FontHandle that can be used to reference the loaded font.
+     * @return A FontHandle, or an empty handle if the font cannot be loaded.
      *
      * @throws std::invalid_argument if the path is empty or contains null
      * characters, or if size_points is not finite or not positive.
-     * @throws std::runtime_error if the font cannot be loaded or if the font
-     * handle space is exhausted.
+     * @throws std::runtime_error if the font handle space is exhausted.
      */
     FontHandle LoadFont(std::string_view path, float size_points);
 

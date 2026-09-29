@@ -28,6 +28,7 @@ $thirdparty = [ordered] @{
     'FreeType' = Join-Path $repoRoot 'thirdparty\freetype-src'
     'SDL3_mixer' = Join-Path $repoRoot 'thirdparty\sdl3_mixer-src'
     'ZeroMQ' = Join-Path $repoRoot 'thirdparty\zeromq-src'
+    'nlohmann/json (Orbital Escalation)' = Join-Path $repoRoot 'thirdparty\nlohmann_json-src'
     'cppzmq' = Join-Path $repoRoot 'thirdparty\cppzmq-src'
 }
 

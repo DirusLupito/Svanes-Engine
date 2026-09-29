@@ -28,11 +28,26 @@ the solution matching the Visual Studio version selected by the build scripts:
 - **Visual Studio 2026:** `out/build/windows-msvc/SvanesEngine.slnx`
 - **Visual Studio 2022:** `out/build/windows-vs2022/SvanesEngine.slnx`
 
-Regardless of whether or not you use Visual Studio, you can launch the games from the command line:
+Regardless of whether or not you use Visual Studio, you can build and launch optimized Release versions of the games from the command line:
 
 ```sh
 just run
 just run erik
 just run orbitalEscalation
 just run doubleTime
+just run doubleTime-server
 ```
+
+Use `just debug` instead to build and launch a Debug version:
+
+```sh
+just debug
+just debug erik
+just debug orbitalEscalation
+just debug doubleTime
+just debug doubleTime-server
+```
+
+Both commands accept the same game targets and default to Orbital Escalation.
+To build without launching, use `just release [target]` for Release or
+`just build [target]` for Debug. Omit the target to build all games.

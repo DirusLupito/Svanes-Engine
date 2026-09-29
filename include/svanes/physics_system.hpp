@@ -54,11 +54,15 @@ struct PhysicsTimeStep {
  * time deltas. The span is valid only during the post-physics update. If the
  * game destroys an entity, its entry remains in the span, so check the
  * registry before accessing that entity's components.
+ * - parallel_for: The engine owned parfor driver which can be used to
+ * parallelize any work the game may wish to do in response to the completed
+ * step.
  */
 struct PhysicsContext {
     Registry &world;
     const InputManager &input;
     std::span<const PhysicsTimeStep> entity_steps;
+    AsyncParallelForDriver &parallel_for;
 };
 
 /**

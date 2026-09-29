@@ -1,0 +1,209 @@
+{
+    "max_acceleration": 1000.0,
+    "max_angular_acceleration": 10.0,
+    "collider": "visuals",
+    "visuals": [
+        {
+            "geometry": {
+                "type": "triangle",
+                "vertices": [
+                    [
+                        -26,
+                        220
+                    ],
+                    [
+                        -42,
+                        288
+                    ],
+                    [
+                        -10,
+                        288
+                    ]
+                ]
+            },
+            "color": [
+                34,
+                177,
+                76,
+                255
+            ],
+            "z_order": 0
+        },
+        {
+            "geometry": {
+                "type": "triangle",
+                "vertices": [
+                    [
+                        26,
+                        220
+                    ],
+                    [
+                        10,
+                        288
+                    ],
+                    [
+                        42,
+                        288
+                    ]
+                ]
+            },
+            "color": [
+                34,
+                177,
+                76,
+                255
+            ],
+            "z_order": 0
+        },
+        {
+            "geometry": {
+                "type": "triangle",
+                "vertices": [
+                    [
+                        -122,
+                        230
+                    ],
+                    [
+                        -140,
+                        266
+                    ],
+                    [
+                        -110,
+                        248
+                    ]
+                ]
+            },
+            "color": [
+                34,
+                177,
+                76,
+                255
+            ],
+            "z_order": 0
+        },
+        {
+            "geometry": {
+                "type": "triangle",
+                "vertices": [
+                    [
+                        122,
+                        230
+                    ],
+                    [
+                        110,
+                        248
+                    ],
+                    [
+                        140,
+                        266
+                    ]
+                ]
+            },
+            "color": [
+                34,
+                177,
+                76,
+                255
+            ],
+            "z_order": 0
+        },
+        {
+            "geometry": {
+                "type": "rectangle",
+                "center": [
+                    0,
+                    98
+                ],
+                "size": [
+                    80,
+                    324
+                ]
+            },
+            "color": [
+                24,
+                27,
+                36,
+                255
+            ],
+            "z_order": 2
+        },
+        {
+            "geometry": {
+                "type": "triangle",
+                "vertices": [
+                    [
+                        0,
+                        -300
+                    ],
+                    [
+                        -40,
+                        -64
+                    ],
+                    [
+                        40,
+                        -64
+                    ]
+                ]
+            },
+            "color": [
+                136,
+                0,
+                27,
+                255
+            ],
+            "z_order": 1
+        },
+        {
+            "geometry": {
+                "type": "triangle",
+                "vertices": [
+                    [
+                        -38,
+                        8
+                    ],
+                    [
+                        -38,
+                        120
+                    ],
+                    [
+                        -150,
+                        280
+                    ]
+                ]
+            },
+            "color": [
+                0,
+                174,
+                220,
+                255
+            ],
+            "z_order": 1
+        },
+        {
+            "geometry": {
+                "type": "triangle",
+                "vertices": [
+                    [
+                        38,
+                        8
+                    ],
+                    [
+                        150,
+                        280
+                    ],
+                    [
+                        38,
+                        120
+                    ]
+                ]
+            },
+            "color": [
+                0,
+                174,
+                220,
+                255
+            ],
+            "z_order": 1
+        }
+    ]
+}
