@@ -3,11 +3,12 @@
 #include "goose_network.hpp"
 #include "goose_simulation.hpp"
 
-#include <chrono>
+#include <svanes/network/peer_group.hpp>
+
 #include <map>
 #include <optional>
+#include <span>
 #include <string>
-#include <string_view>
 #include <vector>
 
 /** The most players a world admits. */
@@ -31,43 +32,34 @@ inline constexpr std::size_t GooseMaxPlayers = 8;
  * Every 100 ticks, peers compare hashes of the same confirmed world boundary.
  * A disagreement stops simulation with the peer and tick in the status message.
  *
- * Players join and leave at coordinated roster boundaries. Any member can be
- * contacted by a joining process. It queues the request, pauses the world with
- * everyone else, and at the agreed boundary every member assigns the same new
- * ids and spawns the new geese. The contacted member then sends the joiner its
- * id, the members' addresses, and the world snapshot. Existing members resume
- * immediately, predicting the joiner's input until its first inputs arrive.
+ * Players join and leave through the network's roster changes. As the network's
+ * participant, the rollback freezes local input, finishes with neutral input up
+ * to the agreed tick, and adds or removes geese when every member agrees.
+ * Existing members resume immediately, predicting a joiner's input until its
+ * first inputs arrive.
  */
-class GooseRollback final {
+class GooseRollback final : public svanes::RosterParticipant {
 public:
     /**
-     * Runs a world whose simulation already holds the network's roster.
-     * @param simulation The gameplay simulation with one goose per member.
-     * @param network The session with the same player ordering.
-     * @throws std::invalid_argument if the simulation and network rosters differ.
+     * Attaches to the network as its roster participant. A world this process
+     * started already holds the local goose. A world this process is joining
+     * starts empty and is loaded when the snapshot arrives.
+     * @param simulation The gameplay simulation.
+     * @param network The members of the world.
+     * @throws std::invalid_argument if a running world's simulation and network
+     * rosters differ.
      */
-    GooseRollback(GooseSimulation& simulation, GooseNetwork& network);
+    GooseRollback(GooseSimulation& simulation, svanes::PeerGroup& network);
 
     /**
-     * Rebuilds a joined world from a sponsor's snapshot and verifies it.
-     * @param simulation An initialized simulation with no players.
-     * @param network The joined network, whose roster the snapshot must match.
-     * @param world The registry the players are spawned in.
-     * @param snapshot The complete snapshot from GooseNetwork::TakeSnapshot().
-     * @throws std::invalid_argument for malformed data.
-     * @throws std::runtime_error if the rebuilt world or roster differs from the sponsor's.
-     */
-    GooseRollback(GooseSimulation& simulation, GooseNetwork& network, svanes::Registry& world,
-                  const svanes::NetworkMessage& snapshot);
-
-    /**
-     * @return A hash of the fixed rules that joining processes must share.
+     * @return A hash of the game's fixed rules that joining processes must share.
      */
     static std::uint64_t RulesHash();
 
     /**
-     * Receives inputs, corrects predictions, and advances due simulation ticks.
-     * Call after GooseNetwork::Update() on every rendered frame.
+     * Updates the network, then receives inputs, corrects predictions, and
+     * advances due simulation ticks. Call on every rendered frame in place of
+     * svanes::PeerGroup::Update().
      * @param frame The world, local input, gravity, and elapsed real time.
      * @throws std::invalid_argument for malformed or unexpected game messages.
      */
@@ -93,6 +85,40 @@ public:
 
     /** @return Whether the window can close after final deliveries, or after a failed session. */
     bool CanClose() const;
+
+    /**
+     * Stops local input and discards pending real time.
+     * @return The current tick.
+     */
+    std::uint64_t Freeze() override;
+
+    /**
+     * Receives inputs, corrects predictions, and advances with neutral local
+     * input toward the boundary.
+     * @param boundary The agreed tick.
+     * @return Whether the simulation is at the boundary with every input through it confirmed.
+     */
+    bool SettleAt(std::uint64_t boundary) override;
+
+    /** @return The encoded current world. */
+    svanes::NetworkMessage SaveWorld() override;
+
+    /**
+     * Removes departing geese, spawns joining ones, and restarts input tracking.
+     * @param departing The members that left.
+     * @param joining The members that joined, in ascending order.
+     */
+    void ChangeRoster(std::span<const svanes::PeerId> departing,
+                      std::span<const svanes::PeerId> joining) override;
+
+    /**
+     * Spawns the roster's geese and restores the received world.
+     * @param roster Every member, in ascending order.
+     * @param world Bytes written by SaveWorld().
+     * @throws std::invalid_argument for malformed data.
+     */
+    void LoadWorld(std::span<const svanes::PeerId> roster,
+                   std::span<const std::byte> world) override;
 
 
 private:
@@ -204,6 +230,12 @@ private:
     GooseIntent TakeLocalInput();
 
     /**
+     * Restores the earliest mispredicted tick and replays to the current tick.
+     * @param frame The world and gravity used for replay.
+     */
+    void ApplyCorrection(const svanes::FrameContext& frame);
+
+    /**
      * Saves the current boundary and advances one tick using actual or predicted inputs.
      * @param frame The world and gravity used for the step.
      */
@@ -220,122 +252,16 @@ private:
 
 
     /**
-     * Records a peer's frozen input boundary and the roster changes it brings.
-     * FIELDS:
-     * - tick: The first tick for which that peer has not generated input.
-     * - leaving: Whether that peer is departing in this revision.
-     * - joining: Addresses of the processes that peer is admitting, in request order.
-     */
-    struct StopRecord {
-        std::uint64_t tick;
-        bool leaving;
-        std::vector<svanes::UdpAddress> joining;
-        bool operator==(const StopRecord&) const = default;
-    };
-
-    /**
-     * A process asking this member to admit it.
-     * FIELDS:
-     * - connection: The pipe connection its requests arrive on.
-     * - address: The host and port it listens on.
-     */
-    struct JoinCandidate {
-        svanes::ConnectionId connection;
-        svanes::UdpAddress address;
-    };
-
-    /**
-     * An assignment kept so a lost reply can be repeated.
-     * FIELDS:
-     * - payload: The JoinAssigned message.
-     * - sent_at: When the joiner was admitted.
-     */
-    struct SentAssignment {
-        svanes::NetworkMessage payload;
-        std::chrono::steady_clock::time_point sent_at;
-    };
-
-    /**
-     * Confirms the shared world and roster change at a pause boundary.
-     * FIELDS:
-     * - tick: The agreed boundary after all final inputs.
-     * - world_hash: The confirmed world before removing players.
-     * - roster_hash: The ordered stop records, roster revision, and next peer id.
-     */
-    struct PreparedRecord {
-        std::uint64_t tick;
-        std::uint64_t world_hash;
-        std::uint64_t roster_hash;
-        bool operator==(const PreparedRecord&) const = default;
-    };
-
-    /**
-     * Collects a roster change without choosing an authoritative peer.
-     * FIELDS:
-     * - local_stop: The frozen local boundary, departure choice, and admitted addresses.
-     * - sponsored: The processes this member is admitting in this revision.
-     * - stops: Each peer's announced boundary, keyed by peer id.
-     * - prepared: Each peer's agreement on the final world and departure set.
-     * - stop_sent: Whether transport accepted the local stop announcement.
-     * - started_at: Real-time start used to report a stalled change.
-     */
-    struct RosterPause {
-        StopRecord local_stop;
-        std::vector<JoinCandidate> sponsored;
-        std::map<std::uint32_t, StopRecord> stops;
-        std::map<std::uint32_t, PreparedRecord> prepared;
-        bool stop_sent = false;
-        std::chrono::steady_clock::time_point started_at;
-    };
-
-    /** Freezes local input generation and records the departure choice and queued joins. */
-    void BeginRosterPause();
-
-    /** Answers join requests and queues acceptable ones for the next roster change. */
-    void HandleJoinRequests();
-
-    /**
-     * Refuses a join request.
-     * @param connection The requesting process.
-     * @param reason The explanation shown to that player.
-     */
-    void RejectJoin(svanes::ConnectionId connection, std::string_view reason);
-
-    /**
-     * Encodes the current boundary for a joiner: roster, next id, world, and hash.
-     * @param world The registry holding the world.
-     * @return The complete snapshot message.
-     */
-    svanes::NetworkMessage EncodeJoinSnapshot(const svanes::Registry& world) const;
-
-    /**
      * Rebuilds per-player input tracking for the network's roster at the current tick,
      * discarding history, corrections, and pending hash checkpoints.
      */
     void ResetPlayers();
 
-    /**
-     * Records a stop or prepared message, allowing either to arrive first.
-     * @param message The current revision's roster-control message.
-     */
-    void ReceiveRosterMessage(const svanes::SessionMessage& message);
-
-    /**
-     * Catches up to the shared boundary, verifies agreement, and adopts departures.
-     * @param frame The world and physics context used for catch-up steps.
-     */
-    void UpdateRosterPause(const svanes::FrameContext& frame);
-
-    std::optional<RosterPause> roster_pause;
-    std::vector<JoinCandidate> join_requests;
-    std::map<std::uint32_t, SentAssignment> assignments;
-    std::uint32_t next_peer_id = 2;
-    bool leave_requested = false;
-    bool departed = false;
     bool force_close = false;
+    const svanes::FrameContext* current_frame = nullptr;
 
     GooseSimulation& simulation;
-    GooseNetwork& network;
+    svanes::PeerGroup& network;
     std::vector<PlayerInputs> players;
     std::size_t local_index = 0;
     std::map<std::uint64_t, TickRecord> history;

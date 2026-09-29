@@ -180,6 +180,9 @@ target_sources(
         src/network/message_serialization.cpp
         src/network/network_message.cpp
         src/network/network_session.cpp
+        src/network/peer_group.cpp
+        src/network/peer_join.hpp
+        src/network/peer_join.cpp
         src/network/network_replication.cpp
         src/network/network_server.cpp
         src/network/tcp_msg_pipe.cpp
@@ -228,6 +231,7 @@ target_sources(
             include/svanes/network/network_client.hpp
             include/svanes/network/network_message.hpp
             include/svanes/network/network_session.hpp
+            include/svanes/network/peer_group.hpp
             include/svanes/network/network_replication.hpp
             include/svanes/network/network_server.hpp
             include/svanes/network/tcp_msg_pipe.hpp
@@ -268,7 +272,6 @@ add_executable(
     games/erik-placeholder/erik_game.cpp
     games/erik-placeholder/goose.cpp
     games/erik-placeholder/goose_simulation.cpp
-    games/erik-placeholder/goose_network.cpp
     games/erik-placeholder/goose_rollback.cpp
     games/erik-placeholder/enemy.cpp
     games/erik-placeholder/bullets.cpp
@@ -336,6 +339,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/network/network_client.hpp
     include/svanes/network/network_message.hpp
     include/svanes/network/network_session.hpp
+    include/svanes/network/peer_group.hpp
     include/svanes/network/network_replication.hpp
     include/svanes/network/network_server.hpp
     include/svanes/network/tcp_msg_pipe.hpp
@@ -382,6 +386,9 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/network/message_serialization.cpp
     src/network/network_message.cpp
     src/network/network_session.cpp
+    src/network/peer_group.cpp
+    src/network/peer_join.hpp
+    src/network/peer_join.cpp
     src/network/network_replication.cpp
     src/network/network_server.cpp
     src/network/tcp_msg_pipe.cpp

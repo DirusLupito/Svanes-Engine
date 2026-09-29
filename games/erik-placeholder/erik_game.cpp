@@ -176,11 +176,14 @@ void ErikGame::Initialize(svanes::GameContext& context)
 
     simulation = std::make_unique<GooseSimulation>();
     simulation->Initialize(context);
+    const svanes::PeerSettings settings{GooseSession, GooseMaxPlayers, GooseRollback::RulesHash()};
+    auto pipe = std::make_unique<svanes::UdpMsgPipe>(port);
     if (join_address) {
-        join = std::make_unique<GooseJoin>(*join_address, port, GooseRollback::RulesHash());
+        network = std::make_unique<svanes::PeerGroup>(std::move(pipe), *join_address, settings);
+        rollback = std::make_unique<GooseRollback>(*simulation, *network);
         return;
     }
-    network = std::make_unique<GooseNetwork>(std::make_unique<svanes::UdpMsgPipe>(port));
+    network = std::make_unique<svanes::PeerGroup>(std::move(pipe), settings);
     simulation->AddPlayer(context.world, network->LocalPeer());
     rollback = std::make_unique<GooseRollback>(*simulation, *network);
     std::cout << "Started a new world. Others can join on port " << network->Port() << ".\n";
@@ -189,11 +192,7 @@ void ErikGame::Initialize(svanes::GameContext& context)
 void ErikGame::Update(const svanes::FrameContext& frame)
 {
     if (frame.input.WasPressed(svanes::Key::Escape)) {
-        if (rollback) {
-            rollback->RequestLeave();
-        } else {
-            should_quit = true;
-        }
+        rollback->RequestLeave();
     }
 
     // TASK 6, scaling: Tab switches the camera between the two scale modes.
@@ -206,12 +205,17 @@ void ErikGame::Update(const svanes::FrameContext& frame)
             : svanes::ScaleMode::Constant;
     }
 
-    if (!rollback) {
-        UpdateJoining(frame);
+    const bool was_running = network->IsRunning();
+    rollback->Update(frame);
+    should_quit = should_quit || rollback->CanClose();
+    if (!was_running && network->IsRunning()) {
+        std::cout << "Joined at tick " << simulation->Tick() << " with "
+            << network->Peers().size() << " player(s). Others can join on port " << network->Port() << ".\n";
+    }
+    if (!network->IsRunning()) {
+        ReportStatus(rollback->Status());
         return;
     }
-    network->Update();
-    rollback->Update(frame);
     ReportStatus("Peer " + std::to_string(network->LocalPeer().value) + ": " + rollback->Status());
     network_diagnostic_tics += std::min(frame.real_delta_tics,
         svanes::TicsPerSecond - network_diagnostic_tics);
@@ -220,31 +224,7 @@ void ErikGame::Update(const svanes::FrameContext& frame)
             << rollback->Diagnostics() << '\n';
         network_diagnostic_tics = 0;
     }
-    should_quit = should_quit || rollback->CanClose();
-    if (!rollback->HasDeparted()) {
-        UpdateCamera(frame, simulation->PlayerEntity(network->LocalPeer()));
-    }
-}
-
-void ErikGame::UpdateJoining(const svanes::FrameContext& frame)
-{
-    if (join) {
-        join->Update();
-        ReportStatus(join->Status());
-        if (join->IsAssigned()) {
-            network = join->Admit();
-            join.reset();
-        }
-        return;
-    }
-    network->Update();
-    ReportStatus("Peer " + std::to_string(network->LocalPeer().value) + ": " +
-        (network->HasFailed() ? network->Status() : "Receiving the world."));
-    if (auto snapshot = network->TakeSnapshot()) {
-        rollback = std::make_unique<GooseRollback>(*simulation, *network, frame.world, *snapshot);
-        std::cout << "Joined at tick " << simulation->Tick() << " with "
-            << network->Peers().size() << " player(s). Others can join on port " << network->Port() << ".\n";
-    }
+    UpdateCamera(frame, simulation->PlayerEntity(network->LocalPeer()));
 }
 
 void ErikGame::ReportStatus(const std::string& status)

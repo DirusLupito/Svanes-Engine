@@ -99,15 +99,16 @@ Game-side wiring, roughly:
 
 ```cpp
 auto pipe = std::make_unique<svanes::UdpMsgPipe>(port);
-peers = join_address ? svanes::PeerGroup::Join(std::move(pipe), *join_address, settings)
-                     : svanes::PeerGroup::Start(std::move(pipe), settings);
+peers = join_address ? std::make_unique<svanes::PeerGroup>(std::move(pipe), *join_address, settings)
+                     : std::make_unique<svanes::PeerGroup>(std::move(pipe), settings);
 sync = std::make_unique<svanes::InputSync<GooseIntent, GooseIntentUse>>(*peers, *simulation, sync_settings);
-// each frame: sync->Update(frame);
+// each frame: sync->Update(frame);  (it calls peers->Update(), and PeerGroup
+// calls back into it as the attached RosterParticipant)
 ```
 
 **Admission policy** (optional). Extra reasons to refuse a join, such as "match in
 progress". The engine already handles version mismatch, full world, and a
-leaving contact. The goose game doesn't need one.
+leaving contact. Deferred until a game needs one.
 
 **Rules hash.** The game describes what must match between builds (gravity, step
 size). The engine adds its own settings and checks the result when someone joins.

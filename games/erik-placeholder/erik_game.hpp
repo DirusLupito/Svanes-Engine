@@ -49,12 +49,6 @@ private:
     void UpdateCamera(const svanes::FrameContext& frame, svanes::Entity player);
 
     /**
-     * Advances the join handshake and, once admitted, waits for the world snapshot.
-     * @param frame The current frame, whose world receives the joined players.
-     */
-    void UpdateJoining(const svanes::FrameContext& frame);
-
-    /**
      * Prints a status line when it differs from the last one printed.
      * @param status The current status.
      */
@@ -62,8 +56,7 @@ private:
 
     std::uint16_t port;
     std::optional<svanes::UdpAddress> join_address;
-    std::unique_ptr<GooseJoin> join;
-    std::unique_ptr<GooseNetwork> network;
+    std::unique_ptr<svanes::PeerGroup> network;
     std::unique_ptr<GooseSimulation> simulation;
     std::unique_ptr<GooseRollback> rollback;
     std::string last_network_status;
