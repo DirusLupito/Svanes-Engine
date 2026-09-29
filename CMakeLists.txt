@@ -271,6 +271,10 @@ target_compile_definitions(svanes_game_erik PRIVATE
 
 add_executable(
     svanes_game_orbital_escalation
+    games/orbitalEscalation/serialization/json.cpp
+    games/orbitalEscalation/serialization/json.hpp
+    games/orbitalEscalation/serialization/ship_serialization.cpp
+    games/orbitalEscalation/serialization/ship_serialization.hpp
     games/orbitalEscalation/main.cpp
     games/orbitalEscalation/orbital_escalation_game.cpp
     games/orbitalEscalation/game_objects/dynamic_object/dynamic_object.cpp
@@ -284,7 +288,17 @@ add_executable(
     games/orbitalEscalation/game_objects/visuals.cpp
     games/orbitalEscalation/game_objects/visuals.hpp
 )
-target_link_libraries(svanes_game_orbital_escalation PRIVATE Svanes::Engine)
+FetchContent_Declare(
+    nlohmann_json
+    URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz
+    URL_HASH SHA256=42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    SOURCE_DIR "${CMAKE_SOURCE_DIR}/thirdparty/nlohmann_json-src"
+)
+FetchContent_MakeAvailable(nlohmann_json)
+target_link_libraries(svanes_game_orbital_escalation PRIVATE
+    Svanes::Engine nlohmann_json::nlohmann_json
+)
 
 add_executable(svanes_game_double_time games/doubleTime/main.cpp games/doubleTime/chris_game.cpp)
 target_link_libraries(svanes_game_double_time PRIVATE Svanes::Engine)

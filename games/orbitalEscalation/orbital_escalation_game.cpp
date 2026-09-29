@@ -1,5 +1,6 @@
 #include "orbital_escalation_game.hpp"
 #include "controls.hpp"
+#include "serialization/ship_serialization.hpp"
 
 #include <svanes/MenuUtilities/text_label.hpp>
 #include <svanes/camera2d.hpp>
@@ -8,7 +9,6 @@
 #include <svanes/kinematic_system.hpp>
 #include <svanes/registry.hpp>
 #include <svanes/render/render_system.hpp>
-#include <svanes/render/texture_manager.hpp>
 #include <svanes/timeline_system.hpp>
 
 #include <algorithm>
@@ -17,57 +17,9 @@
 #include <cstdint>
 #include <numbers>
 
-constexpr std::int32_t kSquarePixels = 300;
 constexpr float kPlanetRadius = 4200.0F;
 const svanes::TicCount kPauseFlashPeriod = svanes::SecondsToTics(1.0);
 constexpr std::uint8_t kPauseLabelMinimumAlpha = 64;
-
-/**
- * Creates a gradient image of size kSquarePixels x kSquarePixels, where the
- * color transitions from a light color in the top-left corner to a dark color
- * in the bottom-right corner
- *
- * @return An ImageData object containing the generated gradient image.
- */
-static svanes::ImageData CreateGradientImage() {
-    svanes::ImageData image{
-        .width = kSquarePixels,
-        .height = kSquarePixels,
-        .rgba_pixels = std::vector<std::uint8_t>(
-            static_cast<std::size_t>(kSquarePixels) * kSquarePixels * 4),
-    };
-
-    constexpr float start_r = 0xF0;
-    constexpr float start_g = 0xF0;
-    constexpr float start_b = 0xF0;
-    constexpr float end_r = 0x00;
-    constexpr float end_g = 0x00;
-    constexpr float end_b = 0xFE;
-
-    // We just linearly interpolate the color from the top-left corner to
-    // the bottom-right corner of the square.
-
-    for (std::int32_t y = 0; y < kSquarePixels; ++y) {
-        for (std::int32_t x = 0; x < kSquarePixels; ++x) {
-            // Measure distance with the 1-norm.
-            // Then we normalize it to the range [0, 1]
-            // so it can be used as a lerp parameter.
-            const float t =
-                static_cast<float>(x + y) / (2.0F * (kSquarePixels - 1));
-            const std::size_t offset =
-                (static_cast<std::size_t>(y) * kSquarePixels + x) * 4;
-            image.rgba_pixels[offset + 0] =
-                static_cast<std::uint8_t>(std::lerp(start_r, end_r, t));
-            image.rgba_pixels[offset + 1] =
-                static_cast<std::uint8_t>(std::lerp(start_g, end_g, t));
-            image.rgba_pixels[offset + 2] =
-                static_cast<std::uint8_t>(std::lerp(start_b, end_b, t));
-            image.rgba_pixels[offset + 3] = 0xFF;
-        }
-    }
-
-    return image;
-}
 
 /**
  * Helper for the planet's gravitational field.
@@ -174,29 +126,9 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext &context) {
     planet->GetTransform(context.world) = {0.0F, 0.0F};
     planet->UpdateVisuals(context.world);
 
-    const svanes::TextureHandle gradient_texture =
-        context.assets.CreateTexture(CreateGradientImage());
-    constexpr float square_size = static_cast<float>(kSquarePixels);
-    const svanes::Rectangle2D square_geometry{0.0F, 0.0F, square_size,
-                                              square_size};
     player_ship.emplace(
         context.world, gameplay_timeline_entity,
-        ShipDefinition{
-            .max_acceleration = 1000.0F,
-            .max_angular_acceleration = 100.0F,
-            .collider = {square_geometry},
-            .visuals =
-                {
-                    {svanes::Sprite{.texture = gradient_texture,
-                                    .geometry = square_geometry}},
-                    {svanes::RadialGradient2D{
-                        .geometry =
-                            svanes::Circle2D{0.0F, 0.0F, square_size * 5.0F},
-                        .center_color = svanes::Color{255, 255, 255, 160},
-                        .edge_color = svanes::Color{64, 128, 255, 0},
-                    }},
-                },
-        });
+        LoadShip("games/orbitalEscalation/assets/ships/player.json"));
     const svanes::Transform player_start{0.0F, -kPlanetRadius - 800.0F};
     player_ship->GetTransform(context.world) = player_start;
     player_ship->GetKinematic(context.world).velocity_x =
