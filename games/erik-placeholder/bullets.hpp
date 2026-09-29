@@ -7,6 +7,7 @@
 #include <svanes/kinematic_system.hpp>
 #include <svanes/collision_system.hpp>
 #include <svanes/render/render_system.hpp>
+#include <svanes/stable_id.hpp>
 
 #include <span>
 #include <vector>
@@ -27,19 +28,18 @@ inline constexpr float BulletSize = 8.0F;
  *
  * FIELDS:
  * - owner: The entity that fired this bullet. Collisions against it are ignored.
- * - id: The simulation's shot sequence number, or zero before assignment.
- * - owner_key: The firing peer's id, with zero identifying the enemy.
+ * - owner_id: The StableId of the entity that fired this bullet, which outlives it.
  */
 struct Bullet {
     svanes::Entity owner = 0;
-    std::uint64_t id = 0;
-    std::uint32_t owner_key = 0;
+    std::uint64_t owner_id = 0;
 };
 
 /**
  * Stores a shot independently of its temporary registry entity.
  * FIELDS:
- * - bullet: The shot's identity and owner.
+ * - id: The shot's shared identity.
+ * - bullet: The shot's owner.
  * - transform: Its position and orientation.
  * - motion: Its velocity and acceleration.
  * - timeline: Its elapsed simulation time.
@@ -47,6 +47,7 @@ struct Bullet {
  * - collider: Its collision body.
  */
 struct BulletSnapshot {
+    svanes::StableId id;
     Bullet bullet;
     svanes::Transform transform;
     svanes::Kinematic2D motion;
@@ -57,7 +58,7 @@ struct BulletSnapshot {
 
 /**
  * @param world The registry containing the shots.
- * @return Bullet entities in shot order, using local creation order for unnumbered shots.
+ * @return Bullet entities in StableId order, leaving out shots not yet given one.
  */
 std::vector<svanes::Entity> OrderedBullets(const svanes::Registry& world);
 
@@ -69,10 +70,13 @@ std::vector<BulletSnapshot> CaptureBullets(const svanes::Registry& world);
 
 /**
  * Replaces live shots with the saved set, including shots destroyed since capture.
- * @param world The registry containing the shots and their unchanged owner entities.
+ * Each shot's owner is found by its StableId, so owners must be restored first.
+ * @param world The registry containing the shots and their owners.
  * @param snapshots The shots to recreate in simulation order.
+ * @param departed_owner The entity recorded as owner when the owner is no longer present.
  */
-void RestoreBullets(svanes::Registry& world, const std::vector<BulletSnapshot>& snapshots);
+void RestoreBullets(svanes::Registry& world, const std::vector<BulletSnapshot>& snapshots,
+                    svanes::Entity departed_owner);
 
 /**
  * A single bullet-versus-entity collision reported back to the game. The bullet
@@ -101,6 +105,8 @@ struct BulletHit {
  * @param direction The direction of travel. Need not be normalized.
  * @param speed The travel speed in world units per second.
  * @param color The color the bullet is drawn in.
+ *
+ * The bullet has no StableId until the simulation assigns one.
  *
  * @throws std::invalid_argument if the direction is not finite or is zero length.
  * @throws std::invalid_argument if the speed is not finite or is not positive.

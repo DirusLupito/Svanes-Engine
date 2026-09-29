@@ -6,6 +6,7 @@
 #include <svanes/kinematic_system.hpp>
 #include <svanes/render/basic_render_types.hpp>
 #include <svanes/sprite_animation_system.hpp>
+#include <svanes/stable_id.hpp>
 #include <svanes/vector2d.hpp>
 
 #include <cstdint>
@@ -98,6 +99,7 @@ enum class GooseState : std::uint8_t {
  * so Restore chooses the texture from the state rather than from the sprite.
  *
  * FIELDS:
+ * - id: The goose's shared identity.
  * - transform: Position and orientation.
  * - motion: Velocity, acceleration, and motion limits.
  * - timeline: Local clock and its accumulated progress.
@@ -113,6 +115,7 @@ enum class GooseState : std::uint8_t {
  * - invincible_timer: Remaining protection from knockback, in timeline tics.
  */
 struct GooseSnapshot {
+    svanes::StableId id;
     svanes::Transform transform;
     svanes::Kinematic2D motion;
     svanes::Timeline timeline;
@@ -152,10 +155,11 @@ public:
      * @param textures Textures from LoadTextures.
      * @param x The world x position to spawn at.
      * @param y The world y position to spawn at.
+     * @param id The goose's shared identity.
      *
      * @throws std::logic_error if the goose has already been spawned.
      */
-    void Spawn(svanes::Registry& world, const GooseTextures& textures, float x, float y);
+    void Spawn(svanes::Registry& world, const GooseTextures& textures, float x, float y, svanes::StableId id);
 
     /**
      * Applies input and advances timers after a physics step. Receives elapsed

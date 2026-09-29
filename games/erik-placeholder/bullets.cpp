@@ -6,7 +6,6 @@
 #include <svanes/registry.hpp>
 #include <svanes/render/render_system.hpp>
 
-#include <algorithm>
 #include <cmath>
 #include <stdexcept>
 #include <vector>
@@ -64,34 +63,23 @@ void SpawnBullet(
         .geometry = body,
     });
     world.AddComponent<svanes::Collider2D>(bullet, svanes::Collider2D{body});
-    world.AddComponent<Bullet>(bullet, Bullet{.owner = owner});
+    world.AddComponent<Bullet>(bullet, Bullet{
+        .owner = owner,
+        .owner_id = world.GetComponent<svanes::StableId>(owner).value,
+    });
 }
 
 std::vector<svanes::Entity> OrderedBullets(const svanes::Registry& world)
 {
-    std::vector<svanes::Entity> entities;
-    world.ForEach<Bullet>([&](svanes::Entity entity, const Bullet&) {
-        entities.push_back(entity);
-    });
-    std::sort(entities.begin(), entities.end(), [&](auto a, auto b) {
-        const auto left = world.GetComponent<Bullet>(a).id;
-        const auto right = world.GetComponent<Bullet>(b).id;
-        if (left == right) {
-            return a < b;
-        }
-        if (left == 0 || right == 0) {
-            return right == 0;
-        }
-        return left < right;
-    });
-    return entities;
+    return svanes::EntitiesByStableId<Bullet>(world);
 }
 
 std::vector<BulletSnapshot> CaptureBullets(const svanes::Registry& world)
 {
     std::vector<BulletSnapshot> snapshots;
     for (const auto entity : OrderedBullets(world)) {
-        snapshots.push_back({world.GetComponent<Bullet>(entity),
+        snapshots.push_back({world.GetComponent<svanes::StableId>(entity),
+            world.GetComponent<Bullet>(entity),
             world.GetComponent<svanes::Transform>(entity),
             world.GetComponent<svanes::Kinematic2D>(entity),
             world.GetComponent<svanes::Timeline>(entity),
@@ -101,14 +89,22 @@ std::vector<BulletSnapshot> CaptureBullets(const svanes::Registry& world)
     return snapshots;
 }
 
-void RestoreBullets(svanes::Registry& world, const std::vector<BulletSnapshot>& snapshots)
+void RestoreBullets(svanes::Registry& world, const std::vector<BulletSnapshot>& snapshots,
+                    svanes::Entity departed_owner)
 {
-    for (const auto entity : OrderedBullets(world)) {
+    std::vector<svanes::Entity> live;
+    world.ForEach<Bullet>([&](svanes::Entity entity, const Bullet&) {
+        live.push_back(entity);
+    });
+    for (const auto entity : live) {
         world.DestroyEntity(entity);
     }
     for (const auto& snapshot : snapshots) {
+        Bullet bullet = snapshot.bullet;
+        bullet.owner = svanes::FindByStableId(world, bullet.owner_id).value_or(departed_owner);
         const auto entity = world.CreateEntity();
-        world.AddComponent<Bullet>(entity, snapshot.bullet);
+        world.AddComponent<svanes::StableId>(entity, snapshot.id);
+        world.AddComponent<Bullet>(entity, bullet);
         world.AddComponent<svanes::Transform>(entity, snapshot.transform);
         world.AddComponent<svanes::Kinematic2D>(entity, snapshot.motion);
         world.AddComponent<svanes::Timeline>(entity, snapshot.timeline);

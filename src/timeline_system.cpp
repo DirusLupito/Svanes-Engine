@@ -93,6 +93,25 @@ std::optional<Entity> Timeline::GetParent() const { return parent; }
 TicCount Timeline::GetTotalTics() const { return total_tics; }
 TicCount Timeline::GetDeltaTics() const { return delta_tics; }
 
+RationalNumber Timeline::GetIncompleteProgress() const {
+    return incomplete_progress;
+}
+
+void Timeline::SetProgress(TicCount total, TicCount delta,
+                           RationalNumber incomplete) {
+    if (delta > total) {
+        throw std::invalid_argument(
+            "Timeline progress has a delta larger than its total.");
+    }
+    if (incomplete.GetNumerator() >= incomplete.GetDenominator()) {
+        throw std::invalid_argument(
+            "Timeline incomplete progress must be less than one tic.");
+    }
+    total_tics = total;
+    delta_tics = delta;
+    incomplete_progress = incomplete;
+}
+
 void Timeline::Advance(TicCount parent_delta_tics) {
     if (paused) {
         delta_tics = 0;

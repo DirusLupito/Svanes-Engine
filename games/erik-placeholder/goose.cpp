@@ -66,7 +66,7 @@ bool ChangesStep(const GooseIntent& used, const GooseIntent& other, GooseIntentU
     return use.aim && (used.aim.x != other.aim.x || used.aim.y != other.aim.y);
 }
 
-void Goose::Spawn(svanes::Registry& world, const GooseTextures& textures, float x, float y)
+void Goose::Spawn(svanes::Registry& world, const GooseTextures& textures, float x, float y, svanes::StableId id)
 {
     if (spawned) {
         throw std::logic_error("Goose::Spawn called twice on the same goose.");
@@ -81,6 +81,7 @@ void Goose::Spawn(svanes::Registry& world, const GooseTextures& textures, float 
     };
 
     entity = world.CreateEntity();
+    world.AddComponent<svanes::StableId>(entity, id);
     world.AddComponent<svanes::Transform>(entity, svanes::Transform{
         .x = x,
         .y = y,
@@ -243,6 +244,7 @@ GooseSnapshot Goose::Capture(const svanes::Registry& world) const
         animation = world.GetComponent<svanes::SpriteAnimation>(entity);
     }
     return {
+        world.GetComponent<svanes::StableId>(entity),
         world.GetComponent<svanes::Transform>(entity),
         world.GetComponent<svanes::Kinematic2D>(entity),
         world.GetComponent<svanes::Timeline>(entity),
@@ -257,6 +259,7 @@ void Goose::Restore(svanes::Registry& world, const GooseSnapshot& snapshot)
     if (!spawned) {
         throw std::logic_error("Goose::Restore called before Goose::Spawn.");
     }
+    world.GetComponent<svanes::StableId>(entity) = snapshot.id;
     world.GetComponent<svanes::Transform>(entity) = snapshot.transform;
     world.GetComponent<svanes::Kinematic2D>(entity) = snapshot.motion;
     world.GetComponent<svanes::Timeline>(entity) = snapshot.timeline;

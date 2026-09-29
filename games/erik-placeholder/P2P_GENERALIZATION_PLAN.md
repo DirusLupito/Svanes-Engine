@@ -124,6 +124,9 @@ uses only membership and snapshot transfer.
   with a made-up peer id. The session should support a "not yet admitted" mode.
 - **Message types can collide.** Once the engine sends its own messages, it needs
   a reserved range of message types.
+- **Attractor forces depend on `ForEach` order.** `attractor_system.cpp` sums
+  forces in registry order, and float sums change with order, so peers could
+  disagree. Not fixed; the goose game doesn't use attractors.
 - **Cross-platform desyncs are likely.** Clang on Apple Silicon fuses multiply-add
   operations by default, and `std::sin`/`std::hypot` differ between platforms.
   A Mac peer will probably desync from Linux or Windows. Fix below.

@@ -31,14 +31,14 @@ inline constexpr float GooseGravity = 2000.0F;
  * - geese: Goose snapshots in the simulation's ascending peer order.
  * - enemy: The enemy's position, health, firing timer, and life state.
  * - bullets: Live shots in simulation order, with local owner references.
- * - next_bullet_id: The next shot sequence number, restored before replay.
+ * - next_stable_id: The next StableId to assign, restored before replay.
  */
 struct GooseWorldSnapshot {
     std::uint64_t tick;
     std::vector<GooseSnapshot> geese;
     EnemySnapshot enemy;
     std::vector<BulletSnapshot> bullets;
-    std::uint64_t next_bullet_id = 1;
+    std::uint64_t next_stable_id = 1;
 };
 
 /**
@@ -52,10 +52,11 @@ struct GooseWorldSnapshot {
  *
  * Capture and Restore include controller timers, motion, clocks, and animation
  * progress. Restore recreates bullets and restores enemy life while preserving
- * player and enemy entity identities. Shot ids, owner peer ids, and bullet
- * targets ordered by gameplay identity keep simulation independent of the
- * registry ids a process assigns, so a joining process can rebuild the world
- * from Encode's bytes and continue identically.
+ * player and enemy entity identities. Geese, the enemy, and shots carry
+ * StableIds from one shared counter. Shots are ordered by them and remember
+ * their owner by them, which keeps simulation independent of the registry ids
+ * a process assigns, so a joining process can rebuild the world from Encode's
+ * bytes and continue identically.
  * The caller controls when to step, including replay from a restored state.
  */
 class GooseSimulation final {
@@ -112,12 +113,11 @@ public:
      * Local entity ids and texture handles are excluded.
      * @param writer The message to append to.
      * @param snapshot The tick boundary to encode.
-     * @throws std::logic_error for a timeline that is paused, parented, or scaled.
      */
     static void Encode(svanes::MessageWriter& writer, const GooseWorldSnapshot& snapshot);
 
     /**
-     * Reads a snapshot written by Encode, mapping shot owners onto this process's entities.
+     * Reads a snapshot written by Encode. Shot owners are found by StableId during Restore.
      * @param reader The message positioned at the encoded snapshot.
      * @return A snapshot that Restore can apply to this simulation.
      * @throws std::invalid_argument for malformed data or a different player count.
@@ -173,12 +173,18 @@ private:
      */
     std::vector<svanes::Entity> BulletTargets(const svanes::Registry& world) const;
 
+    /**
+     * @return A StableId no entity has had before, shared by geese, the enemy, and shots.
+     * @throws std::overflow_error if the counter is exhausted.
+     */
+    svanes::StableId NextStableId();
+
     bool initialized = false;
     GooseTextures textures;
     std::vector<Player> players;
     Enemy enemy;
     svanes::Entity departed_owner = 0;
-    std::uint64_t next_bullet_id = 1;
+    std::uint64_t next_stable_id = 1;
     svanes::AsyncParallelForDriver physics_driver{1};
     std::uint64_t tick = 0;
 };

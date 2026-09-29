@@ -2,7 +2,7 @@
 
 #include <svanes/deterministic_math.hpp>
 #include <svanes/game.hpp>
-#include <svanes/network/message_serialization.hpp>
+#include <svanes/network/component_serialization.hpp>
 #include <svanes/registry.hpp>
 
 #include <algorithm>
@@ -17,93 +17,6 @@ constexpr std::array<float, 8> kSpawnX{400.0F, 550.0F, 700.0F, 850.0F, 1000.0F, 
 constexpr float kSpawnY = 700.0F;
 constexpr float kSpawnClearance = 80.0F;
 
-void WriteTransform(svanes::MessageWriter& writer, const svanes::Transform& transform)
-{
-    writer.WriteFloat32(transform.x);
-    writer.WriteFloat32(transform.y);
-    writer.WriteFloat32(transform.rotation);
-}
-
-svanes::Transform ReadTransform(svanes::MessageReader& reader)
-{
-    svanes::Transform transform;
-    transform.x = reader.ReadFloat32();
-    transform.y = reader.ReadFloat32();
-    transform.rotation = reader.ReadFloat32();
-    return transform;
-}
-
-void WriteMotion(svanes::MessageWriter& writer, const svanes::Kinematic2D& motion)
-{
-    writer.WriteFloat32(motion.velocity_x);
-    writer.WriteFloat32(motion.velocity_y);
-    writer.WriteFloat32(motion.acceleration_x);
-    writer.WriteFloat32(motion.acceleration_y);
-    writer.WriteFloat32(motion.angular_velocity);
-    writer.WriteFloat32(motion.angular_acceleration);
-    for (const auto limit : {motion.max_speed, motion.max_acceleration,
-                             motion.max_angular_speed, motion.max_angular_acceleration}) {
-        writer.WriteBool(limit.has_value());
-        if (limit) {
-            writer.WriteFloat32(*limit);
-        }
-    }
-}
-
-svanes::Kinematic2D ReadMotion(svanes::MessageReader& reader)
-{
-    svanes::Kinematic2D motion;
-    motion.velocity_x = reader.ReadFloat32();
-    motion.velocity_y = reader.ReadFloat32();
-    motion.acceleration_x = reader.ReadFloat32();
-    motion.acceleration_y = reader.ReadFloat32();
-    motion.angular_velocity = reader.ReadFloat32();
-    motion.angular_acceleration = reader.ReadFloat32();
-    for (auto* limit : {&motion.max_speed, &motion.max_acceleration,
-                        &motion.max_angular_speed, &motion.max_angular_acceleration}) {
-        if (reader.ReadBool()) {
-            *limit = reader.ReadFloat32();
-        }
-    }
-    return motion;
-}
-
-/**
- * Writes a timeline's elapsed time. Only root, running, unscaled timelines can be
- * rebuilt from their totals, which is all the simulation creates.
- * @param writer The message to append to.
- * @param timeline The timeline to encode.
- * @throws std::logic_error for a parented, paused, or scaled timeline.
- */
-void WriteTimeline(svanes::MessageWriter& writer, const svanes::Timeline& timeline)
-{
-    const auto tic_size = timeline.GetTicSize();
-    if (timeline.GetParent() || timeline.IsPaused() || tic_size.GetNumerator() != tic_size.GetDenominator()) {
-        throw std::logic_error("GooseSimulation can only encode root, running, unscaled timelines.");
-    }
-    writer.WriteUint64(timeline.GetTotalTics());
-    writer.WriteUint64(timeline.GetDeltaTics());
-}
-
-/**
- * Rebuilds a root, running, unscaled timeline with the given totals.
- * @param reader The message positioned at an encoded timeline.
- * @return A timeline reporting the same total and most recent delta.
- * @throws std::invalid_argument if the delta exceeds the total.
- */
-svanes::Timeline ReadTimeline(svanes::MessageReader& reader)
-{
-    const auto total = reader.ReadUint64();
-    const auto delta = reader.ReadUint64();
-    if (delta > total) {
-        throw std::invalid_argument("Encoded timeline has a delta larger than its total.");
-    }
-    svanes::Timeline timeline;
-    timeline.Advance(total - delta);
-    timeline.Advance(delta);
-    return timeline;
-}
-
 }
 
 void GooseSimulation::Initialize(svanes::GameContext& context)
@@ -113,7 +26,7 @@ void GooseSimulation::Initialize(svanes::GameContext& context)
     }
     context.automatic_simulation = false;
     textures = Goose::LoadTextures(context.assets);
-    enemy.Spawn(context.world, {1600.0F, 300.0F}, 120.0F, 10.0F);
+    enemy.Spawn(context.world, {1600.0F, 300.0F}, 120.0F, 10.0F, NextStableId());
     departed_owner = context.world.CreateEntity();
     initialized = true;
 }
@@ -138,7 +51,7 @@ void GooseSimulation::AddPlayer(svanes::Registry& world, svanes::PeerId peer)
         }
     }
     players.push_back({peer, {}});
-    players.back().goose.Spawn(world, textures, spawn_x, kSpawnY);
+    players.back().goose.Spawn(world, textures, spawn_x, kSpawnY, NextStableId());
 }
 
 std::vector<GooseIntentUse> GooseSimulation::Step(svanes::Registry& world, svanes::Vector2D gravity,
@@ -198,25 +111,15 @@ std::vector<GooseIntentUse> GooseSimulation::Step(svanes::Registry& world, svane
         enemy_intent.aim_point = {position.x, position.y + 1000.0F};
         enemy.Advance(world, enemy_intent, GooseStepTics);
     }
-    for (const auto entity : OrderedBullets(world)) {
-        auto& bullet = world.GetComponent<Bullet>(entity);
-        if (bullet.id != 0) {
-            continue;
+    std::vector<svanes::Entity> new_bullets;
+    world.ForEach<Bullet>([&](svanes::Entity entity, const Bullet&) {
+        if (!world.HasComponent<svanes::StableId>(entity)) {
+            new_bullets.push_back(entity);
         }
-        if (next_bullet_id == std::numeric_limits<std::uint64_t>::max()) {
-            throw std::overflow_error("GooseSimulation exhausted its shot identifiers.");
-        }
-        bullet.id = next_bullet_id++;
-        if (bullet.owner == enemy.GetEntity()) {
-            bullet.owner_key = 0;
-        } else {
-            const auto owner = std::find_if(players.begin(), players.end(),
-                [&](const auto& player) { return player.goose.GetEntity() == bullet.owner; });
-            if (owner == players.end()) {
-                throw std::logic_error("GooseSimulation found a bullet with an unknown owner.");
-            }
-            bullet.owner_key = owner->peer.value;
-        }
+    });
+    std::sort(new_bullets.begin(), new_bullets.end());
+    for (const auto entity : new_bullets) {
+        world.AddComponent<svanes::StableId>(entity, NextStableId());
     }
     const svanes::Rectangle2D bullet_bounds{3000.0F, -60.0F, 6600.0F, 2800.0F};
     for (const auto& hit : UpdateBullets(world, bullet_bounds, BulletTargets(world))) {
@@ -253,7 +156,7 @@ GooseWorldSnapshot GooseSimulation::Capture(const svanes::Registry& world) const
     if (!initialized) {
         throw std::logic_error("GooseSimulation::Capture called before Initialize.");
     }
-    GooseWorldSnapshot snapshot{tick, {}, enemy.Capture(world), CaptureBullets(world), next_bullet_id};
+    GooseWorldSnapshot snapshot{tick, {}, enemy.Capture(world), CaptureBullets(world), next_stable_id};
     snapshot.geese.reserve(players.size());
     for (const auto& player : players) {
         snapshot.geese.push_back(player.goose.Capture(world));
@@ -264,27 +167,20 @@ GooseWorldSnapshot GooseSimulation::Capture(const svanes::Registry& world) const
 void GooseSimulation::Encode(svanes::MessageWriter& writer, const GooseWorldSnapshot& snapshot)
 {
     writer.WriteUint64(snapshot.tick);
-    writer.WriteUint64(snapshot.next_bullet_id);
+    writer.WriteUint64(snapshot.next_stable_id);
     writer.WriteUint32(static_cast<std::uint32_t>(snapshot.geese.size()));
     for (const auto& goose : snapshot.geese) {
-        WriteTransform(writer, goose.transform);
-        WriteMotion(writer, goose.motion);
-        WriteTimeline(writer, goose.timeline);
+        writer.WriteUint64(goose.id.value);
+        svanes::WriteTransform(writer, goose.transform);
+        svanes::WriteKinematic(writer, goose.motion);
+        svanes::WriteTimeline(writer, goose.timeline);
         writer.WriteBool(goose.sprite.source.has_value());
         if (goose.sprite.source) {
-            writer.WriteFloat32(goose.sprite.source->x);
-            writer.WriteFloat32(goose.sprite.source->y);
-            writer.WriteFloat32(goose.sprite.source->width);
-            writer.WriteFloat32(goose.sprite.source->height);
+            svanes::WriteRectangle(writer, *goose.sprite.source);
         }
         writer.WriteBool(goose.animation.has_value());
         if (goose.animation) {
-            writer.WriteInt32(goose.animation->frame_width);
-            writer.WriteInt32(goose.animation->frame_height);
-            writer.WriteInt32(goose.animation->frame_count);
-            writer.WriteInt32(goose.animation->current_frame);
-            writer.WriteUint64(goose.animation->tics_per_frame);
-            writer.WriteUint64(goose.animation->elapsed_tics);
+            svanes::WriteSpriteAnimation(writer, *goose.animation);
         }
         writer.WriteUint8(static_cast<std::uint8_t>(goose.state));
         writer.WriteBool(goose.grounded);
@@ -295,22 +191,19 @@ void GooseSimulation::Encode(svanes::MessageWriter& writer, const GooseWorldSnap
         writer.WriteUint64(goose.knockback_timer);
         writer.WriteUint64(goose.invincible_timer);
     }
-    WriteTransform(writer, snapshot.enemy.transform);
+    svanes::WriteTransform(writer, snapshot.enemy.transform);
     writer.WriteFloat32(snapshot.enemy.health.current);
     writer.WriteFloat32(snapshot.enemy.health.max);
     writer.WriteUint64(snapshot.enemy.fire_cooldown);
     writer.WriteBool(snapshot.enemy.alive);
     writer.WriteUint32(static_cast<std::uint32_t>(snapshot.bullets.size()));
     for (const auto& shot : snapshot.bullets) {
-        writer.WriteUint64(shot.bullet.id);
-        writer.WriteUint32(shot.bullet.owner_key);
-        WriteTransform(writer, shot.transform);
-        WriteMotion(writer, shot.motion);
-        WriteTimeline(writer, shot.timeline);
-        writer.WriteUint8(shot.shape.color.red);
-        writer.WriteUint8(shot.shape.color.green);
-        writer.WriteUint8(shot.shape.color.blue);
-        writer.WriteUint8(shot.shape.color.alpha);
+        writer.WriteUint64(shot.id.value);
+        writer.WriteUint64(shot.bullet.owner_id);
+        svanes::WriteTransform(writer, shot.transform);
+        svanes::WriteKinematic(writer, shot.motion);
+        svanes::WriteTimeline(writer, shot.timeline);
+        svanes::WriteColor(writer, shot.shape.color);
     }
 }
 
@@ -318,28 +211,21 @@ GooseWorldSnapshot GooseSimulation::Decode(svanes::MessageReader& reader) const
 {
     GooseWorldSnapshot snapshot{};
     snapshot.tick = reader.ReadUint64();
-    snapshot.next_bullet_id = reader.ReadUint64();
+    snapshot.next_stable_id = reader.ReadUint64();
     if (reader.ReadUint32() != players.size()) {
         throw std::invalid_argument("Encoded world has a different player count.");
     }
     for (std::size_t index = 0; index < players.size(); ++index) {
         GooseSnapshot goose{};
-        goose.transform = ReadTransform(reader);
-        goose.motion = ReadMotion(reader);
-        goose.timeline = ReadTimeline(reader);
+        goose.id.value = reader.ReadUint64();
+        goose.transform = svanes::ReadTransform(reader);
+        goose.motion = svanes::ReadKinematic(reader);
+        goose.timeline = svanes::ReadTimeline(reader);
         if (reader.ReadBool()) {
-            goose.sprite.source = svanes::Rectangle2D{reader.ReadFloat32(), reader.ReadFloat32(),
-                reader.ReadFloat32(), reader.ReadFloat32()};
+            goose.sprite.source = svanes::ReadRectangle(reader);
         }
         if (reader.ReadBool()) {
-            svanes::SpriteAnimation animation;
-            animation.frame_width = reader.ReadInt32();
-            animation.frame_height = reader.ReadInt32();
-            animation.frame_count = reader.ReadInt32();
-            animation.current_frame = reader.ReadInt32();
-            animation.tics_per_frame = reader.ReadUint64();
-            animation.elapsed_tics = reader.ReadUint64();
-            goose.animation = animation;
+            goose.animation = svanes::ReadSpriteAnimation(reader);
         }
         const auto state = reader.ReadUint8();
         if (state > static_cast<std::uint8_t>(GooseState::Flying)) {
@@ -355,7 +241,7 @@ GooseWorldSnapshot GooseSimulation::Decode(svanes::MessageReader& reader) const
         goose.invincible_timer = reader.ReadUint64();
         snapshot.geese.push_back(goose);
     }
-    snapshot.enemy.transform = ReadTransform(reader);
+    snapshot.enemy.transform = svanes::ReadTransform(reader);
     snapshot.enemy.health.current = reader.ReadFloat32();
     snapshot.enemy.health.max = reader.ReadFloat32();
     snapshot.enemy.fire_cooldown = reader.ReadUint64();
@@ -364,23 +250,14 @@ GooseWorldSnapshot GooseSimulation::Decode(svanes::MessageReader& reader) const
     const svanes::Rectangle2D body{.width = BulletSize, .height = BulletSize};
     for (std::uint32_t index = 0; index < bullet_count; ++index) {
         BulletSnapshot shot{};
-        shot.bullet.id = reader.ReadUint64();
-        shot.bullet.owner_key = reader.ReadUint32();
-        shot.transform = ReadTransform(reader);
-        shot.motion = ReadMotion(reader);
-        shot.timeline = ReadTimeline(reader);
-        shot.shape.color = {reader.ReadUint8(), reader.ReadUint8(), reader.ReadUint8(), reader.ReadUint8()};
+        shot.id.value = reader.ReadUint64();
+        shot.bullet.owner_id = reader.ReadUint64();
+        shot.transform = svanes::ReadTransform(reader);
+        shot.motion = svanes::ReadKinematic(reader);
+        shot.timeline = svanes::ReadTimeline(reader);
+        shot.shape.color = svanes::ReadColor(reader);
         shot.shape.geometry = body;
         shot.collider.geometry = body;
-        shot.bullet.owner = departed_owner;
-        if (shot.bullet.owner_key == 0) {
-            shot.bullet.owner = enemy.GetEntity();
-        }
-        for (const auto& player : players) {
-            if (player.peer.value == shot.bullet.owner_key) {
-                shot.bullet.owner = player.goose.GetEntity();
-            }
-        }
         snapshot.bullets.push_back(shot);
     }
     return snapshot;
@@ -405,8 +282,8 @@ void GooseSimulation::Restore(svanes::Registry& world, const GooseWorldSnapshot&
         players[index].goose.Restore(world, snapshot.geese[index]);
     }
     enemy.Restore(world, snapshot.enemy);
-    RestoreBullets(world, snapshot.bullets);
-    next_bullet_id = snapshot.next_bullet_id;
+    RestoreBullets(world, snapshot.bullets, departed_owner);
+    next_stable_id = snapshot.next_stable_id;
     tick = snapshot.tick;
 }
 
@@ -460,4 +337,12 @@ std::vector<svanes::Entity> GooseSimulation::BulletTargets(const svanes::Registr
         targets.push_back(enemy.GetEntity());
     }
     return targets;
+}
+
+svanes::StableId GooseSimulation::NextStableId()
+{
+    if (next_stable_id == std::numeric_limits<std::uint64_t>::max()) {
+        throw std::overflow_error("GooseSimulation exhausted its stable ids.");
+    }
+    return {next_stable_id++};
 }

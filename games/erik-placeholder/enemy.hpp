@@ -5,6 +5,7 @@
 #include <svanes/entity.hpp>
 #include <svanes/geometry/geometry.hpp>
 #include <svanes/render/basic_render_types.hpp>
+#include <svanes/stable_id.hpp>
 #include <svanes/vector2d.hpp>
 #include <svanes/timeline_system.hpp>
 
@@ -67,12 +68,13 @@ public:
      * @param position The world position to spawn at.
      * @param size The width and height of the enemy's square body.
      * @param health The hit points to spawn with.
+     * @param id The enemy's shared identity.
      *
      * @throws std::logic_error if the enemy is already alive.
      * @throws std::invalid_argument if the size is not finite or is not positive.
      * @throws std::invalid_argument if the health is not finite or is not positive.
      */
-    void Spawn(svanes::Registry& world, svanes::Vector2D position, float size, float health);
+    void Spawn(svanes::Registry& world, svanes::Vector2D position, float size, float health, svanes::StableId id);
 
     /**
      * Moves and fires using an explicit elapsed time, including during replay.

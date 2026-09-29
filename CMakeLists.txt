@@ -164,7 +164,6 @@ target_sources(
         src/geometry/circle_geometry.cpp
         src/geometry/convex_polygon_geometry.cpp
         src/collision_system.cpp
-    src/deterministic_math.cpp
         src/deterministic_math.cpp
         src/tilemaps/tilemap.cpp
         src/collision_pass.cpp
@@ -175,7 +174,8 @@ target_sources(
         src/MenuUtilities/font_manager_internal.hpp
         src/MenuUtilities/text_label_renderer.cpp
         src/MenuUtilities/text_label_renderer.hpp
-        src/network/network_client.cpp
+        src/network/component_serialization.cpp
+    src/network/network_client.cpp
         src/network/msg_pipe.cpp
         src/network/message_serialization.cpp
         src/network/network_message.cpp
@@ -196,6 +196,7 @@ target_sources(
         src/render/texture_manager_internal.hpp
         src/registry.cpp
         src/sprite_animation_system.cpp
+        src/stable_id.cpp
         src/timeline_system.cpp
         src/utility/rational_number.cpp
     PUBLIC
@@ -211,7 +212,6 @@ target_sources(
             include/svanes/geometry/composite_geometry.hpp
             include/svanes/geometry/convex_polygon_geometry.hpp
             include/svanes/collision_system.hpp
-    include/svanes/deterministic_math.hpp
             include/svanes/deterministic_math.hpp
             include/svanes/tilemaps/tilemap.hpp
             include/svanes/collision_pass.hpp
@@ -222,7 +222,8 @@ target_sources(
             include/svanes/kinematic_system.hpp
             include/svanes/MenuUtilities/font_manager.hpp
             include/svanes/MenuUtilities/text_label.hpp
-            include/svanes/network/msg_pipe.hpp
+            include/svanes/network/component_serialization.hpp
+    include/svanes/network/msg_pipe.hpp
             include/svanes/network/message_serialization.hpp
             include/svanes/network/network_client.hpp
             include/svanes/network/network_message.hpp
@@ -241,6 +242,7 @@ target_sources(
             include/svanes/render/texture_manager.hpp
             include/svanes/registry.hpp
             include/svanes/sprite_animation_system.hpp
+            include/svanes/stable_id.hpp
             include/svanes/timeline_system.hpp
             include/svanes/utility/rational_number.hpp
             include/svanes/vector2d.hpp
@@ -328,6 +330,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/kinematic_system.hpp
     include/svanes/MenuUtilities/font_manager.hpp
     include/svanes/MenuUtilities/text_label.hpp
+    include/svanes/network/component_serialization.hpp
     include/svanes/network/msg_pipe.hpp
     include/svanes/network/message_serialization.hpp
     include/svanes/network/network_client.hpp
@@ -347,6 +350,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/render/texture_manager.hpp
     include/svanes/registry.hpp
     include/svanes/sprite_animation_system.hpp
+    include/svanes/stable_id.hpp
     include/svanes/timeline_system.hpp
     include/svanes/utility/rational_number.hpp
     include/svanes/vector2d.hpp
@@ -372,6 +376,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/MenuUtilities/font_manager_internal.hpp
     src/MenuUtilities/text_label_renderer.cpp
     src/MenuUtilities/text_label_renderer.hpp
+    src/network/component_serialization.cpp
     src/network/network_client.cpp
     src/network/msg_pipe.cpp
     src/network/message_serialization.cpp
@@ -393,6 +398,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/render/texture_manager_internal.hpp
     src/registry.cpp
     src/sprite_animation_system.cpp
+    src/stable_id.cpp
     src/timeline_system.cpp
     src/utility/rational_number.cpp
 )

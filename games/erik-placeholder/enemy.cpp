@@ -20,7 +20,7 @@ constexpr svanes::Color kEnemyBulletColor{255, 90, 90, 255};
 
 }
 
-void Enemy::Spawn(svanes::Registry& world, svanes::Vector2D position, float size, float health)
+void Enemy::Spawn(svanes::Registry& world, svanes::Vector2D position, float size, float health, svanes::StableId id)
 {
     if (alive) {
         throw std::logic_error("Enemy::Spawn called on an enemy that is already alive.");
@@ -43,6 +43,7 @@ void Enemy::Spawn(svanes::Registry& world, svanes::Vector2D position, float size
         entity = world.CreateEntity();
     }
     spawned = true;
+    world.AddComponent<svanes::StableId>(entity, id);
     body_size = size;
     world.AddComponent<svanes::Transform>(entity, svanes::Transform{
         .x = position.x,
