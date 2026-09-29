@@ -511,6 +511,31 @@ std::uint64_t GooseRollback::Freeze()
     return simulation.Tick();
 }
 
+std::uint64_t GooseRollback::ProgressOf(svanes::PeerId peer)
+{
+    const auto found = std::find_if(players.begin(), players.end(),
+        [&](const auto& player) { return player.peer == peer; });
+    if (found == players.end()) {
+        throw std::invalid_argument("GooseRollback::ProgressOf: unknown player.");
+    }
+    return found->next_input_tick;
+}
+
+void GooseRollback::Abandon(svanes::PeerId peer, std::uint64_t cutoff, std::uint64_t boundary)
+{
+    const auto found = std::find_if(players.begin(), players.end(),
+        [&](const auto& player) { return player.peer == peer; });
+    if (found == players.end()) {
+        throw std::invalid_argument("GooseRollback::Abandon: unknown player.");
+    }
+    found->actual.erase(found->actual.lower_bound(cutoff), found->actual.end());
+    found->next_input_tick = std::min(found->next_input_tick, cutoff);
+    const auto index = static_cast<std::size_t>(found - players.begin());
+    for (auto tick = cutoff; tick < boundary; ++tick) {
+        RecordInput(index, tick, GooseIntent{});
+    }
+}
+
 bool GooseRollback::SettleAt(std::uint64_t boundary)
 {
     ReceiveMessages();

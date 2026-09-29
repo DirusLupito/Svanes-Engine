@@ -34,7 +34,8 @@ inline constexpr std::size_t GooseMaxPlayers = 8;
  *
  * Players join and leave through the network's roster changes. As the network's
  * participant, the rollback freezes local input, finishes with neutral input up
- * to the agreed tick, and adds or removes geese when every member agrees.
+ * to the agreed tick, and adds or removes geese when every member agrees. A
+ * player that stopped responding gets neutral input from the agreed cutoff.
  * Existing members resume immediately, predicting a joiner's input until its
  * first inputs arrive.
  */
@@ -91,6 +92,23 @@ public:
      * @return The current tick.
      */
     std::uint64_t Freeze() override;
+
+    /**
+     * @param peer Another player.
+     * @return The first tick missing that player's input.
+     * @throws std::invalid_argument if the peer is not a player.
+     */
+    std::uint64_t ProgressOf(svanes::PeerId peer) override;
+
+    /**
+     * Replaces an unresponsive player's inputs from the cutoff with neutral
+     * input up to the boundary, correcting ticks that used other inputs.
+     * @param peer The player being removed.
+     * @param cutoff The first tick whose input is discarded.
+     * @param boundary The agreed tick.
+     * @throws std::invalid_argument if the peer is not a player.
+     */
+    void Abandon(svanes::PeerId peer, std::uint64_t cutoff, std::uint64_t boundary) override;
 
     /**
      * Receives inputs, corrects predictions, and advances with neutral local

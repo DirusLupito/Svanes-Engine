@@ -161,6 +161,10 @@ uses only membership and snapshot transfer.
   - Use `Sin`/`Cos` in the geometry code and the enemy's path. Geese never rotate,
     so for now only the enemy path (`goose_simulation.cpp:191`) actually matters.
   - Verify with a peer on Windows or macOS against a Linux peer.
+- **Unexpected disconnects** are a roster change. A peer silent for 2 seconds is
+  dropped; its input ends at the lowest progress any survivor has for it, neutral
+  after that. A process others dropped removes itself. Network splits and a second
+  failure mid-change fail loudly rather than being resolved.
 - **Pausing is only allowed with no other members.** `InputSync` gets a local
   pause that throws if anyone else is in the roster. While paused, the network
   keeps running and elapsed time is thrown away, not saved for later. With peers,

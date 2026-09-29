@@ -18,6 +18,26 @@ constexpr std::uint32_t kMaximumSnapshotChunks = 4096;
 constexpr std::size_t kMaximumQueuedMessages = 4096;
 constexpr auto kAssignmentRetention = std::chrono::seconds(15);
 constexpr auto kRosterChangeTimeout = std::chrono::seconds(15);
+constexpr auto kDeliveryTimeout = std::chrono::milliseconds(2000);
+
+/**
+ * @return Session settings that report an unresponsive member after two
+ * seconds.
+ */
+ReliabilitySettings PeerReliability() {
+    ReliabilitySettings reliability;
+    reliability.delivery_timeout = kDeliveryTimeout;
+    return reliability;
+}
+
+/**
+ * @param ids Sorted or unsorted ids.
+ * @param id The id to look for.
+ * @return Whether the id is present.
+ */
+bool Contains(const std::vector<std::uint32_t> &ids, std::uint32_t id) {
+    return std::find(ids.begin(), ids.end(), id) != ids.end();
+}
 
 /**
  * @param peers The roster to sort.
@@ -92,14 +112,16 @@ PeerGroup::PeerGroup(std::unique_ptr<UdpMsgPipe> bound_pipe,
     : settings(settings), pipe(bound_pipe.get()), peers{{1}},
       world_loaded(true) {
     session = std::make_unique<NetworkSession>(
-        std::move(bound_pipe), SessionConfiguration{settings.session, {1}, {}});
+        std::move(bound_pipe), SessionConfiguration{settings.session, {1}, {}},
+        PeerReliability());
 }
 
 PeerGroup::PeerGroup(std::unique_ptr<UdpMsgPipe> bound_pipe, UdpAddress entry,
                      PeerSettings settings)
     : settings(settings), pipe(bound_pipe.get()) {
     session = std::make_unique<NetworkSession>(
-        std::move(bound_pipe), SessionConfiguration{settings.session, {}, {}});
+        std::move(bound_pipe), SessionConfiguration{settings.session, {}, {}},
+        PeerReliability());
     join = std::make_unique<PeerJoin>(*session, *pipe, std::move(entry),
                                       RulesHash());
 }
@@ -152,9 +174,13 @@ void PeerGroup::Update() {
     }
     PeerId failed_peer;
     while (session->ReceivePeerFailure(failed_peer)) {
-        if (failure.empty()) {
+        if (!world_loaded) {
             failure = "Peer " + std::to_string(failed_peer.value) +
-                      " stopped acknowledging messages. Restart the game.";
+                      " stopped responding before the world arrived.";
+        } else if (!Contains(unreachable, failed_peer.value)) {
+            unreachable.push_back(failed_peer.value);
+            std::sort(unreachable.begin(), unreachable.end());
+            Discard(failed_peer);
         }
     }
     if (HasFailed() || departed) {
@@ -208,7 +234,8 @@ void PeerGroup::Update() {
     if (HasFailed()) {
         return;
     }
-    if (!roster_change && (leave_requested || !join_requests.empty())) {
+    if (!roster_change && (leave_requested || !join_requests.empty() ||
+                           !unreachable.empty())) {
         BeginRosterChange();
     }
     if (roster_change) {
@@ -217,6 +244,9 @@ void PeerGroup::Update() {
 }
 
 void PeerGroup::QueueTaggedMessage(SessionMessage message) {
+    if (Contains(discarded, message.sender.value)) {
+        return;
+    }
     MessageReader reader(message.payload);
     const auto message_revision = reader.ReadUint64();
     if (message_revision < revision) {
@@ -336,7 +366,9 @@ bool PeerGroup::Receive(SessionMessage &message) {
 void PeerGroup::HandleJoinRequests() {
     const auto now = std::chrono::steady_clock::now();
     std::erase_if(assignments, [&](const auto &entry) {
-        return now - entry.second.sent_at > kAssignmentRetention;
+        return now - entry.second.sent_at > kAssignmentRetention ||
+               std::find(peers.begin(), peers.end(), entry.second.peer) ==
+                   peers.end();
     });
     StrangerMessage stranger;
     while (session->ReceiveStranger(stranger)) {
@@ -422,24 +454,17 @@ void PeerGroup::ReceiveRosterMessage(const SessionMessage &message) {
     }
     BeginRosterChange();
     MessageReader reader(message.payload);
-    const auto position = reader.ReadUint64();
     if (message.type == static_cast<MessageType>(PeerMessageType::RosterStop)) {
-        StopRecord record{position, reader.ReadBool(), {}};
-        const auto count = reader.ReadUint32();
-        if (count > settings.max_players) {
-            throw std::invalid_argument("Roster stop admits too many players.");
-        }
-        for (std::uint32_t index = 0; index < count; ++index) {
-            record.joining.push_back(ReadAddress(reader));
-        }
+        const auto record = ReadStop(reader, settings.max_players);
         const auto [entry, inserted] =
             roster_change->stops.emplace(message.sender.value, record);
         if (!inserted && entry->second != record) {
             failure = "Peer changed its roster stop announcement.";
         }
     } else {
+        const auto boundary = reader.ReadUint64();
         const auto world_hash = reader.ReadUint64();
-        const PreparedRecord record{position, world_hash, reader.ReadUint64()};
+        const PreparedRecord record{boundary, world_hash, reader.ReadUint64()};
         const auto [entry, inserted] =
             roster_change->prepared.emplace(message.sender.value, record);
         if (!inserted && entry->second != record) {
@@ -456,7 +481,15 @@ void PeerGroup::BeginRosterChange() {
         return;
     }
     RosterChange change;
-    change.local_stop = {participant->Freeze(), leave_requested, {}};
+    change.local_stop.position = participant->Freeze();
+    change.local_stop.leaving = leave_requested;
+    change.local_stop.dropped = unreachable;
+    for (const auto peer : peers) {
+        if (peer != LocalPeer()) {
+            change.local_stop.progress.emplace(peer.value,
+                                               participant->ProgressOf(peer));
+        }
+    }
     change.started_at = std::chrono::steady_clock::now();
     if (leave_requested) {
         for (const auto &candidate : join_requests) {
@@ -471,7 +504,84 @@ void PeerGroup::BeginRosterChange() {
     }
     join_requests.clear();
     roster_change = std::move(change);
-    status = "Pausing for roster change.";
+    status = unreachable.empty()
+                 ? "Pausing for roster change."
+                 : "Peer " + std::to_string(unreachable.front()) +
+                       " stopped responding. Removing it from the world.";
+}
+
+void PeerGroup::WriteStop(MessageWriter &writer, const StopRecord &stop) {
+    writer.WriteUint64(stop.position);
+    writer.WriteBool(stop.leaving);
+    writer.WriteUint32(static_cast<std::uint32_t>(stop.joining.size()));
+    for (const auto &address : stop.joining) {
+        WriteAddress(writer, address);
+    }
+    writer.WriteUint32(static_cast<std::uint32_t>(stop.dropped.size()));
+    for (const auto id : stop.dropped) {
+        writer.WriteUint32(id);
+    }
+    writer.WriteUint32(static_cast<std::uint32_t>(stop.progress.size()));
+    for (const auto &[id, position] : stop.progress) {
+        writer.WriteUint32(id);
+        writer.WriteUint64(position);
+    }
+}
+
+PeerGroup::StopRecord PeerGroup::ReadStop(MessageReader &reader,
+                                          std::uint32_t max_players) {
+    StopRecord stop;
+    stop.position = reader.ReadUint64();
+    stop.leaving = reader.ReadBool();
+    const auto joining = reader.ReadUint32();
+    if (joining > max_players) {
+        throw std::invalid_argument("Roster stop admits too many players.");
+    }
+    for (std::uint32_t index = 0; index < joining; ++index) {
+        stop.joining.push_back(ReadAddress(reader));
+    }
+    const auto dropped = reader.ReadUint32();
+    if (dropped > max_players) {
+        throw std::invalid_argument("Roster stop drops too many players.");
+    }
+    for (std::uint32_t index = 0; index < dropped; ++index) {
+        stop.dropped.push_back(reader.ReadUint32());
+    }
+    const auto progress = reader.ReadUint32();
+    if (progress > max_players) {
+        throw std::invalid_argument("Roster stop reports too many players.");
+    }
+    for (std::uint32_t index = 0; index < progress; ++index) {
+        const auto id = reader.ReadUint32();
+        stop.progress.emplace(id, reader.ReadUint64());
+    }
+    return stop;
+}
+
+std::vector<std::uint32_t> PeerGroup::DroppedMembers() const {
+    std::vector<std::uint32_t> dropped = roster_change->local_stop.dropped;
+    for (const auto &[id, stop] : roster_change->stops) {
+        for (const auto peer : stop.dropped) {
+            if (!Contains(dropped, peer)) {
+                dropped.push_back(peer);
+            }
+        }
+    }
+    std::sort(dropped.begin(), dropped.end());
+    return dropped;
+}
+
+void PeerGroup::Discard(PeerId peer) {
+    if (Contains(discarded, peer.value)) {
+        return;
+    }
+    discarded.push_back(peer.value);
+    session->RetirePeer(peer);
+    const auto from_peer = [&](const SessionMessage &message) {
+        return message.sender == peer;
+    };
+    std::erase_if(messages, from_peer);
+    std::erase_if(future_messages, from_peer);
 }
 
 void PeerGroup::UpdateRosterChange() {
@@ -484,13 +594,7 @@ void PeerGroup::UpdateRosterChange() {
     }
     if (!change.stop_sent) {
         MessageWriter writer;
-        writer.WriteUint64(change.local_stop.position);
-        writer.WriteBool(change.local_stop.leaving);
-        writer.WriteUint32(
-            static_cast<std::uint32_t>(change.local_stop.joining.size()));
-        for (const auto &address : change.local_stop.joining) {
-            WriteAddress(writer, address);
-        }
+        WriteStop(writer, change.local_stop);
         if (!BroadcastTagged(
                 static_cast<MessageType>(PeerMessageType::RosterStop),
                 writer.Finish())) {
@@ -499,8 +603,27 @@ void PeerGroup::UpdateRosterChange() {
         change.stop_sent = true;
         change.stops.emplace(LocalPeer().value, change.local_stop);
     }
-    if (change.stops.size() != peers.size()) {
+    const auto dropped = DroppedMembers();
+    for (const auto id : dropped) {
+        if (id != LocalPeer().value) {
+            Discard({id});
+        }
+    }
+    if (Contains(dropped, LocalPeer().value)) {
+        removed = true;
+        departed = true;
+        ApplyRosterChange(std::vector<PeerId>{LocalPeer()}, {});
+        roster_change.reset();
         return;
+    }
+    std::vector<std::uint32_t> survivors;
+    for (const auto peer : peers) {
+        if (!Contains(dropped, peer.value)) {
+            if (!change.stops.contains(peer.value)) {
+                return;
+            }
+            survivors.push_back(peer.value);
+        }
     }
 
     std::uint64_t boundary = 0;
@@ -509,17 +632,20 @@ void PeerGroup::UpdateRosterChange() {
     MessageWriter roster_writer;
     roster_writer.WriteUint64(revision);
     roster_writer.WriteUint32(next_peer_id);
-    for (const auto &[id, stop] : change.stops) {
+    roster_writer.WriteUint32(static_cast<std::uint32_t>(dropped.size()));
+    for (const auto id : dropped) {
+        roster_writer.WriteUint32(id);
+        departing.push_back({id});
+    }
+    for (const auto id : survivors) {
+        const auto &stop = change.stops.at(id);
         boundary = std::max(boundary, stop.position);
         if (stop.leaving) {
             departing.push_back({id});
         }
         roster_writer.WriteUint32(id);
-        roster_writer.WriteUint64(stop.position);
-        roster_writer.WriteBool(stop.leaving);
-        roster_writer.WriteUint32(static_cast<std::uint32_t>(stop.joining.size()));
+        WriteStop(roster_writer, stop);
         for (const auto &address : stop.joining) {
-            WriteAddress(roster_writer, address);
             joining.emplace_back(id, address);
         }
     }
@@ -528,6 +654,22 @@ void PeerGroup::UpdateRosterChange() {
         return;
     }
     const auto roster_hash = HashBytes(roster_writer.Finish().bytes);
+    if (!change.abandoned) {
+        for (const auto id : dropped) {
+            auto cutoff = std::numeric_limits<std::uint64_t>::max();
+            for (const auto survivor : survivors) {
+                const auto &progress = change.stops.at(survivor).progress;
+                const auto found = progress.find(id);
+                if (found == progress.end()) {
+                    throw std::invalid_argument(
+                        "Roster stop lacks progress for a dropped member.");
+                }
+                cutoff = std::min(cutoff, found->second);
+            }
+            participant->Abandon({id}, cutoff, boundary);
+        }
+        change.abandoned = true;
+    }
     status = "Finishing up to roster boundary " + std::to_string(boundary) + ".";
     if (!participant->SettleAt(boundary)) {
         return;
@@ -550,6 +692,9 @@ void PeerGroup::UpdateRosterChange() {
         change.prepared.emplace(LocalPeer().value, local);
     }
     for (const auto &[id, prepared] : change.prepared) {
+        if (Contains(dropped, id)) {
+            continue;
+        }
         if (prepared != local) {
             failure = "Roster state mismatch with peer " + std::to_string(id) +
                       " at boundary " + std::to_string(boundary) +
@@ -557,8 +702,10 @@ void PeerGroup::UpdateRosterChange() {
             return;
         }
     }
-    if (change.prepared.size() != peers.size()) {
-        return;
+    for (const auto id : survivors) {
+        if (!change.prepared.contains(id)) {
+            return;
+        }
     }
 
     if (change.local_stop.leaving) {
@@ -599,6 +746,10 @@ void PeerGroup::UpdateRosterChange() {
     }
     ApplyRosterChange(departing, admitted);
     participant->ChangeRoster(departing, joined);
+    std::erase_if(unreachable,
+                  [&](std::uint32_t id) { return Contains(dropped, id); });
+    std::erase_if(discarded,
+                  [&](std::uint32_t id) { return Contains(dropped, id); });
 
     std::optional<NetworkMessage> join_snapshot;
     for (const auto &[candidate, id] : answers) {
@@ -615,7 +766,7 @@ void PeerGroup::UpdateRosterChange() {
         const auto payload = EncodeAssignment(assignment);
         assignments.insert_or_assign(
             candidate.connection.value,
-            SentAssignment{payload, std::chrono::steady_clock::now()});
+            SentAssignment{*id, payload, std::chrono::steady_clock::now()});
         static_cast<void>(session->SendStranger(
             candidate.connection,
             static_cast<MessageType>(PeerMessageType::JoinAssigned), payload));
@@ -728,6 +879,10 @@ std::string PeerGroup::Status() const {
     }
     if (!world_loaded) {
         return "Receiving the world.";
+    }
+    if (removed) {
+        return "Removed from the world: the other players stopped hearing "
+               "from this game.";
     }
     if (departed) {
         return "Departure agreed. Finishing final message delivery.";

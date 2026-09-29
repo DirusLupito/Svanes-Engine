@@ -1,5 +1,6 @@
 #pragma once
 
+#include <svanes/network/message_serialization.hpp>
 #include <svanes/network/network_session.hpp>
 #include <svanes/network/udp_msg_pipe.hpp>
 
@@ -113,7 +114,9 @@ UdpAddress ResolveRelayedAddress(const UdpAddress &relayed,
  * A roster change freezes every member, agrees on a boundary position (the
  * highest position any member froze at), waits until every member has
  * settled exactly at it, compares hashes of SaveWorld(), and then applies the
- * change on every member together.
+ * change on every member together. A member that stopped responding is
+ * abandoned: its contributions end at the lowest progress any remaining member
+ * has for it, and it is removed at the boundary.
  */
 class RosterParticipant {
 public:
@@ -125,6 +128,25 @@ public:
      * @return The position local progress stopped at, such as a tick.
      */
     virtual std::uint64_t Freeze() = 0;
+
+    /**
+     * Called after Freeze().
+     * @param peer Another member.
+     * @return The position through which this process has that member's
+     * contributions, such as the first tick missing its input.
+     */
+    virtual std::uint64_t ProgressOf(PeerId peer) = 0;
+
+    /**
+     * Ends an unresponsive member's contributions before SettleAt() is called.
+     * Contributions at or after the cutoff are discarded, even if already
+     * used, and neutral ones stand in for them up to the boundary.
+     * @param peer The member being removed.
+     * @param cutoff The lowest progress any remaining member has for it.
+     * @param boundary The position every member stops at.
+     */
+    virtual void Abandon(PeerId peer, std::uint64_t cutoff,
+                         std::uint64_t boundary) = 0;
 
     /**
      * Advances toward the agreed boundary without new local progress. Called
@@ -174,7 +196,12 @@ public:
  * by every member, with the attached RosterParticipant settling the world at
  * a common boundary. Ids come from a counter every member advances the same
  * way, so no id is reused. The member that admitted a joiner sends it an
- * assignment and the world. Failed delivery leaves a status message.
+ * assignment and the world.
+ *
+ * A member that stops acknowledging messages for two seconds is dropped
+ * through the same roster change. Every remaining member combines the drops
+ * the others announce, so a process that others dropped removes itself.
+ * Members that disagree about who was dropped fail with a mismatch.
  */
 class PeerGroup {
 public:
@@ -313,10 +340,12 @@ private:
     /**
      * An assignment kept so a lost reply can be repeated.
      * FIELDS:
+     * - peer: The id the joiner was given.
      * - payload: The JoinAssigned message.
      * - sent_at: When the joiner was admitted.
      */
     struct SentAssignment {
+        PeerId peer;
         NetworkMessage payload;
         std::chrono::steady_clock::time_point sent_at;
     };
@@ -328,11 +357,15 @@ private:
      * - leaving: Whether that member is departing.
      * - joining: Addresses of the processes that member admits, in request
      *   order.
+     * - dropped: Ids of the members it found unresponsive, ascending.
+     * - progress: Its participant's progress for every other member, by id.
      */
     struct StopRecord {
         std::uint64_t position;
         bool leaving;
         std::vector<UdpAddress> joining;
+        std::vector<std::uint32_t> dropped;
+        std::map<std::uint32_t, std::uint64_t> progress;
 
         /** @return Whether both records are identical. */
         bool operator==(const StopRecord &) const = default;
@@ -362,6 +395,7 @@ private:
      * - stops: Each member's stop record, keyed by peer id.
      * - prepared: Each member's confirmation, keyed by peer id.
      * - stop_sent: Whether the session accepted the local stop record.
+     * - abandoned: Whether the participant was told about dropped members.
      * - started_at: When the change began, used to report a stall.
      */
     struct RosterChange {
@@ -370,8 +404,37 @@ private:
         std::map<std::uint32_t, StopRecord> stops;
         std::map<std::uint32_t, PreparedRecord> prepared;
         bool stop_sent = false;
+        bool abandoned = false;
         std::chrono::steady_clock::time_point started_at;
     };
+
+    /**
+     * @param writer The message to append to.
+     * @param stop The stop record to write.
+     */
+    static void WriteStop(MessageWriter &writer, const StopRecord &stop);
+
+    /**
+     * @param reader The message positioned at a record written by WriteStop.
+     * @param max_players The most members a record can name.
+     * @return The stop record.
+     * @throws std::invalid_argument for malformed data.
+     */
+    static StopRecord ReadStop(MessageReader &reader,
+                               std::uint32_t max_players);
+
+    /**
+     * Combines the drops announced by members that are not themselves
+     * dropped, repeating until no more members are added.
+     * @return The dropped member ids, ascending.
+     */
+    std::vector<std::uint32_t> DroppedMembers() const;
+
+    /**
+     * Retires a dropped member's route and discards its queued messages.
+     * @param peer The dropped member.
+     */
+    void Discard(PeerId peer);
 
     /**
      * Records one received snapshot chunk.
@@ -492,6 +555,9 @@ private:
     std::vector<JoinCandidate> join_requests;
     std::map<std::uint32_t, SentAssignment> assignments;
     std::optional<RosterChange> roster_change;
+    std::vector<std::uint32_t> unreachable;
+    std::vector<std::uint32_t> discarded;
+    bool removed = false;
 };
 
 } // namespace svanes
