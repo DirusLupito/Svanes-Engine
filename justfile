@@ -63,8 +63,9 @@ configure:
 # Download/update third-party dependencies into thirdparty/.
 fetch-deps: configure
 
-# Pass a target (erik, orbitalEscalation, doubleTime,
-# doubleTime-server) to build only that game; leave blank to build everything.
+# Pass a target (erik, orbitalEscalation, doubleTime, doubleTime-host,
+# doubleTime-spec, or doubleTime-server) to build only that game; leave blank
+# to build everything.
 # Configure and build.
 build target="": (_check-target target) configure
     {{cmake}} --build --preset {{build-preset-prefix}}-debug --parallel {{
@@ -78,6 +79,8 @@ build target="": (_check-target target) configure
                     "svanes_game_orbital_escalation"
                 } else if target == "doubleTime-server" {
                     "svanes_game_double_time_server"
+                } else if target == "doubleTime-host" {
+                    "svanes_game_double_time_server svanes_game_double_time"
                 } else {
                     "svanes_game_double_time"
                 }
@@ -99,6 +102,8 @@ release target="": (_check-target target) configure
                     "svanes_game_orbital_escalation"
                 } else if target == "doubleTime-server" {
                     "svanes_game_double_time_server"
+                } else if target == "doubleTime-host" {
+                    "svanes_game_double_time_server svanes_game_double_time"
                 } else {
                     "svanes_game_double_time"
                 }
@@ -123,10 +128,14 @@ _check-target target:
             ""
         } else if target == "doubleTime-server" {
             ""
+        } else if target == "doubleTime-host" {
+            ""
+        } else if target == "doubleTime-spec" {
+            ""
         } else {
             error(
                 "no game named '" + target + "'. Try: doubleTime, "
-                + "doubleTime-server, erik, orbitalEscalation, "
+                + "doubleTime-host, doubleTime-spec, doubleTime-server, erik, orbitalEscalation, "
                 + "or leave it blank."
             )
         }
@@ -138,7 +147,7 @@ _check-target target:
 # doubleTime-server's host at each other over a network to test with more than
 # one machine.
 # Build and launch an optimized game.
-run target="": (_check-target target) (release
+run target="" server-host="127.0.0.1": (_check-target target) (release
     if target == "" {
         "orbitalEscalation"
     } else {
@@ -146,8 +155,12 @@ run target="": (_check-target target) (release
     }
 )
     {{
-        if target == "doubleTime" {
-            "just _run-double-time-duo " + release-bin-dir
+        if target == "doubleTime-host" {
+            "just _run-double-time-host " + release-bin-dir
+        } else if target == "doubleTime" {
+            "just _run-double-time-platform " + release-bin-dir + " " + server-host
+        } else if target == "doubleTime-spec" {
+            "just _run-double-time-spectator " + release-bin-dir + " " + server-host
         } else {
             release-bin-dir + (
                 if target == "" {
@@ -214,6 +227,47 @@ _run-double-time-duo directory=bin-dir:
         } else {
             directory + "svanes_game_double_time" + exe-suffix
             + " 127.0.0.1 platform"
+        }
+    }}
+
+_run-double-time-host directory=bin-dir:
+    {{
+        if os() == "windows" {
+            "Start-Process -WorkingDirectory " + directory
+            + " -FilePath " + directory + "svanes_game_double_time_server" + exe-suffix
+        } else {
+            "(cd " + directory + " && ./svanes_game_double_time_server &);"
+        }
+    }}
+    {{
+        if os() == "windows" {
+            "Start-Process -WorkingDirectory " + directory
+            + " -FilePath " + directory + "svanes_game_double_time" + exe-suffix
+            + " -ArgumentList '127.0.0.1 character' -Wait"
+        } else {
+            "cd " + directory + " && ./svanes_game_double_time 127.0.0.1 character"
+        }
+    }}
+
+_run-double-time-platform directory=bin-dir server-host="127.0.0.1":
+    {{
+        if os() == "windows" {
+            "Start-Process -WorkingDirectory " + directory
+            + " -FilePath " + directory + "svanes_game_double_time" + exe-suffix
+            + " -ArgumentList '" + server-host + " platform' -Wait"
+        } else {
+            "cd " + directory + " && ./svanes_game_double_time " + server-host + " platform"
+        }
+    }}
+
+_run-double-time-spectator directory=bin-dir server-host="127.0.0.1":
+    {{
+        if os() == "windows" {
+            "Start-Process -WorkingDirectory " + directory
+            + " -FilePath " + directory + "svanes_game_double_time" + exe-suffix
+            + " -ArgumentList '" + server-host + " spectator' -Wait"
+        } else {
+            "cd " + directory + " && ./svanes_game_double_time " + server-host + " spectator"
         }
     }}
 
