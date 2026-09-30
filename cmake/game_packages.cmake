@@ -8,6 +8,8 @@ endif()
 function(svanes_game_package target name source_folder asset_folder)
     set(asset_source "${CMAKE_SOURCE_DIR}/games/${source_folder}/assets")
     add_custom_target(${target}_assets
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+            "$<TARGET_FILE_DIR:${target}>/assets/${asset_folder}"
         COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${asset_source}" "$<TARGET_FILE_DIR:${target}>/assets/${asset_folder}"
         VERBATIM)

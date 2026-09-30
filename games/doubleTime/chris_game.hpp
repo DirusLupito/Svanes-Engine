@@ -9,6 +9,7 @@
 #include <svanes/network/network_client.hpp>
 #include <svanes/network/network_replication.hpp>
 #include <svanes/render/basic_render_types.hpp>
+#include <svanes/timeline_system.hpp>
 
 #include <string>
 
@@ -32,6 +33,7 @@ private:
     svanes::NetworkClient network_client;
     svanes::NetworkEntityMap entity_map;
     ClientRole role;
+    svanes::Timeline client_timeline;
 
     svanes::TextureHandle idle_texture{};
     svanes::TextureHandle running_texture{};

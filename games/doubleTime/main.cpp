@@ -27,6 +27,10 @@ ClientRole ParseRole(std::string_view role_text) {
 } // namespace
 
 int32_t main(int32_t argc, char **argv) {
+    if (argc > 3) {
+        throw std::invalid_argument(
+            "Expected at most a server host and client role.");
+    }
     const std::string server_host = argc > 1 ? argv[1] : kChrisDefaultServerHost;
     const ClientRole role = argc > 2 ? ParseRole(argv[2]) : ClientRole::Character;
 

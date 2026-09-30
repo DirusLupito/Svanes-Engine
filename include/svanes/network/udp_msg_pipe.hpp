@@ -9,7 +9,9 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-
+/**
+ * CURRENTLY DEPRECATED
+ */
 namespace svanes {
 
 /**

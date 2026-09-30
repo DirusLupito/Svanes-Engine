@@ -6,7 +6,7 @@
 #include <svanes/kinematic_system.hpp>
 #include <svanes/network/network_replication.hpp>
 #include <svanes/network/network_server.hpp>
-#include <svanes/network/udp_msg_pipe.hpp>
+#include <svanes/network/tcp_msg_pipe.hpp>
 #include <svanes/physics_system.hpp>
 #include <svanes/registry.hpp>
 #include <svanes/network/server_runtime.hpp>
@@ -21,7 +21,10 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <stdexcept>
+#include <string_view>
 #include <variant>
+#include <vector>
 
 namespace {
 
@@ -240,9 +243,28 @@ void AdvancePlatform(svanes::Registry &world, ServerPlatform &platform,
 
 } // namespace
 
-int32_t main() {
+namespace {
+
+} // namespace
+
+int32_t main(int32_t argc, char **argv) {
+    if (argc > 1) {
+        throw std::invalid_argument("The Double Time server takes no arguments.");
+    }
     svanes::NetworkServer network_server(
-        std::make_unique<svanes::UdpMsgPipe>(kChrisServerPort));
+        std::vector<svanes::NetworkServer::PipeFactory>{
+            [] {
+                return std::make_unique<svanes::TcpMsgPipe>(
+                    kChrisCharacterTcpPort);
+            },
+            [] {
+                return std::make_unique<svanes::TcpMsgPipe>(
+                    kChrisPlatformTcpPort);
+            },
+            [] {
+                return std::make_unique<svanes::TcpMsgPipe>(
+                    kChrisSpectatorTcpPort);
+            }});
 
     svanes::Registry world;
 

@@ -3,7 +3,7 @@
 
 #include <svanes/camera2d.hpp>
 #include <svanes/input.hpp>
-#include <svanes/network/udp_msg_pipe.hpp>
+#include <svanes/network/tcp_msg_pipe.hpp>
 #include <svanes/registry.hpp>
 #include <svanes/render/render_system.hpp>
 #include <svanes/render/texture_manager.hpp>
@@ -43,11 +43,46 @@ struct NetworkInterpolationTarget {
     svanes::Transform target;
 };
 
+std::uint16_t TcpPortForRole(ClientRole role) {
+    if (role == ClientRole::Character) {
+        return kChrisCharacterTcpPort;
+    }
+    if (role == ClientRole::Platform) {
+        return kChrisPlatformTcpPort;
+    }
+    return kChrisSpectatorTcpPort;
+}
+
+std::unique_ptr<svanes::MsgPipe>
+CreateNetworkPipe(const std::string &server_host, ClientRole role) {
+    return std::make_unique<svanes::TcpMsgPipe>(
+        server_host, TcpPortForRole(role));
+}
+
+void UpdateClientSpeed(const svanes::InputManager &input,
+                       svanes::Timeline &timeline) {
+    if (input.WasPressed(svanes::Key::Digit1)) {
+        timeline.SetTicSize(svanes::RationalNumber{2});
+    }
+    if (input.WasPressed(svanes::Key::Digit2)) {
+        timeline.SetTicSize(svanes::RationalNumber{1});
+    }
+    if (input.WasPressed(svanes::Key::Digit3)) {
+        timeline.SetTicSize(svanes::RationalNumber{1, 2});
+    }
+    if (input.WasPressed(svanes::Key::Digit0)) {
+        if (timeline.IsPaused()) {
+            timeline.Unpause();
+        } else {
+            timeline.Pause();
+        }
+    }
+}
+
 } // namespace
 
 ChrisGame::ChrisGame(std::string server_host, ClientRole role)
-    : network_client(std::make_unique<svanes::UdpMsgPipe>(0, server_host,
-                                                          kChrisServerPort)),
+    : network_client(CreateNetworkPipe(server_host, role)),
       role(role) {
     SDL_Log("Networking: client %u connecting to server at %s.",
             network_client.Id(), server_host.c_str());
@@ -141,27 +176,27 @@ svanes::Entity ChrisGame::SpawnPlatform(svanes::Registry &world,
 }
 
 void ChrisGame::SendInput(const svanes::FrameContext &frame) {
-    input_send_timer += static_cast<float>(frame.real_delta_tics) /
+    input_send_timer += static_cast<float>(client_timeline.GetDeltaTics()) /
                         static_cast<float>(svanes::TicsPerSecond);
-    if (input_send_timer < kInputSendIntervalSeconds) {
-        return;
-    }
-    input_send_timer -= kInputSendIntervalSeconds;
+    while (input_send_timer >= kInputSendIntervalSeconds) {
+        input_send_timer -= kInputSendIntervalSeconds;
 
-    float horizontal_input = 0.0F;
-    if (role == ClientRole::Character) {
-        if (frame.input.IsDown(svanes::Key::Left)) {
-            horizontal_input -= 1.0F;
+        float horizontal_input = 0.0F;
+        if (role == ClientRole::Character) {
+            if (frame.input.IsDown(svanes::Key::Left)) {
+                horizontal_input -= 1.0F;
+            }
+            if (frame.input.IsDown(svanes::Key::Right)) {
+                horizontal_input += 1.0F;
+            }
         }
-        if (frame.input.IsDown(svanes::Key::Right)) {
-            horizontal_input += 1.0F;
-        }
-    }
 
-    const PlayerInputMessage input{network_client.Id(), role, horizontal_input,
-                                   action_requested_since_last_send};
-    network_client.Send(input);
-    action_requested_since_last_send = false;
+        const PlayerInputMessage input{
+            network_client.Id(), role, horizontal_input,
+            action_requested_since_last_send};
+        network_client.Send(input);
+        action_requested_since_last_send = false;
+    }
 }
 
 void ChrisGame::ApplyServerState(svanes::Registry &world) {
@@ -234,10 +269,13 @@ void ChrisGame::SmoothNetworkedTransforms(const svanes::FrameContext &frame) {
 }
 
 void ChrisGame::Update(const svanes::FrameContext &frame) {
+    UpdateClientSpeed(frame.input, client_timeline);
+
     if (frame.input.WasPressed(svanes::Key::Space)) {
         action_requested_since_last_send = true;
     }
 
+    client_timeline.Advance(frame.real_delta_tics);
     SendInput(frame);
     ApplyServerState(frame.world);
     SmoothNetworkedTransforms(frame);
