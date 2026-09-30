@@ -1,8 +1,11 @@
 #include "asset_catalog.hpp"
 
+#include "../combat/weapon_system.hpp"
 #include "dynamic_object_serialization.hpp"
+#include "missile_launcher_serialization.hpp"
 #include "missile_serialization.hpp"
 #include "ship_serialization.hpp"
+#include <svanes/registry.hpp>
 
 #include <algorithm>
 #include <stdexcept>
@@ -59,6 +62,16 @@ AssetCatalog::AssetCatalog(const std::filesystem::path &root) {
         }
     }
 
+    // Load missile launchers
+    for (const auto &path : DefinitionFiles(root / "missile_launchers")) {
+        auto definition = LoadMissileLauncher(path);
+        const auto name = definition.object.name;
+        if (!missile_launchers.emplace(name, std::move(definition)).second) {
+            throw std::invalid_argument(
+                path.string() + ": Duplicate missile launcher name: " + name);
+        }
+    }
+
     // Now that all definitions are loaded, we can check their references.
     // In particular, ships can refer to missiles even though we loaded all of
     // the ships before loading any of the missiles.
@@ -74,6 +87,10 @@ AssetCatalog::AssetCatalog(const std::filesystem::path &root) {
     for (const auto &[name, definition] : missiles) {
         ValidateReferences(DynamicObjectType::Missile, name, visits);
     }
+    // Missile launcher validation
+    for (const auto &[name, definition] : missile_launchers) {
+        ValidateReferences(DynamicObjectType::MissileLauncher, name, visits);
+    }
 }
 
 const DynamicObjectDefinition &
@@ -87,6 +104,12 @@ AssetCatalog::GetDefinition(DynamicObjectType type,
         break;
     case DynamicObjectType::Missile:
         if (const auto found = missiles.find(name); found != missiles.end()) {
+            return found->second.object;
+        }
+        break;
+    case DynamicObjectType::MissileLauncher:
+        if (const auto found = missile_launchers.find(name);
+            found != missile_launchers.end()) {
             return found->second.object;
         }
         break;
@@ -134,6 +157,19 @@ void AssetCatalog::ValidateReferences(
         }
     }
 
+    // The ammunition reference is also an attachment dependency. A missile
+    // that contains a launcher that loads that same missile would create
+    // forever.
+    if (type == DynamicObjectType::MissileLauncher) {
+        try {
+            ValidateReferences(DynamicObjectType::Missile,
+                               missile_launchers.at(name).missile, visits);
+        } catch (const std::invalid_argument &error) {
+            throw std::invalid_argument("missile_launcher '" + name +
+                                        "': " + error.what());
+        }
+    }
+
     // Base case: everything checks out/this definition either has no
     // attachments or all of its attachments are valid.
     visits.at(key) = Visit::Complete;
@@ -160,19 +196,50 @@ std::unique_ptr<Ship> AssetCatalog::CreateShip(svanes::Registry &world,
     return ship;
 }
 
-std::unique_ptr<DynamicObject>
-AssetCatalog::Create(svanes::Registry &world, svanes::Entity gameplay_timeline,
-                     DynamicObjectType type, const std::string &name) const {
-
-    // For now we're either making a ship or a missile.
-    if (type == DynamicObjectType::Ship) {
-        return CreateShip(world, gameplay_timeline, name);
-    }
-
-    // TODO: put this into a new CreateMissile function, similar to CreateShip
-    const auto &definition = GetDefinition(type, name);
+std::unique_ptr<Missile>
+AssetCatalog::CreateMissile(svanes::Registry &world,
+                            svanes::Entity gameplay_timeline,
+                            const std::string &name) const {
+    const auto &definition = GetDefinition(DynamicObjectType::Missile, name);
     auto missile =
         std::make_unique<Missile>(world, gameplay_timeline, missiles.at(name));
     CreateAttachments(world, gameplay_timeline, *missile, definition);
     return missile;
+}
+
+std::unique_ptr<MissileLauncher>
+AssetCatalog::CreateMissileLauncher(svanes::Registry &world,
+                                    svanes::Entity gameplay_timeline,
+                                    const std::string &name) const {
+    const auto &definition =
+        GetDefinition(DynamicObjectType::MissileLauncher, name);
+
+    const auto &launcher_definition = missile_launchers.at(name);
+    auto launcher = std::make_unique<MissileLauncher>(world, gameplay_timeline,
+                                                      launcher_definition);
+
+    CreateAttachments(world, gameplay_timeline, *launcher, definition);
+    auto missile =
+        CreateMissile(world, gameplay_timeline, launcher_definition.missile);
+
+    const auto missile_entity = missile->GetEntity();
+    launcher->AddAttachment(world, std::move(missile), {});
+    world.GetComponent<MissileLauncherState>(launcher->GetEntity())
+        .loaded_missile = missile_entity;
+
+    return launcher;
+}
+
+std::unique_ptr<DynamicObject>
+AssetCatalog::Create(svanes::Registry &world, svanes::Entity gameplay_timeline,
+                     DynamicObjectType type, const std::string &name) const {
+    switch (type) {
+    case DynamicObjectType::Ship:
+        return CreateShip(world, gameplay_timeline, name);
+    case DynamicObjectType::Missile:
+        return CreateMissile(world, gameplay_timeline, name);
+    case DynamicObjectType::MissileLauncher:
+        return CreateMissileLauncher(world, gameplay_timeline, name);
+    }
+    throw std::invalid_argument("Unsupported dynamic object type");
 }

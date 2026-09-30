@@ -6,7 +6,7 @@
 /**
  * Reads the type of a dynamic object from a JSON string.
  *
- * @param value The JSON string, either "ship" or "missile".
+ * @param value The JSON string, "ship", "missile", or "missile_launcher".
  * @return The corresponding DynamicObjectType.
  * @throws std::invalid_argument If the type is unsupported.
  */
@@ -16,7 +16,7 @@ DynamicObjectType ReadDynamicObjectType(const nlohmann::json &value);
  * Writes the type of a dynamic object as a string for use in JSON.
  *
  * @param type The DynamicObjectType to write.
- * @return The string "ship" or "missile".
+ * @return The string "ship", "missile", or "missile_launcher".
  * @throws std::invalid_argument If the type is unsupported.
  */
 std::string WriteDynamicObjectType(DynamicObjectType type);

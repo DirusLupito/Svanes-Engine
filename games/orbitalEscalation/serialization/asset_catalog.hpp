@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../game_objects/dynamic_object/missile.hpp"
+#include "../game_objects/dynamic_object/missile_launcher.hpp"
 #include "../game_objects/dynamic_object/ship.hpp"
 
 #include <filesystem>
@@ -20,10 +21,11 @@
 class AssetCatalog final {
 public:
     /**
-     * Loads the JSON files in the ships and missiles folders underneath root,
-     * including any subfolders.
+     * Loads the JSON files in the ships, missiles, and missile_launchers
+     * folders underneath root, including any subfolders.
      *
-     * @param root The folder containing the ships and missiles folders.
+     * @param root The folder containing the ships, missiles, and
+     * missile_launchers folders.
      *
      * @throws std::invalid_argument If definitions are invalid, names are
      * duplicated within a type, references are missing, or attachments form a
@@ -46,8 +48,8 @@ public:
 
     /**
      * Creates a dynamic object and its attachments from a typed name. This is
-     * used for attachments because an attachment can be either a ship or a
-     * missile.
+     * used for attachments because an attachment can be a ship, missile, or
+     * missile launcher.
      *
      * @param world The registry in which to create the entities.
      * @param gameplay_timeline The parent timeline for all created objects.
@@ -62,6 +64,32 @@ public:
                                           svanes::Entity gameplay_timeline,
                                           DynamicObjectType type,
                                           const std::string &name) const;
+
+    /**
+     * Creates a missile and its attachments from a named definition.
+     *
+     * @param world The registry in which to create the entities.
+     * @param gameplay_timeline The parent timeline for the created objects.
+     * @param name The name of the missile definition.
+     * @return The new missile, which owns its attached objects.
+     */
+    std::unique_ptr<Missile> CreateMissile(svanes::Registry &world,
+                                           svanes::Entity gameplay_timeline,
+                                           const std::string &name) const;
+
+    /**
+     * Creates a launcher and supplies its initial missile. Reloading uses the
+     * same missile definition, so the loaded and replacement missiles match.
+     *
+     * @param world The registry in which to create the entities.
+     * @param gameplay_timeline The parent timeline for the created objects.
+     * @param name The name of the launcher definition.
+     * @return The loaded missile launcher.
+     */
+    std::unique_ptr<MissileLauncher>
+    CreateMissileLauncher(svanes::Registry &world,
+                          svanes::Entity gameplay_timeline,
+                          const std::string &name) const;
 
 private:
     /**
@@ -83,6 +111,9 @@ private:
 
     // The missile definitions loaded from JSON files.
     std::map<std::string, MissileDefinition> missiles;
+
+    // The missile launcher definitions loaded from JSON files.
+    std::map<std::string, MissileLauncherDefinition> missile_launchers;
 
     /**
      * Finds the common properties of a definition, regardless of its type.

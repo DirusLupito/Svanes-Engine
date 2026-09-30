@@ -1,13 +1,16 @@
 #include "orbital_escalation_game.hpp"
 #include "attachment_system.hpp"
 #include "combat/damage_system.hpp"
+#include "combat/missile_system.hpp"
+#include "combat/weapon_system.hpp"
 #include "controls.hpp"
+#include "effects/collision_flashes.hpp"
 #include "serialization/asset_catalog.hpp"
 
 #include <svanes/MenuUtilities/text_label.hpp>
 #include <svanes/asset_path.hpp>
 #include <svanes/camera2d.hpp>
-#include <svanes/collision_system.hpp>
+#include <svanes/collision_pass.hpp>
 #include <svanes/input.hpp>
 #include <svanes/kinematic_system.hpp>
 #include <svanes/registry.hpp>
@@ -22,7 +25,6 @@
 #include <utility>
 
 constexpr float kPlanetRadius = 4200.0F;
-constexpr float kAttachmentLaunchSpeed = 1500.0F;
 constexpr float kPlayerHealth = 100.0F;
 constexpr float kPlanetImpactDamage = 25.0F;
 const svanes::TicCount kPauseFlashPeriod = svanes::SecondsToTics(1.0);
@@ -69,17 +71,14 @@ static Visual CreatePlanetLayer(float radius, svanes::Color color,
  * direction of the collision normal.
  *
  * @param world The registry containing the entities.
- * @param a The first entity.
- * @param b The second entity.
+ * @param pair The entities and collision details from the shared detection
+ * pass.
  */
-static bool ApplyCollisionAcceleration(svanes::Registry &world,
-                                       svanes::Entity a, svanes::Entity b) {
-    const auto collisions = svanes::DetectCollisions(
-        world.GetComponent<svanes::Collider2D>(a).geometry,
-        world.GetComponent<svanes::Transform>(a),
-        world.GetComponent<svanes::Collider2D>(b).geometry,
-        world.GetComponent<svanes::Transform>(b));
-    for (const svanes::Collision2D &collision : collisions) {
+static void ApplyCollisionAcceleration(svanes::Registry &world,
+                                       const svanes::EntityCollision2D &pair) {
+    const auto a = pair.a;
+    const auto b = pair.b;
+    for (const svanes::Collision2D &collision : pair.collisions) {
         const svanes::Vector2D acceleration =
             collision.normal *
             svanes::PerSecondSquaredToPerTicSquared(400000.0F);
@@ -94,7 +93,6 @@ static bool ApplyCollisionAcceleration(svanes::Registry &world,
             motion.acceleration_y -= acceleration.y;
         }
     }
-    return !collisions.empty();
 }
 
 void OrbitalEscalationGame::Initialize(svanes::GameContext &context) {
@@ -135,9 +133,10 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext &context) {
     planet->GetTransform(context.world) = {0.0F, 0.0F};
     planet->UpdateVisuals(context.world);
 
-    const AssetCatalog assets(svanes::AssetPath("assets/orbitalEscalation"));
-    player_ship = assets.CreateShip(context.world, gameplay_timeline_entity,
-                                    "player_ship");
+    assets = std::make_unique<AssetCatalog>(
+        svanes::AssetPath("assets/orbitalEscalation"));
+    player_ship = assets->CreateShip(context.world, gameplay_timeline_entity,
+                                     "player_ship");
     context.world.AddComponent<Health>(player_ship->GetEntity(),
                                        Health{kPlayerHealth});
     const svanes::Transform player_start{0.0F, -kPlanetRadius - 800.0F};
@@ -226,31 +225,27 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext &frame) {
 
     UpdateAttachments(frame.world);
 
-    // Right click fires all attached missiles.
-    if (player_ship &&
-        !frame.world.GetComponent<svanes::Timeline>(gameplay_timeline_entity)
-             .IsPaused() &&
-        frame.input.WasMouseButtonPressed(svanes::MouseButton::Right)) {
-        const auto &pose = player_ship->GetTransform(frame.world);
-
-        const auto forward =
-            frame.world.GetComponent<Propulsion>(player_ship->GetEntity())
-                .GetForward();
-
-        const float cosine = std::cos(pose.rotation);
-        const float sine = std::sin(pose.rotation);
-
-        const svanes::Vector2D direction{forward.x * cosine - forward.y * sine,
-                                         forward.x * sine + forward.y * cosine};
-
-        auto released = player_ship->DetachAttachments(
-            frame.world,
-            direction * svanes::PerSecondToPerTic(kAttachmentLaunchSpeed));
-
-        for (auto &attachment : released) {
-            detached_attachments.push_back(std::move(attachment));
+    // Right click requests one shot from every weapon on the player ship.
+    // The weapon system decides which launchers have ammunition and are ready.
+    if (!frame.world.GetComponent<svanes::Timeline>(gameplay_timeline_entity)
+             .IsPaused()) {
+        if (player_ship) {
+            if (frame.input.WasMouseButtonPressed(svanes::MouseButton::Right)) {
+                SetWeaponControls(frame.world, *player_ship,
+                                  WeaponControl{true});
+            }
+            UpdateWeapons(frame.world, *player_ship, *assets,
+                          gameplay_timeline_entity, projectiles);
+        }
+        const auto count = projectiles.size();
+        for (std::size_t i = 0; i < count; ++i) {
+            UpdateWeapons(frame.world, *projectiles[i], *assets,
+                          gameplay_timeline_entity, projectiles);
         }
     }
+
+    UpdateAttachments(frame.world);
+    UpdateCollisionFlashes(frame.world, collision_flashes);
 
     // Visuals are entities that just have one single visual component, like a
     // sprite or a solid shape. So even though the engine will update the ship
@@ -261,7 +256,7 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext &frame) {
         player_ship->UpdateVisuals(frame.world);
     }
 
-    for (const auto &attachment : detached_attachments) {
+    for (const auto &attachment : projectiles) {
         attachment->UpdateVisuals(frame.world);
     }
 
@@ -304,17 +299,61 @@ void OrbitalEscalationGame::PhysicsUpdate(
     }
     ApplyPropulsion(physics.world);
 
-    if (!player_ship) {
-        return;
-    }
-    const bool touching_planet = ApplyCollisionAcceleration(
-        physics.world, player_ship->GetEntity(), planet->GetEntity());
-    if (touching_planet && !player_touching_planet &&
-        ApplyDamage(physics.world, player_ship->GetEntity(),
-                    kPlanetImpactDamage)) {
-        player_ship.reset();
+    UpdateAttachments(physics.world);
+    std::vector<svanes::Entity> colliders;
+    physics.world.ForEach<svanes::Collider2D, svanes::Transform>(
+        [&](svanes::Entity entity, const auto &, const auto &) {
+            if (!IsDead(physics.world, entity)) {
+                colliders.push_back(entity);
+            }
+        });
+    auto contacts = svanes::DetectEntityCollisions(physics.world, colliders,
+                                                   physics.parallel_for);
+    std::erase_if(contacts, [&](const svanes::EntityCollision2D &pair) {
+        return GetAttachmentRoot(physics.world, pair.a) ==
+                   GetAttachmentRoot(physics.world, pair.b) ||
+               IgnoresFiringShip(physics.world, pair.a, pair.b) ||
+               IgnoresFiringShip(physics.world, pair.b, pair.a);
+    });
+
+    bool touching_planet = false;
+    if (player_ship && !IsDead(physics.world, player_ship->GetEntity())) {
+        const auto player = player_ship->GetEntity();
+        const auto surface = planet->GetEntity();
+        for (const auto &pair : contacts) {
+            if ((pair.a == player && pair.b == surface) ||
+                (pair.b == player && pair.a == surface)) {
+                touching_planet = true;
+                ApplyCollisionAcceleration(physics.world, pair);
+            }
+        }
+
+        if (touching_planet && !player_touching_planet) {
+            ApplyDamage(physics.world, player, kPlanetImpactDamage);
+        }
     }
     player_touching_planet = touching_planet;
+
+    UpdateMissileExplosions(physics.world, gameplay_timeline_entity, contacts,
+                            collision_flashes);
+
+    // Explosions have finished using the entities' geometry. Now their owners
+    // can remove dead objects, including dead missiles still inside launchers.
+    if (player_ship) {
+        if (IsDead(physics.world, player_ship->GetEntity())) {
+            player_ship.reset();
+        } else {
+            player_ship->RemoveDeadAttachments(physics.world);
+        }
+    }
+
+    std::erase_if(projectiles, [&](const auto &object) {
+        if (IsDead(physics.world, object->GetEntity())) {
+            return true;
+        }
+        object->RemoveDeadAttachments(physics.world);
+        return false;
+    });
 }
 
 bool OrbitalEscalationGame::ShouldQuit() const { return should_quit; }

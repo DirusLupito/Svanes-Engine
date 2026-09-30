@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dynamic_object.hpp"
+#include <svanes/timeline_system.hpp>
 
 /**
  * Defines the properties of a missile. For now, a missile simply moves with
@@ -9,9 +10,19 @@
  *
  * FIELDS:
  * - object: The missile's name, collider, visuals, and attachment definitions.
+ * - health: The missile's initial health. A missile explodes when this runs
+ * out.
+ * - damage: The damage dealt at the center of its explosion.
+ * - blast_radius: The distance at which its explosion stops dealing damage.
+ * - arming_tics: The missile's local tics after launch before it can collide
+ * with its firing ship. Other objects can be hit immediately.
  */
 struct MissileDefinition {
     DynamicObjectDefinition object;
+    float health;
+    float damage;
+    float blast_radius;
+    svanes::TicCount arming_tics = 0;
 };
 
 /**
@@ -34,3 +45,12 @@ public:
     Missile(svanes::Registry &world, svanes::Entity gameplay_timeline,
             MissileDefinition definition);
 };
+
+/**
+ * Validates the health and explosion properties of a missile definition.
+ *
+ * @param definition The missile definition to validate.
+ * @throws std::invalid_argument If health or blast_radius is not finite and
+ * positive, or damage is not finite and nonnegative.
+ */
+void ValidateMissile(const MissileDefinition &definition);

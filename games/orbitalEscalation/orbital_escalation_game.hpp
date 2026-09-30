@@ -2,6 +2,7 @@
 
 #include "game_objects/dynamic_object/ship.hpp"
 #include "game_objects/planet.hpp"
+#include "serialization/asset_catalog.hpp"
 
 #include <svanes/entity.hpp>
 #include <svanes/game.hpp>
@@ -51,9 +52,11 @@ private:
 
 
     svanes::Entity background_entity = 0;
+    std::unique_ptr<AssetCatalog> assets;
     std::unique_ptr<Ship> player_ship;
     std::optional<Planet> planet;
-    std::vector<std::unique_ptr<DynamicObject>> detached_attachments;
+    std::vector<std::unique_ptr<DynamicObject>> projectiles;
+    std::vector<OwnedEntity> collision_flashes;
     bool player_touching_planet = false;
 
     bool should_quit = false;
