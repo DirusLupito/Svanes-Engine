@@ -241,8 +241,9 @@ _run-double-time-host directory=bin-dir:
     }}
     {{
         if os() == "windows" {
-            "& " + directory + "svanes_game_double_time" + exe-suffix
-            + " 127.0.0.1 character"
+            "Start-Process -WorkingDirectory " + directory
+            + " -FilePath " + directory + "svanes_game_double_time" + exe-suffix
+            + " -ArgumentList '127.0.0.1 character' -Wait"
         } else {
             "cd " + directory + " && ./svanes_game_double_time 127.0.0.1 character"
         }
@@ -251,8 +252,9 @@ _run-double-time-host directory=bin-dir:
 _run-double-time-platform directory=bin-dir server-host="127.0.0.1":
     {{
         if os() == "windows" {
-            "& " + directory + "svanes_game_double_time" + exe-suffix
-            + " " + server-host + " platform"
+            "Start-Process -WorkingDirectory " + directory
+            + " -FilePath " + directory + "svanes_game_double_time" + exe-suffix
+            + " -ArgumentList '" + server-host + " platform' -Wait"
         } else {
             "cd " + directory + " && ./svanes_game_double_time " + server-host + " platform"
         }
@@ -261,8 +263,9 @@ _run-double-time-platform directory=bin-dir server-host="127.0.0.1":
 _run-double-time-spectator directory=bin-dir server-host="127.0.0.1":
     {{
         if os() == "windows" {
-            "& " + directory + "svanes_game_double_time" + exe-suffix
-            + " " + server-host + " spectator"
+            "Start-Process -WorkingDirectory " + directory
+            + " -FilePath " + directory + "svanes_game_double_time" + exe-suffix
+            + " -ArgumentList '" + server-host + " spectator' -Wait"
         } else {
             "cd " + directory + " && ./svanes_game_double_time " + server-host + " spectator"
         }
