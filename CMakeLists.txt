@@ -323,6 +323,8 @@ add_executable(
     games/orbitalEscalation/serialization/ship_serialization.hpp
     games/orbitalEscalation/main.cpp
     games/orbitalEscalation/orbital_escalation_game.cpp
+    games/orbitalEscalation/orbital_simulation.cpp
+    games/orbitalEscalation/orbital_simulation.hpp
     games/orbitalEscalation/game_objects/dynamic_object/dynamic_object.cpp
     games/orbitalEscalation/game_objects/dynamic_object/dynamic_object.hpp
     games/orbitalEscalation/game_objects/dynamic_object/ship.cpp

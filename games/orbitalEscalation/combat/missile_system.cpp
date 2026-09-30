@@ -4,6 +4,7 @@
 #include "../effects/collision_flashes.hpp"
 #include "damage_system.hpp"
 #include <svanes/registry.hpp>
+#include <svanes/stable_id.hpp>
 
 #include <set>
 
@@ -31,7 +32,13 @@ void UpdateMissileExplosions(
     svanes::Registry &world, svanes::Entity gameplay_timeline,
     std::span<const svanes::EntityCollision2D> contacts,
     std::vector<OwnedEntity> &flashes) {
-    std::set<svanes::Entity> pending;
+    // One explosion can trigger another, so every peer needs to process them
+    // in the same order. Local entity IDs do not provide that guarantee.
+    const auto before = [&](svanes::Entity a, svanes::Entity b) {
+        return world.GetComponent<svanes::StableId>(a).value <
+               world.GetComponent<svanes::StableId>(b).value;
+    };
+    std::set<svanes::Entity, decltype(before)> pending(before);
 
     // Finds undetonated missiles whose health has reached zero and adds them to
     // pending. It is called before processing begins and after each explosion
