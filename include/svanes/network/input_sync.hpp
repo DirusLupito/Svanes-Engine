@@ -221,8 +221,11 @@ public:
     bool CanClose() const;
 
     /**
-     * Stops local input and discards pending real time.
-     * @return The current tick.
+     * Stops local input and discards pending real time. Any input already
+     * taken for sending must be consumed before changing the roster, even if
+     * outgoing capacity has delayed its publication.
+     *
+     * @return The first tick without a reserved local input.
      */
     std::uint64_t Freeze() override;
 
@@ -245,8 +248,11 @@ public:
                  std::uint64_t boundary) override;
 
     /**
-     * Receives inputs, corrects predictions, and advances with neutral local
-     * input toward the boundary.
+     * Advances toward the agreed tick so the roster can change from a state
+     * all peers have confirmed. Retains local input already taken for a tick,
+     * supplying neutral input for any remaining ticks up to the boundary.
+     * With prediction disabled, each tick waits for every remote input.
+     *
      * @param boundary The agreed tick.
      * @return Whether the simulation is at the boundary with every input
      * through it confirmed.
@@ -510,22 +516,30 @@ void InputSync<Input, Use>::Update(const FrameContext &frame) {
             pending_tics = std::min(pending_tics, settings.step_tics);
             break;
         }
+
+        // Publish before waiting for remote inputs. Otherwise, with prediction
+        // disabled, every peer could wait for input nobody has sent yet.
+        // Keep an already published input fixed while waiting for this tick.
+        if (!players[local_index].actual.contains(tick)) {
+            if (!unsent_input) {
+                unsent_input = simulation.TakeInput();
+            }
+            if (!peers.Broadcast(
+                    static_cast<MessageType>(InputSyncMessageType::Input),
+                    EncodeTickInput(tick, *unsent_input))) {
+                waiting = "Waiting for outgoing message capacity.";
+                pending_tics = std::min(pending_tics, settings.step_tics);
+                break;
+            }
+            RecordInput(local_index, tick, *unsent_input);
+            unsent_input.reset();
+        }
+
         if (!CanPredict()) {
             waiting = "Waiting for remote inputs.";
             pending_tics = std::min(pending_tics, settings.step_tics);
             break;
         }
-        if (!unsent_input) {
-            unsent_input = simulation.TakeInput();
-        }
-        if (!peers.Broadcast(static_cast<MessageType>(InputSyncMessageType::Input),
-                             EncodeTickInput(tick, *unsent_input))) {
-            waiting = "Waiting for outgoing message capacity.";
-            pending_tics = std::min(pending_tics, settings.step_tics);
-            break;
-        }
-        RecordInput(local_index, tick, *unsent_input);
-        unsent_input.reset();
         AdvanceTick();
         pending_tics -= pacing_tics;
         waiting.clear();
@@ -897,8 +911,18 @@ bool InputSync<Input, Use>::CanClose() const {
 template <typename Input, typename Use>
 std::uint64_t InputSync<Input, Use>::Freeze() {
     pending_tics = 0;
-    unsent_input.reset();
-    return tick;
+
+    // TakeInput may already have consumed a firing press even if broadcasting
+    // failed. Include that tick in settlement so a roster change cannot lose
+    // the input before it is sent and applied.
+    if (unsent_input) {
+        if (tick == std::numeric_limits<std::uint64_t>::max()) {
+            throw std::overflow_error(
+                "InputSync tick overflow during roster change.");
+        }
+        return tick + 1;
+    }
+    return players[local_index].next_input_tick;
 }
 
 template <typename Input, typename Use>
@@ -931,12 +955,33 @@ bool InputSync<Input, Use>::SettleAt(std::uint64_t boundary) {
     pending_tics = 0;
     for (std::uint32_t step = 0;
          tick < boundary && step < settings.steps_per_frame; ++step) {
-        const Input neutral{};
-        if (!peers.Broadcast(static_cast<MessageType>(InputSyncMessageType::Input),
-                             EncodeTickInput(tick, neutral))) {
+        // A player joining or leaving can start settlement while this tick is
+        // still waiting for remote input or outgoing capacity. Suppose we
+        // already sent fire = true for tick 100. Sending neutral input now
+        // would send fire = false for that same tick, and RecordInput would
+        // reject it because we changed our input after publishing it.
+        //
+        // Even if the input has not been sent yet, TakeInput may already have
+        // consumed the firing press. Replacing unsent_input with neutral input
+        // would silently lose that shot. Finish the input already chosen for
+        // this tick, and use neutral input only for ticks without one.
+        if (!players[local_index].actual.contains(tick)) {
+            if (!unsent_input) {
+                unsent_input = Input{};
+            }
+            if (!peers.Broadcast(
+                    static_cast<MessageType>(InputSyncMessageType::Input),
+                    EncodeTickInput(tick, *unsent_input))) {
+                return false;
+            }
+            RecordInput(local_index, tick, *unsent_input);
+            unsent_input.reset();
+        }
+
+        if (!CanPredict()) {
             return false;
         }
-        RecordInput(local_index, tick, neutral);
+
         AdvanceTick();
     }
     return tick == boundary && ConfirmedTick() == boundary;
