@@ -465,6 +465,10 @@ void OrbitalSimulation::RespondToPhysics(std::span<const OrbitalInput> inputs) {
                IgnoresFiringShip(world, pair.b, pair.a);
     });
 
+    for (const auto &pair : contacts) {
+        ApplyCollisionAcceleration(world, pair);
+    }
+
     // For every player, check if they're contacting the planet.
     for (auto &[peer, player] : players) {
         bool touching_planet = false;
@@ -475,7 +479,6 @@ void OrbitalSimulation::RespondToPhysics(std::span<const OrbitalInput> inputs) {
                 if ((pair.a == entity && pair.b == surface) ||
                     (pair.b == entity && pair.a == surface)) {
                     touching_planet = true;
-                    ApplyCollisionAcceleration(world, pair);
                 }
             }
 
