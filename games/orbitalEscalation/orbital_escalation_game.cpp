@@ -1,4 +1,5 @@
 #include "orbital_escalation_game.hpp"
+#include "attachment_system.hpp"
 #include "combat/damage_system.hpp"
 #include "controls.hpp"
 #include "serialization/ship_serialization.hpp"
@@ -18,8 +19,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <numbers>
+#include <utility>
 
 constexpr float kPlanetRadius = 4200.0F;
+constexpr float kAttachmentLaunchSpeed = 1500.0F;
 constexpr float kPlayerHealth = 100.0F;
 constexpr float kPlanetImpactDamage = 25.0F;
 const svanes::TicCount kPauseFlashPeriod = svanes::SecondsToTics(1.0);
@@ -141,6 +144,7 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext &context) {
     player_ship->GetTransform(context.world) = player_start;
     player_ship->GetKinematic(context.world).velocity_x =
         svanes::PerSecondToPerTic(300.0F);
+    UpdateAttachments(context.world);
     player_ship->UpdateVisuals(context.world);
     context.camera.zoom = 0.02F;
     context.camera.x = player_start.x;
@@ -220,6 +224,33 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext &frame) {
         0.01F, 100.0F);
     frame.camera.zoom = zoom;
 
+    UpdateAttachments(frame.world);
+
+    // Right click fires all attached missiles.
+    if (player_ship &&
+        !frame.world.GetComponent<svanes::Timeline>(gameplay_timeline_entity)
+             .IsPaused() &&
+        frame.input.WasMouseButtonPressed(svanes::MouseButton::Right)) {
+        const auto &pose = player_ship->GetTransform(frame.world);
+
+        const auto forward =
+            frame.world.GetComponent<Propulsion>(player_ship->GetEntity())
+                .GetForward();
+
+        const float cosine = std::cos(pose.rotation);
+        const float sine = std::sin(pose.rotation);
+
+        const svanes::Vector2D direction{forward.x * cosine - forward.y * sine,
+                                         forward.x * sine + forward.y * cosine};
+
+        auto released = player_ship->DetachAttachments(
+            frame.world,
+            direction * svanes::PerSecondToPerTic(kAttachmentLaunchSpeed));
+
+        for (auto &attachment : released) {
+            detached_attachments.push_back(std::move(attachment));
+        }
+    }
 
     // Visuals are entities that just have one single visual component, like a
     // sprite or a solid shape. So even though the engine will update the ship
@@ -229,6 +260,11 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext &frame) {
     if (player_ship) {
         player_ship->UpdateVisuals(frame.world);
     }
+
+    for (const auto &attachment : detached_attachments) {
+        attachment.UpdateVisuals(frame.world);
+    }
+
     planet->UpdateVisuals(frame.world);
 
     // Camera follows the player, centered on the screen.

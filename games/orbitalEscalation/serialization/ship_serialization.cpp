@@ -4,6 +4,7 @@
 #include "geometry_serialization.hpp"
 #include "json.hpp"
 
+#include <cmath>
 #include <limits>
 #include <stdexcept>
 
@@ -108,6 +109,18 @@ static ShipDefinition ReadShip(const json &root) {
         definition.collider.geometry = ReadGeometry(collider);
     }
 
+    // Read the attachments of the ship, if any, from the JSON object. Each
+    // attachment consists of a transform and a nested definition.
+    // TODO: Allow for more than just ships to be attached.
+
+    if (const auto found = root.find("attachments"); found != root.end()) {
+        for (const auto &entry : found->get_ref<const json::array_t &>()) {
+            const auto &pose = ReadArray(entry.at("transform"), 3);
+            definition.attachments.push_back(
+                {{ReadFloat(pose[0]), ReadFloat(pose[1]), ReadFloat(pose[2])},
+                 ReadShip(entry.at("ship"))});
+        }
+    }
     return definition;
 }
 
@@ -151,6 +164,18 @@ static json WriteShip(const ShipDefinition &definition) {
                                 : "additive"}});
     }
 
+    json::array_t attachments;
+    for (const auto &attachment : definition.attachments) {
+        const auto &pose = attachment.transform;
+        if (!std::isfinite(pose.x) || !std::isfinite(pose.y) ||
+            !std::isfinite(pose.rotation)) {
+            throw std::invalid_argument("Attachment transform must be finite");
+        }
+
+        attachments.push_back({{"transform", {pose.x, pose.y, pose.rotation}},
+                               {"ship", WriteShip(attachment.ship)}});
+    }
+
     // We do not bother checking if the collider is equal to the visuals.
     // So even if we could serialize the collider as "visuals", we always
     // serialize it as a geometry object. In the future, this could be
@@ -159,7 +184,8 @@ static json WriteShip(const ShipDefinition &definition) {
             {"max_angular_acceleration", definition.max_angular_acceleration},
             {"forward", WritePoint(definition.forward)},
             {"collider", WriteGeometry(definition.collider.geometry)},
-            {"visuals", std::move(visuals)}};
+            {"visuals", std::move(visuals)},
+            {"attachments", std::move(attachments)}};
 }
 
 ShipDefinition DeserializeShip(std::string_view text) {
