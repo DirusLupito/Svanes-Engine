@@ -301,6 +301,14 @@ add_executable(
     games/orbitalEscalation/serialization/geometry_serialization.hpp
     games/orbitalEscalation/serialization/json.cpp
     games/orbitalEscalation/serialization/json.hpp
+    games/orbitalEscalation/serialization/asset_catalog.cpp
+    games/orbitalEscalation/serialization/asset_catalog.hpp
+    games/orbitalEscalation/serialization/dynamic_object_serialization.cpp
+    games/orbitalEscalation/serialization/dynamic_object_serialization.hpp
+    games/orbitalEscalation/serialization/missile_serialization.cpp
+    games/orbitalEscalation/serialization/missile_serialization.hpp
+    games/orbitalEscalation/game_objects/dynamic_object/missile.cpp
+    games/orbitalEscalation/game_objects/dynamic_object/missile.hpp
     games/orbitalEscalation/serialization/ship_serialization.cpp
     games/orbitalEscalation/serialization/ship_serialization.hpp
     games/orbitalEscalation/main.cpp

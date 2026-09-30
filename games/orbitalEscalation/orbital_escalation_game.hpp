@@ -51,9 +51,9 @@ private:
 
 
     svanes::Entity background_entity = 0;
-    std::optional<Ship> player_ship;
+    std::unique_ptr<Ship> player_ship;
     std::optional<Planet> planet;
-    std::vector<Ship> detached_attachments;
+    std::vector<std::unique_ptr<DynamicObject>> detached_attachments;
     bool player_touching_planet = false;
 
     bool should_quit = false;

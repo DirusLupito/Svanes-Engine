@@ -2,7 +2,7 @@
 #include "attachment_system.hpp"
 #include "combat/damage_system.hpp"
 #include "controls.hpp"
-#include "serialization/ship_serialization.hpp"
+#include "serialization/asset_catalog.hpp"
 
 #include <svanes/MenuUtilities/text_label.hpp>
 #include <svanes/asset_path.hpp>
@@ -135,9 +135,9 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext &context) {
     planet->GetTransform(context.world) = {0.0F, 0.0F};
     planet->UpdateVisuals(context.world);
 
-    player_ship.emplace(context.world, gameplay_timeline_entity,
-                        LoadShip(svanes::AssetPath(
-                            "assets/orbitalEscalation/ships/player.json")));
+    const AssetCatalog assets(svanes::AssetPath("assets/orbitalEscalation"));
+    player_ship = assets.CreateShip(context.world, gameplay_timeline_entity,
+                                    "player_ship");
     context.world.AddComponent<Health>(player_ship->GetEntity(),
                                        Health{kPlayerHealth});
     const svanes::Transform player_start{0.0F, -kPlanetRadius - 800.0F};
@@ -262,7 +262,7 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext &frame) {
     }
 
     for (const auto &attachment : detached_attachments) {
-        attachment.UpdateVisuals(frame.world);
+        attachment->UpdateVisuals(frame.world);
     }
 
     planet->UpdateVisuals(frame.world);
