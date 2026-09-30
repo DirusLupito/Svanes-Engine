@@ -12,13 +12,12 @@ namespace svanes {
  *
  * FIELDS:
  * - value: The local connection id. Zero is invalid.
+ *
+ * Two connection ids compare equal when their values match.
  */
 struct ConnectionId {
     std::uint32_t value = 0;
 
-    /**
-     * @return Whether the two connection ids have the same value.
-     */
     bool operator==(const ConnectionId &) const = default;
 };
 
@@ -49,18 +48,23 @@ public:
     virtual ~MsgPipe() = default;
 
     /**
-     * Handles sending a message through a pipe.
+     * Sends a message to every known connection, rather than to one chosen
+     * destination as the other Send overload does.
      * Checks and verification are the responsibility of the concrete implementations.
-     * 
+     *
      * @param message The content to be sent through the message pipe.
+     * @return Whether every connection accepted the send. False if the pipe has
+     * no connections, or if any one of them refused.
      */
     bool Send(const NetworkMessage &message);
 
     /**
-     * Handles receiving a message through a pipe.
+     * Receives a message from any connection, discarding which one sent it.
+     * The other Receive overload reports the source connection id as well.
      * Checks and verification are the responsibility of the concrete implementations.
-     * 
+     *
      * @param message The content to be received through the message pipe.
+     * @return Whether a message was received. False means none is available.
      */
     bool Receive(NetworkMessage &message);
 

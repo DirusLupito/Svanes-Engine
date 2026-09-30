@@ -3,6 +3,7 @@
 #include "peer_join.hpp"
 
 #include <svanes/network/message_serialization.hpp>
+#include <svanes/utility/hash.hpp>
 
 #include <algorithm>
 #include <limits>
@@ -122,8 +123,8 @@ PeerGroup::PeerGroup(std::unique_ptr<UdpMsgPipe> bound_pipe, UdpAddress entry,
     session = std::make_unique<NetworkSession>(
         std::move(bound_pipe), SessionConfiguration{settings.session, {}, {}},
         PeerReliability());
-    join = std::make_unique<PeerJoin>(*session, *pipe, std::move(entry),
-                                      RulesHash());
+    join = std::make_unique<internal::PeerJoin>(*session, *pipe,
+                                                std::move(entry), RulesHash());
 }
 
 PeerGroup::~PeerGroup() = default;
@@ -262,8 +263,7 @@ void PeerGroup::QueueTaggedMessage(SessionMessage message) {
     message.payload = std::move(payload);
     auto &queue = message_revision == revision ? messages : future_messages;
     if (queue.size() >= kMaximumQueuedMessages) {
-        failure = "Incoming message queue exceeded its limit. Simulation "
-                  "paused.";
+        failure = "Incoming message queue exceeded its limit.";
         messages.clear();
         return;
     }
@@ -588,8 +588,7 @@ void PeerGroup::UpdateRosterChange() {
     auto &change = *roster_change;
     if (std::chrono::steady_clock::now() - change.started_at >
         kRosterChangeTimeout) {
-        failure = "Roster change stalled. Simulation paused. Press Escape to "
-                  "close.";
+        failure = "Roster change stalled.";
         return;
     }
     if (!change.stop_sent) {
