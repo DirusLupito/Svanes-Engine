@@ -19,13 +19,12 @@ namespace svanes {
  *
  * FIELDS:
  * - value: The shared peer id. Zero is invalid.
+ *
+ * Two peer ids compare equal when their values match.
  */
 struct PeerId {
     std::uint32_t value = 0;
 
-    /**
-     * @return Whether the two peer ids have the same value.
-     */
     bool operator==(const PeerId &) const = default;
 };
 
@@ -239,11 +238,18 @@ public:
                    ReliabilitySettings settings = {});
 
     /**
+     * Reads the local identity out of the configuration given at construction.
+     * A process here is one running instance of a game, so two instances on one
+     * machine are two separate peers.
+     *
      * @return The peer id representing this process, or zero before admission.
      */
     PeerId LocalPeer() const;
 
     /**
+     * Reports whether the configured local peer id is nonzero. A process is
+     * admitted once a member of the session hands it an id through Admit().
+     *
      * @return Whether this process has a peer id.
      */
     bool IsAdmitted() const;
@@ -257,6 +263,9 @@ public:
     void Admit(PeerId local_peer);
 
     /**
+     * Borrows the remote roster held in the configuration. Retired entries stay
+     * in the span, since their ids remain reserved for the rest of the session.
+     *
      * @return Known remote mappings, including retired routes, borrowed from the session
      * until the next AddPeer().
      */
@@ -444,13 +453,34 @@ private:
      */
     void LogDroppedConnection(ConnectionId connection, const std::string &reason);
 
+    // The owned transport every packet travels through.
     std::unique_ptr<MsgPipe> pipe;
+
+    // The session id, this process's peer id, and the remote roster. AddPeer()
+    // and Admit() update it as the session grows.
     SessionConfiguration configuration;
+
+    // The retry intervals and queue limits applied to every peer.
     ReliabilitySettings settings;
+
+    // Delivery state per remote peer, held in the same order as the roster in
+    // configuration.remote_peers, so one index addresses both.
     std::vector<PeerState> peers;
+
+    // Game messages accepted by Update(), in arrival order, waiting for
+    // Receive() to take them.
     std::deque<SessionMessage> incoming_messages;
+
+    // One report per peer whose delivery timed out, waiting for
+    // ReceivePeerFailure(). Each peer is queued at most once.
     std::deque<PeerId> failed_peers;
+
+    // Contact packets and data from outside the roster, waiting for
+    // ReceiveStranger().
     std::deque<StrangerMessage> strangers;
+
+    // Connection ids whose first dropped packet has been logged, so that a
+    // misbehaving connection is reported once rather than every packet.
     std::set<std::uint32_t> dropped_connections;
 };
 

@@ -5,7 +5,7 @@
 #include <stdexcept>
 #include <utility>
 
-namespace svanes {
+namespace svanes::internal {
 
 namespace {
 
@@ -95,4 +95,4 @@ std::string PeerJoin::Status() const {
                           std::to_string(entry.port) + ".";
 }
 
-} // namespace svanes
+} // namespace svanes::internal

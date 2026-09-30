@@ -18,14 +18,13 @@ namespace svanes {
  * FIELDS:
  * - host: The normalized numeric IPv4 address.
  * - port: The remote port.
+ *
+ * Two addresses compare equal when both their host and port match.
  */
 struct UdpAddress {
     std::string host;
     std::uint16_t port;
 
-    /**
-     * @return Whether both addresses have the same host and port.
-     */
     bool operator==(const UdpAddress &) const = default;
 };
 
@@ -115,6 +114,7 @@ private:
 void WriteAddress(MessageWriter &writer, const UdpAddress &address);
 
 /**
+ * Reads back a host and port written by WriteAddress, advancing the reader.
  * @param reader The message positioned at an address written by WriteAddress.
  * @return The address.
  * @throws std::invalid_argument for an empty host or a zero port.

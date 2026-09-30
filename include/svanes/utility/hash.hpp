@@ -17,4 +17,14 @@ namespace svanes {
  */
 std::size_t Hash(std::span<const std::uint32_t> values) noexcept;
 
+/**
+ * Hashes bytes with 64-bit FNV-1a
+ * (https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function).
+ * The result depends only on the bytes, so peers can compare hashes of values
+ * they encoded the same way.
+ * @param bytes The bytes to hash.
+ * @return The hash.
+ */
+std::uint64_t HashBytes(std::span<const std::byte> bytes);
+
 } // namespace svanes

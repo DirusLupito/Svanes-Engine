@@ -8,7 +8,7 @@
 #include <optional>
 #include <string>
 
-namespace svanes {
+namespace svanes::internal {
 
 /**
  * The joining side of admission, used by PeerGroup before it has an id. Asks
@@ -59,4 +59,4 @@ private:
     std::string failure;
 };
 
-} // namespace svanes
+} // namespace svanes::internal

@@ -4,6 +4,7 @@
 #include <svanes/network/message_serialization.hpp>
 #include <svanes/network/peer_group.hpp>
 #include <svanes/timeline_system.hpp>
+#include <svanes/utility/hash.hpp>
 
 #include <algorithm>
 #include <cstdint>

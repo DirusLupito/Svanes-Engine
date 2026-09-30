@@ -111,7 +111,7 @@ release target="": (_check-target target) configure
         }
     }}
 
-# Package a native Release game with assets (Windows ZIP or Linux tar.gz).
+# Package a native Release game with assets (Windows ZIP, Linux or macOS tar.gz).
 package target: (_check-target target) configure
     {{cmake}} --build --preset {{build-preset-prefix}}-release --target package-{{target}} --parallel
 

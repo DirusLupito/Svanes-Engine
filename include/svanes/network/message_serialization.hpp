@@ -90,6 +90,9 @@ private:
      * @param width The number of bytes to write, from 1 to 8.
      */
     void WriteUnsigned(std::uint64_t value, std::uint32_t width);
+
+    // The message built so far. Every write function appends to it, and
+    // Finish() moves it out, leaving an empty message ready for reuse.
     NetworkMessage message;
 };
 
@@ -183,16 +186,14 @@ private:
      * @return The decoded integer.
      */
     std::uint64_t ReadUnsigned(std::uint32_t width);
+
+    // The borrowed source bytes. A default-constructed span is empty, but both
+    // constructors replace it, so a reader never starts without a source.
     std::span<const std::byte> bytes;
+
+    // The offset of the next unread byte, advanced by every read. Starts at
+    // zero so the first read begins at the front of the source.
     std::size_t cursor = 0;
 };
-
-/**
- * Hashes bytes with 64-bit FNV-1a. The result depends only on the bytes, so
- * peers can compare hashes of values they encoded the same way.
- * @param bytes The bytes to hash.
- * @return The hash.
- */
-std::uint64_t HashBytes(std::span<const std::byte> bytes);
 
 }
