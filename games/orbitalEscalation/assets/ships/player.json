@@ -1,6 +1,10 @@
 {
-    "max_acceleration": 1000.0,
+    "max_acceleration": 5000.0,
     "max_angular_acceleration": 10.0,
+    "forward": [
+        0.0,
+        -1.0
+    ],
     "collider": "visuals",
     "visuals": [
         {

@@ -1,31 +1,27 @@
 #include "ship_serialization.hpp"
 
+#include "../propulsion_system.hpp"
 #include "geometry_serialization.hpp"
 #include "json.hpp"
 
-#include <cmath>
 #include <limits>
 #include <stdexcept>
 
 using nlohmann::json;
 
 /**
- * Validates the acceleration limits of a ship definition, ensuring they are
- * finite and nonnegative.
+ * Validates the propulsion of a ship definition, ensuring its acceleration
+ * limits are finite and nonnegative, and its forward direction is valid.
  *
  * @param definition The ShipDefinition to validate.
  *
  * @throws std::invalid_argument If any of the acceleration limits are not
- * finite or are negative.
+ * finite or are negative, or the forward direction has a nonfinite or zero
+ * length.
  */
-static void ValidateLimits(const ShipDefinition &definition) {
-    if (!std::isfinite(definition.max_acceleration) ||
-        definition.max_acceleration < 0 ||
-        !std::isfinite(definition.max_angular_acceleration) ||
-        definition.max_angular_acceleration < 0) {
-        throw std::invalid_argument(
-            "Ship acceleration limits must be finite and nonnegative");
-    }
+static void ValidatePropulsion(const ShipDefinition &definition) {
+    Propulsion{definition.max_acceleration, definition.max_angular_acceleration,
+               definition.forward};
 }
 
 /**
@@ -44,9 +40,10 @@ static ShipDefinition ReadShip(const json &root) {
         .max_acceleration = ReadFloat(root.at("max_acceleration")),
         .max_angular_acceleration =
             ReadFloat(root.at("max_angular_acceleration")),
+        .forward = ReadPoint(root.at("forward")),
     };
 
-    ValidateLimits(definition);
+    ValidatePropulsion(definition);
 
     // Represents the visual geometry of the ship, which can be used as the
     // collider if the "collider" field in the JSON is set to "visuals".
@@ -126,7 +123,7 @@ static ShipDefinition ReadShip(const json &root) {
  * unsupported.
  */
 static json WriteShip(const ShipDefinition &definition) {
-    ValidateLimits(definition);
+    ValidatePropulsion(definition);
 
     json::array_t visuals;
     for (const auto &visual : definition.visuals) {
@@ -160,6 +157,7 @@ static json WriteShip(const ShipDefinition &definition) {
     // optimized...
     return {{"max_acceleration", definition.max_acceleration},
             {"max_angular_acceleration", definition.max_angular_acceleration},
+            {"forward", WritePoint(definition.forward)},
             {"collider", WriteGeometry(definition.collider.geometry)},
             {"visuals", std::move(visuals)}};
 }

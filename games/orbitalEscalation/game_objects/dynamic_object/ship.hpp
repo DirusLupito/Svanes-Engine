@@ -11,6 +11,9 @@
  * units per second squared.
  * - max_angular_acceleration: The maximum angular acceleration the ship can
  * achieve, in radians per second squared.
+ * - forward: The forward direction in the ship's local coordinates. It must
+ * have a finite, nonzero length. Propulsion normalizes it when the ship is
+ * constructed.
  * - collider: A Collider2D that defines the ship's collision layer.
  * - visuals: A vector of Visual objects that define the ship's appearance in
  * the game world.
@@ -18,6 +21,7 @@
 struct ShipDefinition {
     float max_acceleration;
     float max_angular_acceleration;
+    svanes::Vector2D forward = {0.0F, -1.0F};
     svanes::Collider2D collider;
     std::vector<Visual> visuals;
 };
@@ -39,12 +43,4 @@ public:
      */
     Ship(svanes::Registry &world, svanes::Entity gameplay_timeline,
          ShipDefinition definition);
-
-    // The maximum linear acceleration the ship can achieve, in units per second
-    // squared.
-    float max_acceleration;
-
-    // The maximum angular acceleration the ship can achieve, in radians per
-    // second squared.
-    float max_angular_acceleration;
 };

@@ -262,20 +262,15 @@ void OrbitalEscalationGame::PhysicsUpdate(
         return;
     }
 
+    if (player_ship) {
+        physics.world.GetComponent<PropulsionControl>(
+            player_ship->GetEntity()) = ReadShipControls(physics.input);
+    }
+    ApplyPropulsion(physics.world);
+
     if (!player_ship) {
         return;
     }
-
-    const ShipControls controls = ReadShipControls(physics.input);
-    const svanes::Vector2D acceleration =
-        controls.thrust *
-        svanes::PerSecondSquaredToPerTicSquared(player_ship->max_acceleration);
-    auto &motion = player_ship->GetKinematic(physics.world);
-    motion.acceleration_x = acceleration.x;
-    motion.acceleration_y = acceleration.y;
-    motion.angular_acceleration =
-        controls.rotation * svanes::PerSecondSquaredToPerTicSquared(
-                                player_ship->max_angular_acceleration);
     const bool touching_planet = ApplyCollisionAcceleration(
         physics.world, player_ship->GetEntity(), planet->GetEntity());
     if (touching_planet && !player_touching_planet &&
