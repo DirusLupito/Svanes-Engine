@@ -1,0 +1,52 @@
+{
+    "name": "basic_missile",
+    "collider": "visuals",
+    "visuals": [
+        {
+            "geometry": {
+                "type": "rectangle",
+                "center": [
+                    0,
+                    0
+                ],
+                "size": [
+                    12,
+                    64
+                ]
+            },
+            "color": [
+                100,
+                100,
+                110,
+                255
+            ],
+            "z_order": 0
+        },
+        {
+            "geometry": {
+                "type": "triangle",
+                "vertices": [
+                    [
+                        0,
+                        -48
+                    ],
+                    [
+                        -6,
+                        -32
+                    ],
+                    [
+                        6,
+                        -32
+                    ]
+                ]
+            },
+            "color": [
+                136,
+                0,
+                27,
+                255
+            ],
+            "z_order": 0
+        }
+    ]
+}

@@ -1,4 +1,5 @@
 {
+    "name": "player_ship",
     "max_acceleration": 5000.0,
     "max_angular_acceleration": 10.0,
     "forward": [
@@ -212,388 +213,58 @@
     ],
     "attachments": [
         {
+            "type": "missile",
+            "name": "basic_missile",
             "transform": [
                 -66,
                 80,
                 0
-            ],
-            "ship": {
-                "max_acceleration": 0.0,
-                "max_angular_acceleration": 0.0,
-                "forward": [
-                    0.0,
-                    -1.0
-                ],
-                "collider": "visuals",
-                "visuals": [
-                    {
-                        "geometry": {
-                            "type": "rectangle",
-                            "center": [
-                                0,
-                                0
-                            ],
-                            "size": [
-                                12,
-                                64
-                            ]
-                        },
-                        "color": [
-                            100,
-                            100,
-                            110,
-                            255
-                        ],
-                        "z_order": 0
-                    },
-                    {
-                        "geometry": {
-                            "type": "triangle",
-                            "vertices": [
-                                [
-                                    0,
-                                    -48
-                                ],
-                                [
-                                    -6,
-                                    -32
-                                ],
-                                [
-                                    6,
-                                    -32
-                                ]
-                            ]
-                        },
-                        "color": [
-                            136,
-                            0,
-                            27,
-                            255
-                        ],
-                        "z_order": 0
-                    }
-                ]
-            }
+            ]
         },
         {
+            "type": "missile",
+            "name": "basic_missile",
             "transform": [
                 66,
                 80,
                 0
-            ],
-            "ship": {
-                "max_acceleration": 0.0,
-                "max_angular_acceleration": 0.0,
-                "forward": [
-                    0.0,
-                    -1.0
-                ],
-                "collider": "visuals",
-                "visuals": [
-                    {
-                        "geometry": {
-                            "type": "rectangle",
-                            "center": [
-                                0,
-                                0
-                            ],
-                            "size": [
-                                12,
-                                64
-                            ]
-                        },
-                        "color": [
-                            100,
-                            100,
-                            110,
-                            255
-                        ],
-                        "z_order": 0
-                    },
-                    {
-                        "geometry": {
-                            "type": "triangle",
-                            "vertices": [
-                                [
-                                    0,
-                                    -48
-                                ],
-                                [
-                                    -6,
-                                    -32
-                                ],
-                                [
-                                    6,
-                                    -32
-                                ]
-                            ]
-                        },
-                        "color": [
-                            136,
-                            0,
-                            27,
-                            255
-                        ],
-                        "z_order": 0
-                    }
-                ]
-            }
+            ]
         },
         {
+            "type": "missile",
+            "name": "basic_missile",
             "transform": [
                 -94,
                 148,
                 0
-            ],
-            "ship": {
-                "max_acceleration": 0.0,
-                "max_angular_acceleration": 0.0,
-                "forward": [
-                    0.0,
-                    -1.0
-                ],
-                "collider": "visuals",
-                "visuals": [
-                    {
-                        "geometry": {
-                            "type": "rectangle",
-                            "center": [
-                                0,
-                                0
-                            ],
-                            "size": [
-                                12,
-                                64
-                            ]
-                        },
-                        "color": [
-                            100,
-                            100,
-                            110,
-                            255
-                        ],
-                        "z_order": 0
-                    },
-                    {
-                        "geometry": {
-                            "type": "triangle",
-                            "vertices": [
-                                [
-                                    0,
-                                    -48
-                                ],
-                                [
-                                    -6,
-                                    -32
-                                ],
-                                [
-                                    6,
-                                    -32
-                                ]
-                            ]
-                        },
-                        "color": [
-                            136,
-                            0,
-                            27,
-                            255
-                        ],
-                        "z_order": 0
-                    }
-                ]
-            }
+            ]
         },
         {
+            "type": "missile",
+            "name": "basic_missile",
             "transform": [
                 94,
                 148,
                 0
-            ],
-            "ship": {
-                "max_acceleration": 0.0,
-                "max_angular_acceleration": 0.0,
-                "forward": [
-                    0.0,
-                    -1.0
-                ],
-                "collider": "visuals",
-                "visuals": [
-                    {
-                        "geometry": {
-                            "type": "rectangle",
-                            "center": [
-                                0,
-                                0
-                            ],
-                            "size": [
-                                12,
-                                64
-                            ]
-                        },
-                        "color": [
-                            100,
-                            100,
-                            110,
-                            255
-                        ],
-                        "z_order": 0
-                    },
-                    {
-                        "geometry": {
-                            "type": "triangle",
-                            "vertices": [
-                                [
-                                    0,
-                                    -48
-                                ],
-                                [
-                                    -6,
-                                    -32
-                                ],
-                                [
-                                    6,
-                                    -32
-                                ]
-                            ]
-                        },
-                        "color": [
-                            136,
-                            0,
-                            27,
-                            255
-                        ],
-                        "z_order": 0
-                    }
-                ]
-            }
+            ]
         },
         {
+            "type": "missile",
+            "name": "basic_missile",
             "transform": [
                 -122,
                 216,
                 0
-            ],
-            "ship": {
-                "max_acceleration": 0.0,
-                "max_angular_acceleration": 0.0,
-                "forward": [
-                    0.0,
-                    -1.0
-                ],
-                "collider": "visuals",
-                "visuals": [
-                    {
-                        "geometry": {
-                            "type": "rectangle",
-                            "center": [
-                                0,
-                                0
-                            ],
-                            "size": [
-                                12,
-                                64
-                            ]
-                        },
-                        "color": [
-                            100,
-                            100,
-                            110,
-                            255
-                        ],
-                        "z_order": 0
-                    },
-                    {
-                        "geometry": {
-                            "type": "triangle",
-                            "vertices": [
-                                [
-                                    0,
-                                    -48
-                                ],
-                                [
-                                    -6,
-                                    -32
-                                ],
-                                [
-                                    6,
-                                    -32
-                                ]
-                            ]
-                        },
-                        "color": [
-                            136,
-                            0,
-                            27,
-                            255
-                        ],
-                        "z_order": 0
-                    }
-                ]
-            }
+            ]
         },
         {
+            "type": "missile",
+            "name": "basic_missile",
             "transform": [
                 122,
                 216,
                 0
-            ],
-            "ship": {
-                "max_acceleration": 0.0,
-                "max_angular_acceleration": 0.0,
-                "forward": [
-                    0.0,
-                    -1.0
-                ],
-                "collider": "visuals",
-                "visuals": [
-                    {
-                        "geometry": {
-                            "type": "rectangle",
-                            "center": [
-                                0,
-                                0
-                            ],
-                            "size": [
-                                12,
-                                64
-                            ]
-                        },
-                        "color": [
-                            100,
-                            100,
-                            110,
-                            255
-                        ],
-                        "z_order": 0
-                    },
-                    {
-                        "geometry": {
-                            "type": "triangle",
-                            "vertices": [
-                                [
-                                    0,
-                                    -48
-                                ],
-                                [
-                                    -6,
-                                    -32
-                                ],
-                                [
-                                    6,
-                                    -32
-                                ]
-                            ]
-                        },
-                        "color": [
-                            136,
-                            0,
-                            27,
-                            255
-                        ],
-                        "z_order": 0
-                    }
-                ]
-            }
+            ]
         }
     ]
 }
