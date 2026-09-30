@@ -21,6 +21,29 @@
 class AssetCatalog final {
 public:
     /**
+     * Creates an object for restoring a saved world. Its attachments and
+     * ammunition are left for the saved state to supply.
+     *
+     * @param world The registry in which to create the object.
+     * @param gameplay_timeline The parent timeline for the new object.
+     * @param type The kind of dynamic object to create.
+     * @param name The definition's name within that type.
+     * @return The independently owned object.
+     * @throws std::invalid_argument if the type or definition is unknown.
+     */
+    std::unique_ptr<DynamicObject>
+    CreateUnattached(svanes::Registry &world, svanes::Entity gameplay_timeline,
+                     DynamicObjectType type, const std::string &name) const;
+
+    /**
+     * Gets a hash of the gameplay definitions so peers can check that their
+     * assets are compatible.
+     *
+     * @return The gameplay definition hash.
+     */
+    std::uint64_t RulesHash() const;
+
+    /**
      * Loads the JSON files in the ships, missiles, and missile_launchers
      * folders underneath root, including any subfolders.
      *

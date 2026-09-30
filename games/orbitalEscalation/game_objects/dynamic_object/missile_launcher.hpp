@@ -33,6 +33,16 @@ struct MissileLauncherDefinition {
 class MissileLauncher final : public DynamicObject {
 public:
     /**
+     * Returns the missile launcher definition type used to recreate this
+     * object.
+     *
+     * @return DynamicObjectType::MissileLauncher.
+     */
+    DynamicObjectType GetType() const override {
+        return DynamicObjectType::MissileLauncher;
+    }
+
+    /**
      * Constructs a launcher with its weapon controls and reload state. The
      * catalog supplies its initial missile after constructing the launcher.
      *

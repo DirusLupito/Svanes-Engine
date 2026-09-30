@@ -33,6 +33,15 @@ struct MissileDefinition {
 class Missile final : public DynamicObject {
 public:
     /**
+     * Returns the missile definition type used to recreate this object.
+     *
+     * @return DynamicObjectType::Missile.
+     */
+    DynamicObjectType GetType() const override {
+        return DynamicObjectType::Missile;
+    }
+
+    /**
      * Constructs a Missile entity in the provided registry.
      *
      * @param world The registry in which to create the missile entity and its

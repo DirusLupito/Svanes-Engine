@@ -311,6 +311,8 @@ add_executable(
     games/orbitalEscalation/game_objects/dynamic_object/missile_launcher.hpp
     games/orbitalEscalation/serialization/missile_launcher_serialization.cpp
     games/orbitalEscalation/serialization/missile_launcher_serialization.hpp
+    games/orbitalEscalation/serialization/world_snapshot.cpp
+    games/orbitalEscalation/serialization/world_snapshot.hpp
     games/orbitalEscalation/serialization/asset_catalog.cpp
     games/orbitalEscalation/serialization/asset_catalog.hpp
     games/orbitalEscalation/serialization/dynamic_object_serialization.cpp

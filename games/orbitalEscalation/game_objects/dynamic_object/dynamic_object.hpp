@@ -65,6 +65,12 @@ struct DynamicObjectDefinition {
  * and collidable geometry, and a kinematic component for movement.
  */
 class DynamicObject {
+
+    // The OrbitalSimulation class needs to access the private members of
+    // DynamicObject to manage the simulation state and handle player
+    // interactions.
+    friend class OrbitalSimulation;
+
 public:
     /**
      * Destroys the DynamicObject entity, its visuals, and any objects still
@@ -80,6 +86,13 @@ public:
      * @return The name of the dynamic object definition.
      */
     const std::string &GetName() const;
+
+    /**
+     * Returns the definition type used with GetName() to recreate this object.
+     *
+     * @return The object's dynamic object definition type.
+     */
+    virtual DynamicObjectType GetType() const = 0;
 
     /**
      * Attaches an object and takes ownership of it. Destroying this object will

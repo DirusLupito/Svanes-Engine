@@ -49,9 +49,11 @@ UpdateLauncher(svanes::Registry &world, DynamicObject &object,
 
     // Missiles can blow up while attached to the launcher, so we check for that
     // and clear the slot if necessary, restarting the reload countdown.
-    if (state.loaded_missile &&
-        (!world.HasComponent<Health>(*state.loaded_missile) ||
-         IsDead(world, *state.loaded_missile))) {
+    if (state.ammunition_lost ||
+        (state.loaded_missile &&
+         (!world.HasComponent<Health>(*state.loaded_missile) ||
+          IsDead(world, *state.loaded_missile)))) {
+        state.ammunition_lost = false;
         state.loaded_missile.reset();
         state.emptied_at = now;
     }

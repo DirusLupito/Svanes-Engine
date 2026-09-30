@@ -32,6 +32,8 @@ struct WeaponControl {
  * velocity when firing a missile.
  * - forward: The launch direction in the launcher's local coordinates.
  * - loaded_missile: The entity in the ammunition slot, or no entity if empty.
+ * - ammunition_lost: Whether destroyed ammunition still needs to start the
+ * reload countdown on the next active weapon update.
  * - emptied_at: The launcher's total local tics when the slot became empty.
  */
 struct MissileLauncherState {
@@ -41,6 +43,7 @@ struct MissileLauncherState {
     svanes::Vector2D forward;
     std::optional<svanes::Entity> loaded_missile;
     std::optional<svanes::TicCount> emptied_at;
+    bool ammunition_lost = false;
 };
 
 /**

@@ -19,6 +19,11 @@
 constexpr float kPlanetRadius = 4200.0F;
 constexpr float kPlayerHealth = 100.0F;
 constexpr float kPlanetImpactDamage = 25.0F;
+constexpr float kPlanetAttraction = 180000000.0F;
+constexpr float kCollisionAcceleration = 400000.0F;
+constexpr float kSpawnSpacing = 2000.0F;
+constexpr float kSpawnHeight = 48000.0F;
+constexpr float kSpawnSpeed = 300.0F;
 
 /**
  * Helper for the planet's gravitational field.
@@ -35,7 +40,7 @@ static svanes::Vector2D AttractionField(svanes::Vector2D offset_to_source) {
         return {};
     }
     const float strength =
-        svanes::PerSecondSquaredToPerTicSquared(180000000.0F) /
+        svanes::PerSecondSquaredToPerTicSquared(kPlanetAttraction) /
         (1.0F + distance * distance / kPlanetRadius);
     return offset_to_source / distance * strength;
 }
@@ -71,7 +76,7 @@ static void ApplyCollisionAcceleration(svanes::Registry &world,
     for (const svanes::Collision2D &collision : pair.collisions) {
         const svanes::Vector2D acceleration =
             collision.normal *
-            svanes::PerSecondSquaredToPerTicSquared(400000.0F);
+            svanes::PerSecondSquaredToPerTicSquared(kCollisionAcceleration);
         if (world.HasComponent<svanes::Kinematic2D>(a)) {
             auto &motion = world.GetComponent<svanes::Kinematic2D>(a);
             motion.acceleration_x += acceleration.x;
@@ -94,22 +99,26 @@ OrbitalSimulation::OrbitalSimulation(svanes::Registry &world,
     // to pause all gameplay, or speedup/slowdown all gameplay.
     world.AddComponent<svanes::Timeline>(gameplay_timeline.Get());
     AssignIdentity(gameplay_timeline.Get());
-    planet.emplace(
-        world,
-        PlanetDefinition{
-            .attractor = {.accelerationField = AttractionField,
-                          .cutoff_radius = std::nullopt,
-                          .allow_parallel = true},
-            .collider = {svanes::Circle2D{0.0F, 0.0F, kPlanetRadius}},
-            .visuals = {CreatePlanetLayer(kPlanetRadius, {255, 127, 38, 255},
-                                          -3),
-                        CreatePlanetLayer(3900.0F, {185, 122, 87, 255}, -2),
-                        CreatePlanetLayer(3750.0F, {127, 127, 127, 255}, -1)},
-        });
+    planet.emplace(world, MakePlanetDefinition());
     planet->GetTransform(world) = {0.0F, 0.0F};
     planet->UpdateVisuals(world);
 
     AssignIdentity(planet->GetEntity());
+
+    // Tell other clients what rules and definitions this simulation expects.
+    svanes::MessageWriter rules;
+    rules.WriteUint64(OrbitalStepTics);
+    rules.WriteUint64(svanes::TicsPerSecond);
+    rules.WriteFloat32(kPlanetRadius);
+    rules.WriteFloat32(kPlayerHealth);
+    rules.WriteFloat32(kPlanetImpactDamage);
+    rules.WriteFloat32(kPlanetAttraction);
+    rules.WriteFloat32(kCollisionAcceleration);
+    rules.WriteFloat32(kSpawnSpacing);
+    rules.WriteFloat32(kSpawnHeight);
+    rules.WriteFloat32(kSpawnSpeed);
+    rules.WriteUint64(assets.RulesHash());
+    rules_hash = svanes::HashBytes(rules.Finish().bytes);
 }
 
 void OrbitalSimulation::AssignIdentity(svanes::Entity entity) {
@@ -148,10 +157,12 @@ void OrbitalSimulation::AddPlayer(svanes::PeerId peer) {
     auto ship =
         assets.CreateShip(world, gameplay_timeline.Get(), "player_ship");
     world.AddComponent<Health>(ship->GetEntity(), Health{kPlayerHealth});
-    ship->GetTransform(world) = {static_cast<float>(peer.value - 1) * 2000.0F,
-                                 -kPlanetRadius - 48000.0F};
+    ship->GetTransform(world) = {static_cast<float>(peer.value - 1) *
+                                     kSpawnSpacing,
+                                 -kPlanetRadius - kSpawnHeight};
 
-    ship->GetKinematic(world).velocity_x = svanes::PerSecondToPerTic(300.0F);
+    ship->GetKinematic(world).velocity_x =
+        svanes::PerSecondToPerTic(kSpawnSpeed);
     AssignIdentities(*ship);
     players.emplace(peer.value, Player{std::move(ship)});
     UpdateAttachments(world);
@@ -259,7 +270,8 @@ bool OrbitalSimulation::IsPaused() const {
         .IsPaused();
 }
 
-void OrbitalSimulation::Step(std::span<const OrbitalInput> inputs) {
+std::vector<std::uint8_t>
+OrbitalSimulation::Step(std::span<const OrbitalInput> inputs) {
     if (inputs.size() != players.size()) {
         throw std::invalid_argument("Orbital tick needs one input per player.");
     }
@@ -349,6 +361,7 @@ void OrbitalSimulation::Step(std::span<const OrbitalInput> inputs) {
 
     svanes::AdvanceSpriteAnimations(world);
     UpdateCollisionFlashes(world, collision_flashes);
+    return std::vector<std::uint8_t>(inputs.size(), 1);
 }
 
 void OrbitalSimulation::RespondToPhysics(std::span<const OrbitalInput> inputs) {
@@ -461,3 +474,17 @@ void OrbitalSimulation::UpdateVisuals() {
 
     planet->UpdateVisuals(world);
 }
+
+PlanetDefinition OrbitalSimulation::MakePlanetDefinition() {
+    return PlanetDefinition{
+        .attractor = {.accelerationField = AttractionField,
+                      .cutoff_radius = std::nullopt,
+                      .allow_parallel = true},
+        .collider = {svanes::Circle2D{0.0F, 0.0F, kPlanetRadius}},
+        .visuals = {CreatePlanetLayer(kPlanetRadius, {255, 127, 38, 255}, -3),
+                    CreatePlanetLayer(3900.0F, {185, 122, 87, 255}, -2),
+                    CreatePlanetLayer(3750.0F, {127, 127, 127, 255}, -1)},
+    };
+}
+
+std::uint64_t OrbitalSimulation::RulesHash() const { return rules_hash; }

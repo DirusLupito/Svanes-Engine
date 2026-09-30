@@ -30,6 +30,15 @@ struct ShipDefinition {
 class Ship final : public DynamicObject {
 public:
     /**
+     * Returns the ship definition type used to recreate this object.
+     *
+     * @return DynamicObjectType::Ship.
+     */
+    DynamicObjectType GetType() const override {
+        return DynamicObjectType::Ship;
+    }
+
+    /**
      * Constructs a Ship entity in the provided registry.
      *
      * @param world The registry in which to create the ship entity and its

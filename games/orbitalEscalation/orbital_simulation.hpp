@@ -9,6 +9,7 @@
 #include <span>
 #include <svanes/async/async_parallel_for_driver.hpp>
 #include <svanes/game.hpp>
+#include <svanes/network/input_sync.hpp>
 #include <svanes/network/message_serialization.hpp>
 #include <svanes/network/network_session.hpp>
 
@@ -37,8 +38,32 @@ struct OrbitalInput {
  * 
  * The registry must outlive this object.
  */
-class OrbitalSimulation final {
+class OrbitalSimulation final
+    : public svanes::SyncedSimulation<OrbitalInput, std::uint8_t> {
 public:
+    /**
+     * Save a deterministic snapshot of the simulation state in order to
+     * use it for rolling back to a previous state, or to synchronize a new peer
+     * joining the game, or for hash/correctness checks.
+     */
+    svanes::NetworkMessage Save() const override;
+
+    /**
+     * Load a deterministic snapshot of the simulation state in order to
+     * restore the game to some state or synchronize a new peer.
+     *
+     * @param bytes The complete state produced by Save().
+     */
+    void Load(std::span<const std::byte> bytes) override;
+
+    /**
+     * Gets a hash of the simulation rules and definitions, which must match
+     * between peers for gameplay to be compatible.
+     *
+     * @return The gameplay compatibility hash.
+     */
+    std::uint64_t RulesHash() const;
+
     /**
      * Creates and initializes the game simulation.
      *
@@ -56,14 +81,14 @@ public:
      * @param peer The unique, nonzero player ID. Add players in ascending
      * order.
      */
-    void AddPlayer(svanes::PeerId peer);
+    void AddPlayer(svanes::PeerId peer) override;
 
     /**
      * Removes a player and their ship. Already launched projectiles remain.
      * 
      * @param peer The player leaving the roster.
      */
-    void RemovePlayer(svanes::PeerId peer);
+    void RemovePlayer(svanes::PeerId peer) override;
 
     /**
      * Gets the player's current ship, for camera tracking or other local
@@ -84,7 +109,8 @@ public:
      * @param frame The local input devices and camera.
      * @param peer The player controlled by these local input devices.
      */
-    void CaptureInput(const svanes::FrameContext &frame, svanes::PeerId peer);
+    void CaptureInput(const svanes::FrameContext &frame,
+                      svanes::PeerId peer) override;
 
     /**
      * Consumes the local controls for one simulation tick. Held controls
@@ -94,7 +120,7 @@ public:
      * @return The latest held controls and any presses recorded since the
      * previous call.
      */
-    OrbitalInput TakeInput();
+    OrbitalInput TakeInput() override;
 
     /**
      * Writes one player's controls to a network message, allowing another
@@ -107,7 +133,7 @@ public:
      * outside [-1, 1].
      */
     void EncodeInput(svanes::MessageWriter &writer,
-                     const OrbitalInput &input) const;
+                     const OrbitalInput &input) const override;
 
     /**
      * Reads and validates one player's controls from a network message.
@@ -118,7 +144,7 @@ public:
      * @throws std::invalid_argument if the controls are truncated, a boolean
      * flag is invalid, or a propulsion value is nonfinite or outside [-1, 1].
      */
-    OrbitalInput DecodeInput(svanes::MessageReader &reader) const;
+    OrbitalInput DecodeInput(svanes::MessageReader &reader) const override;
 
     /**
      * Advances gameplay by one fixed simulation step using the supplied
@@ -131,12 +157,15 @@ public:
      * @param inputs One set of controls for every player, in ascending PeerId
      * order. Players whose ships have been destroyed still require an entry.
      *
+     * @return One input-use report per player, in input order.
+     *
      * @throws std::invalid_argument if the input count differs from the player
      * count, or a propulsion value is nonfinite or outside [-1, 1].
      * @throws std::logic_error if the world does not have exactly one
      * attractor.
      */
-    void Step(std::span<const OrbitalInput> inputs);
+    std::vector<std::uint8_t>
+    Step(std::span<const OrbitalInput> inputs) override;
 
     /**
      * Checks if gameplay is currently paused.
@@ -153,6 +182,18 @@ public:
 
 private:
     /**
+     * Creates the planet definition so new games and restored snapshots use
+     * the same planet properties.
+     *
+     * @return The planet's gravity, collision, and visual properties.
+     */
+    static PlanetDefinition MakePlanetDefinition();
+
+    // The hash used by peers to check that their gameplay rules and
+    // definitions are compatible.
+    std::uint64_t rules_hash = 0;
+
+    /**
      * Represents a player who is still part of the game, including after their
      * ship has been destroyed.
      *
@@ -162,7 +203,7 @@ private:
      * staying in contact does not deal impact damage every tick.
      */
     struct Player {
-        std::unique_ptr<Ship> ship;
+        std::unique_ptr<DynamicObject> ship;
         bool touching_planet = false;
     };
 
