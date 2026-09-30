@@ -52,6 +52,10 @@ private:
 
 
     svanes::Entity background_entity = 0;
+
+    // The engine owns this camera and keeps it alive for the game's updates.
+    // Physics controls need it to interpret the mouse in world coordinates.
+    const svanes::Camera2D *camera = nullptr;
     std::unique_ptr<AssetCatalog> assets;
     std::unique_ptr<Ship> player_ship;
     std::optional<Planet> planet;

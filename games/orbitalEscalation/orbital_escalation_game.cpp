@@ -96,6 +96,7 @@ static void ApplyCollisionAcceleration(svanes::Registry &world,
 }
 
 void OrbitalEscalationGame::Initialize(svanes::GameContext &context) {
+    camera = &context.camera;
     // Create the overarching gameplay timeline entity, which we can use
     // to pause all gameplay, or speedup/slowdown all gameplay.
     gameplay_timeline_entity = context.world.CreateEntity();
@@ -139,7 +140,7 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext &context) {
                                      "player_ship");
     context.world.AddComponent<Health>(player_ship->GetEntity(),
                                        Health{kPlayerHealth});
-    const svanes::Transform player_start{0.0F, -kPlanetRadius - 800.0F};
+    const svanes::Transform player_start{0.0F, -kPlanetRadius - 48000.0F};
     player_ship->GetTransform(context.world) = player_start;
     player_ship->GetKinematic(context.world).velocity_x =
         svanes::PerSecondToPerTic(300.0F);
@@ -295,7 +296,12 @@ void OrbitalEscalationGame::PhysicsUpdate(
 
     if (player_ship) {
         physics.world.GetComponent<PropulsionControl>(
-            player_ship->GetEntity()) = ReadShipControls(physics.input);
+            player_ship->GetEntity()) =
+            ReadShipControls(physics.input, *camera,
+                             player_ship->GetTransform(physics.world),
+                             player_ship->GetKinematic(physics.world),
+                             physics.world.GetComponent<Propulsion>(
+                                 player_ship->GetEntity()));
     }
     ApplyPropulsion(physics.world);
 
