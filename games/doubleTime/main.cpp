@@ -15,8 +15,12 @@ ClientRole ParseRole(std::string_view role_text) {
     if (role_text == "platform") {
         return ClientRole::Platform;
     }
+    if (role_text == "spectator") {
+        return ClientRole::Spectator;
+    }
     throw std::invalid_argument(
-        "Unrecognized client role \"" + std::string{role_text} + "\"; expected \"character\" or \"platform\"."
+        "Unrecognized client role \"" + std::string{role_text} +
+        "\"; expected \"character\", \"platform\", or \"spectator\"."
     );
 }
 

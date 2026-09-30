@@ -34,6 +34,7 @@ constexpr svanes::Entity kChrisPlatformNetworkEntity = 0;
 enum class ClientRole : std::uint8_t {
     Character,
     Platform,
+    Spectator,
 };
 
 struct PlayerInputMessage {

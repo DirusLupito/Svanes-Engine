@@ -306,6 +306,10 @@ int32_t main() {
                 return;
             }
 
+            if (input.role == ClientRole::Spectator) {
+                return;
+            }
+
             if (!character.has_value()) {
                 const svanes::Entity entity = SpawnCharacter(
                     world, kCharacterSpawnLeft, kCharacterSpawnTop);
