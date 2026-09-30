@@ -76,10 +76,13 @@ public:
                       std::uint32_t concurrency = 1);
 
     /**
-     * Creates a ship and its attachments for a new player.
-     * 
+     * Creates a ship and its attachments for a new player, clear of existing
+     * collision geometry.
+     *
      * @param peer The unique, nonzero player ID. Add players in ascending
      * order.
+     * @throws std::overflow_error if no further spawn position can be
+     * represented while searching for a clear position.
      */
     void AddPlayer(svanes::PeerId peer) override;
 

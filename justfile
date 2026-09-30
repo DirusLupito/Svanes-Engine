@@ -178,6 +178,9 @@ run target="" server-host="127.0.0.1": (_check-target target) (release
         }
     }}
 
+nocompile *args:
+    {{release-bin-dir}}svanes_game_orbital_escalation{{exe-suffix}} {{args}}
+
 debug target="": (_check-target target) (build
     if target == "" {
         "orbitalEscalation"

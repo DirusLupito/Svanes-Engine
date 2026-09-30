@@ -148,18 +148,76 @@ void OrbitalSimulation::AssignIdentities(const DynamicObject &object) {
     }
 }
 
+/**
+ * Checks whether an object and its attachments fit at their current positions
+ * without colliding with the existing world.
+ *
+ * @param world The registry containing the object and obstacles.
+ * @param object The object whose spawn position to check.
+ * @param obstacles The existing entities to avoid.
+ * @return true if the object and all its attachments are clear of obstacles.
+ * @throws std::out_of_range if a checked entity lacks a transform or collider.
+ */
+static bool SpawnIsClear(const svanes::Registry &world,
+                         const DynamicObject &object,
+                         std::span<const svanes::Entity> obstacles) {
+    const auto entity = object.GetEntity();
+    const auto &geometry =
+        world.GetComponent<svanes::Collider2D>(entity).geometry;
+    const auto &transform = world.GetComponent<svanes::Transform>(entity);
+    for (const auto obstacle : obstacles) {
+        if (!svanes::DetectCollisions(
+                 geometry, transform,
+                 world.GetComponent<svanes::Collider2D>(obstacle).geometry,
+                 world.GetComponent<svanes::Transform>(obstacle))
+                 .empty()) {
+            return false;
+        }
+    }
+    for (const auto &child : object.GetAttachments()) {
+        if (!SpawnIsClear(world, *child, obstacles)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 void OrbitalSimulation::AddPlayer(svanes::PeerId peer) {
     if (peer.value == 0 || players.contains(peer.value)) {
         throw std::invalid_argument(
             "Orbital player requires a unique, nonzero peer ID.");
     }
 
+    // Collect existing geometry before creating the ship so it cannot block
+    // its own spawn position.
+    std::vector<svanes::Entity> obstacles;
+    world.ForEach<svanes::Transform, svanes::Collider2D>(
+        [&](svanes::Entity entity, const auto &, const auto &) {
+            obstacles.push_back(entity);
+        });
+
     auto ship =
         assets.CreateShip(world, gameplay_timeline.Get(), "player_ship");
     world.AddComponent<Health>(ship->GetEntity(), Health{kPlayerHealth});
-    ship->GetTransform(world) = {static_cast<float>(peer.value - 1) *
-                                     kSpawnSpacing,
-                                 -kPlanetRadius - kSpawnHeight};
+
+    // Check candidates in the same order so every peer chooses the same
+    // available spawn position.
+    for (float x = 0.0F;;) {
+        ship->GetTransform(world) = {x, -kPlanetRadius - kSpawnHeight};
+
+        // Update the attachments of all objects, so that their transforms are correct for collision detection.
+        UpdateAttachments(world);
+        if (SpawnIsClear(world, *ship, obstacles)) {
+            break;
+        }
+    
+        const float next = x + kSpawnSpacing;
+        if (!std::isfinite(next) || next == x) {
+            throw std::overflow_error("Orbital spawn positions exhausted.");
+        }
+    
+        x = next;
+    }
 
     ship->GetKinematic(world).velocity_x =
         svanes::PerSecondToPerTic(kSpawnSpeed);
