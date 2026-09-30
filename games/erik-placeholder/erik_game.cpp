@@ -29,6 +29,7 @@
 #include <svanes/render/render_system.hpp>
 #include <svanes/render/texture_manager.hpp>
 #include <svanes/sprite_animation_system.hpp>
+#include <svanes/utility/hash.hpp>
 
 #include <algorithm>
 #include <cmath>

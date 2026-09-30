@@ -18,6 +18,9 @@ DynamicObjectType ReadDynamicObjectType(const json &value) {
         return DynamicObjectType::Missile;
     }
 
+    if (type == "missile_launcher") {
+        return DynamicObjectType::MissileLauncher;
+    }
     throw std::invalid_argument("Unsupported dynamic object type: " + type);
 }
 
@@ -27,6 +30,8 @@ std::string WriteDynamicObjectType(DynamicObjectType type) {
         return "ship";
     case DynamicObjectType::Missile:
         return "missile";
+    case DynamicObjectType::MissileLauncher:
+        return "missile_launcher";
     }
 
     throw std::invalid_argument("Unsupported dynamic object type");

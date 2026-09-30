@@ -16,7 +16,9 @@
 
 namespace svanes {
 
+namespace internal {
 class PeerJoin;
+}
 
 /**
  * Message types PeerGroup sends for itself, in the range reserved for the engine.
@@ -83,12 +85,14 @@ struct PeerAssignment {
 };
 
 /**
+ * Serializes an assignment into the payload of a JoinAssigned reply.
  * @param assignment The assignment to send.
  * @return The encoded assignment.
  */
 NetworkMessage EncodeAssignment(const PeerAssignment &assignment);
 
 /**
+ * Reads back an assignment written by EncodeAssignment.
  * @param payload An assignment written by EncodeAssignment.
  * @return The assignment it carries.
  * @throws std::invalid_argument for malformed data.
@@ -120,6 +124,10 @@ UdpAddress ResolveRelayedAddress(const UdpAddress &relayed,
  */
 class RosterParticipant {
 public:
+    /**
+     * Virtual destructor so a participant can be destroyed through this
+     * interface.
+     */
     virtual ~RosterParticipant() = default;
 
     /**
@@ -225,6 +233,9 @@ public:
     PeerGroup(std::unique_ptr<UdpMsgPipe> bound_pipe, UdpAddress entry,
               PeerSettings settings);
 
+    /**
+     * Closes the session and the pipe it owns.
+     */
     ~PeerGroup();
 
     /**
@@ -235,6 +246,9 @@ public:
     void Attach(RosterParticipant &roster_participant);
 
     /**
+     * Combines the settings a joiner has to agree with into one value, so a
+     * process built against different rules or a different player limit is
+     * refused before it reaches the world.
      * @return The hash a joiner must match: the game's rules hash combined
      * with the player limit.
      */
@@ -273,43 +287,74 @@ public:
      */
     void RequestLeave();
 
-    /** @return Whether the other members agreed to this process leaving. */
+    /**
+     * Reports the outcome of a requested leave, which the members settle at the
+     * next roster change.
+     * @return Whether the other members agreed to this process leaving.
+     */
     bool HasDeparted() const;
 
     /**
+     * Tells the game when shutting down would lose nothing, so it can keep the
+     * process alive until pending traffic has drained.
      * @return Whether the process can close: after departing and delivering
      * everything, or at once after a failure or an abandoned join.
      */
     bool CanClose() const;
 
     /**
+     * Separates a settled member from one still joining or already departed.
      * @return Whether this process is a member with a loaded world and has
      * not departed.
      */
     bool IsRunning() const;
 
-    /** @return Whether a roster change is in progress. */
+    /**
+     * Reports whether the members are agreeing on joins, departures, or drops.
+     * Game traffic pauses for the length of that agreement.
+     * @return Whether a roster change is in progress.
+     */
     bool IsChangingRoster() const;
 
-    /** @return The sorted roster including the local member, empty before admission. */
+    /**
+     * Borrows the current roster, which changes only when a roster change is
+     * applied.
+     * @return The sorted roster including the local member, empty before admission.
+     */
     std::span<const PeerId> Peers() const;
 
-    /** @return The member this process controls, zero before admission. */
+    /**
+     * Gives the identity this process sends under and the game draws for.
+     * @return The member this process controls, zero before admission.
+     */
     PeerId LocalPeer() const;
 
-    /** @return The local UDP port others can join through. */
+    /**
+     * Reports the bound port, which a player passes to others so they can reach
+     * this process.
+     * @return The local UDP port others can join through.
+     */
     std::uint16_t Port() const;
 
     /**
+     * Reports that the group stopped for something it cannot recover from. The
+     * group makes no further progress, and the game decides how to respond.
      * @return Whether joining failed, a peer failed, a roster change stalled
      * or disagreed, or a message queue overflowed.
      */
     bool HasFailed() const;
 
-    /** @return A short status for the game's display or console. */
+    /**
+     * Describes in text what the group is doing, or why it failed.
+     * @return A short status for the game's display or console.
+     */
     std::string Status() const;
 
-    /** @return The revision attached to broadcast messages. */
+    /**
+     * Reports the roster revision, which advances once per applied roster
+     * change and separates messages belonging to different rosters.
+     * @return The revision attached to broadcast messages.
+     */
     std::uint64_t Revision() const;
 
 private:
@@ -359,6 +404,9 @@ private:
      *   order.
      * - dropped: Ids of the members it found unresponsive, ascending.
      * - progress: Its participant's progress for every other member, by id.
+     *
+     * Two stop records compare equal when every field matches, which detects a
+     * member that announced a second, different stop.
      */
     struct StopRecord {
         std::uint64_t position;
@@ -367,7 +415,6 @@ private:
         std::vector<std::uint32_t> dropped;
         std::map<std::uint32_t, std::uint64_t> progress;
 
-        /** @return Whether both records are identical. */
         bool operator==(const StopRecord &) const = default;
     };
 
@@ -377,13 +424,15 @@ private:
      * - boundary: The agreed position.
      * - world_hash: A hash of the participant's world at the boundary.
      * - roster_hash: A hash of the revision, next id, and every stop record.
+     *
+     * Two prepared records compare equal when every field matches, which is how
+     * members detect that their worlds or rosters diverged at the boundary.
      */
     struct PreparedRecord {
         std::uint64_t boundary;
         std::uint64_t world_hash;
         std::uint64_t roster_hash;
 
-        /** @return Whether both records are identical. */
         bool operator==(const PreparedRecord &) const = default;
     };
 
@@ -409,12 +458,15 @@ private:
     };
 
     /**
+     * Serializes a stop record into the payload of a RosterStop message.
      * @param writer The message to append to.
      * @param stop The stop record to write.
      */
     static void WriteStop(MessageWriter &writer, const StopRecord &stop);
 
     /**
+     * Reads back a stop record written by WriteStop, refusing one that names
+     * more members than the world admits.
      * @param reader The message positioned at a record written by WriteStop.
      * @param max_players The most members a record can name.
      * @return The stop record.
@@ -521,6 +573,8 @@ private:
                            std::span<const PeerEndpoint> joining);
 
     /**
+     * Looks up a member's address through the session connection that reaches
+     * it.
      * @param peer A current remote member.
      * @return The address this process uses to reach it.
      * @throws std::invalid_argument if the peer is not a remote member.
@@ -528,35 +582,102 @@ private:
     UdpAddress PeerAddress(PeerId peer) const;
 
     /**
+     * Pairs every remote member with its address, which a sponsor sends to a
+     * joiner so the joiner can connect to the rest of the world.
      * @return Every current member except this process, with the address
      * this process uses for it.
      */
     std::vector<PeerEndpoint> RemoteEndpoints() const;
 
+    // What every member of this world agreed on, checked against a joiner's
+    // rules hash before it is admitted.
     PeerSettings settings;
+
+    // The session that delivers every message and owns the pipe.
     std::unique_ptr<NetworkSession> session;
+
+    // The pipe the session owns, borrowed to register routes and read the local
+    // port.
     UdpMsgPipe *pipe = nullptr;
+
+    // The game's synchronization, supplied by Attach(). Borrowed, so it must
+    // outlive every later Update().
     RosterParticipant *participant = nullptr;
+
+    // The current roster including this process, ascending by id.
     std::vector<PeerId> peers;
+
+    // Why the group stopped, empty while it has not. HasFailed() tests it.
     std::string failure;
+
+    // What the group is currently doing, reported by Status() while no failure
+    // has been recorded.
     std::string status;
+
+    // Broadcast messages for the current revision, waiting for Receive().
     std::deque<SessionMessage> messages;
+
+    // Broadcast messages tagged with the next revision, held back until the
+    // roster change that starts that revision is applied.
     std::deque<SessionMessage> future_messages;
+
+    // The roster revision, tagged onto every broadcast. Starts at one for the
+    // world's first roster and advances once per applied roster change.
     std::uint64_t revision = 1;
+
+    // The id the next joiner receives. Every member advances it the same way so
+    // no id is reused, starting at two because the founding member is peer one.
     std::uint32_t next_peer_id = 2;
+
+    // Whether the participant holds a world, either because this process
+    // founded it or because a received snapshot finished loading.
     bool world_loaded = false;
+
+    // Whether RequestLeave() asked to depart at the next roster change.
     bool leave_requested = false;
+
+    // Whether the members agreed to this process leaving.
     bool departed = false;
+
+    // Whether the process may close immediately, set when a leave is requested
+    // with no world to hand back or after a failure.
     bool force_close = false;
+
+    // Snapshot chunks waiting for session send capacity, one entry per joiner
+    // being sent the world.
     std::vector<OutgoingSnapshot> outgoing_snapshots;
+
+    // How many chunks the incoming snapshot has, known once its first chunk
+    // arrives and empty while this process is not receiving one.
     std::optional<std::uint32_t> snapshot_chunk_count;
+
+    // Received snapshot chunks by index, assembled into a world once every
+    // chunk has arrived.
     std::map<std::uint32_t, std::vector<std::byte>> snapshot_chunks;
-    std::unique_ptr<PeerJoin> join;
+
+    // The joining side of admission, used until this process has an id. Empty
+    // on a member that founded its own world.
+    std::unique_ptr<internal::PeerJoin> join;
+
+    // Processes asking to be admitted, queued for the next roster change.
     std::vector<JoinCandidate> join_requests;
+
+    // Assignments already sent, by joiner id, kept so a lost reply can be sent
+    // again when the joiner repeats its request.
     std::map<std::uint32_t, SentAssignment> assignments;
+
+    // The roster change in progress, empty while none is.
     std::optional<RosterChange> roster_change;
+
+    // Members this process found unresponsive, announced as drops in its next
+    // stop record.
     std::vector<std::uint32_t> unreachable;
+
+    // Members already retired and cleared from the queues, so that each one is
+    // discarded only once.
     std::vector<std::uint32_t> discarded;
+
+    // Whether the other members dropped this process from the roster.
     bool removed = false;
 };
 

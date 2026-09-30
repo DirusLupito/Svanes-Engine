@@ -94,4 +94,8 @@ Rectangle2D TriangleGeometry::Bounds() const {
                                        maximum.y);
 }
 
+Vector2D TriangleGeometry::Center() const {
+    return (vertices[0] + vertices[1] + vertices[2]) / 3.0F;
+}
+
 } // namespace svanes

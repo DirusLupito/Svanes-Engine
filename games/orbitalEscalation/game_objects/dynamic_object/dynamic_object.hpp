@@ -6,6 +6,7 @@
 #include <svanes/kinematic_system.hpp>
 
 #include <memory>
+#include <span>
 #include <string>
 
 /**
@@ -18,8 +19,9 @@
  * MEMBERS:
  * - Ship: A ship definition.
  * - Missile: A missile definition.
+ * - MissileLauncher: A missile launcher definition.
  */
-enum class DynamicObjectType { Ship, Missile };
+enum class DynamicObjectType { Ship, Missile, MissileLauncher };
 
 /**
  * Defines an object attached to another object. This is a reference to a
@@ -106,6 +108,39 @@ public:
      */
     std::vector<std::unique_ptr<DynamicObject>>
     DetachAttachments(svanes::Registry &world, svanes::Vector2D added_velocity);
+
+    /**
+     * Returns the objects directly attached to this object. Ownership stays
+     * here, so callers cannot remove an attachment without transferring it.
+     *
+     * @return The directly attached objects.
+     */
+    std::span<const std::unique_ptr<DynamicObject>> GetAttachments() const;
+
+    /**
+     * Detaches one object and transfers its ownership to the caller.
+     *
+     * @param world The registry containing the objects.
+     * @param child The entity of the directly attached object.
+     * @param added_velocity The extra world-space velocity, in units per local
+     * tic.
+     * @return The detached object.
+     * @throws std::invalid_argument If child is not directly attached here.
+     */
+    std::unique_ptr<DynamicObject> Detach(svanes::Registry &world,
+                                          svanes::Entity child,
+                                          svanes::Vector2D added_velocity);
+
+    /**
+     * Removes attachments whose health has reached zero, including those on
+     * attached objects. Explosion processing must finish first, so for example,
+     * a dead missile still has its geometry when we determine what its blast
+     * hits. Any child of a dead attachment is also removed, even if it is not
+     * dead itself.
+     *
+     * @param world The registry containing the objects and their health.
+     */
+    void RemoveDeadAttachments(svanes::Registry &world);
 
     /**
      * Returns the unique identifier of the dynamic object entity.

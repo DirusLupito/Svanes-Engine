@@ -28,6 +28,18 @@ struct EntityCollision2D {
 };
 
 /**
+ * Determines which object is first in a collision test.
+ *
+ * MEMBERS:
+ * - EntityId: The smaller local entity ID is first. Result order is
+ * unspecified.
+ * - InputOrder: The entity appearing first in the supplied list is first.
+ * Results are sorted by the two entities' positions in that list. This lets a
+ * game supply shared identity order even when local entity IDs differ.
+ */
+enum class CollisionOrder { EntityId, InputOrder };
+
+/**
  * Given a list of entities, detects all collisions between them and returns a
  * vector of EntityCollision2D objects representing the collisions. The world
  * must remain unchanged until this call returns.
@@ -37,13 +49,13 @@ struct EntityCollision2D {
  * @param driver The driver used for both broad and narrow phase work.
  * @param batch_size The maximum number of entries or candidate pairs per
  * batch. Must be positive. Defaults to 16 for both phases.
+ * @param order The ordering used before narrow-phase testing and for results.
  * @return A vector of EntityCollision2D objects representing the detected
- * collisions between the entities, in unspecified order. Each pair puts the
- * smaller entity ID first so games may choose to use this to sort the
- * collisions in a consistent order if desired.
+ * collisions between the entities, following the selected order.
  */
 std::vector<EntityCollision2D> DetectEntityCollisions(
     const Registry &world, const std::vector<Entity> &entities,
-    AsyncParallelForDriver &driver, std::size_t batch_size = 16);
+    AsyncParallelForDriver &driver, std::size_t batch_size = 16,
+    CollisionOrder order = CollisionOrder::EntityId);
 
 } // namespace svanes

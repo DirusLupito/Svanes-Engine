@@ -58,4 +58,6 @@ Circle2D TransformCircle(Circle2D circle, const Transform &transform) {
     return circle;
 }
 
+Vector2D CircleGeometry::Center() const { return {circle.x, circle.y}; }
+
 } // namespace svanes

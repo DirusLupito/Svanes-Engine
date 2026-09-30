@@ -130,11 +130,7 @@ void DetachAttachment(svanes::Registry &world, svanes::Entity entity,
     // We need to find the root parent of the detached entity, as
     // no attached entity will have a Kinematic2D component.
 
-    auto parent = world.GetComponent<Attachment>(entity).parent;
-
-    while (world.HasComponent<Attachment>(parent)) {
-        parent = world.GetComponent<Attachment>(parent).parent;
-    }
+    const auto parent = GetAttachmentRoot(world, entity);
 
     svanes::Kinematic2D motion;
     if (world.HasComponent<svanes::Kinematic2D>(parent)) {
@@ -148,4 +144,12 @@ void DetachAttachment(svanes::Registry &world, svanes::Entity entity,
     motion.velocity_y += added_velocity.y;
     world.AddComponent<svanes::Kinematic2D>(entity, motion);
     world.RemoveComponent<Attachment>(entity);
+}
+
+svanes::Entity GetAttachmentRoot(const svanes::Registry &world,
+                                 svanes::Entity entity) {
+    while (world.HasComponent<Attachment>(entity)) {
+        entity = world.GetComponent<Attachment>(entity).parent;
+    }
+    return entity;
 }

@@ -1,7 +1,6 @@
 #pragma once
 
-#include "game_objects/dynamic_object/ship.hpp"
-#include "game_objects/planet.hpp"
+#include "orbital_simulation.hpp"
 
 #include <svanes/entity.hpp>
 #include <svanes/game.hpp>
@@ -30,31 +29,28 @@ public:
     void Update(const svanes::FrameContext &frame) override;
 
     /**
-     * Post-physics update logic. Called by the engine once per simulation step
-     * immediately after the physics system has updated all entities' for this
-     * one single simulation step. This runs at most once per rendered frame,
-     * before animation and Update, and is skipped when no step is due.
+     * Checks whether the player has requested to quit the game.
      *
-     * @param physics The world, sampled input, and entities' local tic deltas.
+     * @return true if the game should close, false otherwise.
      */
-    void PhysicsUpdate(const svanes::PhysicsContext &physics) override;
-
     bool ShouldQuit() const override;
 
 private:
-    // The overarching timeline entity for which all other timelines are
-    // children.
-    svanes::Entity gameplay_timeline_entity = 0;
+    // Owns and advances the gameplay world, independently of rendering.
+    std::unique_ptr<OrbitalSimulation> simulation;
 
-    svanes::Entity pause_timeline_entity = 0;
+    // The timeline used to animate the pause label.
+    svanes::Timeline pause_timeline;
+
+    // Real time accumulated toward the next complete simulation step.
+    svanes::TicCount pending_tics = 0;
+
+    // The text label displayed while gameplay is paused.
     svanes::Entity pause_label_entity = 0;
 
-
+    // The background rectangle that follows the camera's view.
     svanes::Entity background_entity = 0;
-    std::unique_ptr<Ship> player_ship;
-    std::optional<Planet> planet;
-    std::vector<std::unique_ptr<DynamicObject>> detached_attachments;
-    bool player_touching_planet = false;
 
+    // Whether the player has requested to close the game.
     bool should_quit = false;
 };

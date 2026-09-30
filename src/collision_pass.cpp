@@ -4,8 +4,9 @@
 #include <svanes/registry.hpp>
 #include <svanes/spatial/hgrid2d.hpp>
 
+#include <algorithm>
 #include <stdexcept>
-#include <unordered_set>
+#include <unordered_map>
 #include <utility>
 
 namespace svanes {
@@ -17,15 +18,30 @@ namespace svanes {
 std::vector<EntityCollision2D>
 DetectEntityCollisions(const Registry &world,
                        const std::vector<Entity> &entities,
-                       AsyncParallelForDriver &driver, std::size_t batch_size) {
+                       AsyncParallelForDriver &driver, std::size_t batch_size,
+                       CollisionOrder order) {
 
     if (batch_size == 0) {
         throw std::invalid_argument("Collision batch size must be positive.");
     }
-    // First, we set up our HGrid2D.
 
-    std::unordered_set<Entity> unique_entities;
-    unique_entities.reserve(entities.size());
+    // This also tracks which entities we have seen, so the same lookup can
+    // reject duplicates and recover the order supplied by the caller.
+    std::unordered_map<Entity, std::size_t> input_order;
+    input_order.reserve(entities.size());
+    const auto sort_results = [&](std::vector<EntityCollision2D> &results) {
+        // Workers may finish in any order. Restore the caller's order after
+        // collecting their results when InputOrder was requested.
+        if (order == CollisionOrder::InputOrder) {
+            std::sort(
+                results.begin(), results.end(),
+                [&](const auto &a, const auto &b) {
+                    return std::pair{input_order.at(a.a), input_order.at(a.b)} <
+                           std::pair{input_order.at(b.a), input_order.at(b.b)};
+                });
+        }
+    };
+    // First, we set up our HGrid2D.
 
     // List of entries used to build the HGrid2D.
     std::vector<HGridEntry2D> entries;
@@ -35,7 +51,7 @@ DetectEntityCollisions(const Registry &world,
     // and populate the entries vector with HGridEntry2D objects for every
     // entity that has a valid bounding box.
     for (Entity entity : entities) {
-        if (!unique_entities.insert(entity).second) {
+        if (!input_order.emplace(entity, input_order.size()).second) {
             throw std::invalid_argument(
                 "Entity collision input requires unique entity IDs.");
         }
@@ -81,7 +97,15 @@ DetectEntityCollisions(const Registry &world,
 
         // For every work item in the range assigned to this worker...
         for (std::size_t index = begin; index < end; ++index) {
-            const auto &[a, b] = pairs[index];
+            auto [a, b] = pairs[index];
+
+            // Choose argument order before testing the geometry. Sorting just
+            // the results would not fix a tie break issue, as tied penetration choices depend on
+            // whichever local entity ID happened to be smaller.
+            if (order == CollisionOrder::InputOrder &&
+                input_order.at(a) > input_order.at(b)) {
+                std::swap(a, b);
+            }
 
             //
             // NARROW PHASE: For every pair of entities that could potentially
@@ -116,6 +140,7 @@ DetectEntityCollisions(const Registry &world,
     // of 1), there's no need to merge results, we simply move ownership and
     // return.
     if (worker_results.size() == 1) {
+        sort_results(worker_results.front());
         return std::move(worker_results.front());
     }
 
@@ -136,6 +161,7 @@ DetectEntityCollisions(const Registry &world,
             results.push_back(std::move(result));
         }
     }
+    sort_results(results);
     return results;
 }
 

@@ -140,4 +140,23 @@ std::optional<Rectangle2D> ComputeBounds(const Geometry2D &geometry,
         geometry);
 }
 
+Vector2D ComputeCenter(const Rectangle2D &shape) {
+    return RectangleGeometry(shape, 0.0F).Center();
+}
+
+Vector2D ComputeCenter(const Triangle2D &shape) {
+    return TriangleGeometry(shape).Center();
+}
+
+Vector2D ComputeCenter(const Circle2D &shape) {
+    return CircleGeometry(shape).Center();
+}
+
+Vector2D ComputeCenter(const ConvexPolygon2D &shape) { return shape.Center(); }
+
+Vector2D ComputeCenter(const Primitive2D &geometry) {
+    return std::visit([](const auto &shape) { return ComputeCenter(shape); },
+                      geometry);
+}
+
 } // namespace svanes

@@ -83,6 +83,16 @@ public:
     Rectangle2D Bounds() const;
 
     /**
+     * Returns the center of the rectangle in the geometry's coordinates.
+     * The caller can apply a transform to place it in world coordinates.
+     *
+     * Rotating the rectangle around its center does not move that center.
+     *
+     * @return The center of the rectangle.
+     */
+    Vector2D Center() const;
+
+    /**
      * Returns the four corners of the rectangle after applying the rotation.
      * The corners are returned in the following order: top-left, top-right,
      * bottom-right, bottom-left.

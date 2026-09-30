@@ -64,3 +64,15 @@ void AttachEntity(svanes::Registry &world, svanes::Entity entity,
  */
 void DetachAttachment(svanes::Registry &world, svanes::Entity entity,
                       svanes::Vector2D added_velocity);
+
+/**
+ * Finds the root of an attachment tree.
+ *
+ * @param world The registry containing the attachment tree. UpdateAttachments
+ * should have validated the tree before it is used for collision or launching.
+ * @param entity The entity whose root we want.
+ *
+ * @return The root entity, or entity itself if it is not attached.
+ */
+svanes::Entity GetAttachmentRoot(const svanes::Registry &world,
+                                 svanes::Entity entity);

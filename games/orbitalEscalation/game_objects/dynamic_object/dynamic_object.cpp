@@ -1,6 +1,9 @@
 #include "dynamic_object.hpp"
 
 #include "../../attachment_system.hpp"
+#include "../../combat/damage_system.hpp"
+
+#include <algorithm>
 
 #include <svanes/registry.hpp>
 #include <svanes/timeline_system.hpp>
@@ -77,4 +80,41 @@ DynamicObject::DetachAttachments(svanes::Registry &world,
     }
 
     return std::exchange(attachments, {});
+}
+
+std::span<const std::unique_ptr<DynamicObject>>
+DynamicObject::GetAttachments() const {
+    return attachments;
+}
+
+std::unique_ptr<DynamicObject>
+DynamicObject::Detach(svanes::Registry &world, svanes::Entity child,
+                      svanes::Vector2D added_velocity) {
+    const auto found = std::find_if(
+        attachments.begin(), attachments.end(),
+        [child](const auto &object) { return object->GetEntity() == child; });
+
+    if (found == attachments.end()) {
+        throw std::invalid_argument("Object is not a direct attachment");
+    }
+
+    DetachAttachment(world, child, added_velocity);
+
+    auto detached = std::move(*found);
+    attachments.erase(found);
+    return detached;
+}
+
+void DynamicObject::RemoveDeadAttachments(svanes::Registry &world) {
+
+    // Remove dead attachments from the list, and recursively remove dead
+    // attachments from their children.
+    std::erase_if(attachments, [&](const auto &object) {
+        if (IsDead(world, object->GetEntity())) {
+            return true;
+        }
+
+        object->RemoveDeadAttachments(world);
+        return false;
+    });
 }

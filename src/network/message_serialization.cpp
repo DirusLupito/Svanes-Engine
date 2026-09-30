@@ -113,13 +113,4 @@ std::string MessageReader::ReadText() {
 
 std::size_t MessageReader::Remaining() const { return bytes.size() - cursor; }
 
-std::uint64_t HashBytes(std::span<const std::byte> bytes) {
-    std::uint64_t hash = 14695981039346656037ULL;
-    for (const std::byte byte : bytes) {
-        hash ^= std::to_integer<std::uint8_t>(byte);
-        hash *= 1099511628211ULL;
-    }
-    return hash;
-}
-
 }

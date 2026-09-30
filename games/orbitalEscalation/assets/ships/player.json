@@ -213,8 +213,8 @@
     ],
     "attachments": [
         {
-            "type": "missile",
-            "name": "basic_missile",
+            "type": "missile_launcher",
+            "name": "basic_missile_single_launcher",
             "transform": [
                 -66,
                 80,
@@ -222,8 +222,8 @@
             ]
         },
         {
-            "type": "missile",
-            "name": "basic_missile",
+            "type": "missile_launcher",
+            "name": "basic_missile_single_launcher",
             "transform": [
                 66,
                 80,
@@ -231,8 +231,8 @@
             ]
         },
         {
-            "type": "missile",
-            "name": "basic_missile",
+            "type": "missile_launcher",
+            "name": "basic_missile_single_launcher",
             "transform": [
                 -94,
                 148,
@@ -240,8 +240,8 @@
             ]
         },
         {
-            "type": "missile",
-            "name": "basic_missile",
+            "type": "missile_launcher",
+            "name": "basic_missile_single_launcher",
             "transform": [
                 94,
                 148,
@@ -249,8 +249,8 @@
             ]
         },
         {
-            "type": "missile",
-            "name": "basic_missile",
+            "type": "missile_launcher",
+            "name": "basic_missile_single_launcher",
             "transform": [
                 -122,
                 216,
@@ -258,8 +258,8 @@
             ]
         },
         {
-            "type": "missile",
-            "name": "basic_missile",
+            "type": "missile_launcher",
+            "name": "basic_missile_single_launcher",
             "transform": [
                 122,
                 216,

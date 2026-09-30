@@ -15,8 +15,15 @@ elseif(package_system STREQUAL "Linux")
         message(FATAL_ERROR "Unsupported Linux architecture: ${package_processor}")
     endif()
     set(extension "tar.gz")
-else()
-    message(FATAL_ERROR "Packaging supports Windows and Linux.")
+elseif(package_system STREQUAL "Darwin")
+    if(package_processor MATCHES "^(arm64|aarch64)$")
+        set(platform "macos-arm64")
+    elseif(package_processor MATCHES "^(x86_64|AMD64|amd64)$")
+        set(platform "macos-x64")
+    else()
+        message(FATAL_ERROR "Unsupported macOS architecture: ${package_processor}")
+    endif()
+    set(extension "tar.gz")
 endif()
 if(NOT package_config STREQUAL "Release")
     message(FATAL_ERROR "Package with the Release configuration.")
@@ -45,6 +52,19 @@ if(package_windows)
         UNRESOLVED_DEPENDENCIES_VAR unresolved
         PRE_EXCLUDE_REGEXES "[Aa][Pp][Ii]-[Mm][Ss]-.*" "[Ee][Xx][Tt]-[Mm][Ss]-.*"
         POST_EXCLUDE_REGEXES ".*[/\\][Ww][Ii][Nn][Dd][Oo][Ww][Ss][/\\][Ss][Yy][Ss][Tt][Ee][Mm]32[/\\].*")
+elseif(package_system STREQUAL "Darwin")
+    set(CMAKE_GET_RUNTIME_DEPENDENCIES_PLATFORM macos+macho)
+    set(CMAKE_GET_RUNTIME_DEPENDENCIES_TOOL otool)
+    set(CMAKE_GET_RUNTIME_DEPENDENCIES_COMMAND "${package_otool}")
+    file(GET_RUNTIME_DEPENDENCIES
+        EXECUTABLES "${stage}/${executable_name}"
+        RESOLVED_DEPENDENCIES_VAR resolved
+        UNRESOLVED_DEPENDENCIES_VAR unresolved
+        PRE_EXCLUDE_REGEXES "^/usr/lib/" "^/System/Library/"
+        POST_EXCLUDE_REGEXES "^/usr/lib/" "^/System/Library/")
+    if(resolved)
+        message(FATAL_ERROR "macOS packaging cannot bundle third-party dynamic libraries: ${resolved}")
+    endif()
 else()
     set(CMAKE_GET_RUNTIME_DEPENDENCIES_PLATFORM linux+elf)
     set(CMAKE_GET_RUNTIME_DEPENDENCIES_TOOL objdump)
@@ -65,6 +85,10 @@ if(package_windows)
         endif()
     endforeach()
     set(archive_arguments cf "${package_output}/${folder}.${extension}" --format=zip "${folder}")
+elseif(package_system STREQUAL "Darwin")
+    file(WRITE "${stage}/runtime-dependencies.txt"
+        "Native macOS build. Every third-party library is linked statically.\nSystem frameworks and libraries are supplied by macOS itself.\nThis build is unsigned, so Gatekeeper blocks it until the quarantine attribute is cleared.\n")
+    set(archive_arguments czf "${package_output}/${folder}.${extension}" --format=gnutar "${folder}")
 else()
     file(WRITE "${stage}/runtime-dependencies.txt"
         "Native Linux build. These shared libraries must be installed on the destination system.\nUse a compatible distribution and architecture. Graphics and audio drivers are supplied by the system.\n\n")

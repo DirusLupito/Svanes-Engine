@@ -31,6 +31,50 @@ using Geometry2D = std::variant<Rectangle2D, Triangle2D, Circle2D,
 std::optional<Rectangle2D> ComputeBounds(const Geometry2D &geometry,
                                          const Transform &transform);
 
+/**
+ * Returns the center of a rectangle using RectangleGeometry::Center.
+ * No transform is applied here.
+ *
+ * @param shape The rectangle whose center we want.
+ * @return The rectangle's center in its own coordinates.
+ */
+Vector2D ComputeCenter(const Rectangle2D &shape);
+
+/**
+ * Returns the centroid of a triangle using TriangleGeometry::Center.
+ * No transform is applied here.
+ *
+ * @param shape The triangle whose center we want.
+ * @return The triangle's centroid in its own coordinates.
+ */
+Vector2D ComputeCenter(const Triangle2D &shape);
+
+/**
+ * Returns the center of a circle using CircleGeometry::Center.
+ * No transform is applied here.
+ *
+ * @param shape The circle whose center we want.
+ * @return The circle's center in its own coordinates.
+ */
+Vector2D ComputeCenter(const Circle2D &shape);
+
+/**
+ * Returns the centroid of a convex polygon using ConvexPolygon2D::Center.
+ * No transform is applied here.
+ *
+ * @param shape The convex polygon whose center we want.
+ * @return The convex polygon's centroid in its own coordinates.
+ */
+Vector2D ComputeCenter(const ConvexPolygon2D &shape);
+
+/**
+ * Returns the centroid of a primitive geometry.
+ *
+ * @param geometry The primitive whose center we want.
+ * @return The primitive's center in its own coordinates.
+ */
+Vector2D ComputeCenter(const Primitive2D &geometry);
+
 } // namespace svanes
 
 namespace svanes::internal {

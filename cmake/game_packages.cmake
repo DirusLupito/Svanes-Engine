@@ -5,6 +5,10 @@ if(MSVC)
     find_program(SVANES_DUMPBIN NAMES dumpbin HINTS "${compiler_directory}" REQUIRED)
 endif()
 
+if(APPLE)
+    find_program(SVANES_OTOOL NAMES otool REQUIRED)
+endif()
+
 function(svanes_game_package target name source_folder asset_folder)
     set(asset_source "${CMAKE_SOURCE_DIR}/games/${source_folder}/assets")
     add_custom_target(${target}_assets
@@ -30,6 +34,7 @@ set(package_arch [==[${CMAKE_SIZEOF_VOID_P}]==])
 set(package_system [==[${CMAKE_SYSTEM_NAME}]==])
 set(package_processor [==[${CMAKE_SYSTEM_PROCESSOR}]==])
 set(package_objdump [==[${CMAKE_OBJDUMP}]==])
+set(package_otool [==[${SVANES_OTOOL}]==])
 set(CMAKE_GET_RUNTIME_DEPENDENCIES_PLATFORM windows+pe)
 set(CMAKE_GET_RUNTIME_DEPENDENCIES_TOOL dumpbin)
 set(CMAKE_GET_RUNTIME_DEPENDENCIES_COMMAND [==[${SVANES_DUMPBIN}]==])
