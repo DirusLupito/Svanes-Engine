@@ -9,9 +9,9 @@
 constexpr const char *kChrisDefaultServerHost = "127.0.0.1";
 constexpr const char *kChrisTileMapFilename = "TestTilemap.png";
 constexpr const char *kChrisMusicFilename = "audio/music/OldCity.wav";
-constexpr std::uint16_t kChrisCharacterTcpPort = 5555;
-constexpr std::uint16_t kChrisPlatformTcpPort = 5556;
-constexpr std::uint16_t kChrisSpectatorTcpPort = 5557;
+constexpr std::uint16_t kChrisCharacterPort = 5555;
+constexpr std::uint16_t kChrisPlatformPort = 5556;
+constexpr std::uint16_t kChrisSpectatorPort = 5557;
 
 constexpr float kChrisTileSize = 10.0F;
 constexpr std::uint32_t kChrisVisibleTileRows = 24;

@@ -6,10 +6,10 @@
 #include <svanes/kinematic_system.hpp>
 #include <svanes/network/network_replication.hpp>
 #include <svanes/network/network_server.hpp>
-#include <svanes/network/tcp_msg_pipe.hpp>
+#include <svanes/network/server_runtime.hpp>
+#include <svanes/network/udp_msg_pipe.hpp>
 #include <svanes/physics_system.hpp>
 #include <svanes/registry.hpp>
-#include <svanes/network/server_runtime.hpp>
 #include <svanes/timeline_system.hpp>
 #include <svanes/vector2d.hpp>
 
@@ -254,16 +254,15 @@ int32_t main(int32_t argc, char **argv) {
     svanes::NetworkServer network_server(
         std::vector<svanes::NetworkServer::PipeFactory>{
             [] {
-                return std::make_unique<svanes::TcpMsgPipe>(
-                    kChrisCharacterTcpPort);
+                return std::make_unique<svanes::UdpMsgPipe>(
+                    kChrisCharacterPort);
             },
             [] {
-                return std::make_unique<svanes::TcpMsgPipe>(
-                    kChrisPlatformTcpPort);
+                return std::make_unique<svanes::UdpMsgPipe>(kChrisPlatformPort);
             },
             [] {
-                return std::make_unique<svanes::TcpMsgPipe>(
-                    kChrisSpectatorTcpPort);
+                return std::make_unique<svanes::UdpMsgPipe>(
+                    kChrisSpectatorPort);
             }});
 
     svanes::Registry world;

@@ -3,7 +3,7 @@
 
 #include <svanes/camera2d.hpp>
 #include <svanes/input.hpp>
-#include <svanes/network/tcp_msg_pipe.hpp>
+#include <svanes/network/udp_msg_pipe.hpp>
 #include <svanes/registry.hpp>
 #include <svanes/render/render_system.hpp>
 #include <svanes/render/texture_manager.hpp>
@@ -43,20 +43,20 @@ struct NetworkInterpolationTarget {
     svanes::Transform target;
 };
 
-std::uint16_t TcpPortForRole(ClientRole role) {
+std::uint16_t PortForRole(ClientRole role) {
     if (role == ClientRole::Character) {
-        return kChrisCharacterTcpPort;
+        return kChrisCharacterPort;
     }
     if (role == ClientRole::Platform) {
-        return kChrisPlatformTcpPort;
+        return kChrisPlatformPort;
     }
-    return kChrisSpectatorTcpPort;
+    return kChrisSpectatorPort;
 }
 
 std::unique_ptr<svanes::MsgPipe>
 CreateNetworkPipe(const std::string &server_host, ClientRole role) {
-    return std::make_unique<svanes::TcpMsgPipe>(
-        server_host, TcpPortForRole(role));
+    return std::make_unique<svanes::UdpMsgPipe>(0, server_host,
+                                                PortForRole(role));
 }
 
 void UpdateClientSpeed(const svanes::InputManager &input,
