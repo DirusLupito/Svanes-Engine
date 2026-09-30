@@ -46,6 +46,18 @@ public:
      */
     Rectangle2D Bounds() const;
 
+    /**
+     * Returns the centroid of the convex polygon in the geometry's coordinates.
+     * The caller can apply a transform to place it in world coordinates.
+     *
+     * The polygon is divided into triangles. Bigger triangles contribute more
+     * to the center than smaller triangles, so each triangle's contribution is
+     * multiplied by its signed area.
+     *
+     * @return The centroid of the convex polygon.
+     */
+    Vector2D Center() const;
+
 private:
     // Declaring TransformConvexPolygon as a friend function allows it to access
     // the private members of ConvexPolygon2D, specifically the vertices vector.

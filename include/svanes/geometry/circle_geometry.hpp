@@ -51,6 +51,14 @@ public:
      */
     Rectangle2D Bounds() const;
 
+    /**
+     * Returns the center of the circle in the geometry's coordinates.
+     * The caller can apply a transform to place it in world coordinates.
+     *
+     * @return The center of the circle.
+     */
+    Vector2D Center() const;
+
 private:
     // The circle's center and radius in local coordinates.
     Circle2D circle;

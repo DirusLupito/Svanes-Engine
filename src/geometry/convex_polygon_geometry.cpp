@@ -178,4 +178,47 @@ ConvexPolygon2D TransformConvexPolygon(const ConvexPolygon2D &polygon,
     return result;
 }
 
+Vector2D ConvexPolygon2D::Center() const {
+
+    // Any scheme that divides the polygon into a non-overlapping set
+    // of shapes that wholly partition the polygon then computes the
+    // centroid of each shape, weights it by the area of that shape,
+    // and averages the results will tell you the centroid of the polygon.
+    // think about it this way: we're basically finding the center of an
+    // infinite collection of points that make up the polygon, and the centroid
+    // is the average of all those points. So if we can find the average of a
+    // subset of those points, and then weight that average by the number of
+    // points in that subset, we can combine the averages of all the subsets
+    // to get the average of the entire set.
+
+    // In this case, we believe the simplest way to produce a complete partition
+    // of the polygon is to take the first vertex produce a triangle fan using
+    // that vertex and every pair of consecutive vertices.
+
+    Vector2D weighted{};
+    float area = 0.0F;
+    for (std::size_t i = 1; i + 1 < vertices.size(); ++i) {
+        const auto a = vertices[i] - vertices[0];
+        const auto b = vertices[i + 1] - vertices[0];
+        const float cross = a.x * b.y - a.y * b.x;
+        weighted = weighted + (a + b) * cross;
+        area += cross;
+    }
+
+    // we split the polygon into triangles, each of which shares the first
+    // vertex of the polygon. (a + b) / 3 is the centroid relative to
+    // vertices[0], cross will be twice the signed area of the triangle,
+    // weighted will be the sum of each triangle's centroid multiplied by its
+    // signed area, and area will be twice the total signed area of the polygon.
+
+    // So if we want to say that the centroid of the polygon is the weighted
+    // average of the centroids of its triangles, we can find that by dividing
+    // the weighted sum of the centroids by the total area. Then the doubling of
+    // the area in the denominator and numerator cancels out. Adding vertices[0]
+    // to the result gives us the centroid in the polygon's coordinates, rather
+    // than relative to vertices[0].
+
+    return vertices[0] + weighted / (3.0F * area);
+}
+
 } // namespace svanes

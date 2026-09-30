@@ -64,6 +64,16 @@ public:
     Rectangle2D Bounds() const;
 
     /**
+     * Returns the centroid of the triangle in the geometry's coordinates.
+     * The caller can apply a transform to place it in world coordinates.
+     *
+     * The centroid is the average of the triangle's three vertices.
+     *
+     * @return The centroid of the triangle.
+     */
+    Vector2D Center() const;
+
+    /**
      * Returns the triangle's vertices in local coordinates.
      *
      * @return An array of three Vector2D objects representing the triangle's

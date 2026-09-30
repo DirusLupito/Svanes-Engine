@@ -212,4 +212,6 @@ std::array<Vector2D, 4> RectangleGeometry::Corners() const {
     return vertices;
 }
 
+Vector2D RectangleGeometry::Center() const { return {center_x, center_y}; }
+
 } // namespace svanes
