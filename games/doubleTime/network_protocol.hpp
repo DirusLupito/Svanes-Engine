@@ -12,6 +12,8 @@ constexpr const char *kChrisMusicFilename = "audio/music/OldCity.wav";
 constexpr std::uint16_t kChrisCharacterPort = 5555;
 constexpr std::uint16_t kChrisPlatformPort = 5556;
 constexpr std::uint16_t kChrisSpectatorPort = 5557;
+// Shared TCP admission port for the dynamic client-server setup.
+constexpr std::uint16_t kChrisServerJoinPort = 5558;
 
 constexpr float kChrisTileSize = 10.0F;
 constexpr std::uint32_t kChrisVisibleTileRows = 24;

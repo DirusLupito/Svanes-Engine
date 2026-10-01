@@ -251,19 +251,7 @@ int32_t main(int32_t argc, char **argv) {
     if (argc > 1) {
         throw std::invalid_argument("The Double Time server takes no arguments.");
     }
-    svanes::NetworkServer network_server(
-        std::vector<svanes::NetworkServer::PipeFactory>{
-            [] {
-                return std::make_unique<svanes::UdpMsgPipe>(
-                    kChrisCharacterPort);
-            },
-            [] {
-                return std::make_unique<svanes::UdpMsgPipe>(kChrisPlatformPort);
-            },
-            [] {
-                return std::make_unique<svanes::UdpMsgPipe>(
-                    kChrisSpectatorPort);
-            }});
+    svanes::NetworkServer network_server(kChrisServerJoinPort);
 
     svanes::Registry world;
 
@@ -320,28 +308,40 @@ int32_t main(int32_t argc, char **argv) {
     runtime.Run(
         [&](const svanes::NetworkMessage &message) {
             const PlayerInputMessage input = message.As<PlayerInputMessage>();
+            const svanes::ClientId assigned_client_id = input.client_id;
 
-            if (input.role == ClientRole::Platform) {
+            const ClientRole assigned_role =
+                assigned_client_id == 1 ? ClientRole::Character
+                : assigned_client_id == 2 ? ClientRole::Platform
+                                           : ClientRole::Spectator;
+
+            if (input.role != assigned_role) {
+                SDL_Log("Server: ignoring client %u's requested role; assigned role is %u.",
+                        assigned_client_id,
+                        static_cast<unsigned>(assigned_role));
+            }
+
+            if (assigned_role == ClientRole::Platform) {
                 platform_trigger_requested =
                     platform_trigger_requested || input.action_requested;
                 return;
             }
 
-            if (input.role == ClientRole::Spectator) {
+            if (assigned_role == ClientRole::Spectator) {
                 return;
             }
 
             if (!character.has_value()) {
                 const svanes::Entity entity = SpawnCharacter(
                     world, kCharacterSpawnLeft, kCharacterSpawnTop);
-                character = ServerCharacter{entity, input.client_id};
+                character = ServerCharacter{entity, assigned_client_id};
                 SDL_Log("Server: spawned the character for client %u.",
-                        input.client_id);
-            } else if (character->client_id != input.client_id) {
+                        assigned_client_id);
+            } else if (character->client_id != assigned_client_id) {
                 SDL_Log("Server: client %u took control of the character from "
                         "client %u.",
-                        input.client_id, character->client_id);
-                character->client_id = input.client_id;
+                        assigned_client_id, character->client_id);
+                character->client_id = assigned_client_id;
             }
 
             character->horizontal_input = input.horizontal;
