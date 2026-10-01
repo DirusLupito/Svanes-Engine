@@ -144,6 +144,17 @@ public:
      * @return True if the game should quit, false otherwise.
      */
     virtual bool ShouldQuit() const { return false; }
+
+    /**
+     * Determines the interval between frames in tics.
+     * This method is called once per frame, allowing the game to control the
+     * pace of the main loop. The engine will sleep for the remaining time
+     * until the next frame, if any.
+     *
+     * @return The interval between frames in tics. A tic is one microsecond.
+     * Return 0 to disable pacing and run as fast as possible.
+     */
+    virtual TicCount GetFrameIntervalTics() const { return 0; }
 };
 
 } // namespace svanes

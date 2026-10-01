@@ -28,6 +28,7 @@
 #include <chrono>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <utility>
 
 namespace svanes {
@@ -103,6 +104,7 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
 
     bool running = true;
     while (running) {
+        const auto frame_start = std::chrono::steady_clock::now();
 
         //
         // INPUT DETECTION AND PROCESSING
@@ -245,6 +247,27 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
         // Implicit limit to 1000 FPS to avoid essentially just busy waiting
         // wasting CPU resources.
         SDL_Delay(1);
+
+        // How long to sleep until the next frame
+        const auto interval = game.GetFrameIntervalTics();
+        if (interval >
+            static_cast<TicCount>(
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    std::chrono::steady_clock::duration::max())
+                    .count())) {
+            throw std::overflow_error("Frame interval is too large.");
+        }
+
+        // If we are supposed to limit the pace of the main loop, we sleep for
+        // the remaining time until the next frame.
+        if (running && interval > 0) {
+            const auto elapsed = std::chrono::steady_clock::now() - frame_start;
+            const auto remaining =
+                std::chrono::microseconds(interval) - elapsed;
+            if (remaining > std::chrono::steady_clock::duration::zero()) {
+                std::this_thread::sleep_for(remaining);
+            }
+        }
     }
 }
 
