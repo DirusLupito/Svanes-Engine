@@ -63,17 +63,17 @@ directory for TASK finds all of them.
 
 Task 1, running the engine, is the game being handed to svanes::Application in main.cpp.
 
-Task 2A, the static entity, is the ground, created in ErikGame::Initialize in
-erik_game.cpp. Task 2B, the controllable entity, is the goose, spawned in the same
+Task 2A, the static entity, is the ground, created in GooseGame::Initialize in
+goose_game.cpp. Task 2B, the controllable entity, is the goose, spawned in the same
 function. Task 2C, the auto-moving entity, is the enemy, also spawned there and walked
-along its path in ErikGame::Update.
+along its path in GooseGame::Update.
 
 Task 3, physics, is the Kinematic2D and Gravity components put on the goose in Goose::Spawn
 in goose.cpp.
 
-Task 4, controls, is the input read into a GooseIntent in ErikGame::Update in erik_game.cpp.
+Task 4, controls, is the input read into a GooseIntent in GooseGame::Update in goose_game.cpp.
 
 Task 5, collision response, is Goose::ResolveCollisions in goose.cpp.
 
-Task 6, scaling, is the Tab key toggling the camera's scale mode in ErikGame::Update in
-erik_game.cpp.
+Task 6, scaling, is the Tab key toggling the camera's scale mode in GooseGame::Update in
+goose_game.cpp.

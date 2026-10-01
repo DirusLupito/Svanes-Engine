@@ -274,17 +274,37 @@ else()
 endif()
 
 add_executable(
-    svanes_game_erik
-    games/erik-placeholder/main.cpp
-    games/erik-placeholder/erik_game.cpp
-    games/erik-placeholder/goose.cpp
-    games/erik-placeholder/goose_simulation.cpp
-    games/erik-placeholder/enemy.cpp
-    games/erik-placeholder/bullets.cpp
+    svanes_game_goose
+    games/goose/main.cpp
+    games/goose/goose_game.cpp
+    games/goose/pause_menu.cpp
+    games/goose/goose_session.cpp
+    games/goose/peer_session.cpp
+    games/goose/server_session.cpp
+    games/goose/server_protocol.cpp
+    games/goose/goose.cpp
+    games/goose/goose_simulation.cpp
+    games/goose/enemy.cpp
+    games/goose/bullets.cpp
 )
-target_link_libraries(svanes_game_erik PRIVATE Svanes::Engine)
-target_compile_definitions(svanes_game_erik PRIVATE
-    ERIK_GAME_ASSETS_DIR="assets/erik"
+target_link_libraries(svanes_game_goose PRIVATE Svanes::Engine)
+target_compile_definitions(svanes_game_goose PRIVATE
+    GOOSE_ASSETS_DIR="assets/goose"
+)
+
+add_executable(
+    svanes_game_goose_server
+    games/goose/goose_server.cpp
+    games/goose/goose_session.cpp
+    games/goose/server_protocol.cpp
+    games/goose/goose.cpp
+    games/goose/goose_simulation.cpp
+    games/goose/enemy.cpp
+    games/goose/bullets.cpp
+)
+target_link_libraries(svanes_game_goose_server PRIVATE Svanes::Engine)
+target_compile_definitions(svanes_game_goose_server PRIVATE
+    GOOSE_ASSETS_DIR="assets/goose"
 )
 
 add_library(
@@ -376,7 +396,7 @@ target_compile_definitions(svanes_game_double_time_server PRIVATE
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT svanes_game_orbital_escalation)
 
 set_target_properties(
-    svanes_engine svanes_game_erik svanes_game_orbital_escalation svanes_orbital_simulation svanes_game_orbital_escalation_server svanes_game_double_time svanes_game_double_time_server
+    svanes_engine svanes_game_goose svanes_game_goose_server svanes_game_orbital_escalation svanes_orbital_simulation svanes_game_orbital_escalation_server svanes_game_double_time svanes_game_double_time_server
     PROPERTIES
         CXX_EXTENSIONS OFF
         ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/$<CONFIG>"
@@ -489,7 +509,8 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
 )
 
 include(cmake/game_packages.cmake)
-svanes_game_package(svanes_game_erik erik erik-placeholder erik)
+svanes_game_package(svanes_game_goose goose goose goose)
+svanes_game_package(svanes_game_goose_server goose-server goose goose)
 svanes_game_package(svanes_game_orbital_escalation orbitalEscalation orbitalEscalation orbitalEscalation)
 add_dependencies(svanes_game_orbital_escalation_server svanes_game_orbital_escalation_assets)
 svanes_game_package(svanes_game_double_time doubleTime doubleTime doubleTime)

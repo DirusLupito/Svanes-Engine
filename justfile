@@ -63,7 +63,7 @@ configure:
 # Download/update third-party dependencies into thirdparty/.
 fetch-deps: configure
 
-# Pass a target (erik, OrbitalEscalation, OrbitalEscalationServer, doubleTime, doubleTime-host,
+# Pass a target (goose, goose-server, OrbitalEscalation, OrbitalEscalationServer, doubleTime, doubleTime-host,
 # doubleTime-spec, or doubleTime-server) to build only that game; leave blank
 # to build everything.
 # Configure and build.
@@ -73,8 +73,10 @@ build target="": (_check-target target) configure
             ""
         } else {
             "--target " + (
-                if target == "erik" {
-                    "svanes_game_erik"
+                if target == "goose" {
+                    "svanes_game_goose"
+                } else if target == "goose-server" {
+                    "svanes_game_goose_server"
                 } else if target =~ "^[Oo]rbitalEscalation$" {
                     "svanes_game_orbital_escalation"
                 } else if target == "OrbitalEscalationServer" {
@@ -98,8 +100,10 @@ release target="": (_check-target target) configure
             ""
         } else {
             "--target " + (
-                if target == "erik" {
-                    "svanes_game_erik"
+                if target == "goose" {
+                    "svanes_game_goose"
+                } else if target == "goose-server" {
+                    "svanes_game_goose_server"
                 } else if target =~ "^[Oo]rbitalEscalation$" {
                     "svanes_game_orbital_escalation"
                 } else if target == "OrbitalEscalationServer" {
@@ -124,7 +128,9 @@ _check-target target:
     @{{
         if target == "" {
             ""
-        } else if target == "erik" {
+        } else if target == "goose" {
+            ""
+        } else if target == "goose-server" {
             ""
         } else if target =~ "^[Oo]rbitalEscalation$" {
             ""
@@ -141,19 +147,21 @@ _check-target target:
         } else {
             error(
                 "no game named '" + target + "'. Try: doubleTime, "
-                + "doubleTime-host, doubleTime-spec, doubleTime-server, erik, OrbitalEscalation, OrbitalEscalationServer, "
+                + "doubleTime-host, doubleTime-spec, doubleTime-server, goose, goose-server, OrbitalEscalation, OrbitalEscalationServer, "
                 + "or leave it blank."
             )
         }
     }}
 
-# doubleTime, doubleTime-server, erik, or orbitalEscalation. 
+# doubleTime, doubleTime-server, goose, goose-server, OrbitalEscalation, or OrbitalEscalationServer.
+# Anything after the target is passed to the game, e.g.
+# `just run goose --join 127.0.0.1:45000 --port 45002` or `just run goose --server 127.0.0.1`.
 # Leave blank for Orbital Escalation.
 # doubleTime launches two clients at once, since it's a two-player game - point
 # doubleTime-server's host at each other over a network to test with more than
 # one machine.
 # Build and launch an optimized game.
-run target="" server-host="127.0.0.1": (_check-target target) (release
+run target="" *args: (_check-target target) (release
     if target == "" {
         "orbitalEscalation"
     } else {
@@ -164,15 +172,17 @@ run target="" server-host="127.0.0.1": (_check-target target) (release
         if target == "doubleTime-host" {
             "just _run-double-time-host " + release-bin-dir
         } else if target == "doubleTime" {
-            "just _run-double-time-platform " + release-bin-dir + " " + server-host
+            "just _run-double-time-platform " + release-bin-dir + " " + (if args == "" { "127.0.0.1" } else { args })
         } else if target == "doubleTime-spec" {
-            "just _run-double-time-spectator " + release-bin-dir + " " + server-host
+            "just _run-double-time-spectator " + release-bin-dir + " " + (if args == "" { "127.0.0.1" } else { args })
         } else {
             release-bin-dir + (
                 if target == "" {
                     "svanes_game_orbital_escalation"
-                } else if target == "erik" {
-                    "svanes_game_erik"
+                } else if target == "goose" {
+                    "svanes_game_goose"
+                } else if target == "goose-server" {
+                    "svanes_game_goose_server"
                 } else if target =~ "^[Oo]rbitalEscalation$" {
                     "svanes_game_orbital_escalation"
                 } else if target == "OrbitalEscalationServer" {
@@ -182,7 +192,7 @@ run target="" server-host="127.0.0.1": (_check-target target) (release
                 } else {
                     "svanes_game_double_time"
                 }
-            ) + exe-suffix
+            ) + exe-suffix + " " + args
         }
     }}
 
@@ -203,8 +213,10 @@ debug target="": (_check-target target) (build
             bin-dir + (
                 if target == "" {
                     "svanes_game_orbital_escalation"
-                } else if target == "erik" {
-                    "svanes_game_erik"
+                } else if target == "goose" {
+                    "svanes_game_goose"
+                } else if target == "goose-server" {
+                    "svanes_game_goose_server"
                 } else if target =~ "^[Oo]rbitalEscalation$" {
                     "svanes_game_orbital_escalation"
                 } else if target == "OrbitalEscalationServer" {

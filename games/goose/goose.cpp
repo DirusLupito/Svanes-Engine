@@ -52,8 +52,8 @@ void AdvanceCountdown(svanes::TicCount& remaining, svanes::TicCount delta_tics)
 GooseTextures Goose::LoadTextures(svanes::TextureManager& assets)
 {
     return {
-        assets.LoadTexture(svanes::AssetPath(ERIK_GAME_ASSETS_DIR) + "/goose.png"),
-        assets.LoadTexture(svanes::AssetPath(ERIK_GAME_ASSETS_DIR) + "/goose_walk.png"),
+        assets.LoadTexture(svanes::AssetPath(GOOSE_ASSETS_DIR) + "/goose.png"),
+        assets.LoadTexture(svanes::AssetPath(GOOSE_ASSETS_DIR) + "/goose_walk.png"),
     };
 }
 
@@ -93,7 +93,7 @@ void Goose::Spawn(svanes::Registry& world, const GooseTextures& textures, float 
     world.AddComponent<svanes::Timeline>(entity);
     // TASK 3, physics: these two components are what put the goose under the
     // engine's physics. Kinematic2D holds its velocity and acceleration, and
-    // Gravity opts it into the world gravity vector set in ErikGame::Initialize
+    // Gravity opts it into the world gravity vector set in GooseGame::Initialize
     world.AddComponent<svanes::Kinematic2D>(entity);
     world.AddComponent<svanes::Gravity>(entity);
     world.AddComponent<svanes::Collider2D>(entity, svanes::Collider2D{body});

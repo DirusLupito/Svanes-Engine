@@ -66,11 +66,13 @@ struct GooseWorldSnapshot {
 class GooseSimulation final : public svanes::SyncedSimulation<GooseIntent, GooseIntentUse> {
 public:
     /**
-     * Loads goose textures, spawns the enemy, and takes control of simulation.
-     * Players are added separately with AddPlayer.
-     * @param context The world, gravity, and asset services used by the simulation.
+     * Builds the arena and spawns the enemy. Players are added separately with AddPlayer.
+     * Needs no window, so a headless server can run the same simulation.
+     * @param world The registry the simulation lives in.
+     * @param gravity World gravity in units per local tic squared.
+     * @param textures The textures geese draw with, or empty handles where nothing is drawn.
      */
-    explicit GooseSimulation(svanes::GameContext& context);
+    GooseSimulation(svanes::Registry& world, svanes::Vector2D gravity, GooseTextures textures);
 
     /** @return Every gameplay and animation field, without local entity ids or texture handles. */
     svanes::NetworkMessage Save() const override;
@@ -157,6 +159,13 @@ public:
      */
     svanes::Entity PlayerEntity(svanes::PeerId peer) const;
 
+    /**
+     * Stops or resumes reading the local devices. While stopped, CaptureInput
+     * reports neutral held controls and remembers no presses.
+     * @param enabled Whether local input controls the goose.
+     */
+    void SetControlsEnabled(bool enabled);
+
 private:
     /**
      * Associates the network player identity with its game controller.
@@ -239,4 +248,5 @@ private:
     svanes::AsyncParallelForDriver physics_driver{1};
     std::uint64_t tick = 0;
     LocalControls controls;
+    bool controls_enabled = true;
 };
