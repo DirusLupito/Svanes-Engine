@@ -1,4 +1,5 @@
 #include "chris_game.hpp"
+#include "p2p_game.hpp"
 
 #include <svanes/application.hpp>
 
@@ -27,6 +28,15 @@ ClientRole ParseRole(std::string_view role_text) {
 } // namespace
 
 int32_t main(int32_t argc, char **argv) {
+    if (argc > 1 && std::string_view{argv[1]} == "p2p") {
+        if (argc > 4) throw std::invalid_argument("P2P expects an optional port and entry host.");
+        const auto port = argc > 2 ? static_cast<std::uint16_t>(std::stoul(argv[2])) : kDoubleTimeP2PHostPort;
+        std::optional<svanes::UdpAddress> entry;
+        if (argc > 3) entry = svanes::UdpAddress{argv[3], kDoubleTimeP2PHostPort};
+        svanes::Application application({.title = "Double Time P2P", .width = 640, .height = 360});
+        DoubleTimeP2PGame game(port, entry);
+        return application.run(game);
+    }
     if (argc > 3) {
         throw std::invalid_argument(
             "Expected at most a server host and client role.");
