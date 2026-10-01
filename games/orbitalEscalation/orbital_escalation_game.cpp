@@ -1,4 +1,5 @@
 #include "orbital_escalation_game.hpp"
+#include "OrbitalEscalationServer.hpp"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -7,6 +8,7 @@
 #include <svanes/asset_path.hpp>
 #include <svanes/camera2d.hpp>
 #include <svanes/input.hpp>
+#include <svanes/network/tcp_msg_pipe.hpp>
 #include <svanes/registry.hpp>
 #include <svanes/render/render_system.hpp>
 
@@ -17,6 +19,19 @@ OrbitalEscalationGame::OrbitalEscalationGame(
     std::uint16_t port, std::optional<svanes::UdpAddress> join_address)
     : port(port), join_address(std::move(join_address)) {}
 
+OrbitalEscalationGame::OrbitalEscalationGame(std::string server_host,
+                                             std::uint16_t server_port)
+    : server_host(std::move(server_host)), port(server_port) {
+    if (this->server_host.empty() || port < OrbitalServerFirstPort ||
+        port >= OrbitalServerFirstPort + OrbitalServerSlots) {
+        throw std::invalid_argument(
+            "Choose a server host and TCP port 45010, 45011, or 45012.");
+    }
+
+    local_player = {
+        static_cast<std::uint32_t>(port - OrbitalServerFirstPort + 1)};
+}
+
 void OrbitalEscalationGame::Initialize(svanes::GameContext &context) {
     // OrbitalSimulation advances gameplay itself. Letting the application
     // advance it too would move objects and their timelines twice.
@@ -26,37 +41,45 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext &context) {
         context.world, svanes::AssetPath("assets/orbitalEscalation"),
         context.concurrency);
 
-    // Peers must agree on pacing as well as gameplay to share a world.
-    svanes::MessageWriter rules;
-    rules.WriteUint64(simulation->RulesHash());
-    rules.WriteUint64(OrbitalSyncSettings.step_tics);
-    rules.WriteUint64(OrbitalSyncSettings.prediction_ticks);
-    rules.WriteUint64(OrbitalSyncSettings.pacing_lead_ticks);
-    rules.WriteUint64(OrbitalSyncSettings.history_ticks);
-    rules.WriteUint64(OrbitalSyncSettings.hash_interval_ticks);
-    rules.WriteUint64(OrbitalSyncSettings.max_unchecked_ticks);
-    rules.WriteUint32(OrbitalSyncSettings.steps_per_frame);
-    rules.WriteUint32(OrbitalSyncSettings.max_backlog_steps);
-
-    const svanes::PeerSettings settings{
-        2, 8, svanes::HashBytes(rules.Finish().bytes)};
-
-    auto pipe = std::make_unique<svanes::UdpMsgPipe>(port);
-
-    if (join_address) {
-        network = std::make_unique<svanes::PeerGroup>(std::move(pipe),
-                                                      *join_address, settings);
-        std::cout << "Joining " << join_address->host << ':'
-                  << join_address->port;
+    if (!server_host.empty()) {
+        client = std::make_unique<svanes::NetworkClient>(
+            std::make_unique<svanes::TcpMsgPipe>(server_host, port));
+        std::cout << "Connecting player " << local_player.value << " to "
+                  << server_host << ':' << port << " over TCP.\n";
     } else {
-        network =
-            std::make_unique<svanes::PeerGroup>(std::move(pipe), settings);
-        std::cout << "Started a new world";
-    }
+        // Peers must agree on pacing as well as gameplay to share a world.
+        svanes::MessageWriter rules;
+        rules.WriteUint64(simulation->RulesHash());
+        rules.WriteUint64(OrbitalSyncSettings.step_tics);
+        rules.WriteUint64(OrbitalSyncSettings.prediction_ticks);
+        rules.WriteUint64(OrbitalSyncSettings.pacing_lead_ticks);
+        rules.WriteUint64(OrbitalSyncSettings.history_ticks);
+        rules.WriteUint64(OrbitalSyncSettings.hash_interval_ticks);
+        rules.WriteUint64(OrbitalSyncSettings.max_unchecked_ticks);
+        rules.WriteUint32(OrbitalSyncSettings.steps_per_frame);
+        rules.WriteUint32(OrbitalSyncSettings.max_backlog_steps);
 
-    std::cout << "; listening on UDP port " << network->Port() << ".\n";
-    sync = std::make_unique<svanes::InputSync<OrbitalInput, std::uint8_t>>(
-        *network, *simulation, OrbitalSyncSettings);
+        const svanes::PeerSettings settings{
+            2, 8, svanes::HashBytes(rules.Finish().bytes)};
+
+        auto pipe = std::make_unique<svanes::UdpMsgPipe>(port);
+
+        if (join_address) {
+            network = std::make_unique<svanes::PeerGroup>(
+                std::move(pipe), *join_address, settings);
+            std::cout << "Joining " << join_address->host << ':'
+                      << join_address->port;
+        } else {
+            network =
+                std::make_unique<svanes::PeerGroup>(std::move(pipe), settings);
+            std::cout << "Started a new world";
+        }
+
+        std::cout << "; listening on UDP port " << network->Port() << ".\n";
+        sync = std::make_unique<svanes::InputSync<OrbitalInput, std::uint8_t>>(
+            *network, *simulation, OrbitalSyncSettings);
+        local_player = network->LocalPeer();
+    }
 
     pause_label_entity = context.world.CreateEntity();
     context.world.AddComponent<svanes::TextLabel>(
@@ -73,7 +96,7 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext &context) {
         });
 
     context.camera.zoom = 0.02F;
-    if (const auto entity = simulation->PlayerEntity(network->LocalPeer())) {
+    if (const auto entity = simulation->PlayerEntity(local_player)) {
         const auto &player =
             context.world.GetComponent<svanes::Transform>(*entity);
         context.camera.x = player.x;
@@ -95,31 +118,61 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext &context) {
                                                svanes::ZOrder{-100});
 }
 
+void OrbitalEscalationGame::UpdateServerClient(
+    const svanes::FrameContext &frame) {
+    for (const auto &message : client->PollBroadcast()) {
+        simulation->Load(message.bytes);
+    }
+
+    // Capture every frame so short presses survive between input sends.
+    simulation->CaptureInput(frame, local_player);
+    input_tics +=
+        std::min(frame.real_delta_tics, OrbitalSnapshotTics - input_tics);
+
+    if (input_tics == OrbitalSnapshotTics) {
+        svanes::MessageWriter writer;
+        simulation->EncodeInput(writer, simulation->TakeInput());
+        client->Send(writer.Finish());
+        input_tics = 0;
+    }
+}
+
 void OrbitalEscalationGame::Update(const svanes::FrameContext &frame) {
     if (frame.input.WasPressed(svanes::Key::Escape)) {
-        sync->RequestLeave();
-    }
-
-    // Keep exchanging inputs and capturing controls while gameplay waits
-    // for other peers.
-    sync->Update(frame);
-    // Keep the session alive until it allows the game to close.
-    should_quit = should_quit || sync->CanClose();
-
-    // Report roster changes and status updates to the console.
-    if (network->IsRunning() && last_roster_revision != network->Revision()) {
-        last_roster_revision = network->Revision();
-        std::cout << "Roster at tick " << sync->Tick() << ":";
-        for (const auto peer : network->Peers()) {
-            std::cout << ' ' << peer.value;
+        if (client) {
+            should_quit = true;
+        } else {
+            sync->RequestLeave();
         }
-        std::cout << "; local player " << network->LocalPeer().value << ".\n";
     }
 
-    const auto status = sync->Status();
-    if (status != last_network_status) {
-        std::cout << status << '\n';
-        last_network_status = status;
+    if (client) {
+        UpdateServerClient(frame);
+    } else {
+        // Keep exchanging inputs and capturing controls while gameplay waits
+        // for other peers.
+        sync->Update(frame);
+        local_player = network->LocalPeer();
+        // Keep the session alive until it allows the game to close.
+        should_quit = should_quit || sync->CanClose();
+
+        // Report roster changes and status updates to the console.
+        if (network->IsRunning() &&
+            last_roster_revision != network->Revision()) {
+            last_roster_revision = network->Revision();
+            std::cout << "Roster at tick " << sync->Tick() << ":";
+            for (const auto peer : network->Peers()) {
+                std::cout << ' ' << peer.value;
+            }
+            std::cout << "; local player " << network->LocalPeer().value
+                      << ".\n";
+        }
+
+        const auto status = sync->Status();
+        if (status != last_network_status) {
+            std::cout << status << '\n';
+            last_network_status = status;
+        }
     }
 
     // The pause label must keep animating while gameplay is stopped,
@@ -169,7 +222,7 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext &frame) {
     frame.camera.zoom = zoom;
 
     // Camera follows the player, centered on the screen.
-    if (const auto entity = simulation->PlayerEntity(network->LocalPeer())) {
+    if (const auto entity = simulation->PlayerEntity(local_player)) {
         const svanes::Transform &player =
             frame.world.GetComponent<svanes::Transform>(*entity);
         frame.camera.x = player.x;

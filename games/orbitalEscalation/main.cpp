@@ -58,6 +58,7 @@ static svanes::UdpAddress ReadAddress(std::string_view text) {
 int32_t main(int32_t argc, char **argv) {
     try {
         std::optional<svanes::UdpAddress> join_address;
+        std::optional<svanes::UdpAddress> server_address;
         std::optional<std::uint16_t> port;
         for (int32_t index = 1; index < argc; ++index) {
             const std::string_view option{argv[index]};
@@ -68,10 +69,19 @@ int32_t main(int32_t argc, char **argv) {
                           << "Joining listens on port 45001 unless --port is "
                              "supplied.\n"
                           << "Every copy on one computer needs its own port.\n";
+                std::cout
+                    << "--server HOST:PORT connects to a headless server; "
+                       "choose TCP port 45010, 45011, or 45012.\n";
                 return 0;
             }
 
-            if (option == "--port") {
+            if (option == "--server") {
+                if (++index >= argc || server_address) {
+                    throw std::invalid_argument(
+                        "--server requires one address and may appear once.");
+                }
+                server_address = ReadAddress(argv[index]);
+            } else if (option == "--port") {
                 if (++index >= argc || port) {
                     throw std::invalid_argument(
                         "--port requires one value and may appear once.");
@@ -89,6 +99,10 @@ int32_t main(int32_t argc, char **argv) {
             }
         }
 
+        if (server_address && (join_address || port)) {
+            throw std::invalid_argument(
+                "--server cannot be combined with --join or --port.");
+        }
         svanes::Application application({
             .title = join_address ? "Orbital Escalation - joining " +
                                         join_address->host + ":" +
@@ -98,6 +112,11 @@ int32_t main(int32_t argc, char **argv) {
             .height = 1080,
         });
 
+        if (server_address) {
+            OrbitalEscalationGame game(server_address->host,
+                                       server_address->port);
+            return application.run(game);
+        }
         OrbitalEscalationGame game(
             port.value_or(join_address ? OrbitalJoinPort : OrbitalHostPort),
             std::move(join_address));

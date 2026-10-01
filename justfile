@@ -63,7 +63,7 @@ configure:
 # Download/update third-party dependencies into thirdparty/.
 fetch-deps: configure
 
-# Pass a target (erik, orbitalEscalation, doubleTime, doubleTime-host,
+# Pass a target (erik, OrbitalEscalation, OrbitalEscalationServer, doubleTime, doubleTime-host,
 # doubleTime-spec, or doubleTime-server) to build only that game; leave blank
 # to build everything.
 # Configure and build.
@@ -75,8 +75,10 @@ build target="": (_check-target target) configure
             "--target " + (
                 if target == "erik" {
                     "svanes_game_erik"
-                } else if target == "orbitalEscalation" {
+                } else if target =~ "^[Oo]rbitalEscalation$" {
                     "svanes_game_orbital_escalation"
+                } else if target == "OrbitalEscalationServer" {
+                    "svanes_game_orbital_escalation_server"
                 } else if target == "doubleTime-server" {
                     "svanes_game_double_time_server"
                 } else if target == "doubleTime-host" {
@@ -98,8 +100,10 @@ release target="": (_check-target target) configure
             "--target " + (
                 if target == "erik" {
                     "svanes_game_erik"
-                } else if target == "orbitalEscalation" {
+                } else if target =~ "^[Oo]rbitalEscalation$" {
                     "svanes_game_orbital_escalation"
+                } else if target == "OrbitalEscalationServer" {
+                    "svanes_game_orbital_escalation_server"
                 } else if target == "doubleTime-server" {
                     "svanes_game_double_time_server"
                 } else if target == "doubleTime-host" {
@@ -122,7 +126,9 @@ _check-target target:
             ""
         } else if target == "erik" {
             ""
-        } else if target == "orbitalEscalation" {
+        } else if target =~ "^[Oo]rbitalEscalation$" {
+            ""
+        } else if target == "OrbitalEscalationServer" {
             ""
         } else if target == "doubleTime" {
             ""
@@ -135,7 +141,7 @@ _check-target target:
         } else {
             error(
                 "no game named '" + target + "'. Try: doubleTime, "
-                + "doubleTime-host, doubleTime-spec, doubleTime-server, erik, orbitalEscalation, "
+                + "doubleTime-host, doubleTime-spec, doubleTime-server, erik, OrbitalEscalation, OrbitalEscalationServer, "
                 + "or leave it blank."
             )
         }
@@ -167,8 +173,10 @@ run target="" server-host="127.0.0.1": (_check-target target) (release
                     "svanes_game_orbital_escalation"
                 } else if target == "erik" {
                     "svanes_game_erik"
-                } else if target == "orbitalEscalation" {
+                } else if target =~ "^[Oo]rbitalEscalation$" {
                     "svanes_game_orbital_escalation"
+                } else if target == "OrbitalEscalationServer" {
+                    "svanes_game_orbital_escalation_server"
                 } else if target == "doubleTime-server" {
                     "svanes_game_double_time_server"
                 } else {
@@ -178,8 +186,8 @@ run target="" server-host="127.0.0.1": (_check-target target) (release
         }
     }}
 
-nocompile *args:
-    {{release-bin-dir}}svanes_game_orbital_escalation{{exe-suffix}} {{args}}
+nocompile target="OrbitalEscalation" *args:
+    {{release-bin-dir}}{{if target == "OrbitalEscalationServer" { "svanes_game_orbital_escalation_server" } else if target =~ "^[Oo]rbitalEscalation$" { "svanes_game_orbital_escalation" } else { error("nocompile supports OrbitalEscalation and OrbitalEscalationServer") }}}{{exe-suffix}} {{args}}
 
 debug target="": (_check-target target) (build
     if target == "" {
@@ -197,8 +205,10 @@ debug target="": (_check-target target) (build
                     "svanes_game_orbital_escalation"
                 } else if target == "erik" {
                     "svanes_game_erik"
-                } else if target == "orbitalEscalation" {
+                } else if target =~ "^[Oo]rbitalEscalation$" {
                     "svanes_game_orbital_escalation"
+                } else if target == "OrbitalEscalationServer" {
+                    "svanes_game_orbital_escalation_server"
                 } else if target == "doubleTime-server" {
                     "svanes_game_double_time_server"
                 } else {

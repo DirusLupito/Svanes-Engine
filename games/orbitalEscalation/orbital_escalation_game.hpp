@@ -4,6 +4,7 @@
 
 #include <svanes/entity.hpp>
 #include <svanes/game.hpp>
+#include <svanes/network/network_client.hpp>
 
 #include <optional>
 #include <string>
@@ -28,6 +29,15 @@ inline constexpr svanes::SyncSettings OrbitalSyncSettings{
  */
 class OrbitalEscalationGame final : public svanes::IGame {
 public:
+    /**
+     * Configures the game to play in a world controlled by a server.
+     *
+     * @param server_host The host running the server.
+     * @param server_port The TCP port for the player's server slot.
+     * @throws std::invalid_argument if the host is empty or the port is not
+     * one of the supported player slots.
+     */
+    OrbitalEscalationGame(std::string server_host, std::uint16_t server_port);
     /**
      * Configures the game to start a world or join an existing one.
      *
@@ -54,14 +64,34 @@ public:
     void Update(const svanes::FrameContext &frame) override;
 
     /**
-     * Checks whether the network session is ready for the game to close.
+     * Checks whether the game is ready to close.
      *
      * @return true if the game should close, false otherwise.
      */
     bool ShouldQuit() const override;
 
 private:
-    // The local UDP port used to receive peer traffic.
+    /**
+     * Updates the displayed world from server snapshots and sends local
+     * controls for the server to apply.
+     *
+     * @param frame The local input, camera, world, and elapsed frame time.
+     * @throws std::invalid_argument if a snapshot or outgoing controls are
+     * invalid.
+     * @throws std::out_of_range if a snapshot references a missing object.
+     */
+    void UpdateServerClient(const svanes::FrameContext &frame);
+
+    // The authoritative server's host, or empty for peer-to-peer play.
+    std::string server_host;
+    // The connection used to exchange controls and server snapshots.
+    std::unique_ptr<svanes::NetworkClient> client;
+    // The player controlled by this process, also used for camera tracking.
+    svanes::PeerId local_player;
+    // Real time accumulated toward the next control message to the server.
+    svanes::TicCount input_tics = 0;
+
+    // The local UDP listening port, or the destination TCP port in server mode.
     std::uint16_t port;
 
     // The peer to contact when joining, or no address when starting a world.
@@ -90,6 +120,6 @@ private:
     // The background rectangle that follows the camera's view.
     svanes::Entity background_entity = 0;
 
-    // Whether the session has allowed the game to close.
+    // Whether the game is ready to close.
     bool should_quit = false;
 };

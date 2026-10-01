@@ -287,8 +287,8 @@ target_compile_definitions(svanes_game_erik PRIVATE
     ERIK_GAME_ASSETS_DIR="assets/erik"
 )
 
-add_executable(
-    svanes_game_orbital_escalation
+add_library(
+    svanes_orbital_simulation STATIC
     games/orbitalEscalation/attachment_system.cpp
     games/orbitalEscalation/attachment_system.hpp
     games/orbitalEscalation/propulsion_system.cpp
@@ -323,8 +323,6 @@ add_executable(
     games/orbitalEscalation/game_objects/dynamic_object/missile.hpp
     games/orbitalEscalation/serialization/ship_serialization.cpp
     games/orbitalEscalation/serialization/ship_serialization.hpp
-    games/orbitalEscalation/main.cpp
-    games/orbitalEscalation/orbital_escalation_game.cpp
     games/orbitalEscalation/orbital_simulation.cpp
     games/orbitalEscalation/orbital_simulation.hpp
     games/orbitalEscalation/game_objects/dynamic_object/dynamic_object.cpp
@@ -346,9 +344,20 @@ FetchContent_Declare(
     SOURCE_DIR "${CMAKE_SOURCE_DIR}/thirdparty/nlohmann_json-src"
 )
 FetchContent_MakeAvailable(nlohmann_json)
-target_link_libraries(svanes_game_orbital_escalation PRIVATE
+target_link_libraries(svanes_orbital_simulation PUBLIC
     Svanes::Engine nlohmann_json::nlohmann_json
 )
+add_executable(svanes_game_orbital_escalation
+    games/orbitalEscalation/main.cpp
+    games/orbitalEscalation/orbital_escalation_game.cpp
+)
+target_link_libraries(svanes_game_orbital_escalation PRIVATE svanes_orbital_simulation)
+add_executable(svanes_game_orbital_escalation_server
+    games/orbitalEscalation/server_main.cpp
+    games/orbitalEscalation/OrbitalEscalationServer.hpp
+    games/orbitalEscalation/OrbitalEscalationServer.cpp
+)
+target_link_libraries(svanes_game_orbital_escalation_server PRIVATE svanes_orbital_simulation)
 
 add_executable(svanes_game_double_time games/doubleTime/main.cpp games/doubleTime/chris_game.cpp)
 target_link_libraries(svanes_game_double_time PRIVATE Svanes::Engine)
@@ -367,7 +376,7 @@ target_compile_definitions(svanes_game_double_time_server PRIVATE
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT svanes_game_orbital_escalation)
 
 set_target_properties(
-    svanes_engine svanes_game_erik svanes_game_orbital_escalation svanes_game_double_time svanes_game_double_time_server
+    svanes_engine svanes_game_erik svanes_game_orbital_escalation svanes_orbital_simulation svanes_game_orbital_escalation_server svanes_game_double_time svanes_game_double_time_server
     PROPERTIES
         CXX_EXTENSIONS OFF
         ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/$<CONFIG>"
@@ -482,5 +491,6 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
 include(cmake/game_packages.cmake)
 svanes_game_package(svanes_game_erik erik erik-placeholder erik)
 svanes_game_package(svanes_game_orbital_escalation orbitalEscalation orbitalEscalation orbitalEscalation)
+add_dependencies(svanes_game_orbital_escalation_server svanes_game_orbital_escalation_assets)
 svanes_game_package(svanes_game_double_time doubleTime doubleTime doubleTime)
 svanes_game_package(svanes_game_double_time_server doubleTime-server doubleTime doubleTime)
