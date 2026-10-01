@@ -51,3 +51,20 @@ just debug doubleTime-server
 Both commands accept the same game targets and default to Orbital Escalation.
 To build without launching, use `just release [target]` for Release or
 `just build [target]` for Debug. Omit the target to build all games.
+
+### Titled Goose Game (Erik's game) multiplayer
+
+Peer-to-peer: one player hosts, others join any player already in the world.
+Every copy on one computer needs its own `--port`.
+
+```sh
+just run goose
+just run goose --join 127.0.0.1:45000 --port 45002
+```
+
+Client/server: start the headless server, then connect clients to its IP.
+
+```sh
+just run goose-server
+just run goose --server 127.0.0.1
+```

@@ -35,6 +35,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 #include <variant>
 #include <utility>
@@ -105,7 +106,7 @@ void GooseGame::Initialize(svanes::GameContext& context)
         64.0F, 64.0F, 128.0F, 128.0F};
 
     context.automatic_simulation = false;
-    menu = std::make_unique<PauseMenu>(context);
+    menu = std::make_unique<PauseMenu>(context, launch.server_host.has_value());
     simulation = std::make_unique<GooseSimulation>(context.world, context.gravity, Goose::LoadTextures(context.assets));
     if (launch.server_host) {
         session = std::make_unique<ServerSession>(*simulation, *launch.server_host);
@@ -183,6 +184,22 @@ void GooseGame::UpdateCamera(const svanes::FrameContext& frame, svanes::Entity p
     sky_body.width = view.width * kSkyMargin;
     sky_body.height = view.height * kSkyMargin;
 
+}
+
+svanes::TicCount GooseGame::GetFrameIntervalTics() const
+{
+    if (!launch.server_host) {
+        return 0;
+    }
+    switch (menu->LoopRate()) {
+    case GooseSpeed::Half:
+        return svanes::SecondsToTics(1.0 / 30.0);
+    case GooseSpeed::Normal:
+        return svanes::SecondsToTics(1.0 / 60.0);
+    case GooseSpeed::Double:
+        return svanes::SecondsToTics(1.0 / 120.0);
+    }
+    throw std::invalid_argument("GooseGame received an unknown loop rate.");
 }
 
 bool GooseGame::ShouldQuit() const

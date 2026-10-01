@@ -16,6 +16,11 @@
  * A world run by a goose server. The server alone advances the simulation;
  * this process sends its player's input and shows each snapshot it receives.
  *
+ * Input is sampled every simulation step, so double taps time the same at any
+ * frame rate, but is sent once per frame: a client running its loop at half
+ * the rate sends half as many messages, and the server, stepping on its own
+ * clock with each client's latest input, runs everyone else unaffected.
+ *
  * To find a place, it says hello to the server's slots in order, moving on
  * when a slot is taken or does not answer, until one welcomes it.
  */
@@ -72,5 +77,6 @@ private:
     std::optional<svanes::PeerId> local;
     std::vector<svanes::PeerId> roster;
     svanes::TicCount input_tics = 0;
+    GooseIntent outgoing{};
     bool left = false;
 };
