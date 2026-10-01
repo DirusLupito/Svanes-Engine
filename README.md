@@ -32,7 +32,7 @@ Regardless of whether or not you use Visual Studio, you can build and launch opt
 
 ```sh
 just run
-just run erik
+just run goose
 just run orbitalEscalation
 just run doubleTime
 just run doubleTime-server
@@ -42,7 +42,7 @@ Use `just debug` instead to build and launch a Debug version:
 
 ```sh
 just debug
-just debug erik
+just debug goose
 just debug orbitalEscalation
 just debug doubleTime
 just debug doubleTime-server

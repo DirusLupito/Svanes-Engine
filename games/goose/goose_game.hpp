@@ -2,35 +2,36 @@
 
 #include <svanes/entity.hpp>
 #include <svanes/game.hpp>
-#include <svanes/network/input_sync.hpp>
-#include <svanes/network/peer_group.hpp>
+#include <svanes/network/udp_msg_pipe.hpp>
 
-#include "enemy.hpp"
-#include "goose.hpp"
+#include "goose_session.hpp"
 #include "goose_simulation.hpp"
+#include "pause_menu.hpp"
 
 #include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
 
-/** The session id every copy of the game uses. */
-inline constexpr svanes::SessionId GooseSession = 1;
+/**
+ * How this process takes part in a world.
+ * FIELDS:
+ * - port: The local UDP port for peer-to-peer play.
+ * - join_address: A player to join peer-to-peer, or empty to start a new world.
+ * - server_host: A goose server to play on instead of peer-to-peer, or empty.
+ */
+struct GooseLaunch {
+    std::uint16_t port;
+    std::optional<svanes::UdpAddress> join_address;
+    std::optional<std::string> server_host;
+};
 
-/** The port a new world listens on unless another is chosen. */
-inline constexpr std::uint16_t GooseHostPort = 45000;
-
-/** The port a joining process listens on unless another is chosen. */
-inline constexpr std::uint16_t GooseJoinPort = 45001;
-
-class ErikGame final : public svanes::IGame {
+class GooseGame final : public svanes::IGame {
 public:
     /**
-     * Starts a new world open for others to join, or joins an existing one.
-     * @param port The local UDP port this process listens on.
-     * @param join_address A player already in the world to join, or empty to start a new world.
+     * @param launch Whether to start or join a peer-to-peer world, or play on a goose server.
      */
-    explicit ErikGame(std::uint16_t port, std::optional<svanes::UdpAddress> join_address = std::nullopt);
+    explicit GooseGame(GooseLaunch launch);
 
     /**
      * Builds the starting world: gravity, the background, the static geometry, and
@@ -68,13 +69,11 @@ private:
      */
     void ReportStatus(const std::string& status);
 
-    std::uint16_t port;
-    std::optional<svanes::UdpAddress> join_address;
-    std::unique_ptr<svanes::PeerGroup> network;
+    GooseLaunch launch;
     std::unique_ptr<GooseSimulation> simulation;
-    std::unique_ptr<svanes::InputSync<GooseIntent, GooseIntentUse>> sync;
+    std::unique_ptr<GooseSession> session;
+    std::unique_ptr<PauseMenu> menu;
     std::string last_network_status;
-    svanes::TicCount network_diagnostic_tics = 0;
 
     svanes::Entity orb{};
 

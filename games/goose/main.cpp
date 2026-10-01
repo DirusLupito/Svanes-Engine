@@ -1,4 +1,5 @@
-#include "erik_game.hpp"
+#include "goose_game.hpp"
+#include "peer_session.hpp"
 
 #include <svanes/application.hpp>
 
@@ -54,13 +55,15 @@ int32_t main(int32_t argc, char** argv)
     try {
         std::optional<svanes::UdpAddress> join_address;
         std::optional<std::uint16_t> port;
+        std::optional<std::string> server_host;
         for (int32_t index = 1; index < argc; ++index) {
             const std::string_view option{argv[index]};
             if (option == "--help") {
-                std::cout << "Usage: svanes_game_erik [--join IPv4:PORT] [--port N]\n"
+                std::cout << "Usage: svanes_game_goose [--join IPv4:PORT] [--port N] | [--server IPv4]\n"
                     << "No options starts a new world that others can join on port 45000.\n"
                     << "--join connects to any player already in a world, listening on port 45001.\n"
-                    << "--port chooses the local port. Every copy on one computer needs its own.\n";
+                    << "--port chooses the local port. Every copy on one computer needs its own.\n"
+                    << "--server plays on a goose server instead of peer-to-peer.\n";
                 return 0;
             }
             if (option == "--port") {
@@ -68,6 +71,13 @@ int32_t main(int32_t argc, char** argv)
                     throw std::invalid_argument("--port requires one value and may appear once.");
                 }
                 port = ReadPort(argv[index]);
+                continue;
+            }
+            if (option == "--server") {
+                if (++index >= argc || server_host) {
+                    throw std::invalid_argument("--server requires one address and may appear once.");
+                }
+                server_host = std::string{argv[index]};
                 continue;
             }
             if (option != "--join") {
@@ -78,18 +88,23 @@ int32_t main(int32_t argc, char** argv)
             }
             join_address = ReadAddress(argv[index]);
         }
+        if (server_host && (join_address || port)) {
+            throw std::invalid_argument("--server cannot be combined with --join or --port.");
+        }
         svanes::Application application({
-            .title = join_address
-                ? "Erik's Game - joining " + join_address->host + ":" + std::to_string(join_address->port)
-                : "Erik's Game",
+            .title = "Titled Goose Game",
             .width = 640,
             .height = 900,
         });
 
-        ErikGame game(port.value_or(join_address ? GooseJoinPort : GooseHostPort), std::move(join_address));
+        GooseGame game({
+            .port = port.value_or(join_address ? GooseJoinPort : GooseHostPort),
+            .join_address = std::move(join_address),
+            .server_host = std::move(server_host),
+        });
         return application.run(game);
     } catch (const std::exception& error) {
-        std::cerr << "Erik's Game: " << error.what() << '\n';
+        std::cerr << "Titled Goose Game: " << error.what() << '\n';
         return 1;
     }
 }
