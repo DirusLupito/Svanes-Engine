@@ -14,7 +14,7 @@
  * The menu Escape opens and closes. Q or the Quit button asks to leave.
  *
  * It has two rows of three options. The game speed row (0.5x, 1x, 2x) works
- * only while the local player is alone. The loop rate row (30, 60, 120 frames
+ * only while the local player is alone. The loop rate row (15, 60, 120 frames
  * per second) works only on a goose server, where it changes how often this
  * client runs its loop and sends input, without affecting anyone else.
  *
@@ -62,7 +62,10 @@ public:
     /** @return The applied game speed. */
     GooseSpeed Speed() const;
 
-    /** @return The applied loop rate, as a multiple of 60 frames per second. */
+    /**
+     * @return The applied loop rate, reusing GooseSpeed for its three options:
+     * the slowest runs at 15 frames per second, Normal at 60, and Double at 120.
+     */
     GooseSpeed LoopRate() const;
 
     /** Returns the game speed to 1x, as when another player joins. */
