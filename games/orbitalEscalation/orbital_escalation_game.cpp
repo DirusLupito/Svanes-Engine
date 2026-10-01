@@ -126,15 +126,40 @@ void OrbitalEscalationGame::UpdateServerClient(
 
     // Capture every frame so short presses survive between input sends.
     simulation->CaptureInput(frame, local_player);
-    input_tics +=
-        std::min(frame.real_delta_tics, OrbitalSnapshotTics - input_tics);
+    client_loop_timeline.Advance(frame.real_delta_tics);
 
-    if (input_tics == OrbitalSnapshotTics) {
-        svanes::MessageWriter writer;
-        simulation->EncodeInput(writer, simulation->TakeInput());
-        client->Send(writer.Finish());
-        input_tics = 0;
+    // In the case of client-server play, +/- will speed up or slow down the
+    // client loop.
+    auto input = simulation->TakeInput();
+    if (input.faster != input.slower) {
+        client_loop_timeline.SetTicSize(client_loop_timeline.GetTicSize() /
+                                        (input.faster
+                                             ? svanes::RationalNumber{2}
+                                             : svanes::RationalNumber{1, 2}));
+        std::cout << "Client loop rate: "
+                  << static_cast<double>(svanes::TicsPerSecond) /
+                         GetFrameIntervalTics()
+                  << " updates/second requested.\n";
     }
+
+    input.faster = false;
+    input.slower = false;
+    svanes::MessageWriter writer;
+    simulation->EncodeInput(writer, input);
+    client->Send(writer.Finish());
+}
+
+svanes::TicCount OrbitalEscalationGame::GetFrameIntervalTics() const {
+    if (!client) {
+        return 0;
+    }
+
+    const auto interval =
+        svanes::RationalNumber{OrbitalSnapshotTics} /
+        (svanes::RationalNumber{1} / client_loop_timeline.GetTicSize());
+
+    return interval.GetWholePart() +
+           (interval.GetFractionalPart().GetNumerator() != 0);
 }
 
 void OrbitalEscalationGame::Update(const svanes::FrameContext &frame) {

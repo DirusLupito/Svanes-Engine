@@ -28,6 +28,8 @@ struct OrbitalInput {
     PropulsionControl propulsion{};
     WeaponControl weapons{};
     bool pause = false;
+    bool faster = false;
+    bool slower = false;
 };
 
 /**

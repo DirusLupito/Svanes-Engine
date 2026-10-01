@@ -8,7 +8,7 @@
 inline constexpr std::uint16_t OrbitalServerFirstPort = 45010;
 inline constexpr std::uint16_t OrbitalServerSlots = 3;
 // The interval for sharing server snapshots and sending client controls.
-inline constexpr svanes::TicCount OrbitalSnapshotTics = 50000; // 1/20 second
+inline constexpr svanes::TicCount OrbitalSnapshotTics = 16666; // 1/60 second
 
 /**
  * Owns the authoritative world, applies client controls, and shares snapshots

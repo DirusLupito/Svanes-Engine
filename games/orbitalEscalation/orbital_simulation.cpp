@@ -108,6 +108,7 @@ OrbitalSimulation::OrbitalSimulation(svanes::Registry &world,
     // Tell other clients what rules and definitions this simulation expects.
     svanes::MessageWriter rules;
     rules.WriteUint64(OrbitalStepTics);
+    EncodeInput(rules, OrbitalInput{});
     rules.WriteUint64(svanes::TicsPerSecond);
     rules.WriteFloat32(kPlanetRadius);
     rules.WriteFloat32(kPlayerHealth);
@@ -265,6 +266,12 @@ void OrbitalSimulation::CaptureInput(const svanes::FrameContext &frame,
 
     input.weapons.fire = input.weapons.fire || pending_input.weapons.fire;
     input.pause = frame.input.WasPressed(svanes::Key::P) || pending_input.pause;
+    input.faster = frame.input.WasPressed(svanes::Key::Equals) ||
+                   frame.input.WasPressed(svanes::Key::KeypadPlus) ||
+                   pending_input.faster;
+    input.slower = frame.input.WasPressed(svanes::Key::Minus) ||
+                   frame.input.WasPressed(svanes::Key::KeypadMinus) ||
+                   pending_input.slower;
     pending_input = input;
 }
 
@@ -276,6 +283,8 @@ OrbitalInput OrbitalSimulation::TakeInput() {
     
     pending_input.weapons.fire = false;
     pending_input.pause = false;
+    pending_input.faster = false;
+    pending_input.slower = false;
     return input;
 }
 
@@ -308,6 +317,8 @@ void OrbitalSimulation::EncodeInput(svanes::MessageWriter &writer,
     writer.WriteFloat32(input.propulsion.rotation);
     writer.WriteBool(input.weapons.fire);
     writer.WriteBool(input.pause);
+    writer.WriteBool(input.faster);
+    writer.WriteBool(input.slower);
 }
 
 OrbitalInput
@@ -317,6 +328,8 @@ OrbitalSimulation::DecodeInput(svanes::MessageReader &reader) const {
                         reader.ReadFloat32()};
     input.weapons.fire = reader.ReadBool();
     input.pause = reader.ReadBool();
+    input.faster = reader.ReadBool();
+    input.slower = reader.ReadBool();
 
     // messages went through the encoder but it doesnt hurt (much) to be safe
     ValidateInput(input);
@@ -350,6 +363,22 @@ OrbitalSimulation::Step(std::span<const OrbitalInput> inputs) {
     if (attractors != 1) {
         throw std::logic_error("Orbital synchronized simulation currently "
                                "requires one attractor.");
+    }
+
+    // If any player requests a speed change, apply it to the whole game.
+    const bool faster =
+        std::any_of(inputs.begin(), inputs.end(),
+                    [](const auto &input) { return input.faster; });
+    const bool slower =
+        std::any_of(inputs.begin(), inputs.end(),
+                    [](const auto &input) { return input.slower; });
+
+    if (faster != slower) {
+        auto &timeline =
+            world.GetComponent<svanes::Timeline>(gameplay_timeline.Get());
+        timeline.SetTicSize(timeline.GetTicSize() /
+                            (faster ? svanes::RationalNumber{2}
+                                    : svanes::RationalNumber{1, 2}));
     }
 
     // If two players press pause on the same tick, we should pause once.

@@ -70,6 +70,17 @@ public:
      */
     bool ShouldQuit() const override;
 
+    /**
+     * Determines the interval between frames in tics.
+     * This method is called once per frame, allowing the game to control the
+     * pace of the main loop. The engine will sleep for the remaining time
+     * until the next frame, if any.
+     *
+     * @return The interval between frames in tics. A tic is one microsecond.
+     * Return 0 to disable pacing and run as fast as possible.
+     */
+    svanes::TicCount GetFrameIntervalTics() const override;
+
 private:
     /**
      * Updates the displayed world from server snapshots and sends local
@@ -88,8 +99,7 @@ private:
     std::unique_ptr<svanes::NetworkClient> client;
     // The player controlled by this process, also used for camera tracking.
     svanes::PeerId local_player;
-    // Real time accumulated toward the next control message to the server.
-    svanes::TicCount input_tics = 0;
+    svanes::Timeline client_loop_timeline;
 
     // The local UDP listening port, or the destination TCP port in server mode.
     std::uint16_t port;
