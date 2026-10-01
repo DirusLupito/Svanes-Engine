@@ -4,9 +4,8 @@
 #include <svanes/network/network_server.hpp>
 #include <svanes/registry.hpp>
 
-// Each listening port reserves one player slot on the server.
-inline constexpr std::uint16_t OrbitalServerFirstPort = 45010;
-inline constexpr std::uint16_t OrbitalServerSlots = 3;
+// The shared TCP port used by clients to join the server.
+inline constexpr std::uint16_t OrbitalServerPort = 45010;
 // The interval for sharing server snapshots and sending client controls.
 inline constexpr svanes::TicCount OrbitalSnapshotTics = 16666; // 1/60 second
 
@@ -17,13 +16,17 @@ inline constexpr svanes::TicCount OrbitalSnapshotTics = 16666; // 1/60 second
 class OrbitalEscalationServer {
 public:
     /**
-     * Creates the world and prepares the connections for its player slots.
+     * Creates the world and prepares to accept player connections.
      *
      * @param assets The folder containing the gameplay object definitions.
+     * @param joining_port The TCP port accepting player join requests.
      * @throws std::invalid_argument if the asset folder or definitions are
      * invalid.
+     * @throws zmq::error_t if the joining port cannot be opened.
      */
-    explicit OrbitalEscalationServer(const std::filesystem::path &assets);
+    explicit OrbitalEscalationServer(
+        const std::filesystem::path &assets,
+        std::uint16_t joining_port = OrbitalServerPort);
 
     /**
      * Runs the server continuously, receiving controls and advancing gameplay.

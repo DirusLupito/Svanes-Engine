@@ -63,15 +63,16 @@ int32_t main(int32_t argc, char **argv) {
         for (int32_t index = 1; index < argc; ++index) {
             const std::string_view option{argv[index]};
             if (option == "--help") {
-                std::cout << "Usage: svanes_game_orbital_escalation [--join "
-                             "IPv4:PORT] [--port N]\n"
-                          << "No options starts a world on UDP port 45000.\n"
-                          << "Joining listens on port 45001 unless --port is "
-                             "supplied.\n"
-                          << "Every copy on one computer needs its own port.\n";
+                std::cout
+                    << "Usage: svanes_game_orbital_escalation [--join "
+                       "IPv4:PORT] [--port N]\n"
+                    << "No options starts a world on UDP port 45000.\n"
+                    << "Joining listens on port 45001 unless --port is "
+                       "supplied.\n"
+                    << "Each P2P copy on one computer needs its own port.\n";
                 std::cout
                     << "--server HOST:PORT connects to a headless server; "
-                       "choose TCP port 45010, 45011, or 45012.\n";
+                       "all clients use its joining port (default 45010).\n";
                 return 0;
             }
 

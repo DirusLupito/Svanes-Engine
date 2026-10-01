@@ -33,9 +33,8 @@ public:
      * Configures the game to play in a world controlled by a server.
      *
      * @param server_host The host running the server.
-     * @param server_port The TCP port for the player's server slot.
-     * @throws std::invalid_argument if the host is empty or the port is not
-     * one of the supported player slots.
+     * @param server_port The server's TCP joining port.
+     * @throws std::invalid_argument if the host is empty or the port is zero.
      */
     OrbitalEscalationGame(std::string server_host, std::uint16_t server_port);
     /**
@@ -53,6 +52,8 @@ public:
      * Initializes the game with the provided context.
      * @param context The context for the game, providing access to the
      * TextureManager.
+     * @throws std::runtime_error if a server join request cannot be sent.
+     * @throws zmq::error_t if requesting a server connection fails.
      */
     void Initialize(svanes::GameContext &context) override;
 
@@ -90,6 +91,7 @@ private:
      * @throws std::invalid_argument if a snapshot or outgoing controls are
      * invalid.
      * @throws std::out_of_range if a snapshot references a missing object.
+     * @throws zmq::error_t if joining or exchanging server messages fails.
      */
     void UpdateServerClient(const svanes::FrameContext &frame);
 

@@ -1,27 +1,13 @@
 #include "OrbitalEscalationServer.hpp"
 #include <iostream>
 #include <svanes/network/server_runtime.hpp>
-#include <svanes/network/tcp_msg_pipe.hpp>
-
-/**
- * Prepares the connections used to admit players to the server.
- *
- * @return One pipe factory per player slot, in player order.
- */
-static std::vector<svanes::NetworkServer::PipeFactory> ClientPipes() {
-    std::vector<svanes::NetworkServer::PipeFactory> pipes;
-    for (std::uint16_t slot = 0; slot < OrbitalServerSlots; ++slot) {
-        pipes.push_back([slot] {
-            return std::make_unique<svanes::TcpMsgPipe>(OrbitalServerFirstPort +
-                                                        slot);
-        });
-    }
-    return pipes;
-}
 
 OrbitalEscalationServer::OrbitalEscalationServer(
-    const std::filesystem::path &assets)
-    : simulation(world, assets), network(ClientPipes()) {}
+    const std::filesystem::path &assets, std::uint16_t joining_port)
+    : simulation(world, assets), network(joining_port) {
+    std::cout << "Orbital Escalation server: TCP joining port " << joining_port
+              << ".\n";
+}
 
 void OrbitalEscalationServer::Receive(const svanes::ServerMessage &message) {
     svanes::MessageReader reader(message.message);
@@ -60,9 +46,6 @@ void OrbitalEscalationServer::Step() {
 }
 
 void OrbitalEscalationServer::Run() {
-    std::cout << "Orbital Escalation server: TCP ports "
-              << OrbitalServerFirstPort << "-"
-              << OrbitalServerFirstPort + OrbitalServerSlots - 1 << ".\n";
     svanes::ServerRuntime::Run(
         network, OrbitalStepTics,
         [this](const auto &message) { Receive(message); }, [this] { Step(); });

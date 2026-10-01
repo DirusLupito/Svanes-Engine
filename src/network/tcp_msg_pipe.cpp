@@ -16,7 +16,8 @@ TcpMsgPipe::TcpMsgPipe(std::uint16_t local_port)
     // Binds the local port to the pair socket
     : socket(context, zmq::socket_type::pair), listening(true) {
     socket.set(zmq::sockopt::linger, 0);
-    socket.bind(MakeTcpEndpoint("*", local_port));
+    socket.bind(local_port == 0 ? "tcp://*:*"
+                                : MakeTcpEndpoint("*", local_port));
     RememberConnection("pair");
 }
 
@@ -26,6 +27,12 @@ TcpMsgPipe::TcpMsgPipe(const std::string &remote_host,
     socket.set(zmq::sockopt::linger, 0);
     socket.connect(MakeTcpEndpoint(remote_host, remote_port));
     RememberConnection(MakeTcpEndpoint(remote_host, remote_port));
+}
+
+std::uint16_t TcpMsgPipe::Port() const {
+    const auto endpoint = socket.get(zmq::sockopt::last_endpoint);
+    return static_cast<std::uint16_t>(
+        std::stoul(endpoint.substr(endpoint.rfind(':') + 1)));
 }
 
 bool TcpMsgPipe::Send(ConnectionId destination, const NetworkMessage &message) {

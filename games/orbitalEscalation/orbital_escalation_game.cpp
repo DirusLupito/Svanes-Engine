@@ -8,7 +8,6 @@
 #include <svanes/asset_path.hpp>
 #include <svanes/camera2d.hpp>
 #include <svanes/input.hpp>
-#include <svanes/network/tcp_msg_pipe.hpp>
 #include <svanes/registry.hpp>
 #include <svanes/render/render_system.hpp>
 
@@ -22,14 +21,10 @@ OrbitalEscalationGame::OrbitalEscalationGame(
 OrbitalEscalationGame::OrbitalEscalationGame(std::string server_host,
                                              std::uint16_t server_port)
     : server_host(std::move(server_host)), port(server_port) {
-    if (this->server_host.empty() || port < OrbitalServerFirstPort ||
-        port >= OrbitalServerFirstPort + OrbitalServerSlots) {
+    if (this->server_host.empty() || port == 0) {
         throw std::invalid_argument(
-            "Choose a server host and TCP port 45010, 45011, or 45012.");
+            "Choose a server host and nonzero TCP port.");
     }
-
-    local_player = {
-        static_cast<std::uint32_t>(port - OrbitalServerFirstPort + 1)};
 }
 
 void OrbitalEscalationGame::Initialize(svanes::GameContext &context) {
@@ -42,10 +37,9 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext &context) {
         context.concurrency);
 
     if (!server_host.empty()) {
-        client = std::make_unique<svanes::NetworkClient>(
-            std::make_unique<svanes::TcpMsgPipe>(server_host, port));
-        std::cout << "Connecting player " << local_player.value << " to "
-                  << server_host << ':' << port << " over TCP.\n";
+        client = std::make_unique<svanes::NetworkClient>(server_host, port);
+        std::cout << "Connecting to " << server_host << ':' << port
+                  << " over TCP.\n";
     } else {
         // Peers must agree on pacing as well as gameplay to share a world.
         svanes::MessageWriter rules;
@@ -123,8 +117,11 @@ void OrbitalEscalationGame::UpdateServerClient(
     for (const auto &message : client->PollBroadcast()) {
         simulation->Load(message.bytes);
     }
+    if (local_player.value != client->Id()) {
+        local_player = {client->Id()};
+        std::cout << "Connected as player " << local_player.value << ".\n";
+    }
 
-    // Capture every frame so short presses survive between input sends.
     simulation->CaptureInput(frame, local_player);
     client_loop_timeline.Advance(frame.real_delta_tics);
 
@@ -146,7 +143,9 @@ void OrbitalEscalationGame::UpdateServerClient(
     input.slower = false;
     svanes::MessageWriter writer;
     simulation->EncodeInput(writer, input);
-    client->Send(writer.Finish());
+    if (client->IsConnected()) {
+        client->Send(writer.Finish());
+    }
 }
 
 svanes::TicCount OrbitalEscalationGame::GetFrameIntervalTics() const {

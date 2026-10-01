@@ -1,6 +1,9 @@
 #include <svanes/network/network_server.hpp>
+#include <svanes/network/tcp_connection.hpp>
 
 #include <chrono>
+#include <future>
+#include <limits>
 #include <stdexcept>
 #include <utility>
 
@@ -37,6 +40,8 @@ struct NetworkServer::Session {
     std::mutex mutex;
     std::condition_variable condition;
     std::deque<NetworkMessage> outbound_messages;
+    // Lets admission wait for a usable pipe or report its startup failure.
+    std::promise<void> ready;
     std::jthread network_thread;
 };
 
@@ -53,17 +58,32 @@ NetworkServer::NetworkServer(std::vector<PipeFactory> pipe_factories) {
 
     sessions.reserve(pipe_factories.size());
     for (PipeFactory &factory : pipe_factories) {
-        auto session = std::make_unique<Session>(
-            RequirePipeFactory(std::move(factory)), sessions.size());
-        session->network_thread = std::jthread(
-            [this, session_pointer = session.get()](std::stop_token stop) {
-                RunNetworkThread(*session_pointer, stop);
-            });
-        sessions.push_back(std::move(session));
+        AddSession(std::move(factory));
     }
 }
 
+NetworkServer::NetworkServer(std::uint16_t joining_port)
+    : listener(std::make_unique<TcpServerListener>(joining_port)) {}
+
 NetworkServer::~NetworkServer() = default;
+
+std::size_t NetworkServer::AddSession(PipeFactory pipe_factory) {
+    if (sessions.size() >= std::numeric_limits<ClientId>::max()) {
+        throw std::overflow_error("Network server exhausted client IDs.");
+    }
+    const auto index = sessions.size();
+    auto session = std::make_unique<Session>(
+        RequirePipeFactory(std::move(pipe_factory)), index);
+    auto ready = session->ready.get_future();
+    session->network_thread = std::jthread(
+        [this, session_pointer = session.get()](std::stop_token stop) {
+            RunNetworkThread(*session_pointer, stop);
+        });
+    // A join reply must not advertise a connection before its pipe is ready.
+    ready.get();
+    sessions.push_back(std::move(session));
+    return index;
+}
 
 void NetworkServer::Send(std::size_t index, const NetworkMessage &message) {
     auto &session = *sessions.at(index);
@@ -99,6 +119,9 @@ std::vector<NetworkMessage> NetworkServer::PollInbound() {
 }
 
 std::vector<ServerMessage> NetworkServer::PollInboundWithSource() {
+    if (listener) {
+        listener->Poll(*this);
+    }
     std::lock_guard lock(mutex);
     std::vector<ServerMessage> messages;
     messages.reserve(inbound_messages.size());
@@ -114,10 +137,18 @@ std::vector<ServerMessage> NetworkServer::PollInboundWithSource() {
 // AMQ does not allow sockets to be shared accross threads, hence
 // the need fo the pipe factory.
 void NetworkServer::RunNetworkThread(Session &session, std::stop_token stop) {
-    std::unique_ptr<MsgPipe> pipe = session.pipe_factory();
-    if (!pipe) {
-        throw std::invalid_argument("Network server pipe factory returned null.");
+    std::unique_ptr<MsgPipe> pipe;
+    try {
+        pipe = session.pipe_factory();
+        if (!pipe) {
+            throw std::invalid_argument(
+                "Network server pipe factory returned null.");
+        }
+    } catch (...) {
+        session.ready.set_exception(std::current_exception());
+        return;
     }
+    session.ready.set_value();
 
     while (!stop.stop_requested()) {
         std::deque<NetworkMessage> outbound;
