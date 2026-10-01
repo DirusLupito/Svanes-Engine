@@ -18,7 +18,7 @@ constexpr std::size_t kSpeedRow = 0;
 constexpr std::size_t kLoopRateRow = 1;
 constexpr std::array<std::array<const char*, 3>, 2> kOptionNames{{
     {"0.5x", "1x", "2x"},
-    {"30 fps", "60 fps", "120 fps"},
+    {"15 fps", "60 fps", "120 fps"},
 }};
 
 constexpr std::int32_t kBackdropZ = 1000;

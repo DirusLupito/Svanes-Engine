@@ -193,7 +193,7 @@ svanes::TicCount GooseGame::GetFrameIntervalTics() const
     }
     switch (menu->LoopRate()) {
     case GooseSpeed::Half:
-        return svanes::SecondsToTics(1.0 / 30.0);
+        return svanes::SecondsToTics(1.0 / 15.0);
     case GooseSpeed::Normal:
         return svanes::SecondsToTics(1.0 / 60.0);
     case GooseSpeed::Double:
