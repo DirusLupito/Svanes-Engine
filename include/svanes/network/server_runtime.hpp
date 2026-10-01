@@ -20,6 +20,23 @@ namespace svanes {
 class ServerRuntime final {
 public:
     /**
+     * Continuously handles client messages and advances a simulation owned
+     * by the game. Callbacks run on the calling thread and their exceptions
+     * propagate to the caller.
+     *
+     * @param server The server supplying messages from client connections.
+     * @param step_tics The minimum real-time interval between steps, in tics.
+     * @param on_message Handles a received message and its connection slot.
+     * @param on_step Advances one fixed simulation step.
+     * @throws std::invalid_argument if step_tics is zero or either callback
+     * is empty.
+     */
+    static void
+    Run(NetworkServer &server, TicCount step_tics,
+        const std::function<void(const ServerMessage &)> &on_message,
+        const std::function<void()> &on_step);
+
+    /**
      * Function defined by the engine user for handling messages received
      * received from clients. As an example, this function may define how
      * to handle client input and its effects on physics objects.

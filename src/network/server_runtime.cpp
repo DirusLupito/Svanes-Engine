@@ -8,6 +8,33 @@
 
 namespace svanes {
 
+void ServerRuntime::Run(
+    NetworkServer &server, TicCount step_tics,
+    const std::function<void(const ServerMessage &)> &on_message,
+    const std::function<void()> &on_step) {
+    if (step_tics == 0 || !on_message || !on_step) {
+        throw std::invalid_argument(
+            "Server runtime requires a positive step and callbacks.");
+    }
+    auto previous = std::chrono::steady_clock::now();
+    while (true) {
+        for (const auto &message : server.PollInboundWithSource()) {
+            on_message(message);
+        }
+        const auto now = std::chrono::steady_clock::now();
+        const auto elapsed = static_cast<TicCount>(
+            std::chrono::duration_cast<std::chrono::microseconds>(now -
+                                                                  previous)
+                .count());
+        // Limit catch-up work so a delayed server slows the simulation.
+        if (elapsed >= step_tics) {
+            previous = now;
+            on_step();
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+}
+
 ServerRuntime::ServerRuntime(NetworkServer &network_server, Registry &world,
                              Vector2D gravity, std::uint32_t concurrency,
                              TicCount physics_step_tics)

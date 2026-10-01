@@ -21,11 +21,19 @@ NetworkServer::PipeFactory RequirePipeFactory(NetworkServer::PipeFactory factory
 // Owns a pipe factory to construct pipe and ensure the socket is
 // fully contained in this thread
 struct NetworkServer::Session {
-    explicit Session(PipeFactory pipe_factory)
-        : pipe_factory(std::move(pipe_factory)),
+    /**
+     * Creates a connection whose messages can be identified and answered.
+     *
+     * @param pipe_factory Creates the pipe on this connection's thread.
+     * @param index The connection slot used for received messages and replies.
+     */
+    explicit Session(PipeFactory pipe_factory, std::size_t index)
+        : pipe_factory(std::move(pipe_factory)), index(index),
           network_thread() {}
 
     PipeFactory pipe_factory;
+    // The slot that identifies this connection in received messages and replies.
+    std::size_t index;
     std::mutex mutex;
     std::condition_variable condition;
     std::deque<NetworkMessage> outbound_messages;
@@ -46,7 +54,7 @@ NetworkServer::NetworkServer(std::vector<PipeFactory> pipe_factories) {
     sessions.reserve(pipe_factories.size());
     for (PipeFactory &factory : pipe_factories) {
         auto session = std::make_unique<Session>(
-            RequirePipeFactory(std::move(factory)));
+            RequirePipeFactory(std::move(factory)), sessions.size());
         session->network_thread = std::jthread(
             [this, session_pointer = session.get()](std::stop_token stop) {
                 RunNetworkThread(*session_pointer, stop);
@@ -56,6 +64,15 @@ NetworkServer::NetworkServer(std::vector<PipeFactory> pipe_factories) {
 }
 
 NetworkServer::~NetworkServer() = default;
+
+void NetworkServer::Send(std::size_t index, const NetworkMessage &message) {
+    auto &session = *sessions.at(index);
+    {
+        std::lock_guard lock(session.mutex);
+        session.outbound_messages.push_back(message);
+    }
+    session.condition.notify_one();
+}
 
 // Loops over every client connection to copy a message into that
 // sessions outbound message queue.
@@ -74,13 +91,21 @@ void NetworkServer::QueueBroadcast(NetworkMessage message) {
 std::vector<NetworkMessage> NetworkServer::PollInbound() {
     std::vector<NetworkMessage> messages;
 
+    for (auto &received : PollInboundWithSource()) {
+        messages.push_back(std::move(received.message));
+    }
+
+    return messages;
+}
+
+std::vector<ServerMessage> NetworkServer::PollInboundWithSource() {
     std::lock_guard lock(mutex);
+    std::vector<ServerMessage> messages;
     messages.reserve(inbound_messages.size());
     while (!inbound_messages.empty()) {
         messages.push_back(std::move(inbound_messages.front()));
         inbound_messages.pop_front();
     }
-
     return messages;
 }
 
@@ -108,7 +133,8 @@ void NetworkServer::RunNetworkThread(Session &session, std::stop_token stop) {
         ReceivedMessage received;
         while (pipe->Receive(received)) {
             std::lock_guard lock(mutex);
-            inbound_messages.push_back(std::move(received.message));
+            inbound_messages.push_back(
+                {session.index, std::move(received.message)});
             received = {};
         }
 

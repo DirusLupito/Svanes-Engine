@@ -9,6 +9,8 @@ NetworkClient::NetworkClient(std::unique_ptr<MsgPipe> pipe)
 
 ClientId NetworkClient::Id() const { return id; }
 
+void NetworkClient::Send(const NetworkMessage &message) { pipe->Send(message); }
+
 std::vector<NetworkMessage> NetworkClient::PollBroadcast() {
     std::vector<NetworkMessage> messages;
 

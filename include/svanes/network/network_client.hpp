@@ -14,6 +14,13 @@ public:
 
     ClientId Id() const;
 
+    /**
+     * Sends an already encoded message through the client's connection.
+     *
+     * @param message The encoded content to send to the server.
+     */
+    void Send(const NetworkMessage &message);
+
     template <typename T> void Send(const T &message) {
         pipe->Send(NetworkMessage::From(message));
     }
