@@ -1,0 +1,181 @@
+#include <svanes/network/network_server.hpp>
+#include <svanes/network/tcp_connection.hpp>
+
+#include <chrono>
+#include <future>
+#include <limits>
+#include <stdexcept>
+#include <utility>
+
+namespace svanes {
+
+namespace {
+
+NetworkServer::PipeFactory RequirePipeFactory(NetworkServer::PipeFactory factory) {
+    if (!factory) {
+        throw std::invalid_argument("Network server requires a pipe factory.");
+    }
+    return factory;
+}
+
+} // namespace
+
+// Representation of one connection between a client and the server
+// Owns a pipe factory to construct pipe and ensure the socket is
+// fully contained in this thread
+struct NetworkServer::Session {
+    /**
+     * Creates a connection whose messages can be identified and answered.
+     *
+     * @param pipe_factory Creates the pipe on this connection's thread.
+     * @param index The connection slot used for received messages and replies.
+     */
+    explicit Session(PipeFactory pipe_factory, std::size_t index)
+        : pipe_factory(std::move(pipe_factory)), index(index),
+          network_thread() {}
+
+    PipeFactory pipe_factory;
+    // The slot that identifies this connection in received messages and replies.
+    std::size_t index;
+    std::mutex mutex;
+    std::condition_variable condition;
+    std::deque<NetworkMessage> outbound_messages;
+    // Lets admission wait for a usable pipe or report its startup failure.
+    std::promise<void> ready;
+    std::jthread network_thread;
+};
+
+// Cunstructors for one session server
+NetworkServer::NetworkServer(PipeFactory pipe_factory)
+    : NetworkServer(std::vector<PipeFactory>{std::move(pipe_factory)}) {}
+
+// Constructor for a multi session server
+NetworkServer::NetworkServer(std::vector<PipeFactory> pipe_factories) {
+    if (pipe_factories.empty()) {
+        throw std::invalid_argument(
+            "Network server requires at least one pipe factory.");
+    }
+
+    sessions.reserve(pipe_factories.size());
+    for (PipeFactory &factory : pipe_factories) {
+        AddSession(std::move(factory));
+    }
+}
+
+NetworkServer::NetworkServer(std::uint16_t joining_port)
+    : listener(std::make_unique<TcpServerListener>(joining_port)) {}
+
+NetworkServer::~NetworkServer() = default;
+
+std::size_t NetworkServer::AddSession(PipeFactory pipe_factory) {
+    if (sessions.size() >= std::numeric_limits<ClientId>::max()) {
+        throw std::overflow_error("Network server exhausted client IDs.");
+    }
+    const auto index = sessions.size();
+    auto session = std::make_unique<Session>(
+        RequirePipeFactory(std::move(pipe_factory)), index);
+    auto ready = session->ready.get_future();
+    session->network_thread = std::jthread(
+        [this, session_pointer = session.get()](std::stop_token stop) {
+            RunNetworkThread(*session_pointer, stop);
+        });
+    // A join reply must not advertise a connection before its pipe is ready.
+    ready.get();
+    sessions.push_back(std::move(session));
+    return index;
+}
+
+void NetworkServer::Send(std::size_t index, const NetworkMessage &message) {
+    auto &session = *sessions.at(index);
+    {
+        std::lock_guard lock(session.mutex);
+        session.outbound_messages.push_back(message);
+    }
+    session.condition.notify_one();
+}
+
+// Loops over every client connection to copy a message into that
+// sessions outbound message queue.
+void NetworkServer::QueueBroadcast(NetworkMessage message) {
+    for (const std::unique_ptr<Session> &session : sessions) {
+        {
+            std::lock_guard lock(session->mutex);
+            session->outbound_messages.push_back(message);
+        }
+        session->condition.notify_one();
+    }
+}
+
+// Pulls in pending messages and clears the queue.
+// The messages are then returned to be used by the server runtime.
+std::vector<NetworkMessage> NetworkServer::PollInbound() {
+    std::vector<NetworkMessage> messages;
+
+    for (auto &received : PollInboundWithSource()) {
+        messages.push_back(std::move(received.message));
+    }
+
+    return messages;
+}
+
+std::vector<ServerMessage> NetworkServer::PollInboundWithSource() {
+    if (listener) {
+        listener->Poll(*this);
+    }
+    std::lock_guard lock(mutex);
+    std::vector<ServerMessage> messages;
+    messages.reserve(inbound_messages.size());
+    while (!inbound_messages.empty()) {
+        messages.push_back(std::move(inbound_messages.front()));
+        inbound_messages.pop_front();
+    }
+    return messages;
+}
+
+// Runs a thread containing a network pipe for a given client.
+// Uses the pipe factory to create the message pipe.
+// AMQ does not allow sockets to be shared accross threads, hence
+// the need fo the pipe factory.
+void NetworkServer::RunNetworkThread(Session &session, std::stop_token stop) {
+    std::unique_ptr<MsgPipe> pipe;
+    try {
+        pipe = session.pipe_factory();
+        if (!pipe) {
+            throw std::invalid_argument(
+                "Network server pipe factory returned null.");
+        }
+    } catch (...) {
+        session.ready.set_exception(std::current_exception());
+        return;
+    }
+    session.ready.set_value();
+
+    while (!stop.stop_requested()) {
+        std::deque<NetworkMessage> outbound;
+        {
+            std::lock_guard lock(session.mutex);
+            outbound.swap(session.outbound_messages);
+        }
+
+        for (const NetworkMessage &message : outbound) {
+            pipe->Send(message);
+        }
+
+        ReceivedMessage received;
+        while (pipe->Receive(received)) {
+            std::lock_guard lock(mutex);
+            inbound_messages.push_back(
+                {session.index, std::move(received.message)});
+            received = {};
+        }
+
+        std::unique_lock lock(session.mutex);
+        session.condition.wait_for(lock, std::chrono::milliseconds(1),
+                                   [&] {
+                                       return stop.stop_requested() ||
+                                              !session.outbound_messages.empty();
+                                   });
+    }
+}
+
+} // namespace svanes

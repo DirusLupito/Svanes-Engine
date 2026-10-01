@@ -1,0 +1,101 @@
+#pragma once
+
+#include <svanes/geometry/rectangle_geometry.hpp>
+#include <svanes/vector2d.hpp>
+
+#include <vector>
+
+namespace svanes {
+
+struct Transform;
+
+/**
+ * Represents a convex polygon in 2D space, defined by a set of vertices.
+ * The vertices are expected to be provided in clockwise or counter-clockwise
+ * order.
+ */
+class ConvexPolygon2D final {
+public:
+    /**
+     * Constructs a ConvexPolygon2D with the given vertices, checking to make
+     * sure they form a valid convex polygon.
+     *
+     * @param vertices A vector of Vector2D representing the vertices of the
+     * polygon. The vertices should be provided in clockwise or
+     * counter-clockwise order.
+     *
+     * @throws std::invalid_argument if there are fewer than three vertices, if
+     * any vertex is not finite, if there is a collinear triple of vertices, or
+     * if the vertices do not form a strictly convex polygon.
+     */
+    explicit ConvexPolygon2D(std::vector<Vector2D> vertices);
+
+    /**
+     * Returns the vertices of the convex polygon.
+     *
+     * @return A const reference to a vector of Vector2D representing the
+     * vertices of the polygon.
+     */
+    const std::vector<Vector2D> &Vertices() const;
+
+    /**
+     * Returns the axis-aligned bounding box of the convex polygon.
+     *
+     * @return A Rectangle2D representing the axis-aligned bounding box of the
+     * polygon.
+     */
+    Rectangle2D Bounds() const;
+
+    /**
+     * Returns the centroid of the convex polygon in the geometry's coordinates.
+     * The caller can apply a transform to place it in world coordinates.
+     *
+     * The polygon is divided into triangles. Bigger triangles contribute more
+     * to the center than smaller triangles, so each triangle's contribution is
+     * multiplied by its signed area.
+     *
+     * @return The centroid of the convex polygon.
+     */
+    Vector2D Center() const;
+
+private:
+    // Declaring TransformConvexPolygon as a friend function allows it to access
+    // the private members of ConvexPolygon2D, specifically the vertices vector.
+    // This is necessary because TransformConvexPolygon needs to modify the
+    // vertices of the polygon during the transformation process to skip
+    // re-validating the convexity of the polygon after transformation. The
+    // (previously existing) alternative approach is to construct a new
+    // ConvexPolygon2D object with the transformed vertices, which would send
+    // the vertices through the convexity validation logic again. Which is
+    // pointless because convexity is preserved under translation, rotation, and
+    // uniform scaling.
+    friend ConvexPolygon2D
+    TransformConvexPolygon(const ConvexPolygon2D &polygon,
+                           const Transform &transform, float scale);
+
+    // The vertices of the convex polygon, stored in the order they were
+    // provided.
+    std::vector<Vector2D> vertices;
+};
+
+/**
+ * Transforms a ConvexPolygon2D by applying a translation, rotation, and
+ * optional scaling.
+ *
+ * @param polygon The ConvexPolygon2D to transform.
+ * @param transform The Transform to apply, which includes translation and
+ * rotation.
+ * @param scale An optional scaling factor to apply to the polygon. Default
+ * is 1.0F (no scaling).
+ *
+ * @return A new ConvexPolygon2D that is the result of applying the transform to
+ * the original polygon.
+ *
+ * @throws std::invalid_argument if the transform has non-finite values or if
+ * the scale is not positive.
+ */
+ConvexPolygon2D TransformConvexPolygon(const ConvexPolygon2D &polygon,
+                                       const Transform &transform,
+                                       float scale = 1.0F);
+
+} // namespace svanes

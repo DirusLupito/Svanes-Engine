@@ -1,9 +1,26 @@
 #pragma once
 
+#include "orbital_simulation.hpp"
+
 #include <svanes/entity.hpp>
 #include <svanes/game.hpp>
+#include <svanes/network/network_client.hpp>
 
-#include <vector>
+#include <optional>
+#include <string>
+
+// Separate defaults allow a host and joiner to run on one computer.
+inline constexpr std::uint16_t OrbitalHostPort = 45000;
+inline constexpr std::uint16_t OrbitalJoinPort = 45001;
+
+// Use confirmed inputs and limit catch-up work so a slow frame slows gameplay
+// instead of running several overdue ticks.
+inline constexpr svanes::SyncSettings OrbitalSyncSettings{
+    .step_tics = OrbitalStepTics,
+    .prediction_ticks = 0,
+    .steps_per_frame = 1,
+    .max_backlog_steps = 1,
+};
 
 /**
  * Top level container for the Orbital Escalation game.
@@ -13,73 +30,108 @@
 class OrbitalEscalationGame final : public svanes::IGame {
 public:
     /**
-     * Initializes the game with the provided context.
-     * @param context The context for the game, providing access to the TextureManager.
+     * Configures the game to play in a world controlled by a server.
+     *
+     * @param server_host The host running the server.
+     * @param server_port The server's TCP joining port.
+     * @throws std::invalid_argument if the host is empty or the port is zero.
      */
-    void Initialize(svanes::GameContext& context) override;
+    OrbitalEscalationGame(std::string server_host, std::uint16_t server_port);
+    /**
+     * Configures the game to start a world or join an existing one.
+     *
+     * @param port The local UDP port to listen on.
+     * @param join_address An existing peer to join, or std::nullopt to start
+     * a new world.
+     */
+    explicit OrbitalEscalationGame(
+        std::uint16_t port = OrbitalHostPort,
+        std::optional<svanes::UdpAddress> join_address = std::nullopt);
+
+    /**
+     * Initializes the game with the provided context.
+     * @param context The context for the game, providing access to the
+     * TextureManager.
+     * @throws std::runtime_error if a server join request cannot be sent.
+     * @throws zmq::error_t if requesting a server connection fails.
+     */
+    void Initialize(svanes::GameContext &context) override;
 
     /**
      * Game specific update logic. Called by the engine once per frame.
-     * @param frame The context for the current frame, providing access to the InputManager
-     * and the time elapsed since the last frame.
+     * @param frame The context for the current frame, providing access to the
+     * InputManager and the time elapsed since the last frame.
      */
-    void Update(const svanes::FrameContext& frame) override;
-
-    bool ShouldQuit() const override;
-
-private:
-    svanes::Entity background_entity = 0;
-    svanes::Entity square_entity = 0;
-    svanes::Entity planet_entity = 0;
-    std::vector<svanes::Entity> boundary_entities;
-
-    // How many NPC entities to spawn in orbit around the planet
-    uint32_t num_npc_entities_to_spawn = 120;
-
-    // The maximum magnitude of the initial velocity of the NPC entities
-    // as given by the magnitude of the tangent to the vector from the planet to the NPC entity
-    // when it is first spawned.
-    float maximum_magnitude_of_npc_entity_initial_velocity = 4200.0F;
-
-    // The minimum magnitude of the initial velocity of the NPC entities
-    // as given by the magnitude of the tangent to the vector from the planet to the NPC entity
-    // when it is first spawned.
-    float minimum_magnitude_of_npc_entity_initial_velocity = 1000.0F;
-
-    // The maximum distance of the NPC entities from the planet when they are spawned,
-    // measured from the surface of the planet to the center of the NPC entity.
-    float maximum_distance_of_npc_entities_from_planet = 70000.0F;
-
-    // The minimum distance of the NPC entities from the planet when they are spawned,
-    // measured from the surface of the planet to the center of the NPC entity.
-    float minimum_distance_of_npc_entities_from_planet = 7500.0F;
-
-    // The maximum angular velocity of the NPC entities when they are spawned, measured in radians per second.
-    float maximum_angular_velocity_of_npc_entities = 1.0F;
-
-    // The minimum angular velocity of the NPC entities when they are spawned, measured in radians per second.
-    float minimum_angular_velocity_of_npc_entities = -1.0F;
-
-    // A list of all non-planet, non-player entities in the game.
-    std::vector<svanes::Entity> non_planet_non_player_entities = {};
-
-    // A list of all collidable entities in the game.
-    std::vector<svanes::Entity> collidable_entities = {};
+    void Update(const svanes::FrameContext &frame) override;
 
     /**
-     * Creates num_npc_entities_to_spawn random non-player, non-planet entities
-     * inside the non_planet_non_player_entities vector. It will add entities
-     * in the order of box, circle, triangle, and repeat. 
-     * 
-     * Additionally, it will uniformly distribute the entities in a circle around the planet, 
-     * with their height above the planet's surface being uniformly distributed between 
-     * minimum_distance_of_npc_entities_from_planet and maximum_distance_of_npc_entities_from_planet,
-     * while their initial velocity will be tangent to the vector from the planet to the entity,
-     * with its magnitude being uniformly distributed between minimum_magnitude_of_npc_entity_initial_velocity
-     * and maximum_magnitude_of_npc_entity_initial_velocity.
-     * 
-     * @param world The registry to create the entities in.
+     * Checks whether the game is ready to close.
+     *
+     * @return true if the game should close, false otherwise.
      */
-    void CreateNonPlayerNonPlanetEntities(svanes::Registry& world);
+    bool ShouldQuit() const override;
+
+    /**
+     * Determines the interval between frames in tics.
+     * This method is called once per frame, allowing the game to control the
+     * pace of the main loop. The engine will sleep for the remaining time
+     * until the next frame, if any.
+     *
+     * @return The interval between frames in tics. A tic is one microsecond.
+     * Return 0 to disable pacing and run as fast as possible.
+     */
+    svanes::TicCount GetFrameIntervalTics() const override;
+
+private:
+    /**
+     * Updates the displayed world from server snapshots and sends local
+     * controls for the server to apply.
+     *
+     * @param frame The local input, camera, world, and elapsed frame time.
+     * @throws std::invalid_argument if a snapshot or outgoing controls are
+     * invalid.
+     * @throws std::out_of_range if a snapshot references a missing object.
+     * @throws zmq::error_t if joining or exchanging server messages fails.
+     */
+    void UpdateServerClient(const svanes::FrameContext &frame);
+
+    // The authoritative server's host, or empty for peer-to-peer play.
+    std::string server_host;
+    // The connection used to exchange controls and server snapshots.
+    std::unique_ptr<svanes::NetworkClient> client;
+    // The player controlled by this process, also used for camera tracking.
+    svanes::PeerId local_player;
+    svanes::Timeline client_loop_timeline;
+
+    // The local UDP listening port, or the destination TCP port in server mode.
+    std::uint16_t port;
+
+    // The peer to contact when joining, or no address when starting a world.
+    std::optional<svanes::UdpAddress> join_address;
+
+    // Owns the peer connections and agreed roster.
+    std::unique_ptr<svanes::PeerGroup> network;
+
+    // Owns and advances the gameplay world, independently of rendering.
+    std::unique_ptr<OrbitalSimulation> simulation;
+
+    // Coordinates player inputs and simulation steps across peers.
+    std::unique_ptr<svanes::InputSync<OrbitalInput, std::uint8_t>> sync;
+    
+    // Last reported status and roster revision, to avoid repeating messages.
+    std::string last_network_status;
+    
+    std::uint64_t last_roster_revision = 0;
+
+    // The timeline used to animate the pause label.
+    svanes::Timeline pause_timeline;
+
+    // The text label displayed while gameplay is paused.
+    svanes::Entity pause_label_entity = 0;
+
+    // The background rectangle that follows the camera's view.
+    svanes::Entity background_entity = 0;
+
+    // Whether the game is ready to close.
     bool should_quit = false;
 };

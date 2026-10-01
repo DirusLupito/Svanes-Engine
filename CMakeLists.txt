@@ -4,10 +4,11 @@ project(
     SvanesEngine
     VERSION 0.1.0
     DESCRIPTION "A small SDL-based game engine"
-    LANGUAGES CXX
+    LANGUAGES C CXX
 )
 
 include(FetchContent)
+find_package(Threads REQUIRED)
 
 set(SDL_SHARED OFF CACHE BOOL "Build SDL as a shared library")
 set(SDL_STATIC ON CACHE BOOL "Build SDL as a static library")
@@ -56,6 +57,35 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(SDL3_image)
 
+set(FT_DISABLE_ZLIB ON CACHE BOOL "")
+set(FT_DISABLE_BZIP2 ON CACHE BOOL "")
+set(FT_DISABLE_PNG ON CACHE BOOL "")
+set(FT_DISABLE_BROTLI ON CACHE BOOL "")
+set(FT_DISABLE_HARFBUZZ ON CACHE BOOL "")
+FetchContent_Declare(
+    Freetype
+    URL https://github.com/libsdl-org/freetype/archive/9973564cfa63763a3e4ac67c09147899539b1e07.tar.gz
+    URL_HASH SHA256=026a05a49d114a1235d2926f4c03a9330e4b1a6efe7c217ec9607904c32907d4
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    SOURCE_DIR "${CMAKE_SOURCE_DIR}/thirdparty/freetype-src"
+    OVERRIDE_FIND_PACKAGE
+)
+FetchContent_MakeAvailable(Freetype)
+add_library(Freetype::Freetype ALIAS freetype)
+
+set(SDLTTF_VENDORED OFF CACHE BOOL "")
+set(SDLTTF_HARFBUZZ OFF CACHE BOOL "")
+set(SDLTTF_PLUTOSVG OFF CACHE BOOL "")
+set(SDLTTF_SAMPLES OFF CACHE BOOL "")
+FetchContent_Declare(
+    SDL3_ttf
+    URL https://github.com/libsdl-org/SDL_ttf/releases/download/release-3.2.2/SDL3_ttf-3.2.2.tar.gz
+    URL_HASH SHA256=63547d58d0185c833213885b635a2c0548201cc8f301e6587c0be1a67e1e045d
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    SOURCE_DIR "${CMAKE_SOURCE_DIR}/thirdparty/sdl3_ttf-src"
+)
+FetchContent_MakeAvailable(SDL3_ttf)
+
 set(SDLMIXER_TESTS OFF CACHE BOOL "")
 set(SDLMIXER_EXAMPLES OFF CACHE BOOL "")
 set(SDLMIXER_DEPS_SHARED OFF CACHE BOOL "")
@@ -84,6 +114,40 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(SDL3_mixer)
 
+block(SCOPE_FOR VARIABLES)
+    set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+    set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+    set(BUILD_SHARED OFF)
+    set(BUILD_STATIC ON)
+    set(BUILD_TESTS OFF)
+    set(ZMQ_BUILD_TESTS OFF)
+    set(WITH_PERF_TOOL OFF)
+    set(WITH_DOC OFF)
+    set(WITH_DOCS OFF)
+    set(ENABLE_CPACK OFF)
+    set(ENABLE_DRAFTS ON)
+    set(WITH_LIBBSD OFF)
+    set(CPPZMQ_BUILD_TESTS OFF)
+
+    FetchContent_Declare(
+        ZeroMQ
+        URL https://github.com/zeromq/libzmq/releases/download/v4.3.5/zeromq-4.3.5.tar.gz
+        URL_HASH SHA256=6653ef5910f17954861fe72332e68b03ca6e4d9c7160eb3a8de5a5a913bfab43
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+        SOURCE_DIR "${CMAKE_SOURCE_DIR}/thirdparty/zeromq-src"
+    )
+    FetchContent_MakeAvailable(ZeroMQ)
+
+    FetchContent_Declare(
+        cppzmq
+        URL https://github.com/zeromq/cppzmq/archive/refs/tags/v4.10.0.tar.gz
+        URL_HASH SHA256=c81c81bba8a7644c84932225f018b5088743a22999c6d82a2b5f5cd1e6942b74
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+        SOURCE_DIR "${CMAKE_SOURCE_DIR}/thirdparty/cppzmq-src"
+    )
+    FetchContent_MakeAvailable(cppzmq)
+endblock()
+
 add_library(svanes_engine STATIC)
 add_library(Svanes::Engine ALIAS svanes_engine)
 
@@ -91,18 +155,43 @@ target_sources(
     svanes_engine
     PRIVATE
         src/application.cpp
+        src/async/async_parallel_for_driver.cpp
         src/attractor_system.cpp
         src/audio/audio_manager.cpp
         src/audio/audio_manager_internal.hpp
         src/camera2d.cpp
-        src/circle_geometry.cpp
-        src/convex_polygon_geometry.cpp
+        src/geometry/composite_geometry.cpp
+        src/geometry/circle_geometry.cpp
+        src/geometry/convex_polygon_geometry.cpp
         src/collision_system.cpp
-        src/geometry.cpp
+        src/deterministic_math.cpp
+        src/tilemaps/tilemap.cpp
+        src/collision_pass.cpp
+        src/geometry/geometry.cpp
         src/input.cpp
         src/kinematic_system.cpp
-        src/rectangle_geometry.cpp
-        src/triangle_geometry.cpp
+        src/MenuUtilities/font_manager.cpp
+        src/MenuUtilities/font_manager_internal.hpp
+        src/MenuUtilities/text_label_renderer.cpp
+        src/MenuUtilities/text_label_renderer.hpp
+        src/network/component_serialization.cpp
+        src/network/network_client.cpp
+        src/network/msg_pipe.cpp
+        src/network/message_serialization.cpp
+        src/network/network_message.cpp
+        src/network/network_session.cpp
+        src/network/peer_group.cpp
+        src/network/peer_join.hpp
+        src/network/peer_join.cpp
+        src/network/network_replication.cpp
+        src/network/network_server.cpp
+        src/network/server_runtime.cpp
+        src/network/tcp_msg_pipe.cpp
+        src/network/tcp_connection.cpp
+        src/network/udp_msg_pipe.cpp
+        src/physics_system.cpp
+        src/geometry/rectangle_geometry.cpp
+        src/geometry/triangle_geometry.cpp
         src/input_manager_internal.hpp
         src/render/render_queue.cpp
         src/render/render_queue_executor.cpp
@@ -112,76 +201,208 @@ target_sources(
         src/render/texture_manager_internal.hpp
         src/registry.cpp
         src/sprite_animation_system.cpp
+        src/spatial/hgrid2d.cpp
+        src/stable_id.cpp
+        src/timeline_system.cpp
+        src/utility/hash.cpp
+        src/utility/rational_number.cpp
     PUBLIC
         FILE_SET HEADERS
         BASE_DIRS include
         FILES
             include/svanes/application.hpp
+            include/svanes/async/async_parallel_for_driver.hpp
             include/svanes/attractor_system.hpp
             include/svanes/audio/audio_manager.hpp
             include/svanes/camera2d.hpp
-            include/svanes/circle_geometry.hpp
-            include/svanes/convex_polygon_geometry.hpp
+            include/svanes/geometry/circle_geometry.hpp
+            include/svanes/geometry/composite_geometry.hpp
+            include/svanes/geometry/convex_polygon_geometry.hpp
             include/svanes/collision_system.hpp
+            include/svanes/deterministic_math.hpp
+            include/svanes/tilemaps/tilemap.hpp
+            include/svanes/collision_pass.hpp
             include/svanes/entity.hpp
             include/svanes/game.hpp
-            include/svanes/geometry.hpp
+            include/svanes/geometry/geometry.hpp
             include/svanes/input.hpp
             include/svanes/kinematic_system.hpp
-            include/svanes/rectangle_geometry.hpp
-            include/svanes/triangle_geometry.hpp
+            include/svanes/MenuUtilities/font_manager.hpp
+            include/svanes/MenuUtilities/text_label.hpp
+            include/svanes/network/component_serialization.hpp
+            include/svanes/network/msg_pipe.hpp
+            include/svanes/network/message_serialization.hpp
+            include/svanes/network/network_client.hpp
+            include/svanes/network/network_message.hpp
+            include/svanes/network/network_session.hpp
+            include/svanes/network/input_sync.hpp
+            include/svanes/network/peer_group.hpp
+            include/svanes/network/network_replication.hpp
+            include/svanes/network/network_server.hpp
+            include/svanes/network/server_runtime.hpp
+            include/svanes/network/tcp_connection.hpp
+            include/svanes/network/tcp_msg_pipe.hpp
+            include/svanes/network/udp_msg_pipe.hpp
+            include/svanes/geometry/primitive_geometry.hpp
+            include/svanes/physics_system.hpp
+            include/svanes/geometry/rectangle_geometry.hpp
+            include/svanes/geometry/triangle_geometry.hpp
             include/svanes/render/basic_render_types.hpp
             include/svanes/render/render_queue.hpp
             include/svanes/render/render_system.hpp
             include/svanes/render/texture_manager.hpp
             include/svanes/registry.hpp
             include/svanes/sprite_animation_system.hpp
+            include/svanes/spatial/hgrid2d.hpp
+            include/svanes/stable_id.hpp
+            include/svanes/timeline_system.hpp
+            include/svanes/utility/hash.hpp
+            include/svanes/utility/rational_number.hpp
             include/svanes/vector2d.hpp
 )
 
 target_compile_features(svanes_engine PUBLIC cxx_std_23)
 target_link_libraries(
     svanes_engine
-    PUBLIC SDL3::SDL3
-    PRIVATE SDL3_image::SDL3_image SDL3_mixer::SDL3_mixer
+    PUBLIC SDL3::SDL3 cppzmq-static Threads::Threads
+    PRIVATE SDL3_image::SDL3_image SDL3_mixer::SDL3_mixer SDL3_ttf::SDL3_ttf
 )
 
 if(MSVC)
     target_compile_options(svanes_engine PRIVATE /W4 /permissive-)
 else()
     target_compile_options(svanes_engine PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(svanes_engine PUBLIC -ffp-contract=off)
 endif()
 
 add_executable(
-    svanes_game_erik
-    games/erik-placeholder/main.cpp
-    games/erik-placeholder/erik_game.cpp
-    games/erik-placeholder/goose.cpp
-    games/erik-placeholder/enemy.cpp
-    games/erik-placeholder/bullets.cpp
+    svanes_game_goose
+    games/goose/main.cpp
+    games/goose/goose_game.cpp
+    games/goose/pause_menu.cpp
+    games/goose/goose_session.cpp
+    games/goose/peer_session.cpp
+    games/goose/server_session.cpp
+    games/goose/server_protocol.cpp
+    games/goose/goose.cpp
+    games/goose/goose_simulation.cpp
+    games/goose/enemy.cpp
+    games/goose/bullets.cpp
 )
-target_link_libraries(svanes_game_erik PRIVATE Svanes::Engine)
-target_compile_definitions(svanes_game_erik PRIVATE
-    ERIK_GAME_ASSETS_DIR="${CMAKE_SOURCE_DIR}/games/erik-placeholder/assets"
+target_link_libraries(svanes_game_goose PRIVATE Svanes::Engine)
+target_compile_definitions(svanes_game_goose PRIVATE
+    GOOSE_ASSETS_DIR="assets/goose"
 )
 
 add_executable(
-    svanes_game_orbital_escalation
+    svanes_game_goose_server
+    games/goose/goose_server.cpp
+    games/goose/goose_session.cpp
+    games/goose/server_protocol.cpp
+    games/goose/goose.cpp
+    games/goose/goose_simulation.cpp
+    games/goose/enemy.cpp
+    games/goose/bullets.cpp
+)
+target_link_libraries(svanes_game_goose_server PRIVATE Svanes::Engine)
+target_compile_definitions(svanes_game_goose_server PRIVATE
+    GOOSE_ASSETS_DIR="assets/goose"
+)
+
+add_library(
+    svanes_orbital_simulation STATIC
+    games/orbitalEscalation/attachment_system.cpp
+    games/orbitalEscalation/attachment_system.hpp
+    games/orbitalEscalation/propulsion_system.cpp
+    games/orbitalEscalation/propulsion_system.hpp
+    games/orbitalEscalation/combat/damage_system.cpp
+    games/orbitalEscalation/combat/damage_system.hpp
+    games/orbitalEscalation/game_objects/owned_entity.cpp
+    games/orbitalEscalation/game_objects/owned_entity.hpp
+    games/orbitalEscalation/serialization/geometry_serialization.cpp
+    games/orbitalEscalation/serialization/geometry_serialization.hpp
+    games/orbitalEscalation/serialization/json.cpp
+    games/orbitalEscalation/serialization/json.hpp
+    games/orbitalEscalation/combat/weapon_system.cpp
+    games/orbitalEscalation/combat/weapon_system.hpp
+    games/orbitalEscalation/combat/missile_system.cpp
+    games/orbitalEscalation/combat/missile_system.hpp
+    games/orbitalEscalation/effects/collision_flashes.cpp
+    games/orbitalEscalation/effects/collision_flashes.hpp
+    games/orbitalEscalation/game_objects/dynamic_object/missile_launcher.cpp
+    games/orbitalEscalation/game_objects/dynamic_object/missile_launcher.hpp
+    games/orbitalEscalation/serialization/missile_launcher_serialization.cpp
+    games/orbitalEscalation/serialization/missile_launcher_serialization.hpp
+    games/orbitalEscalation/serialization/world_snapshot.cpp
+    games/orbitalEscalation/serialization/world_snapshot.hpp
+    games/orbitalEscalation/serialization/asset_catalog.cpp
+    games/orbitalEscalation/serialization/asset_catalog.hpp
+    games/orbitalEscalation/serialization/dynamic_object_serialization.cpp
+    games/orbitalEscalation/serialization/dynamic_object_serialization.hpp
+    games/orbitalEscalation/serialization/missile_serialization.cpp
+    games/orbitalEscalation/serialization/missile_serialization.hpp
+    games/orbitalEscalation/game_objects/dynamic_object/missile.cpp
+    games/orbitalEscalation/game_objects/dynamic_object/missile.hpp
+    games/orbitalEscalation/serialization/ship_serialization.cpp
+    games/orbitalEscalation/serialization/ship_serialization.hpp
+    games/orbitalEscalation/orbital_simulation.cpp
+    games/orbitalEscalation/orbital_simulation.hpp
+    games/orbitalEscalation/game_objects/dynamic_object/dynamic_object.cpp
+    games/orbitalEscalation/game_objects/dynamic_object/dynamic_object.hpp
+    games/orbitalEscalation/game_objects/dynamic_object/ship.cpp
+    games/orbitalEscalation/game_objects/dynamic_object/ship.hpp
+    games/orbitalEscalation/game_objects/planet.cpp
+    games/orbitalEscalation/game_objects/planet.hpp
+    games/orbitalEscalation/controls.cpp
+    games/orbitalEscalation/controls.hpp
+    games/orbitalEscalation/game_objects/visuals.cpp
+    games/orbitalEscalation/game_objects/visuals.hpp
+)
+FetchContent_Declare(
+    nlohmann_json
+    URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz
+    URL_HASH SHA256=42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    SOURCE_DIR "${CMAKE_SOURCE_DIR}/thirdparty/nlohmann_json-src"
+)
+FetchContent_MakeAvailable(nlohmann_json)
+target_link_libraries(svanes_orbital_simulation PUBLIC
+    Svanes::Engine nlohmann_json::nlohmann_json
+)
+add_executable(svanes_game_orbital_escalation
     games/orbitalEscalation/main.cpp
     games/orbitalEscalation/orbital_escalation_game.cpp
 )
-target_link_libraries(svanes_game_orbital_escalation PRIVATE Svanes::Engine)
+target_link_libraries(svanes_game_orbital_escalation PRIVATE svanes_orbital_simulation)
+add_executable(svanes_game_orbital_escalation_server
+    games/orbitalEscalation/server_main.cpp
+    games/orbitalEscalation/OrbitalEscalationServer.hpp
+    games/orbitalEscalation/OrbitalEscalationServer.cpp
+)
+target_link_libraries(svanes_game_orbital_escalation_server PRIVATE svanes_orbital_simulation)
 
-add_executable(svanes_game_chris games/chris-placeholder/main.cpp games/chris-placeholder/chris_game.cpp)
-target_link_libraries(svanes_game_chris PRIVATE Svanes::Engine)
-target_compile_definitions(svanes_game_chris PRIVATE
-    CHRIS_GAME_ASSETS_DIR="${CMAKE_SOURCE_DIR}/games/chris-placeholder/assets"
+add_executable(svanes_game_double_time
+    games/doubleTime/main.cpp
+    games/doubleTime/chris_game.cpp
+    games/doubleTime/p2p_game.cpp
+)
+target_link_libraries(svanes_game_double_time PRIVATE Svanes::Engine)
+target_link_libraries(svanes_game_double_time PRIVATE SDL3_image::SDL3_image)
+target_compile_definitions(svanes_game_double_time PRIVATE
+    DOUBLE_TIME_GAME_ASSETS_DIR="assets/doubleTime"
+)
+
+add_executable(svanes_game_double_time_server games/doubleTime/server_main.cpp)
+target_link_libraries(svanes_game_double_time_server PRIVATE Svanes::Engine)
+target_link_libraries(svanes_game_double_time_server PRIVATE SDL3_image::SDL3_image)
+target_compile_definitions(svanes_game_double_time_server PRIVATE
+    DOUBLE_TIME_GAME_ASSETS_DIR="assets/doubleTime"
 )
 
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT svanes_game_orbital_escalation)
 
 set_target_properties(
-    svanes_engine svanes_game_erik svanes_game_orbital_escalation svanes_game_chris
+    svanes_engine svanes_game_goose svanes_game_goose_server svanes_game_orbital_escalation svanes_orbital_simulation svanes_game_orbital_escalation_server svanes_game_double_time svanes_game_double_time_server
     PROPERTIES
         CXX_EXTENSIONS OFF
         ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/$<CONFIG>"
@@ -191,41 +412,94 @@ set_target_properties(
 
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FILES
     include/svanes/application.hpp
+    include/svanes/async/async_parallel_for_driver.hpp
     include/svanes/attractor_system.hpp
     include/svanes/audio/audio_manager.hpp
     include/svanes/camera2d.hpp
-    include/svanes/circle_geometry.hpp
-    include/svanes/convex_polygon_geometry.hpp
+    include/svanes/geometry/circle_geometry.hpp
+    include/svanes/geometry/composite_geometry.hpp
+    include/svanes/geometry/convex_polygon_geometry.hpp
     include/svanes/collision_system.hpp
+    include/svanes/deterministic_math.hpp
+    include/svanes/tilemaps/tilemap.hpp
+    include/svanes/collision_pass.hpp
     include/svanes/entity.hpp
     include/svanes/game.hpp
-    include/svanes/geometry.hpp
+    include/svanes/geometry/geometry.hpp
     include/svanes/input.hpp
     include/svanes/kinematic_system.hpp
-    include/svanes/rectangle_geometry.hpp
-    include/svanes/triangle_geometry.hpp
+    include/svanes/MenuUtilities/font_manager.hpp
+    include/svanes/MenuUtilities/text_label.hpp
+    include/svanes/network/component_serialization.hpp
+    include/svanes/network/msg_pipe.hpp
+    include/svanes/network/message_serialization.hpp
+    include/svanes/network/network_client.hpp
+    include/svanes/network/network_message.hpp
+    include/svanes/network/network_session.hpp
+    include/svanes/network/input_sync.hpp
+    include/svanes/network/peer_group.hpp
+    include/svanes/network/network_replication.hpp
+    include/svanes/network/network_server.hpp
+    include/svanes/network/server_runtime.hpp
+    include/svanes/network/tcp_connection.hpp
+    include/svanes/network/tcp_msg_pipe.hpp
+    include/svanes/network/udp_msg_pipe.hpp
+    include/svanes/geometry/primitive_geometry.hpp
+    include/svanes/physics_system.hpp
+    include/svanes/geometry/rectangle_geometry.hpp
+    include/svanes/geometry/triangle_geometry.hpp
     include/svanes/render/basic_render_types.hpp
     include/svanes/render/render_queue.hpp
     include/svanes/render/render_system.hpp
     include/svanes/render/texture_manager.hpp
     include/svanes/registry.hpp
     include/svanes/sprite_animation_system.hpp
+    include/svanes/spatial/hgrid2d.hpp
+    include/svanes/stable_id.hpp
+    include/svanes/timeline_system.hpp
+    include/svanes/utility/hash.hpp
+    include/svanes/utility/rational_number.hpp
     include/svanes/vector2d.hpp
 )
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/application.cpp
+    src/async/async_parallel_for_driver.cpp
     src/attractor_system.cpp
     src/audio/audio_manager.cpp
     src/audio/audio_manager_internal.hpp
     src/camera2d.cpp
-    src/circle_geometry.cpp
-    src/convex_polygon_geometry.cpp
+    src/geometry/composite_geometry.cpp
+    src/geometry/circle_geometry.cpp
+    src/geometry/convex_polygon_geometry.cpp
     src/collision_system.cpp
-    src/geometry.cpp
+    src/deterministic_math.cpp
+    src/tilemaps/tilemap.cpp
+    src/collision_pass.cpp
+    src/geometry/geometry.cpp
     src/input.cpp
     src/kinematic_system.cpp
-    src/rectangle_geometry.cpp
-    src/triangle_geometry.cpp
+    src/MenuUtilities/font_manager.cpp
+    src/MenuUtilities/font_manager_internal.hpp
+    src/MenuUtilities/text_label_renderer.cpp
+    src/MenuUtilities/text_label_renderer.hpp
+    src/network/component_serialization.cpp
+    src/network/network_client.cpp
+    src/network/msg_pipe.cpp
+    src/network/message_serialization.cpp
+    src/network/network_message.cpp
+    src/network/network_session.cpp
+    src/network/peer_group.cpp
+    src/network/peer_join.hpp
+    src/network/peer_join.cpp
+    src/network/network_replication.cpp
+    src/network/network_server.cpp
+    src/network/server_runtime.cpp
+    src/network/tcp_msg_pipe.cpp
+    src/network/tcp_connection.cpp
+    src/network/udp_msg_pipe.cpp
+    src/physics_system.cpp
+    src/geometry/rectangle_geometry.cpp
+    src/geometry/triangle_geometry.cpp
     src/input_manager_internal.hpp
     src/render/render_queue.cpp
     src/render/render_queue_executor.cpp
@@ -235,4 +509,17 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/render/texture_manager_internal.hpp
     src/registry.cpp
     src/sprite_animation_system.cpp
+    src/spatial/hgrid2d.cpp
+    src/stable_id.cpp
+    src/timeline_system.cpp
+    src/utility/hash.cpp
+    src/utility/rational_number.cpp
 )
+
+include(cmake/game_packages.cmake)
+svanes_game_package(svanes_game_goose goose goose goose)
+svanes_game_package(svanes_game_goose_server goose-server goose goose)
+svanes_game_package(svanes_game_orbital_escalation orbitalEscalation orbitalEscalation orbitalEscalation)
+add_dependencies(svanes_game_orbital_escalation_server svanes_game_orbital_escalation_assets)
+svanes_game_package(svanes_game_double_time doubleTime doubleTime doubleTime)
+svanes_game_package(svanes_game_double_time_server doubleTime-server doubleTime doubleTime)

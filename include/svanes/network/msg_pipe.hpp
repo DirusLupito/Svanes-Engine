@@ -1,0 +1,125 @@
+#pragma once
+
+#include <svanes/network/network_message.hpp>
+
+#include <string>
+#include <vector>
+
+namespace svanes {
+
+/**
+ * A unique identifier for a connection in a message pipe.
+ *
+ * FIELDS:
+ * - value: The local connection id. Zero is invalid.
+ *
+ * Two connection ids compare equal when their values match.
+ */
+struct ConnectionId {
+    std::uint32_t value = 0;
+
+    bool operator==(const ConnectionId &) const = default;
+};
+
+/**
+ * The received message including the source connection id and the message itself.
+ *
+ * FIELDS:
+ * - source: The connection that sent the message.
+ * - message: The received bytes.
+ */
+struct ReceivedMessage {
+    ConnectionId source;
+    NetworkMessage message;
+};
+
+/**
+ * Abstraction for a network message pipe to send messages between
+ * clients and servers. All concrete implementations of this interface
+ * must include an implementation of the Send and Receive functions.
+ * Any code that uses a message pipe should be able to switch between
+ * different types of message pipes fairly seamlessly.
+ */
+class MsgPipe {
+public:
+    /**
+     * Virtual destructor for deleting a message pipe.
+     */
+    virtual ~MsgPipe() = default;
+
+    /**
+     * Sends a message to every known connection, rather than to one chosen
+     * destination as the other Send overload does.
+     * Checks and verification are the responsibility of the concrete implementations.
+     *
+     * @param message The content to be sent through the message pipe.
+     * @return Whether every connection accepted the send. False if the pipe has
+     * no connections, or if any one of them refused.
+     */
+    bool Send(const NetworkMessage &message);
+
+    /**
+     * Receives a message from any connection, discarding which one sent it.
+     * The other Receive overload reports the source connection id as well.
+     * Checks and verification are the responsibility of the concrete implementations.
+     *
+     * @param message The content to be received through the message pipe.
+     * @return Whether a message was received. False means none is available.
+     */
+    bool Receive(NetworkMessage &message);
+
+    /**
+     * Sends a message to the given connection id.
+     *
+     * @param destination The connection to send to.
+     * @param message The bytes to send.
+     * @return Whether the transport accepted the send, not confirmation of delivery.
+     * @throws std::invalid_argument if the connection id is unknown.
+     */
+    virtual bool Send(ConnectionId destination,
+                      const NetworkMessage &message) = 0;
+
+    /**
+     * Receives a message from any connection, returning the source connection id
+     * and the message itself.
+     *
+     * @param received Receives the source and bytes when a message is available.
+     * @return Whether a message was received. False means none is available.
+     */
+    virtual bool Receive(ReceivedMessage &received) = 0;
+
+    /**
+     * Returns a list of all known connection ids.
+     *
+     * @return The connection ids belonging to this pipe.
+     */
+    std::vector<ConnectionId> Connections() const;
+
+protected:
+    /**
+     * Stores a connection route and returns its connection id. If the route is
+     * already known, the existing connection id is returned.
+     *
+     * @param route The transport address or routing identity to store.
+     * @return The connection id assigned to the route.
+     * @throws std::overflow_error if no more connection ids are available.
+     */
+    ConnectionId RememberConnection(const std::string &route);
+
+    /**
+     * Gets the route for a given connection id.
+     *
+     * @param connection The connection to look up.
+     * @return The stored transport address or routing identity.
+     * @throws std::invalid_argument if the connection id is unknown.
+     */
+    const std::string &Route(ConnectionId connection) const;
+
+private:
+    /**
+     * Stores the routes for all known connections.
+     */
+    std::vector<std::string> routes;
+};
+
+} // namespace svanes

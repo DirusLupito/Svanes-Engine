@@ -1,0 +1,12 @@
+{
+    "name": "basic_missile_single_launcher",
+    "missile": "basic_missile",
+    "reload_seconds": 10.0,
+    "launch_speed": 1500.0,
+    "forward": [
+        0,
+        -1
+    ],
+    "visuals": [],
+    "collider": "visuals"
+}

@@ -1,4 +1,5 @@
 #include <svanes/render/render_system.hpp>
+#include <svanes/tilemaps/tilemap.hpp>
 
 #include <svanes/camera2d.hpp>
 #include <svanes/registry.hpp>
@@ -7,6 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <stdexcept>
 #include <variant>
 
@@ -21,8 +23,7 @@ namespace svanes {
  *
  * @return The value of the entity's ZOrder component, or 0 if it has none.
  */
-static std::int32_t ZOrderOf(const Registry& world, Entity entity)
-{
+static std::int32_t ZOrderOf(const Registry &world, Entity entity) {
     if (!world.HasComponent<ZOrder>(entity)) {
         return 0;
     }
@@ -31,165 +32,295 @@ static std::int32_t ZOrderOf(const Registry& world, Entity entity)
 }
 
 /**
- * Submits a rectangular entity to the render queue for rendering. The rectangle's world coordinates
- * are converted to screen coordinates using the camera, and if the rectangle is outside the bounds
- * of the rendering output, it is not submitted for rendering.
- * 
+ * Submits a rectangular entity to the render queue for rendering. The
+ * rectangle's world coordinates are converted to screen coordinates using the
+ * camera, and if the rectangle is outside the bounds of the rendering output,
+ * it is not submitted for rendering.
+ *
  * @param shape The Rectangle2D component of the entity to be rendered.
  * @param transform The Transform component of the entity to be rendered.
  * @param color The color to render the rectangle with.
  * @param z_order The z order to draw the rectangle at.
- * @param render_queue The render queue to which the rendering commands will be submitted.
- * @param camera The camera used to convert world coordinates to screen coordinates.
+ * @param blend_mode The blending mode used to combine the rectangle with the
+ * existing screen color.
+ * @param render_queue The render queue to which the rendering commands will be
+ * submitted.
+ * @param camera The camera used to convert world coordinates to screen
+ * coordinates.
  */
-static void SubmitShape(
-    const Rectangle2D& shape, const Transform& transform, Color color, std::int32_t z_order,
-    RenderQueue& render_queue, const Camera2D& camera
-)
-{
+static void SubmitShape(const Rectangle2D &shape, const Transform &transform,
+                        Color color, std::int32_t z_order, BlendMode blend_mode,
+                        RenderQueue &render_queue, const Camera2D &camera) {
     const auto destination = camera.PrepareForRendering(transform, shape);
 
     if (!destination) {
         return;
     }
 
-    render_queue.DrawRectangle(*destination, color, transform.rotation, z_order);
+    render_queue.DrawRectangle(*destination, color, transform.rotation, z_order,
+                               blend_mode);
 }
 
 /**
- * Submits a triangular entity to the render queue for rendering. The triangle's world coordinates
- * are converted to screen coordinates using the camera, and if the triangle is outside the bounds
- * of the rendering output, it is not submitted for rendering.
- * 
+ * Submits a triangular entity to the render queue for rendering. The triangle's
+ * world coordinates are converted to screen coordinates using the camera, and
+ * if the triangle is outside the bounds of the rendering output, it is not
+ * submitted for rendering.
+ *
  * @param shape The Triangle2D component of the entity to be rendered.
  * @param transform The Transform component of the entity to be rendered.
  * @param color The color to render the triangle with.
  * @param z_order The z order to draw the triangle at.
- * @param render_queue The render queue to which the rendering commands will be submitted.
- * @param camera The camera used to convert world coordinates to screen coordinates.
+ * @param blend_mode The blending mode used to combine the triangle with the
+ * existing screen color.
+ * @param render_queue The render queue to which the rendering commands will be
+ * submitted.
+ * @param camera The camera used to convert world coordinates to screen
+ * coordinates.
  */
-static void SubmitShape(
-    const Triangle2D& shape, const Transform& transform, Color color, std::int32_t z_order,
-    RenderQueue& render_queue, const Camera2D& camera
-)
-{
+static void SubmitShape(const Triangle2D &shape, const Transform &transform,
+                        Color color, std::int32_t z_order, BlendMode blend_mode,
+                        RenderQueue &render_queue, const Camera2D &camera) {
     const auto destination = camera.PrepareForRendering(transform, shape);
 
     if (!destination) {
         return;
     }
 
-    render_queue.DrawTriangle(*destination, color, z_order);
+    render_queue.DrawTriangle(*destination, color, z_order, blend_mode);
 }
 
 /**
- * Submits a circular entity to the render queue for rendering. The circle's world coordinates
- * are converted to screen coordinates using the camera, and if the circle is outside the bounds
- * of the rendering output, it is not submitted for rendering.
- * 
+ * Submits a circular entity to the render queue for rendering. The circle's
+ * world coordinates are converted to screen coordinates using the camera, and
+ * if the circle is outside the bounds of the rendering output, it is not
+ * submitted for rendering.
+ *
  * @param shape The Circle2D component of the entity to be rendered.
  * @param transform The Transform component of the entity to be rendered.
  * @param color The color to render the circle with.
  * @param z_order The z order to draw the circle at.
- * @param render_queue The render queue to which the rendering commands will be submitted.
- * @param camera The camera used to convert world coordinates to screen coordinates.
+ * @param blend_mode The blending mode used to combine the circle with the
+ * existing screen color.
+ * @param render_queue The render queue to which the rendering commands will be
+ * submitted.
+ * @param camera The camera used to convert world coordinates to screen
+ * coordinates.
  */
-static void SubmitShape(
-    const Circle2D& shape, const Transform& transform, Color color, std::int32_t z_order,
-    RenderQueue& render_queue, const Camera2D& camera
-)
-{
+static void SubmitShape(const Circle2D &shape, const Transform &transform,
+                        Color color, std::int32_t z_order, BlendMode blend_mode,
+                        RenderQueue &render_queue, const Camera2D &camera) {
     const auto destination = camera.PrepareForRendering(transform, shape);
 
     if (!destination) {
         return;
     }
 
-    render_queue.DrawCircle(*destination, color, z_order);
+    render_queue.DrawCircle(*destination, color, z_order, blend_mode);
 }
 
 /**
- * Submits a convex polygonal entity to the render queue for rendering. The polygon's world coordinates
- * are converted to screen coordinates using the camera, and if the polygon is outside the bounds
- * of the rendering output, it is not submitted for rendering.
- * 
+ * Submits a convex polygonal entity to the render queue for rendering. The
+ * polygon's world coordinates are converted to screen coordinates using the
+ * camera, and if the polygon is outside the bounds of the rendering output, it
+ * is not submitted for rendering.
+ *
  * @param shape The ConvexPolygon2D component of the entity to be rendered.
  * @param transform The Transform component of the entity to be rendered.
  * @param color The color to render the polygon with.
  * @param z_order The z order to draw the polygon at.
- * @param render_queue The render queue to which the rendering commands will be submitted.
- * @param camera The camera used to convert world coordinates to screen coordinates.
+ * @param blend_mode The blending mode used to combine the polygon with the
+ * existing screen color.
+ * @param render_queue The render queue to which the rendering commands will be
+ * submitted.
+ * @param camera The camera used to convert world coordinates to screen
+ * coordinates.
  */
-static void SubmitShape(
-    const ConvexPolygon2D& shape, const Transform& transform, Color color, std::int32_t z_order,
-    RenderQueue& render_queue, const Camera2D& camera
-)
-{
+static void SubmitShape(const ConvexPolygon2D &shape,
+                        const Transform &transform, Color color,
+                        std::int32_t z_order, BlendMode blend_mode,
+                        RenderQueue &render_queue, const Camera2D &camera) {
     const auto destination = camera.PrepareForRendering(transform, shape);
     if (!destination) {
         return;
     }
-    render_queue.DrawConvexPolygon(*destination, color, z_order);
+    render_queue.DrawConvexPolygon(*destination, color, z_order, blend_mode);
 }
 
 /**
- * Recursively submits all parts of a composite shape to the render queue for rendering.
- * Each part's transform is composed with the parent transform to determine its final position and rotation.
- * 
+ * Recursively submits all parts of a composite shape to the render queue for
+ * rendering. Each part's transform is composed with the parent transform to
+ * determine its final position and rotation.
+ *
  * @param shape The composite shape to be submitted for rendering.
- * @param transform The transform of the parent entity, which will be combined with each part's transform.
+ * @param transform The transform of the parent entity, which will be combined
+ * with each part's transform.
  * @param color The color to render the composite shape with.
  * @param z_order The z order to draw the composite shape at.
- * @param render_queue The render queue to which the rendering commands will be submitted.
- * @param camera The camera used to convert world coordinates to screen coordinates.
+ * @param blend_mode The blending mode used to combine the composite shape with
+ * the existing screen color.
+ * @param render_queue The render queue to which the rendering commands will be
+ * submitted.
+ * @param camera The camera used to convert world coordinates to screen
+ * coordinates.
  */
-static void SubmitShape(
-    const CompositeShape2D& shape, const Transform& transform, Color color, std::int32_t z_order,
-    RenderQueue& render_queue, const Camera2D& camera
-)
-{
-    for (const GeometryPart2D& part : shape.parts) {
+static void SubmitShape(const CompositeShape2D &shape,
+                        const Transform &transform, Color color,
+                        std::int32_t z_order, BlendMode blend_mode,
+                        RenderQueue &render_queue, const Camera2D &camera) {
+    for (const GeometryPart2D &part : shape.parts) {
         const Transform pose = ComposeTransforms(transform, part.transform);
 
-        std::visit([&](const auto& primitive) {
-            SubmitShape(primitive, pose, color, z_order, render_queue, camera);
-        }, part.shape);
+        std::visit(
+            [&](const auto &primitive) {
+                SubmitShape(primitive, pose, color, z_order, blend_mode,
+                            render_queue, camera);
+            },
+            part.shape);
     }
 }
 
-void SubmitShapes(const Registry& world, RenderQueue& render_queue, const Camera2D& camera)
-{
-    world.ForEach<Transform, SolidShape>(
-        [&](Entity entity, const Transform& transform, const SolidShape& visual) {
-            const std::int32_t z_order = ZOrderOf(world, entity);
+void SubmitShapes(const Registry &world, RenderQueue &render_queue,
+                  const Camera2D &camera) {
+    world.ForEach<Transform, SolidShape>([&](Entity entity,
+                                             const Transform &transform,
+                                             const SolidShape &visual) {
+        const std::int32_t z_order = ZOrderOf(world, entity);
 
-            // std::visit calls a function with whichever value a std::variant currently holds
-            // The visitor function must handle all possible types contained within the variant.
-            // If a type is unhandled, the code will fail to compile.
-            std::visit([&](const auto& shape) {
-                SubmitShape(shape, transform, visual.color, z_order, render_queue, camera);
-            }, visual.geometry);
-        }
-    );
+        // std::visit calls a function with whichever value a std::variant
+        // currently holds The visitor function must handle all possible types
+        // contained within the variant. If a type is unhandled, the code will
+        // fail to compile.
+        std::visit(
+            [&](const auto &shape) {
+                SubmitShape(shape, transform, visual.color, z_order,
+                            visual.blend_mode, render_queue, camera);
+            },
+            visual.geometry);
+    });
 }
 
-void SubmitSprites(const Registry& world, RenderQueue& render_queue, const Camera2D& camera)
-{
+void SubmitRadialGradients(const Registry &world, RenderQueue &render_queue,
+                           const Camera2D &camera) {
+    world.ForEach<Transform, RadialGradient2D>(
+        [&](Entity entity, const Transform &transform,
+            const RadialGradient2D &gradient) {
+            const auto destination =
+                camera.PrepareForRendering(transform, gradient.geometry);
+            if (!destination) {
+                return;
+            }
+
+            render_queue.DrawRadialGradient(
+                *destination, gradient.center_color, gradient.edge_color,
+                ZOrderOf(world, entity), gradient.blend_mode);
+        });
+}
+
+void SubmitSprites(const Registry &world, RenderQueue &render_queue,
+                   const Camera2D &camera) {
     world.ForEach<Transform, Sprite>(
-        [&](Entity entity, const Transform& transform, const Sprite& sprite) {
-            const auto destination = camera.PrepareForRendering(transform, sprite.geometry);
+        [&](Entity entity, const Transform &transform, const Sprite &sprite) {
+            const auto destination =
+                camera.PrepareForRendering(transform, sprite.geometry);
             if (!destination) {
                 return;
             }
 
             const std::int32_t z_order = ZOrderOf(world, entity);
             if (sprite.source.has_value()) {
-                render_queue.DrawTexture(sprite.texture, *sprite.source, *destination, transform.rotation, z_order);
+                render_queue.DrawTexture(sprite.texture, *sprite.source,
+                                         *destination, transform.rotation,
+                                         z_order, sprite.blend_mode);
             } else {
-                render_queue.DrawTexture(sprite.texture, *destination, transform.rotation, z_order);
+                render_queue.DrawTexture(sprite.texture, *destination,
+                                         transform.rotation, z_order,
+                                         sprite.blend_mode);
             }
-        }
-    );
+        });
 }
 
+void SubmitTileMaps(const Registry &world, RenderQueue &render_queue,
+                    const Camera2D &camera) {
+    world.ForEach<Transform, TileMap>(
+        [&](Entity entity, const Transform &transform, const TileMap &tile_map) {
+            if (tile_map.columns == 0 || tile_map.rows == 0 ||
+                tile_map.tile_width == 0 || tile_map.tile_height == 0 ||
+                tile_map.atlas_tile_width == 0 ||
+                tile_map.atlas_tile_height == 0 ||
+                tile_map.atlas_columns == 0 || tile_map.atlas_rows == 0) {
+                throw std::invalid_argument(
+                    "TileMap dimensions and atlas layout must be positive.");
+            }
+
+            const std::uint64_t expected_cell_count =
+                static_cast<std::uint64_t>(tile_map.columns) * tile_map.rows;
+            if (expected_cell_count != tile_map.cells.size()) {
+                throw std::invalid_argument(
+                    "TileMap cell count must match its row and column counts.");
+            }
+
+            const std::uint64_t atlas_tile_count =
+                static_cast<std::uint64_t>(tile_map.atlas_columns) *
+                tile_map.atlas_rows;
+            const std::int32_t z_order = ZOrderOf(world, entity);
+
+            // Loop through and render each tile in the tilemap
+            for (std::uint32_t row = 0; row < tile_map.rows; ++row) {
+                for (std::uint32_t column = 0; column < tile_map.columns;
+                     ++column) {
+                    const std::size_t cell_index =
+                        static_cast<std::size_t>(row) * tile_map.columns +
+                        column;
+                    const TileId tile_id =
+                        tile_map.cells[cell_index].tile_id;
+                    
+                    // Skip empty cells
+                    if (tile_id == 0) {
+                        continue;
+                    }
+
+                    const std::uint64_t atlas_index = tile_id - 1;
+                    if (atlas_index >= atlas_tile_count) {
+                        throw std::invalid_argument(
+                            "TileMap cell references a tile outside its atlas.");
+                    }
+
+                    // Get the correct position in the tileset for the sprite we want
+                    // to render to this tile
+                    const std::uint32_t atlas_column =
+                        static_cast<std::uint32_t>(atlas_index %
+                                                   tile_map.atlas_columns);
+                    const std::uint32_t atlas_row =
+                        static_cast<std::uint32_t>(atlas_index /
+                                                   tile_map.atlas_columns);
+                    // Create a Rectangle2D for this tile and put it into the rendering pipeline
+                    const Rectangle2D source{
+                        (static_cast<float>(atlas_column) + 0.5F) *
+                            static_cast<float>(tile_map.atlas_tile_width),
+                        (static_cast<float>(atlas_row) + 0.5F) *
+                            static_cast<float>(tile_map.atlas_tile_height),
+                        static_cast<float>(tile_map.atlas_tile_width),
+                        static_cast<float>(tile_map.atlas_tile_height)};
+                    const Rectangle2D geometry{
+                        (static_cast<float>(column) + 0.5F) *
+                            static_cast<float>(tile_map.tile_width),
+                        (static_cast<float>(row) + 0.5F) *
+                            static_cast<float>(tile_map.tile_height),
+                        static_cast<float>(tile_map.tile_width),
+                        static_cast<float>(tile_map.tile_height)};
+                    const auto destination =
+                        camera.PrepareForRendering(transform, geometry);
+                    if (!destination) {
+                        continue;
+                    }
+
+                    render_queue.DrawTexture(tile_map.atlas, source,
+                                             *destination, transform.rotation,
+                                             z_order, tile_map.blend_mode);
+                }
+            }
+        });
 }
+
+} // namespace svanes

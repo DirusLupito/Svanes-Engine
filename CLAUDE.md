@@ -53,6 +53,8 @@ demonstrate engine features. Core features, in implementation order:
   the header file they are defined in, not the implementation file.
   This does not apply to static functions that are only used in the implementation file.
   Those should be documented in the implementation file.
+- Use the general written code formatting found in `.clang-format` for formatting code.
+  Run `git clang-format` when making changes to code to ensure that the formatting is correct.
 
 
 Additionally, a core idea here is that we should earn our complexity.

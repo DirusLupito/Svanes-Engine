@@ -1,13 +1,15 @@
 set windows-shell := ["powershell.exe", "-NoLogo", "-NoProfile", "-Command"]
 
 cmake := if os() == "windows" {
-    "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File scripts/run-cmake.ps1"
+    "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass "
+    + "-File scripts/run-cmake.ps1"
 } else {
     "cmake"
 }
 
 check-deps-cmd := if os() == "windows" {
-    "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File scripts/check-deps.ps1"
+    "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass "
+    + "-File scripts/check-deps.ps1"
 } else {
     "bash scripts/check-deps.sh"
 }
@@ -27,7 +29,11 @@ configure-preset := if os() == "windows" {
 }
 
 build-preset-prefix := if os() == "windows" {
-    if configure-preset == "windows-msvc" { "windows" } else { "windows-vs2022" }
+    if configure-preset == "windows-msvc" {
+        "windows"
+    } else {
+        "windows-vs2022"
+    }
 } else if os() == "macos" {
     "macos"
 } else {
@@ -35,8 +41,13 @@ build-preset-prefix := if os() == "windows" {
 }
 
 bin-dir := "./out/build/" + configure-preset + "/bin/Debug/"
+release-bin-dir := "./out/build/" + configure-preset + "/bin/Release/"
 
-exe-suffix := if os() == "windows" { ".exe" } else { "" }
+exe-suffix := if os() == "windows" {
+    ".exe"
+} else {
+    ""
+}
 
 default:
     @just --list
@@ -52,21 +63,272 @@ configure:
 # Download/update third-party dependencies into thirdparty/.
 fetch-deps: configure
 
-# Configure and build. Pass a target (erik, orbitalEscalation, chris) to build only that game; leave blank to build everything.
+# Pass a target (goose, goose-server, OrbitalEscalation, OrbitalEscalationServer, doubleTime, doubleTime-host,
+# doubleTime-spec, or doubleTime-server) to build only that game; leave blank
+# to build everything.
+# Configure and build.
 build target="": (_check-target target) configure
-    {{cmake}} --build --preset {{build-preset-prefix}}-debug --parallel {{ if target == "" { "" } else { "--target " + (if target == "erik" { "svanes_game_erik" } else if target == "orbitalEscalation" { "svanes_game_orbital_escalation" } else { "svanes_game_chris" }) } }}
+    {{cmake}} --build --preset {{build-preset-prefix}}-debug --parallel {{
+        if target == "" {
+            ""
+        } else {
+            "--target " + (
+                if target == "goose" {
+                    "svanes_game_goose"
+                } else if target == "goose-server" {
+                    "svanes_game_goose_server"
+                } else if target =~ "^[Oo]rbitalEscalation$" {
+                    "svanes_game_orbital_escalation"
+                } else if target == "OrbitalEscalationServer" {
+                    "svanes_game_orbital_escalation_server"
+                } else if target == "doubleTime-server" {
+                    "svanes_game_double_time_server"
+                } else if target == "doubleTime-host" {
+                    "svanes_game_double_time_server svanes_game_double_time"
+                } else {
+                    "svanes_game_double_time"
+                }
+            )
+        }
+    }}
 
-# Configure and build all targets in Release mode.
-release: configure
-    {{cmake}} --build --preset {{build-preset-prefix}}-release --parallel
+# Pass a target to build only that game; leave blank to build everything.
+# Configure and build in Release mode.
+release target="": (_check-target target) configure
+    {{cmake}} --build --preset {{build-preset-prefix}}-release --parallel {{
+        if target == "" {
+            ""
+        } else {
+            "--target " + (
+                if target == "goose" {
+                    "svanes_game_goose"
+                } else if target == "goose-server" {
+                    "svanes_game_goose_server"
+                } else if target =~ "^[Oo]rbitalEscalation$" {
+                    "svanes_game_orbital_escalation"
+                } else if target == "OrbitalEscalationServer" {
+                    "svanes_game_orbital_escalation_server"
+                } else if target == "doubleTime-server" {
+                    "svanes_game_double_time_server"
+                } else if target == "doubleTime-host" {
+                    "svanes_game_double_time_server svanes_game_double_time"
+                } else {
+                    "svanes_game_double_time"
+                }
+            )
+        }
+    }}
+
+# Package a native Release game with assets (Windows ZIP, Linux or macOS tar.gz).
+package target: (_check-target target) configure
+    {{cmake}} --build --preset {{build-preset-prefix}}-release --target package-{{target}} --parallel
 
 # Fail fast with a clear message if an unknown game target was given.
 _check-target target:
-    @{{ if target == "" { "" } else if target == "erik" { "" } else if target == "orbitalEscalation" { "" } else if target == "chris" { "" } else { error("no game named '" + target + "'. Try: chris, erik, orbitalEscalation, or leave it blank.") } }}
+    @{{
+        if target == "" {
+            ""
+        } else if target == "goose" {
+            ""
+        } else if target == "goose-server" {
+            ""
+        } else if target =~ "^[Oo]rbitalEscalation$" {
+            ""
+        } else if target == "OrbitalEscalationServer" {
+            ""
+        } else if target == "doubleTime" {
+            ""
+        } else if target == "doubleTime-server" {
+            ""
+        } else if target == "doubleTime-host" {
+            ""
+        } else if target == "doubleTime-spec" {
+            ""
+        } else {
+            error(
+                "no game named '" + target + "'. Try: doubleTime, "
+                + "doubleTime-host, doubleTime-spec, doubleTime-server, goose, goose-server, OrbitalEscalation, OrbitalEscalationServer, "
+                + "or leave it blank."
+            )
+        }
+    }}
 
-# Build and launch a game: chris, erik, or orbitalEscalation. Leave blank for Orbital Escalation.
-run target="": (_check-target target) (build if target == "" { "orbitalEscalation" } else { target })
-    {{bin-dir}}{{ if target == "" { "svanes_game_orbital_escalation" } else if target == "erik" { "svanes_game_erik" } else if target == "orbitalEscalation" { "svanes_game_orbital_escalation" } else { "svanes_game_chris" } }}{{exe-suffix}}
+# doubleTime, doubleTime-server, goose, goose-server, OrbitalEscalation, or OrbitalEscalationServer.
+# Anything after the target is passed to the game, e.g.
+# `just run goose --join 127.0.0.1:45000 --port 45002` or `just run goose --server 127.0.0.1`.
+# Leave blank for Orbital Escalation.
+# doubleTime launches two clients at once, since it's a two-player game - point
+# doubleTime-server's host at each other over a network to test with more than
+# one machine.
+# Build and launch an optimized game.
+run target="" *args: (_check-target target) (release
+    if target == "" {
+        "orbitalEscalation"
+    } else {
+        target
+    }
+)
+    {{
+        if target == "doubleTime-host" {
+            "just _run-double-time-host " + release-bin-dir
+        } else if target == "doubleTime" {
+            if args == "p2p" {
+                "just _run-double-time-p2p " + release-bin-dir
+            } else {
+                "just _run-double-time-platform " + release-bin-dir + " " + (if args == "" { "127.0.0.1" } else { args })
+            }
+        } else if target == "doubleTime-spec" {
+            "just _run-double-time-spectator " + release-bin-dir + " " + (if args == "" { "127.0.0.1" } else { args })
+        } else {
+            release-bin-dir + (
+                if target == "" {
+                    "svanes_game_orbital_escalation"
+                } else if target == "goose" {
+                    "svanes_game_goose"
+                } else if target == "goose-server" {
+                    "svanes_game_goose_server"
+                } else if target =~ "^[Oo]rbitalEscalation$" {
+                    "svanes_game_orbital_escalation"
+                } else if target == "OrbitalEscalationServer" {
+                    "svanes_game_orbital_escalation_server"
+                } else if target == "doubleTime-server" {
+                    "svanes_game_double_time_server"
+                } else {
+                    "svanes_game_double_time"
+                }
+            ) + exe-suffix + " " + args
+        }
+    }}
+
+nocompile target="OrbitalEscalation" *args:
+    {{release-bin-dir}}{{if target == "OrbitalEscalationServer" { "svanes_game_orbital_escalation_server" } else if target =~ "^[Oo]rbitalEscalation$" { "svanes_game_orbital_escalation" } else { error("nocompile supports OrbitalEscalation and OrbitalEscalationServer") }}}{{exe-suffix}} {{args}}
+
+debug target="": (_check-target target) (build
+    if target == "" {
+        "orbitalEscalation"
+    } else {
+        target
+    }
+)
+    {{
+        if target == "doubleTime" {
+            "just _run-double-time-duo"
+        } else {
+            bin-dir + (
+                if target == "" {
+                    "svanes_game_orbital_escalation"
+                } else if target == "goose" {
+                    "svanes_game_goose"
+                } else if target == "goose-server" {
+                    "svanes_game_goose_server"
+                } else if target =~ "^[Oo]rbitalEscalation$" {
+                    "svanes_game_orbital_escalation"
+                } else if target == "OrbitalEscalationServer" {
+                    "svanes_game_orbital_escalation_server"
+                } else if target == "doubleTime-server" {
+                    "svanes_game_double_time_server"
+                } else {
+                    "svanes_game_double_time"
+                }
+            ) + exe-suffix
+        }
+    }}
+
+# Launch two doubleTime clients at once, one controlling the character and the
+# other controlling the platform. The first is backgrounded so the second still 
+# blocks the terminal until you close it; the first keeps running until you close 
+# its window too.
+_run-double-time-duo directory=bin-dir:
+    {{
+        if os() == "windows" {
+            "Start-Process -FilePath " + directory
+            + "svanes_game_double_time" + exe-suffix
+            + " -ArgumentList '127.0.0.1 character'"
+        } else {
+            directory + "svanes_game_double_time" + exe-suffix
+            + " 127.0.0.1 character &"
+        }
+    }}
+    {{
+        if os() == "windows" {
+            "& " + directory + "svanes_game_double_time" + exe-suffix
+            + " 127.0.0.1 platform"
+        } else {
+            directory + "svanes_game_double_time" + exe-suffix
+            + " 127.0.0.1 platform"
+        }
+    }}
+
+# Launch three local Double Time P2P peers: character, platform, and spectator.
+_run-double-time-p2p directory=bin-dir:
+    {{
+        if os() == "windows" {
+            "Start-Process -WorkingDirectory " + directory
+            + " -FilePath " + directory + "svanes_game_double_time" + exe-suffix
+            + " -ArgumentList 'p2p 5560'"
+        } else {
+            "cd " + directory + " && ./svanes_game_double_time p2p 5560 &"
+        }
+    }}
+    {{
+        if os() == "windows" {
+            "Start-Process -WorkingDirectory " + directory
+            + " -FilePath " + directory + "svanes_game_double_time" + exe-suffix
+            + " -ArgumentList 'p2p 5561 127.0.0.1'"
+        } else {
+            "cd " + directory + " && ./svanes_game_double_time p2p 5561 127.0.0.1 &"
+        }
+    }}
+    {{
+        if os() == "windows" {
+            "Start-Process -WorkingDirectory " + directory
+            + " -FilePath " + directory + "svanes_game_double_time" + exe-suffix
+            + " -ArgumentList 'p2p 5562 127.0.0.1' -Wait"
+        } else {
+            "cd " + directory + " && ./svanes_game_double_time p2p 5562 127.0.0.1"
+        }
+    }}
+
+_run-double-time-host directory=bin-dir:
+    {{
+        if os() == "windows" {
+            "Start-Process -WorkingDirectory " + directory
+            + " -FilePath " + directory + "svanes_game_double_time_server" + exe-suffix
+        } else {
+            "(cd " + directory + " && ./svanes_game_double_time_server &);"
+        }
+    }}
+    {{
+        if os() == "windows" {
+            "Start-Process -WorkingDirectory " + directory
+            + " -FilePath " + directory + "svanes_game_double_time" + exe-suffix
+            + " -ArgumentList '127.0.0.1 character' -Wait"
+        } else {
+            "cd " + directory + " && ./svanes_game_double_time 127.0.0.1 character"
+        }
+    }}
+
+_run-double-time-platform directory=bin-dir server-host="127.0.0.1":
+    {{
+        if os() == "windows" {
+            "Start-Process -WorkingDirectory " + directory
+            + " -FilePath " + directory + "svanes_game_double_time" + exe-suffix
+            + " -ArgumentList '" + server-host + " platform' -Wait"
+        } else {
+            "cd " + directory + " && ./svanes_game_double_time " + server-host + " platform"
+        }
+    }}
+
+_run-double-time-spectator directory=bin-dir server-host="127.0.0.1":
+    {{
+        if os() == "windows" {
+            "Start-Process -WorkingDirectory " + directory
+            + " -FilePath " + directory + "svanes_game_double_time" + exe-suffix
+            + " -ArgumentList '" + server-host + " spectator' -Wait"
+        } else {
+            "cd " + directory + " && ./svanes_game_double_time " + server-host + " spectator"
+        }
+    }}
 
 # Remove compiled outputs while retaining the configured build tree.
 clean: configure

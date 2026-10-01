@@ -1,0 +1,125 @@
+#pragma once
+
+#include <svanes/vector2d.hpp>
+
+#include <array>
+
+namespace svanes {
+
+struct Transform;
+
+/**
+ * Represents a rectangle defined by its center (x, y) and its dimensions
+ * (width, height). All values are floating-point numbers. Units may not
+ * necessarily be pixels.
+ *
+ * FIELDS:
+ * - x: The x-coordinate of the rectangle's center.
+ * - y: The y-coordinate of the rectangle's center.
+ * - width: The width of the rectangle.
+ * - height: The height of the rectangle.
+ */
+struct Rectangle2D {
+    float x = 0.0F;
+    float y = 0.0F;
+    float width = 0.0F;
+    float height = 0.0F;
+};
+
+/**
+ * Transforms a rectangle from its local coordinates to world coordinates
+ * by applying a translation and rotation defined by a Transform.
+ *
+ * The rectangle specifies its center (x, y) and dimensions (width, height).
+ * The transform specifies where the rectangle's center should be placed in
+ * world coordinates and how it should be rotated around that center.
+ *
+ * @param rectangle The rectangle to be transformed, defined by its center and
+ * dimensions.
+ * @param transform The Transform specifying the translation and rotation to
+ * apply.
+ *
+ * @return The rectangle in world coordinates.
+ */
+Rectangle2D TransformRectangle(Rectangle2D rectangle,
+                               const Transform &transform);
+
+/**
+ * Represents a rectangle in 2D space and provides methods to compute its
+ * corners and bounding box. The rectangle is defined by its center (x, y),
+ * width, height, and rotation angle. The rotation is applied around the center
+ * of the rectangle.
+ */
+class RectangleGeometry final {
+public:
+    /**
+     * Constructs a RectangleGeometry object from a rectangle and a rotation
+     * angle. The rectangle is defined by its center (x, y), width, and height.
+     * The rotation angle is specified in radians and is applied around the
+     * center of the rectangle.
+     *
+     * @param rectangle The rectangle to be represented by this geometry.
+     */
+    RectangleGeometry(Rectangle2D rectangle, float rotation);
+
+    /**
+     * Calculates the axis-aligned bounding box of the rectangle after applying
+     * the rotation.
+     *
+     * That is, given our rectangle and rotation, this function computes the
+     * smallest rectangle that can contain the rotated rectangle while having
+     * its left two corners differ only in the y-coordinate and its right two
+     * corners differ only in the y-coordinate. Or alternatively, its top two
+     * corners differ only in the x-coordinate and its bottom two corners differ
+     * only in the x-coordinate.
+     *
+     * @return A Rectangle2D representing the axis-aligned bounding box of the
+     * rotated rectangle.
+     *
+     * @throws std::invalid_argument if the rectangle's center coordinates or
+     * dimensions are not finite or if the dimensions are not positive.
+     *
+     */
+    Rectangle2D Bounds() const;
+
+    /**
+     * Returns the center of the rectangle in the geometry's coordinates.
+     * The caller can apply a transform to place it in world coordinates.
+     *
+     * Rotating the rectangle around its center does not move that center.
+     *
+     * @return The center of the rectangle.
+     */
+    Vector2D Center() const;
+
+    /**
+     * Returns the four corners of the rectangle after applying the rotation.
+     * The corners are returned in the following order: top-left, top-right,
+     * bottom-right, bottom-left.
+     *
+     * @return An array of four Vector2D objects representing the corners of the
+     * rectangle.
+     */
+    std::array<Vector2D, 4> Corners() const;
+
+private:
+    // Half the width of the rotated rectangle.
+    float half_width;
+
+    // Half the height of the rotated rectangle.
+    float half_height;
+
+    // The x-coordinate of the center of the rectangle.
+    float center_x;
+
+    // The y-coordinate of the center of the rectangle.
+    float center_y;
+
+    // The cosine of the rotation angle.
+    float cosine;
+
+    // The sine of the rotation angle.
+    float sine;
+};
+
+} // namespace svanes
