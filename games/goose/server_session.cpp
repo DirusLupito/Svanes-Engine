@@ -75,9 +75,15 @@ void ServerSession::Update(const svanes::FrameContext& frame, ClockRequest clock
     simulation.CaptureInput(frame, *local);
     input_tics += std::min(frame.real_delta_tics, kMaxInputBacklog - input_tics);
     while (input_tics >= GooseStepTics) {
-        client->Send(EncodeInput(simulation, simulation.TakeInput(), clock));
+        const float unsent_dash = outgoing.dash;
+        outgoing = simulation.TakeInput();
+        if (outgoing.dash == 0.0F) {
+            outgoing.dash = unsent_dash;
+        }
         input_tics -= GooseStepTics;
     }
+    client->Send(EncodeInput(simulation, outgoing, clock));
+    outgoing.dash = 0.0F;
 }
 
 void ServerSession::Handle(const GooseMessage& message)

@@ -172,7 +172,11 @@ run target="" *args: (_check-target target) (release
         if target == "doubleTime-host" {
             "just _run-double-time-host " + release-bin-dir
         } else if target == "doubleTime" {
-            "just _run-double-time-platform " + release-bin-dir + " " + (if args == "" { "127.0.0.1" } else { args })
+            if args == "p2p" {
+                "just _run-double-time-p2p " + release-bin-dir
+            } else {
+                "just _run-double-time-platform " + release-bin-dir + " " + (if args == "" { "127.0.0.1" } else { args })
+            }
         } else if target == "doubleTime-spec" {
             "just _run-double-time-spectator " + release-bin-dir + " " + (if args == "" { "127.0.0.1" } else { args })
         } else {
@@ -252,6 +256,36 @@ _run-double-time-duo directory=bin-dir:
         } else {
             directory + "svanes_game_double_time" + exe-suffix
             + " 127.0.0.1 platform"
+        }
+    }}
+
+# Launch three local Double Time P2P peers: character, platform, and spectator.
+_run-double-time-p2p directory=bin-dir:
+    {{
+        if os() == "windows" {
+            "Start-Process -WorkingDirectory " + directory
+            + " -FilePath " + directory + "svanes_game_double_time" + exe-suffix
+            + " -ArgumentList 'p2p 5560'"
+        } else {
+            "cd " + directory + " && ./svanes_game_double_time p2p 5560 &"
+        }
+    }}
+    {{
+        if os() == "windows" {
+            "Start-Process -WorkingDirectory " + directory
+            + " -FilePath " + directory + "svanes_game_double_time" + exe-suffix
+            + " -ArgumentList 'p2p 5561 127.0.0.1'"
+        } else {
+            "cd " + directory + " && ./svanes_game_double_time p2p 5561 127.0.0.1 &"
+        }
+    }}
+    {{
+        if os() == "windows" {
+            "Start-Process -WorkingDirectory " + directory
+            + " -FilePath " + directory + "svanes_game_double_time" + exe-suffix
+            + " -ArgumentList 'p2p 5562 127.0.0.1' -Wait"
+        } else {
+            "cd " + directory + " && ./svanes_game_double_time p2p 5562 127.0.0.1"
         }
     }}
 

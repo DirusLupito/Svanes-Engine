@@ -35,8 +35,10 @@ just run
 just run goose
 just run orbitalEscalation
 just run OrbitalEscalationServer
+just run doubleTime-host
 just run doubleTime
-just run doubleTime-server
+just run doubleTime-spec
+just run doubleTime p2p
 ```
 
 Use `just debug` instead to build and launch a Debug version:
@@ -47,7 +49,6 @@ just debug goose
 just debug orbitalEscalation
 just debug OrbitalEscalationServer
 just debug doubleTime
-just debug doubleTime-server
 ```
 
 Both commands accept the same game targets and default to Orbital Escalation.
@@ -115,3 +116,19 @@ just nocompile OrbitalEscalation --join 127.0.0.1:45000 --port 45002
 
 Use an existing peer's LAN address when joining from another computer. These
 options also work with `just run OrbitalEscalation` to build before launching.
+### Titled Goose Game (Erik's game) multiplayer
+
+Peer-to-peer: one player hosts, others join any player already in the world.
+Every copy on one computer needs its own `--port`.
+
+```sh
+just run goose
+just run goose --join 127.0.0.1:45000 --port 45002
+```
+
+Client/server: start the headless server, then connect clients to its IP.
+
+```sh
+just run goose-server
+just run goose --server 127.0.0.1
+```

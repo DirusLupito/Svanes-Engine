@@ -55,6 +55,14 @@ public:
      */
     bool ShouldQuit() const override;
 
+    /**
+     * On a goose server, paces the loop at the menu's loop rate, so a slower
+     * client also sends input less often. Peer-to-peer play runs unpaced, since
+     * a slower peer would hold back everyone sharing its lockstep.
+     * @return The interval between frames, or zero for no pacing.
+     */
+    svanes::TicCount GetFrameIntervalTics() const override;
+
 private:
     /**
      * Keeps the camera on the local player and sizes the sky to the view.

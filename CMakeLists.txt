@@ -381,7 +381,11 @@ add_executable(svanes_game_orbital_escalation_server
 )
 target_link_libraries(svanes_game_orbital_escalation_server PRIVATE svanes_orbital_simulation)
 
-add_executable(svanes_game_double_time games/doubleTime/main.cpp games/doubleTime/chris_game.cpp)
+add_executable(svanes_game_double_time
+    games/doubleTime/main.cpp
+    games/doubleTime/chris_game.cpp
+    games/doubleTime/p2p_game.cpp
+)
 target_link_libraries(svanes_game_double_time PRIVATE Svanes::Engine)
 target_link_libraries(svanes_game_double_time PRIVATE SDL3_image::SDL3_image)
 target_compile_definitions(svanes_game_double_time PRIVATE

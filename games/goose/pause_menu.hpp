@@ -7,27 +7,34 @@
 #include <svanes/geometry/rectangle_geometry.hpp>
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 
 /**
  * The menu Escape opens and closes. Q or the Quit button asks to leave.
  *
- * While the local player is alone, the speed row chooses how fast the game
- * runs. The applied speed is filled in and a border marks the highlighted one.
- * Left and Right, or A and D, move the highlight and Enter applies it.
- * Clicking an option highlights and applies it at once. Closing the menu forgets a highlight that was not
- * applied. With other players present the row is greyed out and ignores input.
+ * It has two rows of three options. The game speed row (0.5x, 1x, 2x) works
+ * only while the local player is alone. The loop rate row (30, 60, 120 frames
+ * per second) works only on a goose server, where it changes how often this
+ * client runs its loop and sends input, without affecting anyone else.
  *
- * A label in the corner of the screen shows the speed whenever it is not 1x.
+ * The applied option of each row is filled in, and a border marks the
+ * highlighted one. Up and Down, or W and S, move between enabled rows. Left
+ * and Right, or A and D, move the highlight, and Enter applies it. Clicking an
+ * option highlights and applies it at once. Closing the menu forgets a
+ * highlight that was not applied. A disabled row is greyed out and ignores input.
+ *
+ * A label in the corner of the screen shows any setting that is not 1x.
  */
 class PauseMenu final {
 public:
     /**
      * Creates the menu's shapes and labels, hidden until the menu opens.
      * @param context The world to create them in and the fonts to draw with.
+     * @param on_server Whether this process plays on a goose server, which enables the loop rate row.
      * @throws std::runtime_error if the menu font cannot be loaded.
      */
-    explicit PauseMenu(svanes::GameContext& context);
+    PauseMenu(svanes::GameContext& context, bool on_server);
 
     /**
      * Opens or closes the menu on Escape and, while it is open, handles its keys and clicks.
@@ -37,7 +44,7 @@ public:
     void HandleInput(const svanes::FrameContext& frame, bool alone);
 
     /**
-     * Places the menu and speed label over the current view. Call after the camera has moved.
+     * Places the menu and corner label over the current view. Call after the camera has moved.
      * @param frame The frame's world and camera.
      * @param alone Whether the local player is the only one in the world.
      */
@@ -52,10 +59,13 @@ public:
      */
     bool TakeQuitRequest();
 
-    /** @return The applied speed. */
+    /** @return The applied game speed. */
     GooseSpeed Speed() const;
 
-    /** Returns the game to 1x, as when another player joins. */
+    /** @return The applied loop rate, as a multiple of 60 frames per second. */
+    GooseSpeed LoopRate() const;
+
+    /** Returns the game speed to 1x, as when another player joins. */
     void ResetSpeed();
 
 private:
@@ -73,24 +83,50 @@ private:
     };
 
     /**
+     * A captioned row of three options.
+     * FIELDS:
+     * - buttons: The options, slowest first.
+     * - caption: The entity drawing the row's title.
+     * - applied: The option in effect.
+     */
+    struct Row {
+        std::array<Button, 3> buttons;
+        svanes::Entity caption;
+        GooseSpeed applied = GooseSpeed::Normal;
+    };
+
+    /**
+     * @param row The row's index.
+     * @param alone Whether the local player is the only one in the world.
+     * @return Whether the row accepts input.
+     */
+    bool IsEnabled(std::size_t row, bool alone) const;
+
+    /**
+     * Moves focus to an enabled row and its applied option, if the focused row is disabled.
+     * @param alone Whether the local player is the only one in the world.
+     */
+    void KeepFocusEnabled(bool alone);
+
+    /**
      * Moves the menu's areas so the menu stays centered in the viewport.
      * @param viewport The viewport in screen coordinates.
      */
     void Layout(const svanes::Rectangle2D& viewport);
 
+    bool on_server;
     bool open = false;
     bool quit_requested = false;
-    GooseSpeed speed = GooseSpeed::Normal;
+    std::size_t focused_row = 0;
     GooseSpeed highlighted = GooseSpeed::Normal;
 
     svanes::Rectangle2D backdrop_area{};
     svanes::Entity backdrop{};
     svanes::Entity highlight{};
-    std::array<Button, 3> speed_buttons{};
+    std::array<Row, 2> rows{};
     Button quit_button{};
     svanes::Entity title{};
-    svanes::Entity caption{};
     svanes::Entity note{};
     svanes::Entity hint{};
-    svanes::Entity speed_label{};
+    svanes::Entity corner_label{};
 };

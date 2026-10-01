@@ -14,7 +14,12 @@
 
 namespace {
 
-constexpr std::array<const char*, 3> kSpeedNames{"0.5x", "1x", "2x"};
+constexpr std::size_t kSpeedRow = 0;
+constexpr std::size_t kLoopRateRow = 1;
+constexpr std::array<std::array<const char*, 3>, 2> kOptionNames{{
+    {"0.5x", "1x", "2x"},
+    {"30 fps", "60 fps", "120 fps"},
+}};
 
 constexpr std::int32_t kBackdropZ = 1000;
 constexpr std::int32_t kHighlightZ = 1001;
@@ -166,7 +171,7 @@ void PlaceLabel(
 
 }
 
-PauseMenu::PauseMenu(svanes::GameContext& context)
+PauseMenu::PauseMenu(svanes::GameContext& context, bool on_server) : on_server(on_server)
 {
     const svanes::FontHandle large = LoadMenuFont(context.fonts, kLargeTextPoints);
     const svanes::FontHandle small = LoadMenuFont(context.fonts, kSmallTextPoints);
@@ -174,36 +179,60 @@ PauseMenu::PauseMenu(svanes::GameContext& context)
 
     backdrop = CreateShape(world, kBackdropZ);
     highlight = CreateShape(world, kHighlightZ);
-    for (Button& button : speed_buttons) {
-        button.shape = CreateShape(world, kButtonZ);
-        button.label = CreateLabel(world, large, svanes::TextAlignment::Center);
+    for (Row& row : rows) {
+        row.caption = CreateLabel(world, small, svanes::TextAlignment::Center);
+        for (Button& button : row.buttons) {
+            button.shape = CreateShape(world, kButtonZ);
+            button.label = CreateLabel(world, small, svanes::TextAlignment::Center);
+        }
     }
     quit_button.shape = CreateShape(world, kButtonZ);
     quit_button.label = CreateLabel(world, large, svanes::TextAlignment::Center);
     title = CreateLabel(world, large, svanes::TextAlignment::Center);
-    caption = CreateLabel(world, small, svanes::TextAlignment::Center);
     note = CreateLabel(world, small, svanes::TextAlignment::Center);
     hint = CreateLabel(world, small, svanes::TextAlignment::Center);
-    speed_label = CreateLabel(world, large, svanes::TextAlignment::TopRight);
+    corner_label = CreateLabel(world, large, svanes::TextAlignment::TopRight);
 }
 
 void PauseMenu::Layout(const svanes::Rectangle2D& viewport)
 {
     const float center_x = viewport.width * 0.5F;
     const float center_y = viewport.height * 0.5F;
-    backdrop_area = {center_x, center_y, 480.0F, 400.0F};
-    for (std::size_t index = 0; index < speed_buttons.size(); ++index) {
-        const float offset = (static_cast<float>(index) - 1.0F) * 130.0F;
-        speed_buttons[index].area = {center_x + offset, center_y - 30.0F, 110.0F, 56.0F};
+    backdrop_area = {center_x, center_y + 15.0F, 500.0F, 490.0F};
+    for (std::size_t row = 0; row < rows.size(); ++row) {
+        const float row_y = center_y - 70.0F + static_cast<float>(row) * 110.0F;
+        for (std::size_t index = 0; index < rows[row].buttons.size(); ++index) {
+            const float offset = (static_cast<float>(index) - 1.0F) * 140.0F;
+            rows[row].buttons[index].area = {center_x + offset, row_y, 120.0F, 50.0F};
+        }
     }
-    quit_button.area = {center_x, center_y + 100.0F, 220.0F, 56.0F};
+    quit_button.area = {center_x, center_y + 160.0F, 220.0F, 56.0F};
+}
+
+bool PauseMenu::IsEnabled(std::size_t row, bool alone) const
+{
+    return row == kSpeedRow ? alone : on_server;
+}
+
+void PauseMenu::KeepFocusEnabled(bool alone)
+{
+    if (IsEnabled(focused_row, alone)) {
+        return;
+    }
+    for (std::size_t row = 0; row < rows.size(); ++row) {
+        if (IsEnabled(row, alone)) {
+            focused_row = row;
+            highlighted = rows[row].applied;
+            return;
+        }
+    }
 }
 
 void PauseMenu::HandleInput(const svanes::FrameContext& frame, bool alone)
 {
     if (frame.input.WasPressed(svanes::Key::Escape)) {
         open = !open;
-        highlighted = speed;
+        highlighted = rows[focused_row].applied;
         return;
     }
     if (!open) {
@@ -220,9 +249,18 @@ void PauseMenu::HandleInput(const svanes::FrameContext& frame, bool alone)
     if (frame.input.WasPressed(svanes::Key::Q) || (clicked && Contains(quit_button.area, pointer))) {
         quit_requested = true;
     }
-    if (!alone) {
-        highlighted = speed;
+
+    KeepFocusEnabled(alone);
+    if (!IsEnabled(focused_row, alone)) {
         return;
+    }
+
+    const std::size_t other_row = 1 - focused_row;
+    const bool switch_row = frame.input.WasPressed(svanes::Key::Up) || frame.input.WasPressed(svanes::Key::W) ||
+        frame.input.WasPressed(svanes::Key::Down) || frame.input.WasPressed(svanes::Key::S);
+    if (switch_row && IsEnabled(other_row, alone)) {
+        focused_row = other_row;
+        highlighted = rows[focused_row].applied;
     }
 
     auto index = static_cast<std::size_t>(highlighted);
@@ -230,22 +268,25 @@ void PauseMenu::HandleInput(const svanes::FrameContext& frame, bool alone)
         --index;
     }
     if ((frame.input.WasPressed(svanes::Key::Right) || frame.input.WasPressed(svanes::Key::D)) &&
-        index + 1 < speed_buttons.size()) {
+        index + 1 < kOptionNames[focused_row].size()) {
         ++index;
     }
     bool clicked_option = false;
     if (clicked) {
-        for (std::size_t option = 0; option < speed_buttons.size(); ++option) {
-            if (Contains(speed_buttons[option].area, pointer)) {
-                index = option;
-                clicked_option = true;
+        for (std::size_t row = 0; row < rows.size(); ++row) {
+            for (std::size_t option = 0; option < rows[row].buttons.size(); ++option) {
+                if (IsEnabled(row, alone) && Contains(rows[row].buttons[option].area, pointer)) {
+                    focused_row = row;
+                    index = option;
+                    clicked_option = true;
+                }
             }
         }
     }
     highlighted = static_cast<GooseSpeed>(index);
     if (clicked_option || frame.input.WasPressed(svanes::Key::Enter) ||
         frame.input.WasPressed(svanes::Key::KeypadEnter)) {
-        speed = highlighted;
+        rows[focused_row].applied = highlighted;
     }
 }
 
@@ -253,42 +294,56 @@ void PauseMenu::Draw(const svanes::FrameContext& frame, bool alone)
 {
     const svanes::Rectangle2D viewport = frame.camera.Viewport();
     Layout(viewport);
+    KeepFocusEnabled(alone);
     const float center_x = viewport.width * 0.5F;
     const float center_y = viewport.height * 0.5F;
 
     PlaceShape(frame, backdrop, backdrop_area, Shown(kBackdropColor, open));
-    PlaceLabel(frame.world, title, alone ? "PAUSED" : "MENU", {center_x, center_y - 150.0F}, kTextColor, open);
-    PlaceLabel(frame.world, caption, "Game speed", {center_x, center_y - 90.0F},
-        alone ? kTextColor : kDisabledTextColor, open);
+    PlaceLabel(frame.world, title, alone ? "PAUSED" : "MENU", {center_x, center_y - 195.0F}, kTextColor, open);
 
-    for (std::size_t index = 0; index < speed_buttons.size(); ++index) {
-        const Button& button = speed_buttons[index];
-        svanes::Color fill = kButtonColor;
-        if (!alone) {
-            fill = kDisabledColor;
-        } else if (index == static_cast<std::size_t>(speed)) {
-            fill = kAppliedColor;
+    const std::array<const char*, 2> captions{
+        alone ? "Game speed" : "Game speed - only while playing alone",
+        on_server ? "Loop rate" : "Loop rate - only on a goose server",
+    };
+    for (std::size_t row = 0; row < rows.size(); ++row) {
+        const bool enabled = IsEnabled(row, alone);
+        const svanes::Color text = enabled ? kTextColor : kDisabledTextColor;
+        const float caption_y = rows[row].buttons.front().area.y - 45.0F;
+        PlaceLabel(frame.world, rows[row].caption, captions[row], {center_x, caption_y}, text, open);
+        for (std::size_t index = 0; index < rows[row].buttons.size(); ++index) {
+            const Button& button = rows[row].buttons[index];
+            svanes::Color fill = kButtonColor;
+            if (!enabled) {
+                fill = kDisabledColor;
+            } else if (index == static_cast<std::size_t>(rows[row].applied)) {
+                fill = kAppliedColor;
+            }
+            PlaceShape(frame, button.shape, button.area, Shown(fill, open));
+            PlaceLabel(frame.world, button.label, kOptionNames[row][index], {button.area.x, button.area.y}, text, open);
         }
-        PlaceShape(frame, button.shape, button.area, Shown(fill, open));
-        PlaceLabel(frame.world, button.label, kSpeedNames[index], {button.area.x, button.area.y},
-            alone ? kTextColor : kDisabledTextColor, open);
     }
 
-    const svanes::Rectangle2D& chosen = speed_buttons[static_cast<std::size_t>(highlighted)].area;
+    const bool any_enabled = IsEnabled(focused_row, alone);
+    const svanes::Rectangle2D& chosen = rows[focused_row].buttons[static_cast<std::size_t>(highlighted)].area;
     PlaceShape(frame, highlight,
         {chosen.x, chosen.y, chosen.width + 2.0F * kHighlightBorder, chosen.height + 2.0F * kHighlightBorder},
-        Shown(kHighlightColor, open && alone));
-
-    PlaceLabel(frame.world, note,
-        alone ? "Left/Right to choose, Enter to apply" : "Only available while playing alone",
-        {center_x, center_y + 25.0F}, alone ? kTextColor : kDisabledTextColor, open);
+        Shown(kHighlightColor, open && any_enabled));
+    PlaceLabel(frame.world, note, "Up/Down row, Left/Right choose, Enter apply",
+        {center_x, center_y + 100.0F}, kTextColor, open && any_enabled);
 
     PlaceShape(frame, quit_button.shape, quit_button.area, Shown(kQuitColor, open));
     PlaceLabel(frame.world, quit_button.label, "Quit (Q)", {quit_button.area.x, quit_button.area.y}, kTextColor, open);
-    PlaceLabel(frame.world, hint, "Esc to resume", {center_x, center_y + 165.0F}, kTextColor, open);
+    PlaceLabel(frame.world, hint, "Esc to resume", {center_x, center_y + 225.0F}, kTextColor, open);
 
-    PlaceLabel(frame.world, speed_label, kSpeedNames[static_cast<std::size_t>(speed)],
-        {viewport.width - kCornerMargin, kCornerMargin}, kTextColor, speed != GooseSpeed::Normal);
+    std::string corner;
+    for (std::size_t row = 0; row < rows.size(); ++row) {
+        if (rows[row].applied != GooseSpeed::Normal) {
+            corner += corner.empty() ? "" : "  ";
+            corner += kOptionNames[row][static_cast<std::size_t>(rows[row].applied)];
+        }
+    }
+    PlaceLabel(frame.world, corner_label, corner, {viewport.width - kCornerMargin, kCornerMargin}, kTextColor,
+        !corner.empty());
 }
 
 bool PauseMenu::IsOpen() const
@@ -305,11 +360,18 @@ bool PauseMenu::TakeQuitRequest()
 
 GooseSpeed PauseMenu::Speed() const
 {
-    return speed;
+    return rows[kSpeedRow].applied;
+}
+
+GooseSpeed PauseMenu::LoopRate() const
+{
+    return rows[kLoopRateRow].applied;
 }
 
 void PauseMenu::ResetSpeed()
 {
-    speed = GooseSpeed::Normal;
-    highlighted = GooseSpeed::Normal;
+    rows[kSpeedRow].applied = GooseSpeed::Normal;
+    if (focused_row == kSpeedRow) {
+        highlighted = GooseSpeed::Normal;
+    }
 }
