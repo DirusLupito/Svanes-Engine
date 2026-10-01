@@ -34,8 +34,10 @@ Regardless of whether or not you use Visual Studio, you can build and launch opt
 just run
 just run goose
 just run orbitalEscalation
+just run doubleTime-host
 just run doubleTime
-just run doubleTime-server
+just run doubleTime-spec
+just run doubleTime p2p
 ```
 
 Use `just debug` instead to build and launch a Debug version:
@@ -45,7 +47,6 @@ just debug
 just debug goose
 just debug orbitalEscalation
 just debug doubleTime
-just debug doubleTime-server
 ```
 
 Both commands accept the same game targets and default to Orbital Escalation.
