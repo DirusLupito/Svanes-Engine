@@ -1,3 +1,7 @@
+# List available commands.
+default:
+    @just --list
+
 set windows-shell := ["powershell.exe", "-NoLogo", "-NoProfile", "-Command"]
 
 cmake := if os() == "windows" {
@@ -48,9 +52,6 @@ exe-suffix := if os() == "windows" {
 } else {
     ""
 }
-
-default:
-    @just --list
 
 # Verify CMake, the compiler/generator, and vendored third-party sources are present.
 check-deps:
@@ -200,9 +201,11 @@ run target="" *args: (_check-target target) (release
         }
     }}
 
+# Launch an existing Release Orbital Escalation client or server without compiling.
 nocompile target="OrbitalEscalation" *args:
     {{release-bin-dir}}{{if target == "OrbitalEscalationServer" { "svanes_game_orbital_escalation_server" } else if target =~ "^[Oo]rbitalEscalation$" { "svanes_game_orbital_escalation" } else { error("nocompile supports OrbitalEscalation and OrbitalEscalationServer") }}}{{exe-suffix}} {{args}}
 
+# Configure, build, and launch a game with debug symbols and no optimizations.
 debug target="": (_check-target target) (build
     if target == "" {
         "orbitalEscalation"
