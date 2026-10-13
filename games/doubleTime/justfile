@@ -1,0 +1,137 @@
+default:
+    @just --justfile "{{justfile()}}" --list
+
+set working-directory := "../.."
+
+import '../../scripts/common.just'
+
+build target="doubleTime": (_check-target target) (_build if target == "doubleTime-host" { "svanes_game_double_time_server svanes_game_double_time" } else if target == "doubleTime-server" { "svanes_game_double_time_server" } else { "svanes_game_double_time" })
+
+release target="doubleTime": (_check-target target) (_release if target == "doubleTime-host" { "svanes_game_double_time_server svanes_game_double_time" } else if target == "doubleTime-server" { "svanes_game_double_time_server" } else { "svanes_game_double_time" })
+
+run target="doubleTime" *args: (release target)
+    {{
+        if target == "doubleTime-host" {
+            'just --justfile "' + justfile() + '" _run-double-time-host ' + release-bin-dir
+        } else if target == "doubleTime" {
+            if args == "p2p" {
+                'just --justfile "' + justfile() + '" _run-double-time-p2p ' + release-bin-dir
+            } else {
+                'just --justfile "' + justfile() + '" _run-double-time-platform ' + release-bin-dir + " " + (if args == "" { "127.0.0.1" } else { args })
+            }
+        } else if target == "doubleTime-spec" {
+            'just --justfile "' + justfile() + '" _run-double-time-spectator ' + release-bin-dir + " " + (if args == "" { "127.0.0.1" } else { args })
+        } else {
+            release-bin-dir + "svanes_game_double_time_server" + exe-suffix + " " + args
+        }
+    }}
+
+debug target="doubleTime": (build target)
+    {{
+        if target == "doubleTime" {
+            'just --justfile "' + justfile() + '" _run-double-time-duo'
+        } else {
+            bin-dir + (if target == "doubleTime-server" { "svanes_game_double_time_server" } else { "svanes_game_double_time" }) + exe-suffix
+        }
+    }}
+
+package target="doubleTime": (_check-target target) (_package target)
+
+_check-target target:
+    @{{if target =~ "^doubleTime(-server|-host|-spec)?$" { "" } else { error("no Double Time target named '" + target + "'. Try doubleTime, doubleTime-server, doubleTime-host, or doubleTime-spec.") }}}
+
+# Launch two doubleTime clients at once, one controlling the character and the
+# other controlling the platform. The first is backgrounded so the second still 
+# blocks the terminal until you close it; the first keeps running until you close 
+# its window too.
+_run-double-time-duo directory=bin-dir:
+    {{
+        if os() == "windows" {
+            "Start-Process -FilePath " + directory
+            + "svanes_game_double_time" + exe-suffix
+            + " -ArgumentList '127.0.0.1 character'"
+        } else {
+            directory + "svanes_game_double_time" + exe-suffix
+            + " 127.0.0.1 character &"
+        }
+    }}
+    {{
+        if os() == "windows" {
+            "& " + directory + "svanes_game_double_time" + exe-suffix
+            + " 127.0.0.1 platform"
+        } else {
+            directory + "svanes_game_double_time" + exe-suffix
+            + " 127.0.0.1 platform"
+        }
+    }}
+
+# Launch three local Double Time P2P peers: character, platform, and spectator.
+_run-double-time-p2p directory=bin-dir:
+    {{
+        if os() == "windows" {
+            "Start-Process -WorkingDirectory " + directory
+            + " -FilePath " + directory + "svanes_game_double_time" + exe-suffix
+            + " -ArgumentList 'p2p 5560'"
+        } else {
+            "cd " + directory + " && ./svanes_game_double_time p2p 5560 &"
+        }
+    }}
+    {{
+        if os() == "windows" {
+            "Start-Process -WorkingDirectory " + directory
+            + " -FilePath " + directory + "svanes_game_double_time" + exe-suffix
+            + " -ArgumentList 'p2p 5561 127.0.0.1'"
+        } else {
+            "cd " + directory + " && ./svanes_game_double_time p2p 5561 127.0.0.1 &"
+        }
+    }}
+    {{
+        if os() == "windows" {
+            "Start-Process -WorkingDirectory " + directory
+            + " -FilePath " + directory + "svanes_game_double_time" + exe-suffix
+            + " -ArgumentList 'p2p 5562 127.0.0.1' -Wait"
+        } else {
+            "cd " + directory + " && ./svanes_game_double_time p2p 5562 127.0.0.1"
+        }
+    }}
+
+_run-double-time-host directory=bin-dir:
+    {{
+        if os() == "windows" {
+            "Start-Process -WorkingDirectory " + directory
+            + " -FilePath " + directory + "svanes_game_double_time_server" + exe-suffix
+        } else {
+            "(cd " + directory + " && ./svanes_game_double_time_server &);"
+        }
+    }}
+    {{
+        if os() == "windows" {
+            "Start-Process -WorkingDirectory " + directory
+            + " -FilePath " + directory + "svanes_game_double_time" + exe-suffix
+            + " -ArgumentList '127.0.0.1 character' -Wait"
+        } else {
+            "cd " + directory + " && ./svanes_game_double_time 127.0.0.1 character"
+        }
+    }}
+
+_run-double-time-platform directory=bin-dir server-host="127.0.0.1":
+    {{
+        if os() == "windows" {
+            "Start-Process -WorkingDirectory " + directory
+            + " -FilePath " + directory + "svanes_game_double_time" + exe-suffix
+            + " -ArgumentList '" + server-host + " platform' -Wait"
+        } else {
+            "cd " + directory + " && ./svanes_game_double_time " + server-host + " platform"
+        }
+    }}
+
+_run-double-time-spectator directory=bin-dir server-host="127.0.0.1":
+    {{
+        if os() == "windows" {
+            "Start-Process -WorkingDirectory " + directory
+            + " -FilePath " + directory + "svanes_game_double_time" + exe-suffix
+            + " -ArgumentList '" + server-host + " spectator' -Wait"
+        } else {
+            "cd " + directory + " && ./svanes_game_double_time " + server-host + " spectator"
+        }
+    }}

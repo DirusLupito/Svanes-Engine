@@ -19,7 +19,13 @@ After cloning the repository, open a terminal in its root directory and run:
 
 ```sh
 just fetch-deps
-just build
+```
+
+Then build your desired game:
+```sh
+just --justfile games/doubleTime/justfile build
+just --justfile games/goose/justfile build
+just --justfile games/orbitalEscalation/justfile build
 ```
 
 On Windows, CMake generates the Visual Studio solution during this process. Open
@@ -31,34 +37,38 @@ the solution matching the Visual Studio version selected by the build scripts:
 Regardless of whether or not you use Visual Studio, you can build and launch optimized Release versions of the games from the command line:
 
 ```sh
-just run
-just run goose
-just run orbitalEscalation
-just run OrbitalEscalationServer
-just run doubleTime-host
-just run doubleTime
-just run doubleTime-spec
-just run doubleTime p2p
+just --justfile games/orbitalEscalation/justfile run
+just --justfile games/orbitalEscalation/justfile run OrbitalEscalationServer
+just --justfile games/goose/justfile run
+just --justfile games/doubleTime/justfile run doubleTime-host
+just --justfile games/doubleTime/justfile run
+just --justfile games/doubleTime/justfile run doubleTime-spec
+just --justfile games/doubleTime/justfile run doubleTime p2p
 ```
 
 Use `just debug` instead to build and launch a Debug version:
 
 ```sh
-just debug
-just debug goose
-just debug orbitalEscalation
-just debug OrbitalEscalationServer
-just debug doubleTime
+just --justfile games/orbitalEscalation/justfile debug
+just --justfile games/orbitalEscalation/justfile debug OrbitalEscalationServer
+just --justfile games/goose/justfile debug
+just --justfile games/doubleTime/justfile debug
 ```
 
-Both commands accept the same game targets and default to Orbital Escalation.
-To build without launching, use `just release [target]` for Release or
-`just build [target]` for Debug. Omit the target to build all games.
+You can also run `just` from a game's directory if you don't want to specify `--justfile`.
+Running `just build`, `just release`, `just run`, or `just debug` from a game
+directory defaults to that game. For example:
+
+```sh
+just build
+just run
+just run doubleTime p2p
+```
 
 ## Orbital Escalation multiplayer
 
 Orbital Escalation supports both a dedicated server and P2P. Run the commands
-below from the repository root, with each running process in its own terminal.
+below from `games/orbitalEscalation`, with each running process in its own terminal.
 
 ### Dedicated server
 
@@ -117,6 +127,8 @@ just nocompile OrbitalEscalation --join 127.0.0.1:45000 --port 45002
 Use an existing peer's LAN address when joining from another computer. These
 options also work with `just run OrbitalEscalation` to build before launching.
 ### Titled Goose Game (Erik's game) multiplayer
+
+Run the commands below from `games/goose`.
 
 Peer-to-peer: one player hosts, others join any player already in the world.
 Every copy on one computer needs its own `--port`.

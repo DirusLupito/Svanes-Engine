@@ -1,0 +1,21 @@
+default:
+    @just --justfile "{{justfile()}}" --list
+
+set working-directory := "../.."
+
+import '../../scripts/common.just'
+
+build target="goose": (_check-target target) (_build if target == "goose-server" { "svanes_game_goose_server" } else { "svanes_game_goose" })
+
+release target="goose": (_check-target target) (_release if target == "goose-server" { "svanes_game_goose_server" } else { "svanes_game_goose" })
+
+run target="goose" *args: (release target)
+    {{release-bin-dir}}{{if target == "goose-server" { "svanes_game_goose_server" } else { "svanes_game_goose" }}}{{exe-suffix}} {{args}}
+
+debug target="goose": (build target)
+    {{bin-dir}}{{if target == "goose-server" { "svanes_game_goose_server" } else { "svanes_game_goose" }}}{{exe-suffix}}
+
+package target="goose": (_check-target target) (_package target)
+
+_check-target target:
+    @{{if target =~ "^goose(-server)?$" { "" } else { error("no goose target named '" + target + "'. Try goose or goose-server.") }}}
