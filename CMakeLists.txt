@@ -148,6 +148,11 @@ block(SCOPE_FOR VARIABLES)
     FetchContent_MakeAvailable(cppzmq)
 endblock()
 
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/$<CONFIG>")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/$<CONFIG>")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/$<CONFIG>")
+
 add_library(svanes_engine STATIC)
 add_library(Svanes::Engine ALIAS svanes_engine)
 
@@ -275,141 +280,6 @@ else()
     target_compile_options(svanes_engine PUBLIC -ffp-contract=off)
 endif()
 
-add_executable(
-    svanes_game_goose
-    games/goose/main.cpp
-    games/goose/goose_game.cpp
-    games/goose/pause_menu.cpp
-    games/goose/goose_session.cpp
-    games/goose/peer_session.cpp
-    games/goose/server_session.cpp
-    games/goose/server_protocol.cpp
-    games/goose/goose.cpp
-    games/goose/goose_simulation.cpp
-    games/goose/enemy.cpp
-    games/goose/bullets.cpp
-)
-target_link_libraries(svanes_game_goose PRIVATE Svanes::Engine)
-target_compile_definitions(svanes_game_goose PRIVATE
-    GOOSE_ASSETS_DIR="assets/goose"
-)
-
-add_executable(
-    svanes_game_goose_server
-    games/goose/goose_server.cpp
-    games/goose/goose_session.cpp
-    games/goose/server_protocol.cpp
-    games/goose/goose.cpp
-    games/goose/goose_simulation.cpp
-    games/goose/enemy.cpp
-    games/goose/bullets.cpp
-)
-target_link_libraries(svanes_game_goose_server PRIVATE Svanes::Engine)
-target_compile_definitions(svanes_game_goose_server PRIVATE
-    GOOSE_ASSETS_DIR="assets/goose"
-)
-
-add_library(
-    svanes_orbital_simulation STATIC
-    games/orbitalEscalation/attachment_system.cpp
-    games/orbitalEscalation/attachment_system.hpp
-    games/orbitalEscalation/propulsion_system.cpp
-    games/orbitalEscalation/propulsion_system.hpp
-    games/orbitalEscalation/combat/damage_system.cpp
-    games/orbitalEscalation/combat/damage_system.hpp
-    games/orbitalEscalation/game_objects/owned_entity.cpp
-    games/orbitalEscalation/game_objects/owned_entity.hpp
-    games/orbitalEscalation/serialization/geometry_serialization.cpp
-    games/orbitalEscalation/serialization/geometry_serialization.hpp
-    games/orbitalEscalation/serialization/json.cpp
-    games/orbitalEscalation/serialization/json.hpp
-    games/orbitalEscalation/combat/weapon_system.cpp
-    games/orbitalEscalation/combat/weapon_system.hpp
-    games/orbitalEscalation/combat/missile_system.cpp
-    games/orbitalEscalation/combat/missile_system.hpp
-    games/orbitalEscalation/effects/collision_flashes.cpp
-    games/orbitalEscalation/effects/collision_flashes.hpp
-    games/orbitalEscalation/game_objects/dynamic_object/missile_launcher.cpp
-    games/orbitalEscalation/game_objects/dynamic_object/missile_launcher.hpp
-    games/orbitalEscalation/serialization/missile_launcher_serialization.cpp
-    games/orbitalEscalation/serialization/missile_launcher_serialization.hpp
-    games/orbitalEscalation/serialization/world_snapshot.cpp
-    games/orbitalEscalation/serialization/world_snapshot.hpp
-    games/orbitalEscalation/serialization/asset_catalog.cpp
-    games/orbitalEscalation/serialization/asset_catalog.hpp
-    games/orbitalEscalation/serialization/dynamic_object_serialization.cpp
-    games/orbitalEscalation/serialization/dynamic_object_serialization.hpp
-    games/orbitalEscalation/serialization/missile_serialization.cpp
-    games/orbitalEscalation/serialization/missile_serialization.hpp
-    games/orbitalEscalation/game_objects/dynamic_object/missile.cpp
-    games/orbitalEscalation/game_objects/dynamic_object/missile.hpp
-    games/orbitalEscalation/serialization/ship_serialization.cpp
-    games/orbitalEscalation/serialization/ship_serialization.hpp
-    games/orbitalEscalation/orbital_simulation.cpp
-    games/orbitalEscalation/orbital_simulation.hpp
-    games/orbitalEscalation/game_objects/dynamic_object/dynamic_object.cpp
-    games/orbitalEscalation/game_objects/dynamic_object/dynamic_object.hpp
-    games/orbitalEscalation/game_objects/dynamic_object/ship.cpp
-    games/orbitalEscalation/game_objects/dynamic_object/ship.hpp
-    games/orbitalEscalation/game_objects/planet.cpp
-    games/orbitalEscalation/game_objects/planet.hpp
-    games/orbitalEscalation/controls.cpp
-    games/orbitalEscalation/controls.hpp
-    games/orbitalEscalation/game_objects/visuals.cpp
-    games/orbitalEscalation/game_objects/visuals.hpp
-)
-FetchContent_Declare(
-    nlohmann_json
-    URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz
-    URL_HASH SHA256=42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa
-    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-    SOURCE_DIR "${CMAKE_SOURCE_DIR}/thirdparty/nlohmann_json-src"
-)
-FetchContent_MakeAvailable(nlohmann_json)
-target_link_libraries(svanes_orbital_simulation PUBLIC
-    Svanes::Engine nlohmann_json::nlohmann_json
-)
-add_executable(svanes_game_orbital_escalation
-    games/orbitalEscalation/main.cpp
-    games/orbitalEscalation/orbital_escalation_game.cpp
-)
-target_link_libraries(svanes_game_orbital_escalation PRIVATE svanes_orbital_simulation)
-add_executable(svanes_game_orbital_escalation_server
-    games/orbitalEscalation/server_main.cpp
-    games/orbitalEscalation/OrbitalEscalationServer.hpp
-    games/orbitalEscalation/OrbitalEscalationServer.cpp
-)
-target_link_libraries(svanes_game_orbital_escalation_server PRIVATE svanes_orbital_simulation)
-
-add_executable(svanes_game_double_time
-    games/doubleTime/main.cpp
-    games/doubleTime/chris_game.cpp
-    games/doubleTime/p2p_game.cpp
-)
-target_link_libraries(svanes_game_double_time PRIVATE Svanes::Engine)
-target_link_libraries(svanes_game_double_time PRIVATE SDL3_image::SDL3_image)
-target_compile_definitions(svanes_game_double_time PRIVATE
-    DOUBLE_TIME_GAME_ASSETS_DIR="assets/doubleTime"
-)
-
-add_executable(svanes_game_double_time_server games/doubleTime/server_main.cpp)
-target_link_libraries(svanes_game_double_time_server PRIVATE Svanes::Engine)
-target_link_libraries(svanes_game_double_time_server PRIVATE SDL3_image::SDL3_image)
-target_compile_definitions(svanes_game_double_time_server PRIVATE
-    DOUBLE_TIME_GAME_ASSETS_DIR="assets/doubleTime"
-)
-
-set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT svanes_game_orbital_escalation)
-
-set_target_properties(
-    svanes_engine svanes_game_goose svanes_game_goose_server svanes_game_orbital_escalation svanes_orbital_simulation svanes_game_orbital_escalation_server svanes_game_double_time svanes_game_double_time_server
-    PROPERTIES
-        CXX_EXTENSIONS OFF
-        ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/$<CONFIG>"
-        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/$<CONFIG>"
-        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/$<CONFIG>"
-)
-
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FILES
     include/svanes/application.hpp
     include/svanes/async/async_parallel_for_driver.hpp
@@ -517,9 +387,9 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
 )
 
 include(cmake/game_packages.cmake)
-svanes_game_package(svanes_game_goose goose goose goose)
-svanes_game_package(svanes_game_goose_server goose-server goose goose)
-svanes_game_package(svanes_game_orbital_escalation orbitalEscalation orbitalEscalation orbitalEscalation)
-add_dependencies(svanes_game_orbital_escalation_server svanes_game_orbital_escalation_assets)
-svanes_game_package(svanes_game_double_time doubleTime doubleTime doubleTime)
-svanes_game_package(svanes_game_double_time_server doubleTime-server doubleTime doubleTime)
+
+add_subdirectory(games/goose)
+add_subdirectory(games/orbitalEscalation)
+add_subdirectory(games/doubleTime)
+
+set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT svanes_game_orbital_escalation)
