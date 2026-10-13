@@ -74,8 +74,9 @@ we should avoid it.
   `just` as the command runner. Windows prefers `windows-msvc` (Visual
   Studio 2026) and falls back to `windows-vs2022`; `linux-gcc` and
   `macos-clang` use Ninja Multi-Config — see `CMakePresets.json`.
-- `just check-deps`, `just build`, `just run`, `just release`, `just clean`,
-  `just fetch-deps` work identically on all three platforms.
+- Root commands `just check-deps`, `just configure`, `just clean`, and
+  `just fetch-deps` work identically on all three platforms. Game commands
+  `just build`, `just run`, and `just release` live in each game's directory.
 - Third-party sources are cached in `thirdparty/` (gitignored except
   `README.md`) so they aren't re-downloaded on every clean build.
 - C++23, no compiler extensions (`CXX_EXTENSIONS OFF`).
