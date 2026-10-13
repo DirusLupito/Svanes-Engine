@@ -3,123 +3,78 @@
 #include <svanes/network/network_message.hpp>
 
 #include <string>
-#include <vector>
 
 namespace svanes {
 
 /**
- * A unique identifier for a connection in a message pipe.
+ * Represents one local endpoint of a unidirectional message pipe.
+ * 
+ * Message pipes give an API to implement a digraph of message routes. Visualize
+ * each application as a vertex, and then a MsgPipe is a directed edge that can be used to
+ * send messages from one vertex to another.
+ * 
+ * A successful Listen configures an object to receive only. A successful Connect
+ * configures an object to send only. Calling Send on a receiving object or Receive
+ * on a sending object throws std::logic_error. Before successful setup and after
+ * Close, both Send and Receive throw std::logic_error.
  *
- * FIELDS:
- * - value: The local connection id. Zero is invalid.
- *
- * Two connection ids compare equal when their values match.
- */
-struct ConnectionId {
-    std::uint32_t value = 0;
-
-    bool operator==(const ConnectionId &) const = default;
-};
-
-/**
- * The received message including the source connection id and the message itself.
- *
- * FIELDS:
- * - source: The connection that sent the message.
- * - message: The received bytes.
- */
-struct ReceivedMessage {
-    ConnectionId source;
-    NetworkMessage message;
-};
-
-/**
- * Abstraction for a network message pipe to send messages between
- * clients and servers. All concrete implementations of this interface
- * must include an implementation of the Send and Receive functions.
- * Any code that uses a message pipe should be able to switch between
- * different types of message pipes fairly seamlessly.
+ * For bidirectional communication, node A calls Connect to B, and node B calls
+ * Listen to receive messages from A. The reverse edge uses separate MsgPipe
+ * objects. That is, B calls Connect to A, and A calls Listen to receive messages from B.
  */
 class MsgPipe {
 public:
+
     /**
-     * Virtual destructor for deleting a message pipe.
+     * Virtual destructor to allow derived classes to clean up resources.
      */
     virtual ~MsgPipe() = default;
 
     /**
-     * Sends a message to every known connection, rather than to one chosen
-     * destination as the other Send overload does.
-     * Checks and verification are the responsibility of the concrete implementations.
-     *
-     * @param message The content to be sent through the message pipe.
-     * @return Whether every connection accepted the send. False if the pipe has
-     * no connections, or if any one of them refused.
+     * Starts listening for incoming connections on the specified address.
+     * The receiving direction is established only if this call succeeds.
+     * 
+     * @param address The address to listen on. The format of the address is implementation-defined.
      */
-    bool Send(const NetworkMessage &message);
+    virtual void Listen(const std::string &address) = 0;
 
     /**
-     * Receives a message from any connection, discarding which one sent it.
-     * The other Receive overload reports the source connection id as well.
-     * Checks and verification are the responsibility of the concrete implementations.
-     *
-     * @param message The content to be received through the message pipe.
-     * @return Whether a message was received. False means none is available.
+     * Connects to a remote address. The format of the address is implementation-defined.
+     * The sending direction is established only if this call succeeds.
+     * 
+     * @param address The address to connect to.
      */
-    bool Receive(NetworkMessage &message);
+    virtual void Connect(const std::string &address) = 0;
+
 
     /**
-     * Sends a message to the given connection id.
-     *
-     * @param destination The connection to send to.
-     * @param message The bytes to send.
-     * @return Whether the transport accepted the send, not confirmation of delivery.
-     * @throws std::invalid_argument if the connection id is unknown.
+     * Sends a message to the connected peer.
+     * 
+     * @param message The message to send.
+     * 
+     * @return True if the message was accepted for sending, false otherwise.
+     * 
+     * @throws std::logic_error if the pipe is configured to receive, has not
+     * successfully connected, or has been closed.
      */
-    virtual bool Send(ConnectionId destination,
-                      const NetworkMessage &message) = 0;
+    virtual bool Send(const NetworkMessage &message) = 0;
 
     /**
-     * Receives a message from any connection, returning the source connection id
-     * and the message itself.
-     *
-     * @param received Receives the source and bytes when a message is available.
-     * @return Whether a message was received. False means none is available.
+     * Receives a message from the connected peer.
+     * 
+     * @param message The message to receive.
+     * @return True if a message was received, false otherwise.
+     * @throws std::logic_error if the pipe is configured to send, has not
+     * successfully started listening, or has been closed.
      */
-    virtual bool Receive(ReceivedMessage &received) = 0;
+    virtual bool Receive(NetworkMessage &message) = 0;
 
     /**
-     * Returns a list of all known connection ids.
-     *
-     * @return The connection ids belonging to this pipe.
+     * Closes the message pipe, releasing any resources associated with it.
+     * Idempotent in that calling Close multiple times has no additional effect.
+     * After closing, both Send and Receive throw std::logic_error.
      */
-    std::vector<ConnectionId> Connections() const;
-
-protected:
-    /**
-     * Stores a connection route and returns its connection id. If the route is
-     * already known, the existing connection id is returned.
-     *
-     * @param route The transport address or routing identity to store.
-     * @return The connection id assigned to the route.
-     * @throws std::overflow_error if no more connection ids are available.
-     */
-    ConnectionId RememberConnection(const std::string &route);
-
-    /**
-     * Gets the route for a given connection id.
-     *
-     * @param connection The connection to look up.
-     * @return The stored transport address or routing identity.
-     * @throws std::invalid_argument if the connection id is unknown.
-     */
-    const std::string &Route(ConnectionId connection) const;
-
-private:
-    /**
-     * Stores the routes for all known connections.
-     */
-    std::vector<std::string> routes;
+    virtual void Close() = 0;
 };
 
 } // namespace svanes
