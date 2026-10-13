@@ -8,23 +8,23 @@ namespace svanes {
 
 /**
  * Represents one local endpoint of a unidirectional message pipe.
- * 
+ *
  * Message pipes give an API to implement a digraph of message routes. Visualize
- * each application as a vertex, and then a MsgPipe is a directed edge that can be used to
- * send messages from one vertex to another.
- * 
- * A successful Listen configures an object to receive only. A successful Connect
- * configures an object to send only. Calling Send on a receiving object or Receive
- * on a sending object throws std::logic_error. Before successful setup and after
- * Close, both Send and Receive throw std::logic_error.
+ * each application as a vertex, and then a MsgPipe is a directed edge that can
+ * be used to send messages from one vertex to another.
+ *
+ * A successful Listen configures an object to receive only. A successful
+ * Connect configures an object to send only. Calling Send on a receiving object
+ * or Receive on a sending object throws std::logic_error. Before successful
+ * setup and after Close, both Send and Receive throw std::logic_error.
  *
  * For bidirectional communication, node A calls Connect to B, and node B calls
  * Listen to receive messages from A. The reverse edge uses separate MsgPipe
- * objects. That is, B calls Connect to A, and A calls Listen to receive messages from B.
+ * objects. That is, B calls Connect to A, and A calls Listen to receive
+ * messages from B.
  */
 class MsgPipe {
 public:
-
     /**
      * Virtual destructor to allow derived classes to clean up resources.
      */
@@ -33,15 +33,17 @@ public:
     /**
      * Starts listening for incoming connections on the specified address.
      * The receiving direction is established only if this call succeeds.
-     * 
-     * @param address The address to listen on. The format of the address is implementation-defined.
+     *
+     * @param address The address to listen on. The format of the address is
+     * implementation-defined.
      */
     virtual void Listen(const std::string &address) = 0;
 
     /**
-     * Connects to a remote address. The format of the address is implementation-defined.
-     * The sending direction is established only if this call succeeds.
-     * 
+     * Connects to a remote address. The format of the address is
+     * implementation-defined. The sending direction is established only if this
+     * call succeeds.
+     *
      * @param address The address to connect to.
      */
     virtual void Connect(const std::string &address) = 0;
@@ -49,11 +51,11 @@ public:
 
     /**
      * Sends a message to the connected peer.
-     * 
+     *
      * @param message The message to send.
-     * 
+     *
      * @return True if the message was accepted for sending, false otherwise.
-     * 
+     *
      * @throws std::logic_error if the pipe is configured to receive, has not
      * successfully connected, or has been closed.
      */
@@ -61,7 +63,7 @@ public:
 
     /**
      * Receives a message from the connected peer.
-     * 
+     *
      * @param message The message to receive.
      * @return True if a message was received, false otherwise.
      * @throws std::logic_error if the pipe is configured to send, has not
