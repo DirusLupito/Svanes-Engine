@@ -96,8 +96,9 @@ void UdpMsgPipe::Connect(const std::string &address) {
         }
     }
 
-    // ZMQ_DGRAM does not support connect, so the destination is stored locally
-    // and the sending socket is bound to an available local port.
+    // ZMQ_DGRAM requires a destination address with each send, but the 0mq
+    // socket does not store the destination for us. So we store it in this pipe
+    // to supply as the address frame for each Send.
 
     // Append the port to the normalized IPv4 address, giving IPv4:PORT.
     canonical += ':' + std::to_string(port);

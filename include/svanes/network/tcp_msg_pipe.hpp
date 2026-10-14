@@ -4,7 +4,6 @@
 
 #include <zmq.hpp>
 
-#include <cstdint>
 #include <string>
 
 namespace svanes {
@@ -14,7 +13,7 @@ namespace svanes {
  * Uses a ZMQ_PULL socket to receive and a ZMQ_PUSH socket to send raw
  * messages, one message per frame.
  *
- * Call Listen, Connect, Port, Send, Receive, and Close on the same thread.
+ * Call Listen, Connect, Send, Receive, and Close on the same thread.
  */
 class TcpMsgPipe final : public MsgPipe {
 public:
@@ -26,11 +25,11 @@ public:
     /**
      * Starts listening for incoming TCP connections on the specified address.
      * The receiving direction is established only if this call succeeds.
-     * Any number of connecting pipes may send to one listening pipe.
+     * Assumes one sending pipe per listening pipe. Traffic from
+     * additional senders is undefined behavior.
      *
      * @param address The address to listen on, in HOST:PORT form. Use *:PORT
-     * to listen on all local interfaces, and *:0 to let the OS pick an
-     * available port (Port returns the chosen port).
+     * to listen on all local interfaces.
      *
      * @throws std::logic_error if the pipe is already configured. Call Close
      * before configuring it again.
@@ -42,8 +41,6 @@ public:
     /**
      * Connects to a remote listening pipe at the specified address.
      * The sending direction is established only if this call succeeds.
-     * The TCP connection itself is made in the background, so success does
-     * not mean that the remote pipe is listening yet.
      *
      * @param address The address to connect to, in HOST:PORT form. HOST may
      * be an IPv4 address or a hostname.
@@ -57,22 +54,9 @@ public:
     void Connect(const std::string &address) override;
 
     /**
-     * Finds the pipe's endpoint port so a joining client can be directed to it.
-     *
-     * @return The local listening port, or the destination port for a
-     * connecting pipe.
-     *
-     * @throws std::logic_error if the pipe has not successfully started
-     * listening or connected, or has been closed.
-     *
-     * @throws zmq::error_t if the endpoint cannot be queried.
-     */
-    std::uint16_t Port() const;
-
-    /**
      * Sends a message to the connected peer as one frame.
      * Nonblocking, so this could return false if 0mq's internal buffers are
-     * full or the TCP connection has not been made yet.
+     * full. Messages can be queued before the TCP connection has been made.
      *
      * @param message The message to send.
      *
@@ -87,7 +71,7 @@ public:
     bool Send(const NetworkMessage &message) override;
 
     /**
-     * Receives one message from any pipe connected to this listening pipe.
+     * Receives one message from the connected sending pipe.
      * Non-blocking, false indicates that no message was available.
      *
      * @param message The message to receive. Unchanged if none is available.
@@ -115,10 +99,6 @@ private:
 
     // The local socket, available after successful Listen or Connect.
     zmq::socket_t socket;
-
-    // True after a successful Listen, false for a connecting pipe or a pipe
-    // that has not been configured, including after Close.
-    bool listening = false;
 };
 
 } // namespace svanes

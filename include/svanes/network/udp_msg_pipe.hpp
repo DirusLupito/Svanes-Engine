@@ -106,8 +106,9 @@ private:
     // The local socket, available after successful Listen or Connect.
     zmq::socket_t socket;
 
-    // The normalized IPv4:PORT destination. Empty for a listening pipe or
-    // a pipe that has not been configured, including after Close.
+    // MQ_DGRAM does not retain the destination address, so it must be stored by
+    // the pipe. The normalized IPv4:PORT destination. Empty for a listening
+    // pipe or a pipe that has not been configured, including after Close.
     std::string destination;
 };
 

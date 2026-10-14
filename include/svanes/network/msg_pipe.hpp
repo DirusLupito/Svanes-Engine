@@ -18,10 +18,12 @@ namespace svanes {
  * or Receive on a sending object throws std::logic_error. Before successful
  * setup and after Close, both Send and Receive throw std::logic_error.
  *
- * For bidirectional communication, node A calls Connect to B, and node B calls
- * Listen to receive messages from A. The reverse edge uses separate MsgPipe
- * objects. That is, B calls Connect to A, and A calls Listen to receive
- * messages from B.
+ * For bidirectional communication you might have a setup like so:
+ * Node A calls Connect to B at a known IP address and port. Node B calls Listen
+ * on *:PORT to receive messages from anyone (including A) at that port.
+ * The reverse edge uses a separate MsgPipe object. In the reverse case, B will
+ * call Connect to A at a known IP address and port, and A will call Listen on
+ * *:PORT to receive messages from anyone (including B) at that port.
  */
 class MsgPipe {
 public:
@@ -47,7 +49,6 @@ public:
      * @param address The address to connect to.
      */
     virtual void Connect(const std::string &address) = 0;
-
 
     /**
      * Sends a message to the connected peer.
