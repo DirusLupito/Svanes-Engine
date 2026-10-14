@@ -18,6 +18,13 @@ namespace svanes {
  * or Receive on a sending object throws std::logic_error. Before successful
  * setup and after Close, both Send and Receive throw std::logic_error.
  *
+ * Even though pipes are intended to be used in a unidirectional fashion,
+ * messages may arrive from multiple senders, and the pipe does not
+ * automatically select the first sender. Receive returns the message bytes
+ * without identifying the sender. Any identity or reply address needed by the
+ * caller must be included in the message itself. The pipe does not care about
+ * those details, it just delivers the bytes.
+ *
  * For bidirectional communication you might have a setup like so:
  * Node A calls Connect to B at a known IP address and port. Node B calls Listen
  * on *:PORT to receive messages from anyone (including A) at that port.
@@ -33,11 +40,11 @@ public:
     virtual ~MsgPipe() = default;
 
     /**
-     * Starts listening for incoming connections on the specified address.
+     * Starts listening for incoming messages on the specified local address.
      * The receiving direction is established only if this call succeeds.
      *
-     * @param address The address to listen on. The format of the address is
-     * implementation-defined.
+     * @param address The local address to listen on. The format of the address
+     * is implementation-defined.
      */
     virtual void Listen(const std::string &address) = 0;
 
@@ -63,7 +70,7 @@ public:
     virtual bool Send(const NetworkMessage &message) = 0;
 
     /**
-     * Receives a message from the connected peer.
+     * Receives a message from the listening endpoint.
      *
      * @param message The message to receive.
      * @return True if a message was received, false otherwise.

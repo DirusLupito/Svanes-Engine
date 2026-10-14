@@ -23,13 +23,13 @@ public:
     TcpMsgPipe() = default;
 
     /**
-     * Starts listening for incoming TCP connections on the specified address.
-     * The receiving direction is established only if this call succeeds.
-     * Assumes one sending pipe per listening pipe. Traffic from
-     * additional senders is undefined behavior.
+     * Starts listening for incoming TCP connections on the specified local
+     * address. The receiving direction is established only if this call
+     * succeeds. Messages may arrive from multiple sending pipes. This pipe does
+     * not select a sender or report which sending pipe a message came from.
      *
-     * @param address The address to listen on, in HOST:PORT form. Use *:PORT
-     * to listen on all local interfaces.
+     * @param address The local address to listen on, in HOST:PORT form. Use
+     * *:PORT to listen on all local interfaces.
      *
      * @throws std::logic_error if the pipe is already configured. Call Close
      * before configuring it again.
@@ -71,7 +71,7 @@ public:
     bool Send(const NetworkMessage &message) override;
 
     /**
-     * Receives one message from the connected sending pipe.
+     * Receives one message from any sender connected to the listening endpoint.
      * Non-blocking, false indicates that no message was available.
      *
      * @param message The message to receive. Unchanged if none is available.

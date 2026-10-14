@@ -20,11 +20,13 @@ public:
     UdpMsgPipe() = default;
 
     /**
-     * Starts listening for incoming datagrams on the specified address.
+     * Starts listening for incoming datagrams on the specified local address.
      * The receiving direction is established only if this call succeeds.
+     * Datagrams may arrive from multiple senders. This pipe does not select
+     * or restrict the remote sender.
      *
-     * @param address The address to listen on, in IPv4:PORT form. Use *:PORT
-     * to listen on all local interfaces.
+     * @param address The local address to listen on, in IPv4:PORT form. Use
+     * *:PORT to listen on all local interfaces.
      *
      * @throws std::logic_error if the pipe is already configured. Call Close
      * before configuring it again.
@@ -73,7 +75,7 @@ public:
     bool Send(const NetworkMessage &message) override;
 
     /**
-     * Receives one datagram from the listening socket.
+     * Receives one datagram from any sender at the listening endpoint.
      * The source address is discarded, leaving only the message bytes.
      * Non-blocking, false indicates that no message was available.
      *
