@@ -243,6 +243,7 @@ target_sources(
             include/svanes/network/peer_group.hpp
             include/svanes/network/network_replication.hpp
             include/svanes/network/network_server.hpp
+            include/svanes/network/IServer.hpp
             include/svanes/network/server_runtime.hpp
             include/svanes/network/tcp_connection.hpp
             include/svanes/network/tcp_msg_pipe.hpp
@@ -309,6 +310,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/network/peer_group.hpp
     include/svanes/network/network_replication.hpp
     include/svanes/network/network_server.hpp
+    include/svanes/network/IServer.hpp
     include/svanes/network/server_runtime.hpp
     include/svanes/network/tcp_connection.hpp
     include/svanes/network/tcp_msg_pipe.hpp

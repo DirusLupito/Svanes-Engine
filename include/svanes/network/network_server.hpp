@@ -1,133 +1,178 @@
 #pragma once
 
 #include <svanes/network/msg_pipe.hpp>
-#include <svanes/network/network_message.hpp>
+#include <svanes/registry.hpp>
 
-#include <condition_variable>
-#include <deque>
-#include <functional>
 #include <memory>
-#include <mutex>
-#include <thread>
+#include <ranges>
+#include <span>
+#include <string>
 #include <vector>
 
 namespace svanes {
 
-class TcpServerListener;
+class IServer;
 
 /**
- * Pairs a received message with its connection so requests and replies can
- * be associated with the correct client.
+ * Represents a single input message received from a client.
  *
  * FIELDS:
- * - session: The zero-based slot in the server's list of pipe factories.
- * - message: The content received from that connection.
+ * - client: The unique identifier of the client that sent the input.
+ * - message: The input message received from the client.
  */
-struct ServerMessage {
-    std::size_t session;
+struct ClientInput {
+    ClientId client;
     NetworkMessage message;
 };
 
 /**
- * A network server for handling messages between the server and clients.
- * Defines PipeFactory function to construct message pipes within the servers
- * network thread.
- * 
- * Each client connecting to the server will have its own MessagePipe in its
- * own thread.
+ * Represents the main application that runs the server loop and manages
+ * the networking and game state updates for a server. It is responsible for
+ * managing client sessions, receiving inputs, sending messages, and running the
+ * server loop until the server indicates that it should quit.
  */
 class NetworkServer final {
 public:
-    using PipeFactory = std::function<std::unique_ptr<MsgPipe>()>;
-
-    explicit NetworkServer(PipeFactory pipe_factory);
+    /**
+     * Constructs a NetworkServer instance.
+     */
+    NetworkServer();
 
     /**
-     * Creates a server with its initial client connections ready for use.
-     * Errors from the pipe factories propagate to the caller.
-     *
-     * @param pipe_factories Creates each client's pipe on its network thread.
-     * @throws std::invalid_argument if the list is empty, a factory is empty,
-     * or a factory returns no pipe.
-     * @throws std::overflow_error if the connections exhaust client IDs.
-     * @throws std::system_error if a network thread cannot be started.
+     * Destroys the NetworkServer instance, releasing any resources associated
+     * with it.
      */
-    explicit NetworkServer(std::vector<PipeFactory> pipe_factories);
-
-    /**
-     * Accepts new clients through a shared TCP joining port.
-     *
-     * @param joining_port The local TCP port for client join requests.
-     * @throws zmq::error_t if the joining port cannot be opened.
-     */
-    explicit NetworkServer(std::uint16_t joining_port);
-
     ~NetworkServer();
 
     /**
-     * Adds a client connection and waits until its pipe is ready for use.
-     * Errors from the pipe factory propagate to the caller.
+     * Adds a new client session to the server with the specified receiving
+     * address and the client's receiving address. This establishes a connection
+     * for sending and receiving messages with the client.
      *
-     * @param pipe_factory Creates the client's pipe on its network thread.
-     * @return The connection slot used to identify received messages and
-     * address replies.
-     * @throws std::invalid_argument if the factory is empty or returns no pipe.
-     * @throws std::overflow_error if no more client IDs are available.
-     * @throws std::system_error if the network thread cannot be started.
+     * @param receive_address The local address to listen for incoming messages
+     * from the client. The format of the address is implementation-defined.
+     * @param client_receive_address The remote address of the client to send
+     * messages to. The format of the address is implementation-defined.
+     * @return The unique identifier of the newly added client session.
+     *
+     * @throws std::overflow_error if the server has exhausted available client
+     * IDs.
+     * @throws std::invalid_argument if the receiving address is already
+     * registered for another session.
      */
-    std::size_t AddSession(PipeFactory pipe_factory);
+    ClientId AddSession(const std::string &receive_address,
+                        const std::string &client_receive_address);
 
     /**
-     * Queues an encoded message for one client connection.
+     * Sends a message to the specified client.
      *
-     * @param session The connection slot reported by ServerMessage.
-     * @param message The encoded content to send.
-     * @throws std::out_of_range if the session slot does not exist.
+     * @param client The unique identifier of the client to send the message
+     * to.
+     * @param message The message to send to the client.
+     *
+     * @throws std::out_of_range if the specified client ID is unknown.
      */
-    void Send(std::size_t session, const NetworkMessage &message);
+    void Send(ClientId client, const NetworkMessage &message);
 
     /**
-     * Takes the waiting messages and their connection slots so the caller
-     * can identify each sender and direct its replies.
-     * Also admits waiting clients when using a TCP joining port.
+     * Broadcasts a message to all connected clients.
      *
-     * @return The queued messages with their sources, removing them from
-     * the receive queue.
-     * @throws std::overflow_error if admitting clients exhausts client IDs.
-     * @throws std::runtime_error if a connection assignment cannot be sent.
-     * @throws std::system_error if a client's network thread cannot be started.
-     * @throws zmq::error_t if accepting a connection fails.
+     * @param message The message to broadcast to all clients.
      */
-    std::vector<ServerMessage> PollInboundWithSource();
+    void Broadcast(const NetworkMessage &message);
 
-    template <typename T> void Broadcast(const T &message) {
-        QueueBroadcast(NetworkMessage::From(message));
+    /**
+     * Polls for input messages received from all clients.
+     * Must be called before the server's update loop so that client
+     * inputs can be processed during the update.
+     *
+     * @return A span of ClientInput structures representing the input messages
+     * received from clients.
+     */
+    std::span<const ClientInput> PollInputs() const;
+
+    /**
+     * Polls for input messages received from a specific client.
+     *
+     * @param client The unique identifier of the client to poll for inputs.
+     * @return A span of ClientInput structures representing the input messages
+     * received from the specified client.
+     */
+    auto PollInputs(ClientId client) const {
+
+        // get the collection of all inputs for this tick, pass it
+        // to a filter view that only returns inputs for the specified client
+        // will not copy the inputs, instead returning a view of the original
+        // collection
+        return PollInputs() |
+               std::views::filter([client](const ClientInput &input) {
+                   return input.client == client;
+               });
     }
 
-    std::vector<NetworkMessage> PollInbound();
-
-/**
- * Representation of the server sesstion between a client and the server
- */
-private:
-    struct Session;
-
-    void QueueBroadcast(NetworkMessage message);
     /**
-     * Exchanges queued messages for one client until shutdown is requested.
-     * Reports pipe startup errors to the caller admitting the connection.
+     * Runs the application with the provided server instance. This method
+     * initializes the server, manages client sessions, and enters the server
+     * loop until the server indicates that it should quit. It returns an
+     * integer status code, where 0 indicates success and any non-zero value
+     * indicates an error.
      *
-     * @param session The connection whose incoming and outgoing messages
-     * are exchanged.
-     * @param stop Requests that the connection's network loop finish.
+     * @param server The server instance to run within the application.
+     * @return An integer status code indicating the result of the application
+     * run.
      */
-    void RunNetworkThread(Session &session, std::stop_token stop);
+    std::int32_t run(IServer &server);
 
-    // Admits clients through the shared port when dynamic joining is enabled.
-    std::unique_ptr<TcpServerListener> listener;
-    std::mutex mutex;
-    std::deque<ServerMessage> inbound_messages;
-    std::vector<std::unique_ptr<Session>> sessions;
+private:
+    /**
+     * Represents a single client session managed by the server.
+     *
+     * FIELDS:
+     * - receive_address: The local address to listen for incoming messages
+     * from the client.
+     * - receiver: A unique pointer to a MsgPipe instance used for receiving
+     * messages from the client.
+     * - sender: A unique pointer to a MsgPipe instance used for sending
+     * messages to the client.
+     * - outgoing: A vector of NetworkMessage instances representing messages
+     * queued for sending to the client.
+     */
+    struct Session {
+        std::string receive_address;
+        std::unique_ptr<MsgPipe> receiver;
+        std::unique_ptr<MsgPipe> sender;
+        std::vector<NetworkMessage> outgoing;
+    };
+
+    /**
+     * Receives input messages from all connected clients and stores them in
+     * the provided vector of pending inputs.
+     *
+     * @param pending A reference to a vector where received ClientInput
+     * structures will be stored.
+     */
+    void ReceiveInputs(std::vector<ClientInput> &pending);
+
+    /**
+     * Sends all queued messages to their respective clients.
+     * This method should be called after the server's update loop to ensure
+     * that all outgoing messages are sent to clients.
+     *
+     * @throws std::runtime_error if a message could not be sent to a client.
+     */
+    void SendMessages();
+
+    // The registry containing all entities and their components for the server.
+    Registry world;
+
+    // A vector of Session structures representing all connected client
+    // sessions.
+    std::vector<Session> sessions;
+
+    // A vector of ClientInput structures representing input messages received
+    // from clients during the current update tick. The client at index i in the
+    // sessions vector has client ID i + 1.
+    std::vector<ClientInput> inputs;
 };
 
 } // namespace svanes
