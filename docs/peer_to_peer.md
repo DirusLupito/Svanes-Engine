@@ -50,4 +50,4 @@ Every copy must produce exactly the same world. Every 100 ticks the copies compa
 - Use `svanes::Sin`, `svanes::Cos`, and `svanes::Length` from [deterministic_math](../include/svanes/deterministic_math.hpp), not `std::sin`/`std::cos`/`std::hypot`, which differ between platforms.
 - Don't depend on `Registry::ForEach` order or entity ids; they differ between players. Give entities a `StableId` and use `EntitiesByStableId` ([stable_id](../include/svanes/stable_id.hpp)).
 - Don't read real time, random numbers, or anything local (window size, camera, mouse) inside `Step`. Only the world and the inputs.
-- `Save` must include everything `Step` reads. Anything left out will differ on a player who joins late or after a rewind. [component_serialization](../include/svanes/network/component_serialization.hpp) writes the common engine components.
+- `Save` must include everything `Step` reads. Anything left out will differ on a player who joins late or after a rewind.
