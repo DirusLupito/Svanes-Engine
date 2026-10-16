@@ -1,0 +1,27 @@
+default:
+    @just --justfile "{{justfile()}}" --list
+
+set working-directory := "../../.."
+
+import '../../../scripts/common.just'
+
+build target="doubleTime-grading": (_check-target target) (_build if target == "doubleTime-grading-server" { "svanes_game_double_time_grading_server" } else { "svanes_game_double_time_grading" })
+
+release target="doubleTime-grading": (_check-target target) (_release if target == "doubleTime-grading-server" { "svanes_game_double_time_grading_server" } else { "svanes_game_double_time_grading" })
+
+run target="doubleTime-grading": (release target)
+    {{if target == "doubleTime-grading-server" { 'just --justfile "' + justfile() + '" _run-server ' + release-bin-dir } else { 'just --justfile "' + justfile() + '" _run-client ' + release-bin-dir }}}
+
+debug target="doubleTime-grading": (build target)
+    {{if target == "doubleTime-grading-server" { 'just --justfile "' + justfile() + '" _run-server ' + bin-dir } else { 'just --justfile "' + justfile() + '" _run-client ' + bin-dir }}}
+
+package target="doubleTime-grading": (_check-target target) (_package target)
+
+_check-target target:
+    @{{if target =~ "^doubleTime-grading(-server)?$" { "" } else { error("no grading target named '" + target + "'. Try doubleTime-grading or doubleTime-grading-server.") }}}
+
+_run-server directory=bin-dir:
+    {{if os() == "windows" { "Start-Process -WorkingDirectory " + directory + " -FilePath " + directory + "svanes_game_double_time_grading_server" + exe-suffix } else { "cd " + directory + " && exec ./svanes_game_double_time_grading_server" }}}
+
+_run-client directory=bin-dir:
+    {{if os() == "windows" { "Start-Process -WorkingDirectory " + directory + " -FilePath " + directory + "svanes_game_double_time_grading" + exe-suffix } else { "cd " + directory + " && exec ./svanes_game_double_time_grading" }}}

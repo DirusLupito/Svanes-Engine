@@ -379,5 +379,6 @@ include(cmake/game_packages.cmake)
 add_subdirectory(games/goose)
 add_subdirectory(games/orbitalEscalation)
 add_subdirectory(games/doubleTime)
+add_subdirectory(games/doubleTime/grading)
 
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT svanes_game_orbital_escalation)
