@@ -1,21 +1,21 @@
-#include <svanes/network/network_client.hpp>
+#include <svanes/network/clientserver/network_client.hpp>
 
 #include <svanes/audio/audio_manager.hpp>
 #include <svanes/camera2d.hpp>
 #include <svanes/input.hpp>
-#include <svanes/network/IClient.hpp>
+#include <svanes/network/clientserver/IClient.hpp>
 #include <svanes/render/render_queue.hpp>
 #include <svanes/render/render_system.hpp>
 #include <svanes/tilemaps/tilemap.hpp>
 
-#include "../MenuUtilities/font_manager_internal.hpp"
-#include "../MenuUtilities/text_label_renderer.hpp"
-#include "../audio/audio_manager_internal.hpp"
-#include "../input_manager_internal.hpp"
-#include "../render/render_queue_executor.hpp"
-#include "../render/texture_manager_internal.hpp"
+#include "../../MenuUtilities/font_manager_internal.hpp"
+#include "../../MenuUtilities/text_label_renderer.hpp"
+#include "../../audio/audio_manager_internal.hpp"
+#include "../../input_manager_internal.hpp"
+#include "../../render/render_queue_executor.hpp"
+#include "../../render/texture_manager_internal.hpp"
 
-#include "msg_pipe_factory.hpp"
+#include "../msg_pipe_factory.hpp"
 
 #include <SDL3/SDL.h>
 
@@ -184,7 +184,7 @@ void NetworkClient::RunClientLoop(IClient &client, SDL_Window *window,
         // server.
         SendMessages();
 
-        // Once messages have been processed, we don't want to keep 
+        // Once messages have been processed, we don't want to keep
         // applying them unless they're explicitly sent again.
         incoming.clear();
 

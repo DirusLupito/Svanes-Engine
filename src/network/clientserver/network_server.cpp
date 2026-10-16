@@ -1,10 +1,10 @@
-#include <svanes/network/network_server.hpp>
+#include <svanes/network/clientserver/network_server.hpp>
 
 #include <svanes/async/async_parallel_for_driver.hpp>
-#include <svanes/network/IServer.hpp>
+#include <svanes/network/clientserver/IServer.hpp>
 #include <svanes/timeline_system.hpp>
 
-#include "msg_pipe_factory.hpp"
+#include "../msg_pipe_factory.hpp"
 
 #include <chrono>
 #include <limits>
@@ -184,7 +184,7 @@ std::int32_t NetworkServer::run(IServer &server) {
                            });
 
             // Send whatever messages may have been queued during the update to
-            // keep clients in sync with the server's state. 
+            // keep clients in sync with the server's state.
             SendMessages();
             inputs.clear();
             pending_tics %= DefaultPhysicsStepTics;

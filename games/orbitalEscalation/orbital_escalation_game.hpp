@@ -4,7 +4,7 @@
 
 #include <svanes/entity.hpp>
 #include <svanes/game.hpp>
-#include <svanes/network/network_client.hpp>
+#include <svanes/network/clientserver/network_client.hpp>
 
 #include <optional>
 #include <string>

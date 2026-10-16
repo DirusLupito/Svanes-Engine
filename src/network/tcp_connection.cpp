@@ -1,7 +1,7 @@
 #include <svanes/network/tcp_connection.hpp>
 
+#include <svanes/network/clientserver/network_server.hpp>
 #include <svanes/network/message_serialization.hpp>
-#include <svanes/network/network_server.hpp>
 #include <svanes/network/tcp_msg_pipe.hpp>
 
 #include <stdexcept>

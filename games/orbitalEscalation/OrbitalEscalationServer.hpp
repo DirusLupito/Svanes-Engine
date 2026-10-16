@@ -1,7 +1,7 @@
 #pragma once
 
 #include "orbital_simulation.hpp"
-#include <svanes/network/network_server.hpp>
+#include <svanes/network/clientserver/network_server.hpp>
 #include <svanes/registry.hpp>
 
 // The shared TCP port used by clients to join the server.

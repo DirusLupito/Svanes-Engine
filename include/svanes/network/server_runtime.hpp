@@ -1,7 +1,7 @@
 #pragma once
 
 #include <svanes/async/async_parallel_for_driver.hpp>
-#include <svanes/network/network_server.hpp>
+#include <svanes/network/clientserver/network_server.hpp>
 #include <svanes/physics_system.hpp>
 #include <svanes/registry.hpp>
 #include <svanes/vector2d.hpp>

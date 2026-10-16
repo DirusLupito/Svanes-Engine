@@ -99,8 +99,8 @@ public:
      * Updates the server's state based on the provided context.
      * This method is called once per update tick.
      *
-     * @param context The ServerUpdateContext containing relevant information for
-     * the update.
+     * @param context The ServerUpdateContext containing relevant information
+     * for the update.
      */
     virtual void Update(const ServerUpdateContext &context) = 0;
 
@@ -108,8 +108,8 @@ public:
      * Updates the server's physics state based on the provided context.
      * This method is called once per update tick.
      *
-     * @param context The ServerPhysicsContext containing relevant information for
-     * the physics update.
+     * @param context The ServerPhysicsContext containing relevant information
+     * for the physics update.
      */
     virtual void PhysicsUpdate(const ServerPhysicsContext &) {}
 
