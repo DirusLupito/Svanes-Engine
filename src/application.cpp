@@ -299,7 +299,14 @@ int32_t Application::run(IGame &game) {
     }
 
     // This is where the actual logic of the game loop is executed.
-    internal::RunGameLoop(game, window, renderer, world);
+    try {
+        internal::RunGameLoop(game, window, renderer, world);
+    } catch (...) {
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        throw;
+    }
 
     // Cleanup
 

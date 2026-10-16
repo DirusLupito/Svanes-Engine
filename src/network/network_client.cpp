@@ -285,7 +285,14 @@ std::int32_t NetworkClient::run(IClient &client) {
     }
 
     // This is where the actual logic of the client loop is executed.
-    RunClientLoop(client, window, renderer);
+    try {
+        RunClientLoop(client, window, renderer);
+    } catch (...) {
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        throw;
+    }
 
     // Cleanup
 
