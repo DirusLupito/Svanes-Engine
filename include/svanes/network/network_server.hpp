@@ -83,8 +83,8 @@ public:
 
     /**
      * Polls for input messages received from all clients.
-     * Must be called before the server's update loop so that client
-     * inputs can be processed during the update.
+     * Should be used by IServer implementations to process client
+     * inputs during the server's update loop.
      *
      * @return A span of ClientInput structures representing the input messages
      * received from clients.
