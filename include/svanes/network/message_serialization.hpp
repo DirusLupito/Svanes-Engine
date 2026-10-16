@@ -2,6 +2,7 @@
 
 #include <svanes/network/network_message.hpp>
 
+#include <cstdint>
 #include <span>
 #include <string>
 #include <string_view>

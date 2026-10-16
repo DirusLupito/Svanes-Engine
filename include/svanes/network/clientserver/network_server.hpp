@@ -3,6 +3,7 @@
 #include <svanes/network/msg_pipe.hpp>
 #include <svanes/registry.hpp>
 
+#include <cstdint>
 #include <memory>
 #include <ranges>
 #include <span>
@@ -12,6 +13,11 @@
 namespace svanes {
 
 class IServer;
+
+/**
+ * The ID assigned to a client by the server.
+ */
+using ClientId = std::uint32_t;
 
 /**
  * Represents a single input message received from a client.
