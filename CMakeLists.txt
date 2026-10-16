@@ -180,6 +180,8 @@ target_sources(
         src/MenuUtilities/text_label_renderer.cpp
         src/MenuUtilities/text_label_renderer.hpp
         src/network/clientserver/network_client.cpp
+        src/network/clientserver/protocol.cpp
+        src/network/clientserver/protocol.hpp
         src/network/msg_pipe_factory.hpp
         src/network/message_serialization.cpp
         src/network/network_message.cpp
@@ -345,6 +347,8 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/MenuUtilities/text_label_renderer.cpp
     src/MenuUtilities/text_label_renderer.hpp
     src/network/clientserver/network_client.cpp
+    src/network/clientserver/protocol.cpp
+    src/network/clientserver/protocol.hpp
     src/network/msg_pipe_factory.hpp
     src/network/message_serialization.cpp
     src/network/network_message.cpp

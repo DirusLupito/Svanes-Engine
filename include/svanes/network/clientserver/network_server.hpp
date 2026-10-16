@@ -52,23 +52,13 @@ public:
     ~NetworkServer();
 
     /**
-     * Adds a new client session to the server with the specified receiving
-     * address and the client's receiving address. This establishes a connection
-     * for sending and receiving messages with the client.
+     * Starts the shared receiver for admission and gameplay messages.
      *
-     * @param receive_address The local address to listen for incoming messages
-     * from the client. The format of the address is implementation-defined.
-     * @param client_receive_address The remote address of the client to send
-     * messages to. The format of the address is implementation-defined.
-     * @return The unique identifier of the newly added client session.
-     *
-     * @throws std::overflow_error if the server has exhausted available client
-     * IDs.
-     * @throws std::invalid_argument if the receiving address is already
-     * registered for another session.
+     * @param receive_address The local address for all client messages.
+     * The format of the address is implementation-defined.
+     * @throws std::logic_error if the server is already listening.
      */
-    ClientId AddSession(const std::string &receive_address,
-                        const std::string &client_receive_address);
+    void Listen(const std::string &receive_address);
 
     /**
      * Sends a message to the specified client.
@@ -77,7 +67,7 @@ public:
      * to.
      * @param message The message to send to the client.
      *
-     * @throws std::out_of_range if the specified client ID is unknown.
+     * @throws std::out_of_range if the client ID is unknown or not admitted.
      */
     void Send(ClientId client, const NetworkMessage &message);
 
@@ -132,38 +122,37 @@ public:
 
 private:
     /**
-     * Represents a single client session managed by the server.
+     * Represents a client attempt and its reply route. Rejected routes are
+     * saved until server destruction so queued replies can finish sending
+     * asynchronously through the current pipe API.
      *
      * FIELDS:
-     * - receive_address: The local address to listen for incoming messages
-     * from the client.
-     * - receiver: A unique pointer to a MsgPipe instance used for receiving
-     * messages from the client.
      * - sender: A unique pointer to a MsgPipe instance used for sending
      * messages to the client.
      * - outgoing: A vector of NetworkMessage instances representing messages
      * queued for sending to the client.
+     * - accepted: Whether the game admitted this client.
      */
     struct Session {
-        std::string receive_address;
-        std::unique_ptr<MsgPipe> receiver;
         std::unique_ptr<MsgPipe> sender;
         std::vector<NetworkMessage> outgoing;
+        bool accepted;
     };
 
     /**
-     * Receives input messages from all connected clients and stores them in
-     * the provided vector of pending inputs.
+     * Receives from the shared pipe, handles join callbacks, and collects
+     * gameplay messages from accepted clients for the next simulation tick.
      *
+     * @param server The game server handling join requests.
      * @param pending A reference to a vector where received ClientInput
      * structures will be stored.
      */
-    void ReceiveInputs(std::vector<ClientInput> &pending);
+    void ReceiveMessages(IServer &server, std::vector<ClientInput> &pending);
 
     /**
      * Sends all queued messages to their respective clients.
-     * This method should be called after the server's update loop to ensure
-     * that all outgoing messages are sent to clients.
+     * Called each loop iteration after any simulation work, so admission
+     * responses are sent even when a simulation step is not performed.
      *
      * @throws std::runtime_error if a message could not be sent to a client.
      */
@@ -172,13 +161,14 @@ private:
     // The registry containing all entities and their components for the server.
     Registry world;
 
-    // A vector of Session structures representing all connected client
-    // sessions.
+    std::unique_ptr<MsgPipe> receiver;
+
+    // Client join attempts and their reply routes, including rejected attempts.
     std::vector<Session> sessions;
 
     // A vector of ClientInput structures representing input messages received
     // from clients during the current update tick. The client at index i in the
-    // sessions vector has client ID i + 1.
+    // sessions vector has client ID i + 1. Rejected attempts leave gaps.
     std::vector<ClientInput> inputs;
 };
 

@@ -5,6 +5,7 @@
 #include <svanes/timeline_system.hpp>
 
 #include "../msg_pipe_factory.hpp"
+#include "protocol.hpp"
 
 #include <chrono>
 #include <limits>
@@ -20,40 +21,32 @@ namespace svanes {
 NetworkServer::NetworkServer() = default;
 NetworkServer::~NetworkServer() = default;
 
-ClientId NetworkServer::AddSession(const std::string &receive_address,
-                                   const std::string &client_receive_address) {
-    if (sessions.size() >= std::numeric_limits<ClientId>::max()) {
-        throw std::overflow_error("Network server exhausted client IDs.");
+void NetworkServer::Listen(const std::string &receive_address) {
+    if (receiver) {
+        throw std::logic_error("Network server is already listening.");
     }
 
-    for (const Session &session : sessions) {
-        if (session.receive_address == receive_address) {
-            throw std::invalid_argument(
-                "Network server: receiving address is already registered.");
-        }
-    }
-
-    auto receiver = internal::MakePipe();
-    receiver->Listen(receive_address);
-    auto sender = internal::MakePipe();
-    sender->Connect(client_receive_address);
-    sessions.push_back(
-        {receive_address, std::move(receiver), std::move(sender), {}});
-
-    return static_cast<ClientId>(sessions.size());
+    auto new_receiver = internal::MakePipe();
+    new_receiver->Listen(receive_address);
+    receiver = std::move(new_receiver);
 }
 
 void NetworkServer::Send(ClientId client, const NetworkMessage &message) {
-    if (client == 0 || client > sessions.size()) {
+    if (client == 0 || client > sessions.size() ||
+        !sessions[client - 1].accepted) {
         throw std::out_of_range("Network server: unknown client ID.");
     }
 
-    sessions[client - 1].outgoing.push_back(message);
+    sessions[client - 1].outgoing.push_back(
+        internal::EncodeGameMessage(client, message));
 }
 
 void NetworkServer::Broadcast(const NetworkMessage &message) {
-    for (Session &session : sessions) {
-        session.outgoing.push_back(message);
+    for (std::size_t index = 0; index < sessions.size(); ++index) {
+        if (sessions[index].accepted) {
+            sessions[index].outgoing.push_back(internal::EncodeGameMessage(
+                static_cast<ClientId>(index + 1), message));
+        }
     }
 }
 
@@ -61,17 +54,40 @@ std::span<const ClientInput> NetworkServer::PollInputs() const {
     return inputs;
 }
 
-void NetworkServer::ReceiveInputs(std::vector<ClientInput> &pending) {
-    for (std::size_t index = 0; index < sessions.size(); ++index) {
-        NetworkMessage message;
-
-        // Receive all available messages from the client and store them in the
-        // pending vector. Each message is associated with the client ID, which
-        // is index + 1 (since client IDs start from 1).
-
-        while (sessions[index].receiver->Receive(message)) {
-            pending.push_back(
-                {static_cast<ClientId>(index + 1), std::move(message)});
+void NetworkServer::ReceiveMessages(IServer &server,
+                                    std::vector<ClientInput> &pending) {
+    if (!receiver) {
+        return;
+    }
+    NetworkMessage message;
+    while (receiver->Receive(message)) {
+        if (message.bytes.empty()) {
+            continue;
+        }
+        MessageReader reader(message);
+        const auto kind =
+            static_cast<internal::ClientServerMessageKind>(reader.ReadUint8());
+        if (kind == internal::ClientServerMessageKind::Join) {
+            if (sessions.size() >= std::numeric_limits<ClientId>::max()) {
+                throw std::overflow_error(
+                    "Network server exhausted client IDs.");
+            }
+            const auto reply_address = reader.ReadText();
+            const auto request = internal::ReadPayload(reader);
+            auto sender = internal::MakePipe();
+            sender->Connect(reply_address);
+            const auto id = static_cast<ClientId>(sessions.size() + 1);
+            auto response =
+                server.HandleJoinRequest({world, *this, id, request});
+            sessions.push_back({std::move(sender),
+                                {internal::EncodeJoinResult(
+                                    response.accepted, id, response.message)},
+                                response.accepted});
+        } else if (kind == internal::ClientServerMessageKind::Game) {
+            const auto id = reader.ReadUint32();
+            if (id != 0 && id <= sessions.size() && sessions[id - 1].accepted) {
+                pending.push_back({id, internal::ReadPayload(reader)});
+            }
         }
     }
 }
@@ -133,7 +149,7 @@ std::int32_t NetworkServer::run(IServer &server) {
         // CLIENT INPUT POLLING
         //
 
-        ReceiveInputs(pending);
+        ReceiveMessages(server, pending);
 
 
         //
@@ -183,12 +199,11 @@ std::int32_t NetworkServer::run(IServer &server) {
                                    {world, *this, steps, parallel_for});
                            });
 
-            // Send whatever messages may have been queued during the update to
-            // keep clients in sync with the server's state.
-            SendMessages();
             inputs.clear();
             pending_tics %= DefaultPhysicsStepTics;
         }
+
+        SendMessages();
 
         if (!server.ShouldQuit()) {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));

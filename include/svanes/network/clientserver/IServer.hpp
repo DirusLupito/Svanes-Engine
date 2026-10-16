@@ -1,5 +1,6 @@
 #pragma once
 
+#include <svanes/network/clientserver/network_server.hpp>
 #include <svanes/physics_system.hpp>
 #include <svanes/vector2d.hpp>
 
@@ -8,6 +9,34 @@
 namespace svanes {
 
 class NetworkServer;
+
+/**
+ * Represents one join attempt presented to the server for an admission decision.
+ *
+ * FIELDS:
+ * - world: The engine owned registry containing the server's entities.
+ * - network: The engine owned network server.
+ * - client: The reserved ID, usable for gameplay sends after acceptance.
+ * - message: The game specific join request bytes.
+ */
+struct ServerJoinContext {
+    Registry &world;
+    NetworkServer &network;
+    ClientId client;
+    const NetworkMessage &message;
+};
+
+/**
+ * The game's decision and response to a join request.
+ *
+ * FIELDS:
+ * - accepted: Whether the client may exchange gameplay messages.
+ * - message: The game specific acceptance or rejection response.
+ */
+struct JoinResponse {
+    bool accepted = false;
+    NetworkMessage message;
+};
 
 /**
  * Defines relevant context for a server.
@@ -94,6 +123,15 @@ public:
      * initialization.
      */
     virtual void Initialize(ServerContext &context) = 0;
+
+    /**
+     * Examines one single join request and returns the server's decision.
+     * Called during network polling, independently of simulation steps.
+     *
+     * @param context The request, server world, and reserved client identity.
+     * @return Whether to admit the client and the game's response bytes.
+     */
+    virtual JoinResponse HandleJoinRequest(const ServerJoinContext &context) = 0;
 
     /**
      * Updates the server's state based on the provided context.

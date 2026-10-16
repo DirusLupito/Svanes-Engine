@@ -2,9 +2,12 @@
 
 #include <svanes/network/msg_pipe.hpp>
 #include <svanes/registry.hpp>
+#include <svanes/timeline_system.hpp>
 
+#include <chrono>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -15,6 +18,7 @@ struct SDL_Renderer;
 namespace svanes {
 
 class IClient;
+struct JoinResult;
 
 /**
  * Defines the settings for the client's window.
@@ -52,23 +56,42 @@ public:
     ~NetworkClient();
 
     /**
-     * Establishes separate receiving and sending pipes for the server session.
-     * This can be called before run or from the client's Initialize or Update.
-     * The server must be configured with the corresponding addresses.
+     * Starts a nonblocking join attempt. 
+     * 
+     * Frames continue while waiting. Gameplay messages remain queued until
+     * acceptance. All pipe operations must remain on the same thread as Connect.
      *
      * @param receive_address The local address to listen for server messages.
+     * @param reply_address The address the server can reach for replies. This
+     * must identify the receiving endpoint, so it cannot be a wildcard address.
      * @param server_receive_address The remote address where the server listens
-     * for this client's messages. Address formats are implementation-defined.
-     * @throws std::logic_error if the client already has a connection.
+     * for admission and gameplay messages.
+     * @param timeout_tics The time allowed for a response, in microseconds,
+     * starting when the request is sent. Defaults to sixty seconds.
+     * 
+     * @throws std::logic_error if already connecting or connected.
+     * 
+     * @throws std::invalid_argument if the timeout is zero or reply address
+     * empty.
      */
     void Connect(const std::string &receive_address,
-                 const std::string &server_receive_address);
+                 const std::string &reply_address,
+                 const std::string &server_receive_address,
+                 TicCount timeout_tics = 60 * TicsPerSecond);
 
     /**
-     * Queues a message to send to the server after Initialize or Update.
+     * Determines whether the client is currently connected to the server.
+     * 
+     * @return Whether the server has accepted this client.
+     */
+    bool IsConnected() const;
+
+    /**
+     * Queues a message to send to the server after acceptance and Update.
+     * Messages queued while joining are discarded if the attempt fails.
      *
      * @param message The message to send to the server.
-     * @throws std::logic_error if the client has not connected to a server.
+     * @throws std::logic_error if no join attempt or connection exists.
      */
     void Send(const NetworkMessage &message);
 
@@ -104,11 +127,22 @@ private:
                        SDL_Renderer *renderer);
 
     /**
-     * Receives messages from the server and stores them in the incoming vector.
-     * This should be called before the client's Update method to ensure that
-     * all server messages are available for processing.
+     * Handles the join attempt and receives gameplay messages into incoming.
+     * Called before Update so join callbacks and this frame's messages are
+     * available to the game without blocking the frame loop.
+     *
+     * @param client The game client supplying the handshake callbacks.
      */
-    void ReceiveMessages();
+    void ReceiveMessages(IClient &client);
+
+    /**
+     * Updates connection state before delivering the one last callback.
+     * Failed attempts release their pipes and discard queued gameplay messages.
+     *
+     * @param client The game client handling the result.
+     * @param result The acceptance, rejection, or timeout outcome.
+     */
+    void CompleteJoin(IClient &client, const JoinResult &result);
 
     /**
      * Sends all queued messages to the server. Should be called once per frame
@@ -127,6 +161,19 @@ private:
 
     // The message pipe used to send messages to the server.
     std::unique_ptr<MsgPipe> sender;
+
+    // The ID assigned by the server to this client, or zero if not connected.
+    std::uint32_t client_id = 0;
+
+    // The address the server can reach for replies, or empty if not connecting.
+    std::string join_reply_address;
+
+    // Stores how long the client will wait for a join response, in microseconds.
+    TicCount join_timeout_tics = 0;
+
+    // The time point when the join attempt was started, or std::nullopt if not
+    // currently connecting. Used to determine if the join attempt has timed out.
+    std::optional<std::chrono::steady_clock::time_point> join_started;
 
     // A vector of NetworkMessage instances representing messages received
     // from the server during the current frame.

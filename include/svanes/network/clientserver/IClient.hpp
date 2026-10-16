@@ -1,5 +1,6 @@
 #pragma once
 
+#include <svanes/network/network_message.hpp>
 #include <svanes/timeline_system.hpp>
 
 #include <cstdint>
@@ -13,6 +14,30 @@ class InputManager;
 class NetworkClient;
 class Registry;
 class TextureManager;
+
+/**
+ * Represents the outcome of a client's join attempt.
+ *
+ * MEMBERS:
+ * - Accepted: The server admitted the client.
+ * - Rejected: The server declined the client's request.
+ * - TimedOut: No result was received within the requested interval.
+ */
+enum class JoinStatus { Accepted, Rejected, TimedOut };
+
+/**
+ * The result of a join attempt, delivered once by the engine.
+ *
+ * FIELDS:
+ * - status: Whether the attempt was accepted, rejected, or timed out.
+ * - client_id: The server assigned ID, or zero unless accepted.
+ * - message: The game's response bytes, empty for a timeout.
+ */
+struct JoinResult {
+    JoinStatus status;
+    std::uint32_t client_id;
+    NetworkMessage message;
+};
 
 /**
  * Defines relevant context for a client.
@@ -102,6 +127,24 @@ public:
      * network client used to establish the server connection.
      */
     virtual void Initialize(ClientContext &context) = 0;
+
+    /**
+     * Builds the game specific portion of a join request.
+     * Called once when the engine handles a new Connect request.
+     *
+     * @return The game's join request bytes.
+     */
+    virtual NetworkMessage CreateJoinRequest() = 0;
+
+    /**
+     * Handles acceptance, rejection, or timeout of a join attempt.
+     * Called once by the engine before the frame's Update. The connection
+     * state has already been updated, so accepted clients may queue messages
+     * and rejected or timed out clients may start another attempt.
+     *
+     * @param result The outcome and the game's response bytes.
+     */
+    virtual void HandleJoinResult(const JoinResult &result) = 0;
 
     /**
      * Updates the client's view and controls once per frame, after local input

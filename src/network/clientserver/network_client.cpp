@@ -16,6 +16,7 @@
 #include "../../render/texture_manager_internal.hpp"
 
 #include "../msg_pipe_factory.hpp"
+#include "protocol.hpp"
 
 #include <SDL3/SDL.h>
 
@@ -33,9 +34,17 @@ NetworkClient::NetworkClient(ClientSettings settings)
 NetworkClient::~NetworkClient() = default;
 
 void NetworkClient::Connect(const std::string &receive_address,
-                            const std::string &server_receive_address) {
+                            const std::string &reply_address,
+                            const std::string &server_receive_address,
+                            TicCount timeout_tics) {
     if (receiver || sender) {
-        throw std::logic_error("Network client already has a connection.");
+        throw std::logic_error(
+            "Network client is already joining or connected.");
+    }
+
+    if (timeout_tics == 0 || reply_address.empty()) {
+        throw std::invalid_argument(
+            "A join attempt requires a reply address and positive timeout.");
     }
 
     auto new_receiver = internal::MakePipe();
@@ -44,7 +53,11 @@ void NetworkClient::Connect(const std::string &receive_address,
     new_sender->Connect(server_receive_address);
     receiver = std::move(new_receiver);
     sender = std::move(new_sender);
+    join_reply_address = reply_address;
+    join_timeout_tics = timeout_tics;
 }
+
+bool NetworkClient::IsConnected() const { return client_id != 0; }
 
 void NetworkClient::Send(const NetworkMessage &message) {
     if (!sender) {
@@ -57,20 +70,114 @@ std::span<const NetworkMessage> NetworkClient::PollMessages() const {
     return incoming;
 }
 
-void NetworkClient::ReceiveMessages() {
+void NetworkClient::CompleteJoin(IClient &client, const JoinResult &result) {
+    join_started.reset();
+    join_reply_address.clear();
+
+    if (result.status == JoinStatus::Accepted) {
+        client_id = result.client_id;
+    } else {
+        receiver.reset();
+        sender.reset();
+        outgoing.clear();
+    }
+
+    client.HandleJoinResult(result);
+}
+
+void NetworkClient::ReceiveMessages(IClient &client) {
+    // If we haven't configured a receiving pipe, there is nothing to poll.
     if (!receiver) {
         return;
     }
 
+    // Case 1: Not connected.
+    if (!IsConnected()) {
+        // Case 1a: Not connected and not yet started joining.
+        // So we send the join request and start the timeout timer.
+        if (!join_started) {
+            const auto request = internal::EncodeJoinRequest(
+                join_reply_address, client.CreateJoinRequest());
+            if (!sender->Send(request)) {
+                throw std::runtime_error(
+                    "Network client could not send its join request.");
+            }
+            join_started = std::chrono::steady_clock::now();
+        } else {
+            // Case 1b: Not connected and already started joining.
+            // So we check for timeout. If it has expired, we notify the game
+            // and return. Otherwise we continue polling for the join response.
+            const auto elapsed = static_cast<TicCount>(
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    std::chrono::steady_clock::now() - *join_started)
+                    .count());
+            if (elapsed >= join_timeout_tics) {
+                CompleteJoin(client, {JoinStatus::TimedOut, 0, {}});
+                return;
+            }
+        }
+    }
+
+    // Case 2: Either we're connected or we're still waiting for a join
+    // response.
     NetworkMessage message;
     while (receiver->Receive(message)) {
-        incoming.push_back(std::move(message));
+        // An empty message has no engine message kind to read, so skip it.
+        if (message.bytes.empty()) {
+            continue;
+        }
+
+        // The first byte tells us what kind of engine message this is.
+        // The remaining fields depend on that kind.
+        MessageReader reader(message);
+        const auto kind =
+            static_cast<internal::ClientServerMessageKind>(reader.ReadUint8());
+
+        // Case 2a: Still joining, and the server has accepted us.
+        // So we read our assigned ID and pass the game's response bytes to
+        // HandleJoinResult. Zero is reserved for a client that isn't connected.
+        if (!IsConnected() &&
+            kind == internal::ClientServerMessageKind::Accepted) {
+            const auto assigned_id = reader.ReadUint32();
+            if (assigned_id == 0) {
+                throw std::invalid_argument(
+                    "The server assigned client ID zero.");
+            }
+            CompleteJoin(client, {JoinStatus::Accepted, assigned_id,
+                                  internal::ReadPayload(reader)});
+            // Leave any remaining messages for the next frame now that the
+            // game has been notified and the connection state has changed.
+            return;
+        }
+
+        // Case 2b: Still joining, and the server has rejected us.
+        // So we release the failed connection and notify the game with the
+        // rejection response. The callback may start another join attempt,
+        // which we will handle on the next frame.
+        if (!IsConnected() &&
+            kind == internal::ClientServerMessageKind::Rejected) {
+            CompleteJoin(client, {JoinStatus::Rejected, 0,
+                                  internal::ReadPayload(reader)});
+            return;
+        }
+
+        // Case 2c: Connected, and this is a gameplay message for our client ID.
+        // So we remove the engine fields and store only the game's bytes for
+        // Update to read through PollMessages.
+        if (IsConnected() && kind == internal::ClientServerMessageKind::Game &&
+            reader.ReadUint32() == client_id) {
+            incoming.push_back(internal::ReadPayload(reader));
+        }
     }
 }
 
 void NetworkClient::SendMessages() {
+    if (!IsConnected()) {
+        return;
+    }
+
     for (const NetworkMessage &message : outgoing) {
-        if (!sender->Send(message)) {
+        if (!sender->Send(internal::EncodeGameMessage(client_id, message))) {
             throw std::runtime_error(
                 "Network client could not send a message.");
         }
@@ -145,7 +252,7 @@ void NetworkClient::RunClientLoop(IClient &client, SDL_Window *window,
 
         // Gather this frame's server messages before the client reads them.
         // Messages arriving during Update will have to wait for the next frame.
-        ReceiveMessages();
+        ReceiveMessages(client);
 
         //
         // DELTA TIME CALCULATION
