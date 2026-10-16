@@ -40,10 +40,9 @@ Regardless of whether or not you use Visual Studio, you can build and launch opt
 just --justfile games/orbitalEscalation/justfile run
 just --justfile games/orbitalEscalation/justfile run OrbitalEscalationServer
 just --justfile games/goose/justfile run
-just --justfile games/doubleTime/justfile run doubleTime-host
-just --justfile games/doubleTime/justfile run
-just --justfile games/doubleTime/justfile run doubleTime-spec
-just --justfile games/doubleTime/justfile run doubleTime p2p
+just --justfile games/doubleTime/justfile run doubleTime-server
+just --justfile games/doubleTime/justfile run doubleTime-input
+just --justfile games/doubleTime/justfile run doubleTime
 ```
 
 Use `just debug` instead to build and launch a Debug version:
@@ -62,7 +61,7 @@ directory defaults to that game. For example:
 ```sh
 just build
 just run
-just run doubleTime p2p
+just run doubleTime
 ```
 
 ## Orbital Escalation multiplayer

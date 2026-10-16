@@ -1,0 +1,19 @@
+add_executable(svanes_game_double_time_grading
+    main.cpp
+    double_time_game.cpp
+)
+target_link_libraries(svanes_game_double_time_grading PRIVATE Svanes::Engine)
+target_link_libraries(svanes_game_double_time_grading PRIVATE SDL3_image::SDL3_image)
+target_compile_definitions(svanes_game_double_time_grading PRIVATE
+    DOUBLE_TIME_GAME_ASSETS_DIR="assets/doubleTime-grading"
+)
+
+add_executable(svanes_game_double_time_grading_server server_main.cpp)
+target_link_libraries(svanes_game_double_time_grading_server PRIVATE Svanes::Engine)
+target_link_libraries(svanes_game_double_time_grading_server PRIVATE SDL3_image::SDL3_image)
+target_compile_definitions(svanes_game_double_time_grading_server PRIVATE
+    DOUBLE_TIME_GAME_ASSETS_DIR="assets/doubleTime-grading"
+)
+
+svanes_game_package(svanes_game_double_time_grading doubleTime-grading doubleTime/grading doubleTime-grading)
+svanes_game_package(svanes_game_double_time_grading_server doubleTime-grading-server doubleTime/grading doubleTime-grading)
