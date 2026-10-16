@@ -1,91 +1,140 @@
 #pragma once
 
 #include <svanes/network/msg_pipe.hpp>
-#include <svanes/network/network_message.hpp>
+#include <svanes/registry.hpp>
 
+#include <cstdint>
 #include <memory>
+#include <span>
+#include <string>
 #include <vector>
+
+struct SDL_Window;
+struct SDL_Renderer;
 
 namespace svanes {
 
-class TcpClientConnector;
+class IClient;
 
+/**
+ * Defines the settings for the client's window.
+ *
+ * FIELDS:
+ * - title: The title displayed by the client window.
+ * - width: The initial width of the client window.
+ * - height: The initial height of the client window.
+ */
+struct ClientSettings {
+    std::string title = "Svanes Engine";
+    std::int32_t width = 1920;
+    std::int32_t height = 1080;
+};
+
+/**
+ * Represents the main application that runs the client loop in a client-server
+ * networked game and manages the networking and game state updates for a
+ * client. It is responsible for creating the client window, managing the
+ * connection to the server, receiving messages, sending messages, and running
+ * the client loop until the client indicates that it should quit.
+ */
 class NetworkClient final {
 public:
-    explicit NetworkClient(std::unique_ptr<MsgPipe> pipe);
     /**
-     * Requests a connection to a server. PollBroadcast completes the join.
+     * Constructs a NetworkClient with the specified window settings.
      *
-     * @param host The host running the server.
-     * @param joining_port The server's TCP joining port.
-     * @throws std::runtime_error if the join request cannot be sent.
-     * @throws zmq::error_t if the connection request fails.
+     * @param settings The title and initial dimensions of the client window.
      */
-    NetworkClient(std::string host, std::uint16_t joining_port);
+    explicit NetworkClient(ClientSettings settings = {});
 
     /**
-     * Releases the client's connection or pending join request.
+     * Destroys the client and releases its message pipes.
      */
     ~NetworkClient();
 
     /**
-     * Takes ownership of another client's connection or pending join request.
+     * Establishes separate receiving and sending pipes for the server session.
+     * This can be called before run or from the client's Initialize or Update.
+     * The server must be configured with the corresponding addresses.
+     *
+     * @param receive_address The local address to listen for server messages.
+     * @param server_receive_address The remote address where the server listens
+     * for this client's messages. Address formats are implementation-defined.
+     * @throws std::logic_error if the client already has a connection.
      */
-    NetworkClient(NetworkClient &&) noexcept;
+    void Connect(const std::string &receive_address,
+                 const std::string &server_receive_address);
 
     /**
-     * Replaces this client's connection with another client's connection
-     * or pending join request.
+     * Queues a message to send to the server after Initialize or Update.
      *
-     * @return This client after taking ownership.
-     */
-    NetworkClient &operator=(NetworkClient &&) noexcept;
-
-    ClientId Id() const;
-    /**
-     * Checks whether the client is ready to send gameplay messages.
-     *
-     * @return True when a message pipe is available, false while joining.
-     */
-    bool IsConnected() const;
-
-    /**
-     * Sends an already encoded message through the client's connection.
-     *
-     * @param message The encoded content to send to the server.
-     * @throws std::logic_error if the client is still joining.
+     * @param message The message to send to the server.
+     * @throws std::logic_error if the client has not connected to a server.
      */
     void Send(const NetworkMessage &message);
 
     /**
-     * Sends a value to a server that uses the same representation of its type.
+     * Returns the server messages collected for the current frame.
+     * This should be used by IClient implementations to process server
+     * messages during the client's Update method.
      *
-     * @tparam T A trivially copyable message type.
-     * @param message The value to send.
-     * @throws std::logic_error if the client is still joining.
+     * @return A span of the server's messages for this frame.
      */
-    template <typename T> void Send(const T &message) {
-        Send(NetworkMessage::From(message));
-    }
+    std::span<const NetworkMessage> PollMessages() const;
 
     /**
-     * Completes any pending join and takes the messages waiting from the
-     * server.
+     * Creates the window, initializes the client, and runs its frame loop until
+     * the window is closed or the client indicates that it should quit.
      *
-     * @return The received messages, or an empty list while joining or when
-     * no messages are waiting.
-     * @throws std::invalid_argument if the connection assignment is truncated
-     * or contains an invalid ID or port.
-     * @throws zmq::error_t if receiving or establishing the connection fails.
+     * @param client The game client to run.
+     * @return Zero on success, or 1 if SDL or window creation fails.
      */
-    std::vector<NetworkMessage> PollBroadcast();
+    std::int32_t run(IClient &client);
 
 private:
-    ClientId id;
-    std::unique_ptr<MsgPipe> pipe;
+    /**
+     * Runs the client's frame loop, calling the client's Update method and
+     * managing the window, input, and networking. Should not be exposed
+     * to the user of the engine.
+     *
+     * @param client The game client to run.
+     * @param window The SDL window to render to.
+     * @param renderer The SDL renderer to use for rendering.
+     */
+    void RunClientLoop(IClient &client, SDL_Window *window,
+                       SDL_Renderer *renderer);
 
-    // Keeps the join request alive until the server assigns a connection.
-    std::unique_ptr<TcpClientConnector> connector;
+    /**
+     * Receives messages from the server and stores them in the incoming vector.
+     * This should be called before the client's Update method to ensure that
+     * all server messages are available for processing.
+     */
+    void ReceiveMessages();
+
+    /**
+     * Sends all queued messages to the server. Should be called once per frame
+     * after all input has been processed for that frame.
+     */
+    void SendMessages();
+
+    // The settings for the client's window, including title and dimensions.
+    ClientSettings settings;
+
+    // The registry containing all entities and their components for the client.
+    Registry world;
+
+    // The message pipe used to receive messages from the server.
+    std::unique_ptr<MsgPipe> receiver;
+
+    // The message pipe used to send messages to the server.
+    std::unique_ptr<MsgPipe> sender;
+
+    // A vector of NetworkMessage instances representing messages received
+    // from the server during the current frame.
+    std::vector<NetworkMessage> incoming;
+
+    // A vector of NetworkMessage instances representing messages queued
+    // to be sent to the server during the current frame.
+    std::vector<NetworkMessage> outgoing;
 };
 
 } // namespace svanes

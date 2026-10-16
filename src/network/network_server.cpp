@@ -2,9 +2,9 @@
 
 #include <svanes/async/async_parallel_for_driver.hpp>
 #include <svanes/network/IServer.hpp>
-#include <svanes/network/tcp_msg_pipe.hpp>
-#include <svanes/network/udp_msg_pipe.hpp>
 #include <svanes/timeline_system.hpp>
+
+#include "msg_pipe_factory.hpp"
 
 #include <chrono>
 #include <limits>
@@ -13,20 +13,6 @@
 #include <utility>
 
 namespace svanes {
-
-namespace {
-
-/**
- * Creates a new message pipe instance. Currently, the client-server
- * netcode is hardcoded to use UDP for message transport. In the future,
- * this function can be easily changed to create some other type of message
- * pipe, such as TCP, without requiring changes to the rest of the server code.
- *
- * @return A unique pointer to a new MsgPipe instance.
- */
-std::unique_ptr<MsgPipe> MakePipe() { return std::make_unique<UdpMsgPipe>(); }
-
-} // namespace
 
 // We need only use the default constructor and destructor, as all members
 // can be default-constructed and destructed.
@@ -47,9 +33,9 @@ ClientId NetworkServer::AddSession(const std::string &receive_address,
         }
     }
 
-    auto receiver = MakePipe();
+    auto receiver = internal::MakePipe();
     receiver->Listen(receive_address);
-    auto sender = MakePipe();
+    auto sender = internal::MakePipe();
     sender->Connect(client_receive_address);
     sessions.push_back(
         {receive_address, std::move(receiver), std::move(sender), {}});

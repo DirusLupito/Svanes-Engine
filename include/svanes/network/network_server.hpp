@@ -26,10 +26,11 @@ struct ClientInput {
 };
 
 /**
- * Represents the main application that runs the server loop and manages
- * the networking and game state updates for a server. It is responsible for
- * managing client sessions, receiving inputs, sending messages, and running the
- * server loop until the server indicates that it should quit.
+ * Represents the main application that runs the server loop in a client-server
+ * networked game and manages the networking and game state updates for a
+ * server. It is responsible for managing client sessions, receiving inputs,
+ * sending messages, and running the server loop until the server indicates that
+ * it should quit.
  */
 class NetworkServer final {
 public:
