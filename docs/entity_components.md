@@ -28,7 +28,7 @@ struct SpriteAnimation {
 Like stated above, this struct only contains the data that we want to store and action on. The entity's `Sprite` component owns the texture handle and source rectangle used for rendering; `SpriteAnimation` updates that source rectangle as frames advance.
 
 The logic for this component is contained in a utility function that operates on the data contained within the struct.
-For example the [AdvanceSpriteAnimations](sprite_animation_system.cpp) function is roughly defined like this:
+For example the [AdvanceSpriteAnimations](../src/sprite_animation_system.cpp) function is roughly defined like this:
 
 ```cpp
 void AdvanceSpriteAnimations(Registry& registry)
