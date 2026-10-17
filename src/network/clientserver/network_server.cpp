@@ -59,30 +59,75 @@ void NetworkServer::ReceiveMessages(IServer &server,
     if (!receiver) {
         return;
     }
+
+    // Buffer to hold the incoming message while we read it.
+    // We only read one message at a time, so we can reuse the same object for
+    // each message.
     NetworkMessage message;
+
+    // Poll for messages until there are no more to receive.
+    // In theory, if this loop is extremely slow, and a client
+    // sends a lot of messages, we can get stuck in this loop forever.
+    // TODO: Consider adding a timeout or a maximum number of messages to
+    // process per tick.
     while (receiver->Receive(message)) {
         if (message.bytes.empty()) {
             continue;
         }
+
         MessageReader reader(message);
+
+        // What we do next depends on the kind of message.
+
+        // The first byte tells us what kind of engine message this is. See
+        // ClientServerMessageKind for the possible values.
         const auto kind =
             static_cast<internal::ClientServerMessageKind>(reader.ReadUint8());
+
+        // Case 1: A client is trying to join the server.
+        // We expect the following format, read in order:
+        // - 1 byte: ClientServerMessageKind::Join
+        // - 2 bytes: length of the reply address = N
+        // - N bytes: the reply address string
+        // - remaining bytes: the join request payload
+
         if (kind == internal::ClientServerMessageKind::Join) {
             if (sessions.size() >= std::numeric_limits<ClientId>::max()) {
                 throw std::overflow_error(
                     "Network server exhausted client IDs.");
             }
+
+            // Address specified by the client to receive the server's response.
+            // The client must be listening on this address.
+
             const auto reply_address = reader.ReadText();
+
+            // The rest of the message is the join request payload, which we
+            // pass to the server's HandleJoinRequest method. Meaningless to the
+            // engine.
             const auto request = internal::ReadPayload(reader);
+
+            // Message pipe we will use to send messages to this client.
             auto sender = internal::MakePipe();
+
             sender->Connect(reply_address);
+
             const auto id = static_cast<ClientId>(sessions.size() + 1);
+
             auto response =
                 server.HandleJoinRequest({world, *this, id, request});
+
             sessions.push_back({std::move(sender),
                                 {internal::EncodeJoinResult(
                                     response.accepted, id, response.message)},
                                 response.accepted});
+
+            // Case 2: A client has been accepted and is sending gameplay
+            // messages. We expect the following format, read in order:
+            // - 1 byte: ClientServerMessageKind::Game
+            // - 4 bytes: the client ID
+            // - remaining bytes: the gameplay message payload
+
         } else if (kind == internal::ClientServerMessageKind::Game) {
             const auto id = reader.ReadUint32();
             if (id != 0 && id <= sessions.size() && sessions[id - 1].accepted) {
@@ -203,6 +248,8 @@ std::int32_t NetworkServer::run(IServer &server) {
             pending_tics %= DefaultPhysicsStepTics;
         }
 
+        // Send whatever messages may have been queued during the update to
+        // keep clients in sync with the server's state.
         SendMessages();
 
         if (!server.ShouldQuit()) {

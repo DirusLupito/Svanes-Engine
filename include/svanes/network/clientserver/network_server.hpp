@@ -122,9 +122,7 @@ public:
 
 private:
     /**
-     * Represents a client attempt and its reply route. Rejected routes are
-     * saved until server destruction so queued replies can finish sending
-     * asynchronously through the current pipe API.
+     * Represents a single client session managed by the server.
      *
      * FIELDS:
      * - sender: A unique pointer to a MsgPipe instance used for sending
@@ -161,14 +159,17 @@ private:
     // The registry containing all entities and their components for the server.
     Registry world;
 
+    // The shared receiving pipe for client join requests and gameplay messages.
     std::unique_ptr<MsgPipe> receiver;
 
-    // Client join attempts and their reply routes, including rejected attempts.
+    // Collection of client sessions, including rejected join attempts.
+    // The index of the session corresponds to the client ID minus one
+    // (i.e., client ID = index + 1). Rejected attempts occupy an entry with
+    // accepted = false, so admitted client IDs can have gaps.
     std::vector<Session> sessions;
 
     // A vector of ClientInput structures representing input messages received
-    // from clients during the current update tick. The client at index i in the
-    // sessions vector has client ID i + 1. Rejected attempts leave gaps.
+    // from admitted clients during the current update tick.
     std::vector<ClientInput> inputs;
 };
 

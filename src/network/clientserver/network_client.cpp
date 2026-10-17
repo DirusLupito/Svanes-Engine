@@ -98,10 +98,12 @@ void NetworkClient::ReceiveMessages(IClient &client) {
         if (!join_started) {
             const auto request = internal::EncodeJoinRequest(
                 join_reply_address, client.CreateJoinRequest());
+
             if (!sender->Send(request)) {
                 throw std::runtime_error(
                     "Network client could not send its join request.");
             }
+
             join_started = std::chrono::steady_clock::now();
         } else {
             // Case 1b: Not connected and already started joining.
@@ -111,6 +113,7 @@ void NetworkClient::ReceiveMessages(IClient &client) {
                 std::chrono::duration_cast<std::chrono::microseconds>(
                     std::chrono::steady_clock::now() - *join_started)
                     .count());
+
             if (elapsed >= join_timeout_tics) {
                 CompleteJoin(client, {JoinStatus::TimedOut, 0, {}});
                 return;
@@ -143,6 +146,7 @@ void NetworkClient::ReceiveMessages(IClient &client) {
                 throw std::invalid_argument(
                     "The server assigned client ID zero.");
             }
+
             CompleteJoin(client, {JoinStatus::Accepted, assigned_id,
                                   internal::ReadPayload(reader)});
             // Leave any remaining messages for the next frame now that the

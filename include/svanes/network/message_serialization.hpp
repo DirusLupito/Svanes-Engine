@@ -170,7 +170,13 @@ public:
     std::span<const std::byte> ReadBytes(std::size_t count);
 
     /**
-     * @return The next text written by MessageWriter::WriteText.
+     * Reads a 16-bit length followed by that many bytes, returning them as a
+     * string.
+     *
+     * @return A string containing some number of bytes, at most 65535,
+     * specified by two bytes immediately preceding the string's bytes. The
+     * string may contain null bytes.
+     *
      * @throws std::invalid_argument if the text is truncated.
      */
     std::string ReadText();
