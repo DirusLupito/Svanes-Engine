@@ -9,7 +9,6 @@
 
 #include <algorithm>
 #include <stdexcept>
-#include <svanes/utility/hash.hpp>
 
 /**
  * Finds the JSON files in an asset folder, including its subfolders.
@@ -261,45 +260,4 @@ std::unique_ptr<DynamicObject> AssetCatalog::CreateUnattached(
     }
 
     throw std::invalid_argument("Unsupported dynamic object type");
-}
-
-
-std::uint64_t AssetCatalog::RulesHash() const {
-    nlohmann::json definitions = nlohmann::json::array();
-
-    // Hash definitions in a consistent order so peers can compare their assets.
-
-    // TODO: Come up with a smarter way than just iterating over every type of
-    // dynamic object in a for loop.
-
-    for (const auto &[name, source] : ships) {
-        auto definition = source;
-        definition.object.visuals.clear();
-        auto json = nlohmann::json::parse(SerializeShip(definition));
-        json.erase("visuals");
-        definitions.push_back({"ship", std::move(json)});
-    }
-
-    for (const auto &[name, source] : missiles) {
-        auto definition = source;
-        definition.object.visuals.clear();
-        auto json = nlohmann::json::parse(SerializeMissile(definition));
-        json.erase("visuals");
-        json.erase("arming_seconds");
-        json["arming_tics"] = definition.arming_tics;
-        definitions.push_back({"missile", std::move(json)});
-    }
-
-    for (const auto &[name, source] : missile_launchers) {
-        auto definition = source;
-        definition.object.visuals.clear();
-        auto json = nlohmann::json::parse(SerializeMissileLauncher(definition));
-        json.erase("visuals");
-        json.erase("reload_seconds");
-        json["reload_tics"] = definition.reload_tics;
-        definitions.push_back({"missile_launcher", std::move(json)});
-    }
-
-    const auto text = definitions.dump();
-    return svanes::HashBytes(std::as_bytes(std::span(text)));
 }

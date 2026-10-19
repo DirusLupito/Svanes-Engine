@@ -15,7 +15,7 @@ void OrbitalEscalationServer::Receive(const svanes::ServerMessage &message) {
     const auto player = static_cast<std::uint32_t>(message.session + 1);
     auto [entry, added] = inputs.try_emplace(player);
     if (added) {
-        simulation.AddPlayer({player});
+        simulation.AddPlayer(player);
         std::cout << "Player " << player << " joined.\n";
     }
     // Several messages may arrive before a step. Keep firing and pause presses

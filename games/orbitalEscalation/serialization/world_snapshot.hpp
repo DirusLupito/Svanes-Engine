@@ -32,7 +32,7 @@ struct SnapshotAttachment {
 
 /**
  * Saves the changes to an object during gameplay so it can be restored from
- * its definition. Shared identities let peers resolve references to the same
+ * its definition. Shared identities let clients resolve references to the same
  * objects.
  *
  * FIELDS:
@@ -84,20 +84,19 @@ struct SnapshotObject {
  * A roster entry, which remains present even after the player's ship dies.
  *
  * FIELDS:
- * - peer: The player's unique, nonzero peer ID.
+ * - client: The player's unique, nonzero client ID.
  * - ship: The owned ship's shared identity, or zero if it has been destroyed.
  * - touching_planet: Whether contact was already established on the previous
  * tick, so restoring contact does not cause another impact.
  */
 struct SnapshotPlayer {
-    std::uint32_t peer;
+    std::uint32_t client;
     std::uint64_t ship;
     bool touching_planet;
 };
 
 /**
- * Saves the gameplay state for rollback, synchronizing joining peers, and
- * checking that peers agree on the state of the world.
+ * Saves the server's gameplay state for clients to display.
  *
  * FIELDS:
  * - next_identity: The next unused shared identity.
@@ -105,7 +104,7 @@ struct SnapshotPlayer {
  * - root: The gameplay timeline's saved clock state.
  * - planet_identity: The planet's shared identity.
  * - planet: The planet's saved gameplay components.
- * - players: Roster entries in ascending peer ID order.
+ * - players: Roster entries in ascending client ID order.
  * - objects: Dynamic objects in ascending shared identity order.
  * - projectiles: Shared identities of independently owned projectiles, in
  * their simulation order.

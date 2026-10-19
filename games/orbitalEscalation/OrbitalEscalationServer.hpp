@@ -35,8 +35,6 @@ public:
      * @throws std::invalid_argument if a client sends invalid controls.
      * @throws std::overflow_error if admitting a player exhausts spawn
      * positions or shared identities.
-     * @throws std::logic_error if the world does not have exactly one
-     * attractor.
      */
     void Run();
 
@@ -54,9 +52,6 @@ private:
     /**
      * Advances the authoritative world by one tick and shares snapshots when
      * due, so clients can display the resulting gameplay.
-     *
-     * @throws std::logic_error if the world does not have exactly one
-     * attractor.
      */
     void Step();
 

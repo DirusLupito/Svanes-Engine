@@ -104,22 +104,6 @@ OrbitalSimulation::OrbitalSimulation(svanes::Registry &world,
     planet->UpdateVisuals(world);
 
     AssignIdentity(planet->GetEntity());
-
-    // Tell other clients what rules and definitions this simulation expects.
-    svanes::MessageWriter rules;
-    rules.WriteUint64(OrbitalStepTics);
-    EncodeInput(rules, OrbitalInput{});
-    rules.WriteUint64(svanes::TicsPerSecond);
-    rules.WriteFloat32(kPlanetRadius);
-    rules.WriteFloat32(kPlayerHealth);
-    rules.WriteFloat32(kPlanetImpactDamage);
-    rules.WriteFloat32(kPlanetAttraction);
-    rules.WriteFloat32(kCollisionAcceleration);
-    rules.WriteFloat32(kSpawnSpacing);
-    rules.WriteFloat32(kSpawnHeight);
-    rules.WriteFloat32(kSpawnSpeed);
-    rules.WriteUint64(assets.RulesHash());
-    rules_hash = svanes::HashBytes(rules.Finish().bytes);
 }
 
 void OrbitalSimulation::AssignIdentity(svanes::Entity entity) {
@@ -183,10 +167,10 @@ static bool SpawnIsClear(const svanes::Registry &world,
     return true;
 }
 
-void OrbitalSimulation::AddPlayer(svanes::PeerId peer) {
-    if (peer.value == 0 || players.contains(peer.value)) {
+void OrbitalSimulation::AddPlayer(std::uint32_t client) {
+    if (client == 0 || players.contains(client)) {
         throw std::invalid_argument(
-            "Orbital player requires a unique, nonzero peer ID.");
+            "Orbital player requires a unique, nonzero client ID.");
     }
 
     // Collect existing geometry before creating the ship so it cannot block
@@ -201,8 +185,7 @@ void OrbitalSimulation::AddPlayer(svanes::PeerId peer) {
         assets.CreateShip(world, gameplay_timeline.Get(), "player_ship");
     world.AddComponent<Health>(ship->GetEntity(), Health{kPlayerHealth});
 
-    // Check candidates in the same order so every peer chooses the same
-    // available spawn position.
+    // Find an available spawn position.
     for (float x = 0.0F;;) {
         ship->GetTransform(world) = {x, -kPlanetRadius - kSpawnHeight};
 
@@ -223,20 +206,20 @@ void OrbitalSimulation::AddPlayer(svanes::PeerId peer) {
     ship->GetKinematic(world).velocity_x =
         svanes::PerSecondToPerTic(kSpawnSpeed);
     AssignIdentities(*ship);
-    players.emplace(peer.value, Player{std::move(ship)});
+    players.emplace(client, Player{std::move(ship)});
     UpdateAttachments(world);
     UpdateVisuals();
 }
 
-void OrbitalSimulation::RemovePlayer(svanes::PeerId peer) {
-    if (players.erase(peer.value) == 0) {
+void OrbitalSimulation::RemovePlayer(std::uint32_t client) {
+    if (players.erase(client) == 0) {
         throw std::invalid_argument("Orbital player is not in the roster.");
     }
 }
 
 std::optional<svanes::Entity>
-OrbitalSimulation::PlayerEntity(svanes::PeerId peer) const {
-    const auto found = players.find(peer.value);
+OrbitalSimulation::PlayerEntity(std::uint32_t client) const {
+    const auto found = players.find(client);
 
     // Being in the game does not necessarily mean the player still has a ship.
     if (found == players.end() || !found->second.ship) {
@@ -247,11 +230,11 @@ OrbitalSimulation::PlayerEntity(svanes::PeerId peer) const {
 }
 
 void OrbitalSimulation::CaptureInput(const svanes::FrameContext &frame,
-                                     svanes::PeerId peer) {
+                                     std::uint32_t client) {
     // Mouse steering uses this player's ship and local camera to produce a
-    // propulsion request. Every peer then applies that same request.
+    // propulsion request for the server.
     OrbitalInput input;
-    if (const auto entity = PlayerEntity(peer)) {
+    if (const auto entity = PlayerEntity(client)) {
         input.propulsion =
             ReadShipControls(frame.input, frame.camera,
                              world.GetComponent<svanes::Transform>(*entity),
@@ -317,8 +300,6 @@ void OrbitalSimulation::EncodeInput(svanes::MessageWriter &writer,
     writer.WriteFloat32(input.propulsion.rotation);
     writer.WriteBool(input.weapons.fire);
     writer.WriteBool(input.pause);
-    writer.WriteBool(input.faster);
-    writer.WriteBool(input.slower);
 }
 
 OrbitalInput
@@ -328,8 +309,6 @@ OrbitalSimulation::DecodeInput(svanes::MessageReader &reader) const {
                         reader.ReadFloat32()};
     input.weapons.fire = reader.ReadBool();
     input.pause = reader.ReadBool();
-    input.faster = reader.ReadBool();
-    input.slower = reader.ReadBool();
 
     // messages went through the encoder but it doesnt hurt (much) to be safe
     ValidateInput(input);
@@ -341,44 +320,12 @@ bool OrbitalSimulation::IsPaused() const {
         .IsPaused();
 }
 
-std::vector<std::uint8_t>
-OrbitalSimulation::Step(std::span<const OrbitalInput> inputs) {
+void OrbitalSimulation::Step(std::span<const OrbitalInput> inputs) {
     if (inputs.size() != players.size()) {
         throw std::invalid_argument("Orbital tick needs one input per player.");
     }
     for (const auto &input : inputs) {
         ValidateInput(input);
-    }
-
-    // Currently, attractors are collected in registry order, which can differ between
-    // peers. With several attractors, even adding the same forces in a
-    // different order can change the floating point result. One source avoids
-    // that problem for now.
-
-    std::size_t attractors = 0;
-    world.ForEach<svanes::PointAttractor2D>(
-        [&](svanes::Entity, const auto &) { ++attractors; });
-
-    // TODO: support multiple attractors in multiplayer.
-    if (attractors != 1) {
-        throw std::logic_error("Orbital synchronized simulation currently "
-                               "requires one attractor.");
-    }
-
-    // If any player requests a speed change, apply it to the whole game.
-    const bool faster =
-        std::any_of(inputs.begin(), inputs.end(),
-                    [](const auto &input) { return input.faster; });
-    const bool slower =
-        std::any_of(inputs.begin(), inputs.end(),
-                    [](const auto &input) { return input.slower; });
-
-    if (faster != slower) {
-        auto &timeline =
-            world.GetComponent<svanes::Timeline>(gameplay_timeline.Get());
-        timeline.SetTicSize(timeline.GetTicSize() /
-                            (faster ? svanes::RationalNumber{2}
-                                    : svanes::RationalNumber{1, 2}));
     }
 
     // If two players press pause on the same tick, we should pause once.
@@ -411,7 +358,7 @@ OrbitalSimulation::Step(std::span<const OrbitalInput> inputs) {
         // The weapon system decides which launchers have ammunition and are
         // ready.
 
-        for (auto &[peer, player] : players) {
+        for (auto &[client, player] : players) {
             if (player.ship) {
                 SetWeaponControls(world, *player.ship, inputs[index].weapons);
                 UpdateWeapons(world, *player.ship, assets,
@@ -432,7 +379,7 @@ OrbitalSimulation::Step(std::span<const OrbitalInput> inputs) {
         // Reloading may have created new ammunition. Assign its identity in
         // shared object order before the next collision pass can use it.
 
-        for (const auto &[peer, player] : players) {
+        for (const auto &[client, player] : players) {
             if (player.ship) {
                 AssignIdentities(*player.ship);
             }
@@ -448,7 +395,6 @@ OrbitalSimulation::Step(std::span<const OrbitalInput> inputs) {
 
     svanes::AdvanceSpriteAnimations(world);
     UpdateCollisionFlashes(world, collision_flashes);
-    return std::vector<std::uint8_t>(inputs.size(), 1);
 }
 
 void OrbitalSimulation::RespondToPhysics(std::span<const OrbitalInput> inputs) {
@@ -456,7 +402,7 @@ void OrbitalSimulation::RespondToPhysics(std::span<const OrbitalInput> inputs) {
     // A dead player can still occupy an input slot.
 
     std::size_t index = 0;
-    for (auto &[peer, player] : players) {
+    for (auto &[client, player] : players) {
         if (player.ship) {
             const auto entity = player.ship->GetEntity();
             world.GetComponent<PropulsionControl>(entity) =
@@ -470,8 +416,8 @@ void OrbitalSimulation::RespondToPhysics(std::span<const OrbitalInput> inputs) {
     // to the new positions before checking for collisions.
     UpdateAttachments(world);
 
-    // Local entity IDs can differ between peers. Shared order determines both
-    // which object goes first in a collision test and the order of responses.
+    // Stable order determines both which object goes first in a collision test
+    // and the order of responses.
     // This matters when several axes have the same penetration
     // depth since swapping the objects can change which normal is chosen.
 
@@ -499,7 +445,7 @@ void OrbitalSimulation::RespondToPhysics(std::span<const OrbitalInput> inputs) {
     }
 
     // For every player, check if they're contacting the planet.
-    for (auto &[peer, player] : players) {
+    for (auto &[client, player] : players) {
         bool touching_planet = false;
         if (player.ship && !IsDead(world, player.ship->GetEntity())) {
             const auto entity = player.ship->GetEntity();
@@ -527,7 +473,7 @@ void OrbitalSimulation::RespondToPhysics(std::span<const OrbitalInput> inputs) {
     // Explosions have finished using the entities' geometry. Now their owners
     // can remove dead objects, including dead missiles still inside launchers.
     // A player's roster entry remains even when their ship is removed.
-    for (auto &[peer, player] : players) {
+    for (auto &[client, player] : players) {
         if (player.ship) {
             if (IsDead(world, player.ship->GetEntity())) {
                 player.ship.reset();
@@ -552,7 +498,7 @@ void OrbitalSimulation::UpdateVisuals() {
     // sprite or a solid shape. So even though the engine will update the ship
     // entity and the planet entity, we need to update their visuals separately
     // to make sure they are drawn correctly on the screen.
-    for (const auto &[peer, player] : players) {
+    for (const auto &[client, player] : players) {
         if (player.ship) {
             player.ship->UpdateVisuals(world);
         }
@@ -576,5 +522,3 @@ PlanetDefinition OrbitalSimulation::MakePlanetDefinition() {
                     CreatePlanetLayer(3750.0F, {127, 127, 127, 255}, -1)},
     };
 }
-
-std::uint64_t OrbitalSimulation::RulesHash() const { return rules_hash; }

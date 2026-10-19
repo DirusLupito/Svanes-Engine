@@ -6,23 +6,24 @@
 #include "propulsion_system.hpp"
 #include "serialization/asset_catalog.hpp"
 #include <map>
+#include <optional>
 #include <span>
 #include <svanes/async/async_parallel_for_driver.hpp>
 #include <svanes/game.hpp>
-#include <svanes/network/input_sync.hpp>
 #include <svanes/network/message_serialization.hpp>
-#include <svanes/network/network_session.hpp>
 
 // How many simulation tics advanced by one step.
 inline constexpr svanes::TicCount OrbitalStepTics = 10000;
 
 /**
  * One player's controls for a simulation tick.
- * 
+ *
  * FIELDS:
  * - propulsion: Thrust and rotation requests.
  * - weapons: A firing request.
  * - pause: A shared pause toggle.
+ * - faster: A request to increase the local client frame rate.
+ * - slower: A request to decrease the local client frame rate.
  */
 struct OrbitalInput {
     PropulsionControl propulsion{};
@@ -34,37 +35,25 @@ struct OrbitalInput {
 
 /**
  * Represents the game simulation for Orbital Escalation (used for multiplayer).
- * 
- * Owns the gameplay world and advances it one agreed input tick at a time.
- * Rendering may run more or less often without changing what a tick does.
- * 
+ *
+ * Manages the gameplay objects and advances the server's world one tick at a
+ * time. Rendering may run more or less often without changing what a tick does.
+ *
  * The registry must outlive this object.
  */
-class OrbitalSimulation final
-    : public svanes::SyncedSimulation<OrbitalInput, std::uint8_t> {
+class OrbitalSimulation final {
 public:
     /**
-     * Save a deterministic snapshot of the simulation state in order to
-     * use it for rolling back to a previous state, or to synchronize a new peer
-     * joining the game, or for hash/correctness checks.
+     * Saves the server's gameplay state for clients to display.
      */
-    svanes::NetworkMessage Save() const override;
+    svanes::NetworkMessage Save() const;
 
     /**
-     * Load a deterministic snapshot of the simulation state in order to
-     * restore the game to some state or synchronize a new peer.
+     * Restores the gameplay state from a server snapshot.
      *
      * @param bytes The complete state produced by Save().
      */
-    void Load(std::span<const std::byte> bytes) override;
-
-    /**
-     * Gets a hash of the simulation rules and definitions, which must match
-     * between peers for gameplay to be compatible.
-     *
-     * @return The gameplay compatibility hash.
-     */
-    std::uint64_t RulesHash() const;
+    void Load(std::span<const std::byte> bytes);
 
     /**
      * Creates and initializes the game simulation.
@@ -81,41 +70,39 @@ public:
      * Creates a ship and its attachments for a new player, clear of existing
      * collision geometry.
      *
-     * @param peer The unique, nonzero player ID. Add players in ascending
-     * order.
+     * @param client The unique, nonzero client ID assigned by the server.
      * @throws std::overflow_error if no further spawn position can be
      * represented while searching for a clear position.
      */
-    void AddPlayer(svanes::PeerId peer) override;
+    void AddPlayer(std::uint32_t client);
 
     /**
      * Removes a player and their ship. Already launched projectiles remain.
-     * 
-     * @param peer The player leaving the roster.
+     *
+     * @param client The client whose player is leaving.
      */
-    void RemovePlayer(svanes::PeerId peer) override;
+    void RemovePlayer(std::uint32_t client);
 
     /**
      * Gets the player's current ship, for camera tracking or other local
      * presentation.
      *
-     * @param peer The player whose ship to look up.
+     * @param client The client whose ship to look up.
      * @return The ship's local entity ID, or std::nullopt if the player is
      * absent or their ship has been destroyed.
      */
-    std::optional<svanes::Entity> PlayerEntity(svanes::PeerId peer) const;
+    std::optional<svanes::Entity> PlayerEntity(std::uint32_t client) const;
 
     /**
      * Records local controls for the next simulation tick. Call once per
-     * rendered frame, including while waiting for other players' inputs.
+     * rendered frame.
      * Firing and pause presses remain available until TakeInput consumes them.
      * A player whose ship has been destroyed can still request a pause.
      *
      * @param frame The local input devices and camera.
-     * @param peer The player controlled by these local input devices.
+     * @param client The client controlled by these local input devices.
      */
-    void CaptureInput(const svanes::FrameContext &frame,
-                      svanes::PeerId peer) override;
+    void CaptureInput(const svanes::FrameContext &frame, std::uint32_t client);
 
     /**
      * Consumes the local controls for one simulation tick. Held controls
@@ -125,11 +112,10 @@ public:
      * @return The latest held controls and any presses recorded since the
      * previous call.
      */
-    OrbitalInput TakeInput() override;
+    OrbitalInput TakeInput();
 
     /**
-     * Writes one player's controls to a network message, allowing another
-     * peer to apply the same requests.
+     * Writes one player's gameplay controls for the server to apply.
      *
      * @param writer The message to append the controls to.
      * @param input The controls for one simulation tick.
@@ -138,7 +124,7 @@ public:
      * outside [-1, 1].
      */
     void EncodeInput(svanes::MessageWriter &writer,
-                     const OrbitalInput &input) const override;
+                     const OrbitalInput &input) const;
 
     /**
      * Reads and validates one player's controls from a network message.
@@ -149,28 +135,23 @@ public:
      * @throws std::invalid_argument if the controls are truncated, a boolean
      * flag is invalid, or a propulsion value is nonfinite or outside [-1, 1].
      */
-    OrbitalInput DecodeInput(svanes::MessageReader &reader) const override;
+    OrbitalInput DecodeInput(svanes::MessageReader &reader) const;
 
     /**
      * Advances gameplay by one fixed simulation step using the supplied
-     * player controls. Each peer must call this with the same inputs.
+     * player controls.
      *
      * Pause requests toggle gameplay once per tick, even if several players
      * request it. While paused, ticks still accept pause requests, but firing
      * requests are discarded and gameplay time remains stopped.
      *
-     * @param inputs One set of controls for every player, in ascending PeerId
-     * order. Players whose ships have been destroyed still require an entry.
-     *
-     * @return One input-use report per player, in input order.
+     * @param inputs One set of controls for every player, in ascending client
+     * ID order. Players whose ships have been destroyed still require an entry.
      *
      * @throws std::invalid_argument if the input count differs from the player
      * count, or a propulsion value is nonfinite or outside [-1, 1].
-     * @throws std::logic_error if the world does not have exactly one
-     * attractor.
      */
-    std::vector<std::uint8_t>
-    Step(std::span<const OrbitalInput> inputs) override;
+    void Step(std::span<const OrbitalInput> inputs);
 
     /**
      * Checks if gameplay is currently paused.
@@ -194,10 +175,6 @@ private:
      */
     static PlanetDefinition MakePlanetDefinition();
 
-    // The hash used by peers to check that their gameplay rules and
-    // definitions are compatible.
-    std::uint64_t rules_hash = 0;
-
     /**
      * Represents a player who is still part of the game, including after their
      * ship has been destroyed.
@@ -213,9 +190,8 @@ private:
     };
 
     /**
-     * Gives a gameplay entity an identity shared by all peers. Keeps any
-     * identity it already has. New identities must be assigned in the same
-     * object order on every peer.
+     * Gives a gameplay entity an identity used in server snapshots. Keeps any
+     * identity it already has.
      *
      * @param entity The local entity to assign a shared identity to.
      *
@@ -237,7 +213,7 @@ private:
      * Applies player controls and resolves combat after movement. Run once per
      * unpaused simulation step, after physics has advanced the objects.
      *
-     * @param inputs The current tick's controls in ascending PeerId order.
+     * @param inputs The current tick's controls in ascending client ID order.
      */
     void RespondToPhysics(std::span<const OrbitalInput> inputs);
 
@@ -256,8 +232,8 @@ private:
     // The planet providing the world's gravity and surface collisions.
     std::optional<Planet> planet;
 
-    // Players keyed by PeerId, so iteration follows an agreed input order.
-    // A player remains here even after their ship is destroyed.
+    // Players keyed by client ID, matching the order of controls passed to
+    // Step. A player remains here even after their ship is destroyed.
     std::map<std::uint32_t, Player> players;
 
     // Owns launched projectiles independently of the ships that fired them.

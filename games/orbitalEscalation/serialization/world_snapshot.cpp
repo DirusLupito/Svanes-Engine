@@ -299,7 +299,7 @@ static SnapshotBody ReadBody(MessageReader &reader) {
 //     planet_identity: 2
 //     planet:          <planet body>
 //     player_count:    1
-//         peer=1, ship=3, touching_planet=false
+//         client=1, ship=3, touching_planet=false
 //     object_count:    3
 //         identity=3, type=0, name="player_ship", <ship body>,
 //             child_count=1, children=[4]
@@ -319,7 +319,7 @@ svanes::NetworkMessage WriteWorldSnapshot(const WorldSnapshot &snapshot) {
     WriteBody(writer, snapshot.planet);
     WriteCount(writer, snapshot.players.size());
     for (const auto &player : snapshot.players) {
-        writer.WriteUint32(player.peer);
+        writer.WriteUint32(player.client);
         writer.WriteUint64(player.ship);
         writer.WriteBool(player.touching_planet);
     }
@@ -395,7 +395,7 @@ static std::optional<T> CaptureComponent(const svanes::Registry &world,
 }
 
 /**
- * Gets the identity peers use to refer to the same gameplay entity.
+ * Gets the identity used in snapshots to refer to the same gameplay entity.
  *
  * @param world The registry containing the entity.
  * @param entity The gameplay entity whose shared identity to get.
@@ -488,9 +488,9 @@ svanes::NetworkMessage OrbitalSimulation::Save() const {
     std::vector<const DynamicObject *> pending;
 
     // First we add the players and all projectiles to the pending list.
-    for (const auto &[peer, player] : players) {
+    for (const auto &[client, player] : players) {
         snapshot.players.push_back(
-            {peer,
+            {client,
              player.ship ? SharedIdentity(world, player.ship->GetEntity()) : 0,
              player.touching_planet});
         if (player.ship) {
@@ -518,8 +518,7 @@ svanes::NetworkMessage OrbitalSimulation::Save() const {
         }
         snapshot.objects.push_back(std::move(saved));
     }
-    // Sort by shared identity so peers saving the same world produce the same
-    // bytes for state comparisons.
+    // Sort by shared identity to keep snapshot objects in a consistent order.
     std::sort(
         snapshot.objects.begin(), snapshot.objects.end(),
         [](const auto &a, const auto &b) { return a.identity < b.identity; });
@@ -700,7 +699,7 @@ void OrbitalSimulation::Load(std::span<const std::byte> bytes) {
     std::map<std::uint32_t, Player> replacement_players;
     for (const auto &player : snapshot.players) {
         replacement_players.emplace(
-            player.peer,
+            player.client,
             Player{player.ship ? std::move(objects.at(player.ship)) : nullptr,
                    player.touching_planet});
     }

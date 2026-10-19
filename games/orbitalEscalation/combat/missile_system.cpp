@@ -32,8 +32,8 @@ void UpdateMissileExplosions(
     svanes::Registry &world, svanes::Entity gameplay_timeline,
     std::span<const svanes::EntityCollision2D> contacts,
     std::vector<OwnedEntity> &flashes) {
-    // One explosion can trigger another, so every peer needs to process them
-    // in the same order. Local entity IDs do not provide that guarantee.
+    // One explosion can trigger another, so process them in stable identity
+    // order.
     const auto before = [&](svanes::Entity a, svanes::Entity b) {
         return world.GetComponent<svanes::StableId>(a).value <
                world.GetComponent<svanes::StableId>(b).value;
