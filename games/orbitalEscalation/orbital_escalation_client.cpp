@@ -19,21 +19,15 @@ const svanes::TicCount kPauseFlashPeriod = svanes::SecondsToTics(1.0);
 constexpr std::uint8_t kPauseLabelMinimumAlpha = 64;
 constexpr svanes::TicCount kClientFrameTics = 16666;
 
-OrbitalEscalationClient::OrbitalEscalationClient(std::string receive_address,
-                                                 std::string reply_address,
-                                                 std::string server_address)
-    : receive_address(std::move(receive_address)),
-      reply_address(std::move(reply_address)),
-      server_address(std::move(server_address)) {
-    if (this->receive_address.empty() || this->reply_address.empty() ||
-        this->server_address.empty()) {
-        throw std::invalid_argument(
-            "Client listen, reply, and server addresses must be provided.");
+OrbitalEscalationClient::OrbitalEscalationClient(std::string server_address)
+    : server_address(std::move(server_address)) {
+    if (this->server_address.empty()) {
+        throw std::invalid_argument("The server address must be provided.");
     }
 }
 
 void OrbitalEscalationClient::Initialize(svanes::ClientContext &context) {
-    context.network.Connect(receive_address, reply_address, server_address);
+    context.network.Connect(server_address);
     std::cout << "Joining " << server_address << '.' << std::endl;
 
     pause_label_entity = context.world.CreateEntity();

@@ -13,15 +13,11 @@ public:
     /**
      * Configures the game to play in a world controlled by a server.
      *
-     * @param receive_address The local address for receiving server messages.
-     * @param reply_address The address the server can reach to reply to this
-     * client.
-     * @param server_address The server's address for join requests.
-     * @throws std::invalid_argument if an address is empty.
+     * @param server_address The server's address for admission and gameplay
+     * messages.
+     * @throws std::invalid_argument if the server address is empty.
      */
-    OrbitalEscalationClient(std::string receive_address,
-                            std::string reply_address,
-                            std::string server_address);
+    explicit OrbitalEscalationClient(std::string server_address);
 
     /**
      * Starts joining the server and prepares the client's view.
@@ -67,13 +63,7 @@ public:
     svanes::TicCount GetFrameIntervalTics() const override;
 
 private:
-    // The local address on which the client listens for server messages.
-    std::string receive_address;
-
-    // The address the server uses to reach this client.
-    std::string reply_address;
-
-    // The server's address.
+    // The server's address for admission and gameplay messages.
     std::string server_address;
 
     // The timeline controlling the client's frame rate.
