@@ -1,5 +1,6 @@
 #include "orbital_escalation_client.hpp"
 #include "combat/damage_system.hpp"
+#include "controls.hpp"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -176,6 +177,8 @@ void OrbitalEscalationClient::Update(const svanes::ClientFrameContext &frame) {
             .geometry);
     background_rectangle.width = view.width;
     background_rectangle.height = view.height;
+
+    SendInput(frame);
 }
 
 void OrbitalEscalationClient::ApplyWorldUpdate(
@@ -280,13 +283,60 @@ void OrbitalEscalationClient::ApplyWorldUpdate(
 
     // Follow this player's living ship. If it has been destroyed, keep the
     // camera at its last position.
+    player_ship.reset();
     for (const auto &player : update.players) {
-        if (player.client == client_id && player.ship) {
-            const auto &pose = objects.at(*player.ship)->GetTransform(world);
-            frame.camera.x = pose.x;
-            frame.camera.y = pose.y;
+        if (player.client == client_id) {
+            player_ship = player.ship;
+
+            if (player_ship) {
+                const auto &pose =
+                    objects.at(*player_ship)->GetTransform(world);
+                frame.camera.x = pose.x;
+                frame.camera.y = pose.y;
+            }
         }
     }
+}
+
+void OrbitalEscalationClient::SendInput(
+    const svanes::ClientFrameContext &frame) {
+    if (!frame.network.IsConnected()) {
+        return;
+    }
+
+    // The player's requested thrust and rotation, neutral without a ship.
+    PropulsionControl control{};
+
+    // Whether the player requested a shot during this frame.
+    bool fire = false;
+
+    // If the player has a ship, read its movement and firing controls.
+    if (player_ship) {
+        const auto entity = objects.at(*player_ship)->GetEntity();
+        control = ReadShipControls(
+            frame.input, frame.camera,
+            frame.world.GetComponent<svanes::Transform>(entity),
+            frame.world.GetComponent<svanes::Kinematic2D>(entity),
+            frame.world.GetComponent<Propulsion>(entity));
+        fire = frame.input.WasMouseButtonPressed(svanes::MouseButton::Right);
+    }
+
+    // The writer collecting this frame's gameplay controls.
+    svanes::MessageWriter writer;
+
+    // An input message consists of the following fields, in order:
+    // - 4 bytes: horizontal thrust request, as a 32-bit float
+    // - 4 bytes: vertical thrust request, as a 32-bit float
+    // - 4 bytes: rotation request, as a 32-bit float
+    // - 1 byte: firing request, zero or one
+    // - 1 byte: pause toggle request, zero or one
+
+    writer.WriteFloat32(control.thrust.x);
+    writer.WriteFloat32(control.thrust.y);
+    writer.WriteFloat32(control.rotation);
+    writer.WriteBool(fire);
+    writer.WriteBool(frame.input.WasPressed(svanes::Key::P));
+    frame.network.Send(writer.Finish());
 }
 
 bool OrbitalEscalationClient::ShouldQuit() const { return should_quit; }

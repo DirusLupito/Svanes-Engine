@@ -82,6 +82,14 @@ OrbitalEscalationServer::Input
 OrbitalEscalationServer::DecodeInput(const svanes::NetworkMessage &message) {
     svanes::MessageReader reader(message);
     Input input;
+
+    // An input message consists of the following fields, in order:
+    // - 4 bytes: horizontal thrust request, as a 32-bit float
+    // - 4 bytes: vertical thrust request, as a 32-bit float
+    // - 4 bytes: rotation request, as a 32-bit float
+    // - 1 byte: firing request, zero or one
+    // - 1 byte: pause toggle request, zero or one
+
     input.propulsion = {{reader.ReadFloat32(), reader.ReadFloat32()},
                         reader.ReadFloat32()};
 

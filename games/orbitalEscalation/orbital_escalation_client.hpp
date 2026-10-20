@@ -86,6 +86,14 @@ private:
     void ApplyWorldUpdate(const svanes::ClientFrameContext &frame,
                           const WorldUpdate &update);
 
+    /**
+     * Reads this player's controls and queues them for the server to apply.
+     *
+     * @param frame The local input, displayed world, camera, and network client
+     * for this frame.
+     */
+    void SendInput(const svanes::ClientFrameContext &frame);
+
     // The server's address for admission and gameplay messages.
     std::string server_address;
 
@@ -94,6 +102,10 @@ private:
 
     // The server assigned ID of this player, or zero before admission.
     std::uint32_t client_id = 0;
+
+    // The server entity ID of this player's ship, or empty before its first
+    // world update or after its destruction.
+    std::optional<svanes::Entity> player_ship;
 
     // The master clock shared by displayed gameplay objects. Its state comes
     // from server updates.
