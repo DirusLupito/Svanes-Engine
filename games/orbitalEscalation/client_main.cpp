@@ -32,22 +32,21 @@ static std::uint16_t ReadPort(std::string_view text) {
 }
 
 /**
- * Reads the server address supplied when joining a game.
+ * Reads an endpoint address supplied through the command line.
  *
  * @param text The host and port separated by a colon.
- * @return The destination address for the join request.
+ * @return The address with a validated port.
  * @throws std::invalid_argument if the host or separator is missing, or the
  * port is invalid.
  */
-static std::pair<std::string, std::uint16_t>
-ReadAddress(std::string_view text) {
+static std::string ReadAddress(std::string_view text) {
     const auto colon = text.rfind(':');
     if (colon == std::string_view::npos || colon == 0) {
         throw std::invalid_argument("Expected an address in IPv4:PORT form: " +
                                     std::string{text});
     }
-    return {std::string{text.substr(0, colon)},
-            ReadPort(text.substr(colon + 1))};
+    return std::string{text.substr(0, colon)} + ':' +
+           std::to_string(ReadPort(text.substr(colon + 1)));
 }
 
 /**
@@ -60,14 +59,19 @@ ReadAddress(std::string_view text) {
  */
 int32_t main(int32_t argc, char **argv) {
     try {
-        std::optional<std::pair<std::string, std::uint16_t>> server_address;
+        std::optional<std::string> server_address;
+        std::optional<std::string> receive_address;
+        std::optional<std::string> reply_address;
         for (int32_t index = 1; index < argc; ++index) {
             const std::string_view option{argv[index]};
             if (option == "--help") {
-                std::cout
-                    << "Usage: svanes_game_orbital_escalation --server "
-                       "HOST:PORT\n"
-                    << "Selects the headless Orbital Escalation server.\n";
+                std::cout << "Usage: svanes_game_orbital_escalation --server "
+                             "IPv4:PORT --listen IPv4:PORT --reply IPv4:PORT\n"
+                          << "--server: The server's receiving address.\n"
+                          << "--listen: The client's local receiving address; "
+                             "*:PORT listens on all local interfaces.\n"
+                          << "--reply: The client's address reachable by the "
+                             "server.\n";
                 return 0;
             }
 
@@ -77,14 +81,27 @@ int32_t main(int32_t argc, char **argv) {
                         "--server requires one address and may appear once.");
                 }
                 server_address = ReadAddress(argv[index]);
+            } else if (option == "--listen") {
+                if (++index >= argc || receive_address) {
+                    throw std::invalid_argument(
+                        "--listen requires one address and may appear once.");
+                }
+                receive_address = ReadAddress(argv[index]);
+            } else if (option == "--reply") {
+                if (++index >= argc || reply_address) {
+                    throw std::invalid_argument(
+                        "--reply requires one address and may appear once.");
+                }
+                reply_address = ReadAddress(argv[index]);
             } else {
                 throw std::invalid_argument("Unknown option: " +
                                             std::string{option});
             }
         }
 
-        if (!server_address) {
-            throw std::invalid_argument("--server HOST:PORT is required.");
+        if (!server_address || !receive_address || !reply_address) {
+            throw std::invalid_argument(
+                "--server, --listen, and --reply addresses are required.");
         }
         svanes::NetworkClient network({
             .title = "Orbital Escalation",
@@ -92,8 +109,9 @@ int32_t main(int32_t argc, char **argv) {
             .height = 1080,
         });
 
-        OrbitalEscalationClient client(server_address->first,
-                                       server_address->second);
+        OrbitalEscalationClient client(std::move(*receive_address),
+                                       std::move(*reply_address),
+                                       std::move(*server_address));
 
         return network.run(client);
     } catch (const std::exception &error) {

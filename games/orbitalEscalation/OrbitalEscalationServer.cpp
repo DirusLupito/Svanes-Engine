@@ -113,7 +113,7 @@ void OrbitalEscalationServer::Initialize(svanes::ServerContext &context) {
 svanes::JoinResponse OrbitalEscalationServer::HandleJoinRequest(
     const svanes::ServerJoinContext &context) {
     AddPlayer(context.world, context.client);
-    std::cout << "Player " << context.client << " joined.\n";
+    std::cout << "Player " << context.client << " joined." << std::endl;
     return {true, {}};
 }
 

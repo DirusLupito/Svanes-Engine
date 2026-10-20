@@ -13,14 +13,18 @@ public:
     /**
      * Configures the game to play in a world controlled by a server.
      *
-     * @param server_host The host running the server.
-     * @param server_port The server's joining port.
-     * @throws std::invalid_argument if the host is empty or the port is zero.
+     * @param receive_address The local address for receiving server messages.
+     * @param reply_address The address the server can reach to reply to this
+     * client.
+     * @param server_address The server's address for join requests.
+     * @throws std::invalid_argument if an address is empty.
      */
-    OrbitalEscalationClient(std::string server_host, std::uint16_t server_port);
+    OrbitalEscalationClient(std::string receive_address,
+                            std::string reply_address,
+                            std::string server_address);
 
     /**
-     * Prepares the client's camera, background, and user interface.
+     * Starts joining the server and prepares the client's view.
      * @param context The engine services used to initialize the client.
      */
     void Initialize(svanes::ClientContext &context) override;
@@ -63,14 +67,17 @@ public:
     svanes::TicCount GetFrameIntervalTics() const override;
 
 private:
-    // The authoritative server's host.
-    std::string server_host;
+    // The local address on which the client listens for server messages.
+    std::string receive_address;
+
+    // The address the server uses to reach this client.
+    std::string reply_address;
+
+    // The server's address.
+    std::string server_address;
 
     // The timeline controlling the client's frame rate.
     svanes::Timeline client_loop_timeline;
-
-    // The server's joining port.
-    std::uint16_t port;
 
     // The timeline used to animate the pause label.
     svanes::Timeline pause_timeline;

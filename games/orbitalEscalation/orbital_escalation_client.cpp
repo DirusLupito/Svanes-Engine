@@ -8,6 +8,7 @@
 #include <svanes/asset_path.hpp>
 #include <svanes/camera2d.hpp>
 #include <svanes/input.hpp>
+#include <svanes/network/clientserver/network_client.hpp>
 #include <svanes/registry.hpp>
 #include <svanes/render/render_system.hpp>
 #include <utility>
@@ -16,16 +17,22 @@ const svanes::TicCount kPauseFlashPeriod = svanes::SecondsToTics(1.0);
 constexpr std::uint8_t kPauseLabelMinimumAlpha = 64;
 constexpr svanes::TicCount kClientFrameTics = 16666;
 
-OrbitalEscalationClient::OrbitalEscalationClient(std::string server_host,
-                                                 std::uint16_t server_port)
-    : server_host(std::move(server_host)), port(server_port) {
-    if (this->server_host.empty() || port == 0) {
-        throw std::invalid_argument("Choose a server host and nonzero port.");
+OrbitalEscalationClient::OrbitalEscalationClient(std::string receive_address,
+                                                 std::string reply_address,
+                                                 std::string server_address)
+    : receive_address(std::move(receive_address)),
+      reply_address(std::move(reply_address)),
+      server_address(std::move(server_address)) {
+    if (this->receive_address.empty() || this->reply_address.empty() ||
+        this->server_address.empty()) {
+        throw std::invalid_argument(
+            "Client listen, reply, and server addresses must be provided.");
     }
 }
 
 void OrbitalEscalationClient::Initialize(svanes::ClientContext &context) {
-    std::cout << "Server configured as " << server_host << ':' << port << ".\n";
+    context.network.Connect(receive_address, reply_address, server_address);
+    std::cout << "Joining " << server_address << '.' << std::endl;
 
     pause_label_entity = context.world.CreateEntity();
     context.world.AddComponent<svanes::TextLabel>(
@@ -66,7 +73,8 @@ void OrbitalEscalationClient::HandleJoinResult(
     const svanes::JoinResult &result) {
     switch (result.status) {
     case svanes::JoinStatus::Accepted:
-        std::cout << "Connected as player " << result.client_id << ".\n";
+        std::cout << "Connected as player " << result.client_id << '.'
+                  << std::endl;
         break;
     case svanes::JoinStatus::Rejected:
         std::cout << "Server rejected the join request.\n";
