@@ -8,6 +8,7 @@
 #include <ranges>
 #include <span>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace svanes {
@@ -52,13 +53,13 @@ public:
     ~NetworkServer();
 
     /**
-     * Starts the shared receiver for admission and gameplay messages.
+     * Starts the shared pipe for all messages to and from clients.
      *
-     * @param receive_address The local address for all client messages.
+     * @param address The local address for all client messages.
      * The format of the address is implementation-defined.
      * @throws std::logic_error if the server is already listening.
      */
-    void Listen(const std::string &receive_address);
+    void Listen(const std::string &address);
 
     /**
      * Sends a message to the specified client.
@@ -125,14 +126,14 @@ private:
      * Represents a single client session managed by the server.
      *
      * FIELDS:
-     * - sender: A unique pointer to a MsgPipe instance used for sending
-     * messages to the client.
+     * - address: The client's address, as reported by the pipe when its join
+     * request arrived.
      * - outgoing: A vector of NetworkMessage instances representing messages
      * queued for sending to the client.
      * - accepted: Whether the game admitted this client.
      */
     struct Session {
-        std::unique_ptr<MsgPipe> sender;
+        std::string address;
         std::vector<NetworkMessage> outgoing;
         bool accepted;
     };
@@ -159,14 +160,18 @@ private:
     // The registry containing all entities and their components for the server.
     Registry world;
 
-    // The shared receiving pipe for client join requests and gameplay messages.
-    std::unique_ptr<MsgPipe> receiver;
+    // The shared pipe for all messages to and from clients.
+    std::unique_ptr<MsgPipe> pipe;
 
     // Collection of client sessions, including rejected join attempts.
     // The index of the session corresponds to the client ID minus one
     // (i.e., client ID = index + 1). Rejected attempts occupy an entry with
     // accepted = false, so admitted client IDs can have gaps.
     std::vector<Session> sessions;
+
+    // The client ID of each session, keyed by its address, including rejected
+    // attempts.
+    std::unordered_map<std::string, ClientId> clients;
 
     // A vector of ClientInput structures representing input messages received
     // from admitted clients during the current update tick.

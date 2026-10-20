@@ -21,14 +21,14 @@ namespace svanes {
 NetworkServer::NetworkServer() = default;
 NetworkServer::~NetworkServer() = default;
 
-void NetworkServer::Listen(const std::string &receive_address) {
-    if (receiver) {
+void NetworkServer::Listen(const std::string &address) {
+    if (pipe) {
         throw std::logic_error("Network server is already listening.");
     }
 
-    auto new_receiver = internal::MakePipe();
-    new_receiver->Listen(receive_address);
-    receiver = std::move(new_receiver);
+    auto new_pipe = internal::MakePipe();
+    new_pipe->Listen(address);
+    pipe = std::move(new_pipe);
 }
 
 void NetworkServer::Send(ClientId client, const NetworkMessage &message) {
@@ -38,14 +38,13 @@ void NetworkServer::Send(ClientId client, const NetworkMessage &message) {
     }
 
     sessions[client - 1].outgoing.push_back(
-        internal::EncodeGameMessage(client, message));
+        internal::EncodeGameMessage(message));
 }
 
 void NetworkServer::Broadcast(const NetworkMessage &message) {
-    for (std::size_t index = 0; index < sessions.size(); ++index) {
-        if (sessions[index].accepted) {
-            sessions[index].outgoing.push_back(internal::EncodeGameMessage(
-                static_cast<ClientId>(index + 1), message));
+    for (Session &session : sessions) {
+        if (session.accepted) {
+            session.outgoing.push_back(internal::EncodeGameMessage(message));
         }
     }
 }
@@ -56,9 +55,13 @@ std::span<const ClientInput> NetworkServer::PollInputs() const {
 
 void NetworkServer::ReceiveMessages(IServer &server,
                                     std::vector<ClientInput> &pending) {
-    if (!receiver) {
+    if (!pipe) {
         return;
     }
+
+    // The address the message came from, set by the pipe alongside the
+    // message.
+    std::string address;
 
     // Buffer to hold the incoming message while we read it.
     // We only read one message at a time, so we can reuse the same object for
@@ -70,7 +73,7 @@ void NetworkServer::ReceiveMessages(IServer &server,
     // sends a lot of messages, we can get stuck in this loop forever.
     // TODO: Consider adding a timeout or a maximum number of messages to
     // process per tick.
-    while (receiver->Receive(message)) {
+    while (pipe->Receive(address, message)) {
         if (message.bytes.empty()) {
             continue;
         }
@@ -87,8 +90,6 @@ void NetworkServer::ReceiveMessages(IServer &server,
         // Case 1: A client is trying to join the server.
         // We expect the following format, read in order:
         // - 1 byte: ClientServerMessageKind::Join
-        // - 2 bytes: length of the reply address = N
-        // - N bytes: the reply address string
         // - remaining bytes: the join request payload
 
         if (kind == internal::ClientServerMessageKind::Join) {
@@ -97,42 +98,47 @@ void NetworkServer::ReceiveMessages(IServer &server,
                     "Network server exhausted client IDs.");
             }
 
-            // Address specified by the client to receive the server's response.
-            // The client must be listening on this address.
-
-            const auto reply_address = reader.ReadText();
+            if (clients.contains(address)) {
+                throw std::runtime_error(
+                    "Network server: join request from an address that "
+                    "already has a session: " +
+                    address);
+            }
 
             // The rest of the message is the join request payload, which we
             // pass to the server's HandleJoinRequest method. Meaningless to the
             // engine.
             const auto request = internal::ReadPayload(reader);
 
-            // Message pipe we will use to send messages to this client.
-            auto sender = internal::MakePipe();
-
-            sender->Connect(reply_address);
-
             const auto id = static_cast<ClientId>(sessions.size() + 1);
 
             auto response =
                 server.HandleJoinRequest({world, *this, id, request});
 
-            sessions.push_back({std::move(sender),
+            sessions.push_back({address,
                                 {internal::EncodeJoinResult(
                                     response.accepted, id, response.message)},
                                 response.accepted});
 
+            clients.emplace(address, id);
+
             // Case 2: A client has been accepted and is sending gameplay
             // messages. We expect the following format, read in order:
             // - 1 byte: ClientServerMessageKind::Game
-            // - 4 bytes: the client ID
             // - remaining bytes: the gameplay message payload
 
         } else if (kind == internal::ClientServerMessageKind::Game) {
-            const auto id = reader.ReadUint32();
-            if (id != 0 && id <= sessions.size() && sessions[id - 1].accepted) {
-                pending.push_back({id, internal::ReadPayload(reader)});
+            const auto client = clients.find(address);
+            if (client == clients.end() ||
+                !sessions[client->second - 1].accepted) {
+                // NAT port rebinding also lands here (see Quake 3's qport).
+                throw std::runtime_error(
+                    "Network server: game message from an address that was "
+                    "not admitted: " +
+                    address);
             }
+
+            pending.push_back({client->second, internal::ReadPayload(reader)});
         }
     }
 }
@@ -140,7 +146,7 @@ void NetworkServer::ReceiveMessages(IServer &server,
 void NetworkServer::SendMessages() {
     for (Session &session : sessions) {
         for (const NetworkMessage &message : session.outgoing) {
-            if (!session.sender->Send(message)) {
+            if (!pipe->Send(session.address, message)) {
                 throw std::runtime_error(
                     "Network server could not send a message.");
             }

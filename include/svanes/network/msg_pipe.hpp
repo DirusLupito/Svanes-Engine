@@ -7,30 +7,25 @@
 namespace svanes {
 
 /**
- * Represents one local endpoint of a unidirectional message pipe.
+ * Represents one local endpoint of a bidirectional message pipe.
  *
  * Message pipes give an API to implement a digraph of message routes. Visualize
- * each application as a vertex, and then a MsgPipe is a directed edge that can
- * be used to send messages from one vertex to another.
+ * each application as a vertex, and then a MsgPipe as that vertex's mailbox.
+ * Each Send names a directed edge to another vertex by its address.
  *
- * A successful Listen configures an object to receive only. A successful
- * Connect configures an object to send only. Calling Send on a receiving object
- * or Receive on a sending object throws std::logic_error. Before successful
- * setup and after Close, both Send and Receive throw std::logic_error.
+ * A successful Listen binds a local address, after which the object both sends
+ * and receives. Before successful setup and after Close, both Send and Receive
+ * throw std::logic_error.
  *
- * Even though pipes are intended to be used in a unidirectional fashion,
- * messages may arrive from multiple senders, and the pipe does not
- * automatically select the first sender. Receive returns the message bytes
- * without identifying the sender. Any identity or reply address needed by the
- * caller must be included in the message itself. The pipe does not care about
- * those details, it just delivers the bytes.
+ * The pipe does not remember destinations. Callers pass an address to every
+ * Send and must only send to addresses that will accept the message, such as
+ * one that is port forwarded or one that has already sent to this pipe. Receive
+ * reports the address a message came from, so a caller can reply to it. The
+ * pipe attaches no meaning to addresses, it just delivers the bytes.
  *
- * For bidirectional communication you might have a setup like so:
- * Node A calls Connect to B at a known IP address and port. Node B calls Listen
- * on *:PORT to receive messages from anyone (including A) at that port.
- * The reverse edge uses a separate MsgPipe object. In the reverse case, B will
- * call Connect to A at a known IP address and port, and A will call Listen on
- * *:PORT to receive messages from anyone (including B) at that port.
+ * For example, a server calls Listen on *:PORT at a known port. A client calls
+ * Listen on *:0 to let the system choose its port, then sends to the server's
+ * address. The server replies to the address reported by Receive.
  */
 class MsgPipe {
 public:
@@ -40,44 +35,40 @@ public:
     virtual ~MsgPipe() = default;
 
     /**
-     * Starts listening for incoming messages on the specified local address.
-     * The receiving direction is established only if this call succeeds.
+     * Binds the specified local address for sending and receiving messages.
+     * Both directions are established only if this call succeeds.
      *
-     * @param address The local address to listen on. The format of the address
-     * is implementation-defined.
+     * @param address The local address to bind. The format of the address is
+     * implementation-defined.
      */
     virtual void Listen(const std::string &address) = 0;
 
     /**
-     * Connects to a remote address. The format of the address is
-     * implementation-defined. The sending direction is established only if this
-     * call succeeds.
+     * Sends a message to the specified address.
      *
-     * @param address The address to connect to.
-     */
-    virtual void Connect(const std::string &address) = 0;
-
-    /**
-     * Sends a message to the connected peer.
-     *
+     * @param address The address to send to. The format of the address is
+     * implementation-defined.
      * @param message The message to send.
      *
      * @return True if the message was accepted for sending, false otherwise.
      *
-     * @throws std::logic_error if the pipe is configured to receive, has not
-     * successfully connected, or has been closed.
+     * @throws std::logic_error if the pipe has not successfully started
+     * listening, or has been closed.
      */
-    virtual bool Send(const NetworkMessage &message) = 0;
+    virtual bool Send(const std::string &address,
+                      const NetworkMessage &message) = 0;
 
     /**
-     * Receives a message from the listening endpoint.
+     * Receives a message and the address it came from.
      *
-     * @param message The message to receive.
+     * @param address Set to the address the message came from. The format of
+     * the address is implementation-defined.
+     * @param message Set to the message received.
      * @return True if a message was received, false otherwise.
-     * @throws std::logic_error if the pipe is configured to send, has not
-     * successfully started listening, or has been closed.
+     * @throws std::logic_error if the pipe has not successfully started
+     * listening, or has been closed.
      */
-    virtual bool Receive(NetworkMessage &message) = 0;
+    virtual bool Receive(std::string &address, NetworkMessage &message) = 0;
 
     /**
      * Closes the message pipe, releasing any resources associated with it.

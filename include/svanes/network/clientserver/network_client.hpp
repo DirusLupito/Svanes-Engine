@@ -51,7 +51,7 @@ public:
     explicit NetworkClient(ClientSettings settings = {});
 
     /**
-     * Destroys the client and releases its message pipes.
+     * Destroys the client and releases its message pipe.
      */
     ~NetworkClient();
 
@@ -61,22 +61,16 @@ public:
      * Frames continue while waiting. Gameplay messages remain queued until
      * acceptance. All pipe operations must remain on the same thread as Connect.
      *
-     * @param receive_address The local address to listen for server messages.
-     * @param reply_address The address the server can reach for replies. This
-     * must identify the receiving endpoint, so it cannot be a wildcard address.
-     * @param server_receive_address The remote address where the server listens
+     * @param server_address The remote address where the server listens
      * for admission and gameplay messages.
      * @param timeout_tics The time allowed for a response, in microseconds,
      * starting when the request is sent. Defaults to sixty seconds.
      * 
      * @throws std::logic_error if already connecting or connected.
      * 
-     * @throws std::invalid_argument if the timeout is zero or reply address
-     * empty.
+     * @throws std::invalid_argument if the timeout is zero.
      */
-    void Connect(const std::string &receive_address,
-                 const std::string &reply_address,
-                 const std::string &server_receive_address,
+    void Connect(const std::string &server_address,
                  TicCount timeout_tics = 60 * TicsPerSecond);
 
     /**
@@ -156,17 +150,15 @@ private:
     // The registry containing all entities and their components for the client.
     Registry world;
 
-    // The message pipe used to receive messages from the server.
-    std::unique_ptr<MsgPipe> receiver;
-
-    // The message pipe used to send messages to the server.
-    std::unique_ptr<MsgPipe> sender;
+    // The message pipe used to send messages to and receive messages from the
+    // server.
+    std::unique_ptr<MsgPipe> pipe;
 
     // The ID assigned by the server to this client, or zero if not connected.
     std::uint32_t client_id = 0;
 
-    // The address the server can reach for replies, or empty if not connecting.
-    std::string join_reply_address;
+    // The server's address, or empty if not joining or connected.
+    std::string server_address;
 
     // Stores how long the client will wait for a join response, in microseconds.
     TicCount join_timeout_tics = 0;

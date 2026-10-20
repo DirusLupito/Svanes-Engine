@@ -3,7 +3,6 @@
 #include <svanes/network/message_serialization.hpp>
 
 #include <cstdint>
-#include <string>
 
 namespace svanes::internal {
 
@@ -14,10 +13,10 @@ namespace svanes::internal {
  * between a client and server.
  *
  * MEMBERS:
- * - Join: A reply address followed by the game's join request.
+ * - Join: The game's join request.
  * - Accepted: An assigned client ID followed by the game's response.
  * - Rejected: The game's rejection response.
- * - Game: A client ID followed by opaque game bytes.
+ * - Game: Opaque game bytes.
  */
 enum class ClientServerMessageKind : std::uint8_t {
     Join = 1,
@@ -29,14 +28,11 @@ enum class ClientServerMessageKind : std::uint8_t {
 /**
  * Encodes a join request message to be sent from a client to the server.
  *
- * @param reply_address The address on which the client is listening for the
- * server's response.
  * @param request The game's join request payload.
  *
  * @return A message containing the encoded join request.
  */
-NetworkMessage EncodeJoinRequest(const std::string &reply_address,
-                                 const NetworkMessage &request);
+NetworkMessage EncodeJoinRequest(const NetworkMessage &request);
 
 /**
  * Encodes a join result message to be sent from the server to a client.
@@ -54,14 +50,11 @@ NetworkMessage EncodeJoinResult(bool accepted, std::uint32_t client_id,
 /**
  * Encodes a game message to be sent between a client and the server.
  *
- * @param client_id The sender client ID for client-to-server messages,
- * or the recipient client ID for server-to-client messages.
  * @param message The game's message payload.
  *
  * @return A message containing the encoded game message.
  */
-NetworkMessage EncodeGameMessage(std::uint32_t client_id,
-                                 const NetworkMessage &message);
+NetworkMessage EncodeGameMessage(const NetworkMessage &message);
 
 /**
  * Reads the remaining bytes from a message reader and returns them as a

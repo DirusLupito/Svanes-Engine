@@ -2,18 +2,14 @@
 
 namespace svanes::internal {
 
-NetworkMessage EncodeJoinRequest(const std::string &reply_address,
-                                 const NetworkMessage &request) {
+NetworkMessage EncodeJoinRequest(const NetworkMessage &request) {
     MessageWriter writer;
 
     // A join request message consists of the following fields, in order:
     // - 1 byte: ClientServerMessageKind::Join
-    // - 2 bytes: length of the reply address = N
-    // - N bytes: the reply address string
     // - remaining bytes: the join request payload
 
     writer.WriteUint8(static_cast<std::uint8_t>(ClientServerMessageKind::Join));
-    writer.WriteText(reply_address);
     writer.WriteBytes(request.bytes);
     return writer.Finish();
 }
@@ -41,18 +37,14 @@ NetworkMessage EncodeJoinResult(bool accepted, std::uint32_t client_id,
     return writer.Finish();
 }
 
-NetworkMessage EncodeGameMessage(std::uint32_t client_id,
-                                 const NetworkMessage &message) {
+NetworkMessage EncodeGameMessage(const NetworkMessage &message) {
     MessageWriter writer;
 
     // A game message consists of the following fields, in order:
     // - 1 byte: ClientServerMessageKind::Game
-    // - 4 bytes: the client ID of the sender for client-to-server messages,
-    // or the recipient for server-to-client messages
     // - remaining bytes: the game's message payload
 
     writer.WriteUint8(static_cast<std::uint8_t>(ClientServerMessageKind::Game));
-    writer.WriteUint32(client_id);
     writer.WriteBytes(message.bytes);
     return writer.Finish();
 }

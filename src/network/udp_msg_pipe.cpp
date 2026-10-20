@@ -7,28 +7,15 @@
 
 namespace svanes {
 
-void UdpMsgPipe::Listen(const std::string &address) {
-    if (socket) {
-        throw std::logic_error(
-            "UdpMsgPipe: close the pipe before configuring it again.");
-    }
-
-    zmq::socket_t receiver(context, zmq::socket_type::dgram);
-
-    // Bind the socket to the specified address to establish the receiving
-    // direction.
-    receiver.bind("udp://" + address);
-
-    // Now the pipe owns the socket and is ready to receive datagrams.
-    socket = std::move(receiver);
-}
-
-void UdpMsgPipe::Connect(const std::string &address) {
-    if (socket) {
-        throw std::logic_error(
-            "UdpMsgPipe: close the pipe before configuring it again.");
-    }
-
+/**
+ * Validates a numeric IPv4:PORT address and normalizes it for ZMQ_DGRAM.
+ *
+ * @param address The address to validate.
+ * @return The normalized IPv4:PORT address.
+ * @throws std::invalid_argument if the IPv4 address is invalid or the port is
+ * outside the range from 1 to 65535.
+ */
+static std::string CanonicalAddress(const std::string &address) {
     const std::string_view endpoint = address;
 
     // Assuming the address is in the format IPv4:PORT...
@@ -96,35 +83,40 @@ void UdpMsgPipe::Connect(const std::string &address) {
         }
     }
 
-    // ZMQ_DGRAM requires a destination address with each send, but the 0mq
-    // socket does not store the destination for us. So we store it in this pipe
-    // to supply as the address frame for each Send.
-
     // Append the port to the normalized IPv4 address, giving IPv4:PORT.
     canonical += ':' + std::to_string(port);
 
-    // Create a UDP datagram socket using this pipe's ZeroMQ context.
-    zmq::socket_t sender(context, zmq::socket_type::dgram);
-
-    // When this socket closes, discard any messages still waiting to be sent.
-    sender.set(zmq::sockopt::linger, 0);
-
-    // DGRAM needs a local binding before it can send. But we don't care
-    // which local port is used, so we just let the OS pick one for us.
-    sender.bind("udp://*:0");
-
-    // This message pipe owns the socket now.
-    socket = std::move(sender);
-
-    // Store the destination to supply as the address frame for each Send.
-    destination = std::move(canonical);
+    return canonical;
 }
 
-bool UdpMsgPipe::Send(const NetworkMessage &message) {
-    if (!socket || destination.empty()) {
+void UdpMsgPipe::Listen(const std::string &address) {
+    if (socket) {
         throw std::logic_error(
-            "UdpMsgPipe: Send requires a connected sending pipe.");
+            "UdpMsgPipe: close the pipe before configuring it again.");
     }
+
+    // Create a UDP datagram socket using this pipe's ZeroMQ context.
+    zmq::socket_t new_socket(context, zmq::socket_type::dgram);
+
+    // When this socket closes, discard any messages still waiting to be sent.
+    new_socket.set(zmq::sockopt::linger, 0);
+
+    // Bind the socket to the specified address. ZMQ_DGRAM both sends and
+    // receives through this binding.
+    new_socket.bind("udp://" + address);
+
+    // Now the pipe owns the socket and is ready to send and receive datagrams.
+    socket = std::move(new_socket);
+}
+
+bool UdpMsgPipe::Send(const std::string &address,
+                      const NetworkMessage &message) {
+    if (!socket) {
+        throw std::logic_error("UdpMsgPipe: Send requires a listening pipe.");
+    }
+
+    // ZMQ_DGRAM requires a destination address with each send.
+    const std::string destination = CanonicalAddress(address);
 
     // Check if the message exceeds the ZeroMQ DGRAM UDP buffer limit of 8192
     // bytes.
@@ -153,18 +145,18 @@ bool UdpMsgPipe::Send(const NetworkMessage &message) {
     return true;
 }
 
-bool UdpMsgPipe::Receive(NetworkMessage &message) {
-    if (!socket || !destination.empty()) {
+bool UdpMsgPipe::Receive(std::string &address, NetworkMessage &message) {
+    if (!socket) {
         throw std::logic_error(
-            "UdpMsgPipe: Receive requires a listening receiving pipe.");
+            "UdpMsgPipe: Receive requires a listening pipe.");
     }
 
-    zmq::message_t address;
+    zmq::message_t source;
 
     // We delegate to the socket's recv method, which will return an empty
     // optional if no message is available. dontwait so we don't block if no
     // message is available.
-    if (!socket.recv(address, zmq::recv_flags::dontwait).has_value()) {
+    if (!socket.recv(source, zmq::recv_flags::dontwait).has_value()) {
         return false;
     }
 
@@ -181,6 +173,10 @@ bool UdpMsgPipe::Receive(NetworkMessage &message) {
             "UdpMsgPipe: received an address frame without a body frame.");
     }
 
+    // ZeroMQ writes the sender's address frame as NUL-terminated IPv4:PORT
+    // text.
+    address = source.data<char>();
+
     // Copy the received bytes into the provided NetworkMessage object.
 
     const auto *bytes = body.data<std::byte>();
@@ -190,9 +186,6 @@ bool UdpMsgPipe::Receive(NetworkMessage &message) {
     return true;
 }
 
-void UdpMsgPipe::Close() {
-    socket.close();
-    destination.clear();
-}
+void UdpMsgPipe::Close() { socket.close(); }
 
 } // namespace svanes

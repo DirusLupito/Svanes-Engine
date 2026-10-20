@@ -1,6 +1,5 @@
 #pragma once
 
-#include <svanes/network/tcp_msg_pipe.hpp>
 #include <svanes/network/udp_msg_pipe.hpp>
 
 #include <memory>
