@@ -1,8 +1,7 @@
 #include "orbital_escalation_client.hpp"
-#include "serialization/world_update.hpp"
+#include "combat/damage_system.hpp"
 #include <algorithm>
 #include <cmath>
-#include <iomanip>
 #include <iostream>
 #include <numbers>
 #include <stdexcept>
@@ -13,6 +12,7 @@
 #include <svanes/network/clientserver/network_client.hpp>
 #include <svanes/registry.hpp>
 #include <svanes/render/render_system.hpp>
+#include <unordered_set>
 #include <utility>
 
 const svanes::TicCount kPauseFlashPeriod = svanes::SecondsToTics(1.0);
@@ -20,7 +20,8 @@ constexpr std::uint8_t kPauseLabelMinimumAlpha = 64;
 constexpr svanes::TicCount kClientFrameTics = 16666;
 
 OrbitalEscalationClient::OrbitalEscalationClient(std::string server_address)
-    : server_address(std::move(server_address)) {
+    : server_address(std::move(server_address)),
+      assets(svanes::AssetPath("assets/orbitalEscalation")) {
     if (this->server_address.empty()) {
         throw std::invalid_argument("The server address must be provided.");
     }
@@ -29,6 +30,9 @@ OrbitalEscalationClient::OrbitalEscalationClient(std::string server_address)
 void OrbitalEscalationClient::Initialize(svanes::ClientContext &context) {
     context.network.Connect(server_address);
     std::cout << "Joining " << server_address << '.' << std::endl;
+
+    gameplay_timeline.emplace(context.world);
+    context.world.AddComponent<svanes::Timeline>(gameplay_timeline->Get());
 
     pause_label_entity = context.world.CreateEntity();
     context.world.AddComponent<svanes::TextLabel>(
@@ -69,6 +73,7 @@ void OrbitalEscalationClient::HandleJoinResult(
     const svanes::JoinResult &result) {
     switch (result.status) {
     case svanes::JoinStatus::Accepted:
+        client_id = result.client_id;
         std::cout << "Connected as player " << result.client_id << '.'
                   << std::endl;
         break;
@@ -91,20 +96,13 @@ svanes::TicCount OrbitalEscalationClient::GetFrameIntervalTics() const {
 }
 
 void OrbitalEscalationClient::Update(const svanes::ClientFrameContext &frame) {
-    // temporary debugging output of the world update messages received from the
-    // server
-    // TODO: remove this and replace it with an actual reader that turns server
-    // messages into game state updates.
-    for (const auto &message : frame.network.PollMessages()) {
-        const auto update = WorldUpdate::Read(message);
-        std::cout << "World update (" << message.bytes.size() << " bytes, "
-                  << update.objects.size() << " objects): ";
-        std::cout << std::hex << std::setfill('0');
-        for (const auto byte : message.bytes) {
-            std::cout << std::setw(2) << std::to_integer<std::uint32_t>(byte)
-                      << ' ';
-        }
-        std::cout << std::dec << std::setfill(' ') << std::endl;
+    // The world update messages received for this frame.
+    const auto messages = frame.network.PollMessages();
+
+    // Each update describes the complete world state, so only apply the last
+    // one before the engine renders this frame.
+    if (!messages.empty()) {
+        ApplyWorldUpdate(frame, WorldUpdate::Read(messages.back()));
     }
 
     if (frame.input.WasPressed(svanes::Key::Escape)) {
@@ -178,6 +176,117 @@ void OrbitalEscalationClient::Update(const svanes::ClientFrameContext &frame) {
             .geometry);
     background_rectangle.width = view.width;
     background_rectangle.height = view.height;
+}
+
+void OrbitalEscalationClient::ApplyWorldUpdate(
+    const svanes::ClientFrameContext &frame, const WorldUpdate &update) {
+    // The registry containing the client's displayed objects and local UI.
+    auto &world = frame.world;
+
+    // The master clock shared by the displayed gameplay objects.
+    auto &timeline =
+        world.GetComponent<svanes::Timeline>(gameplay_timeline->Get());
+
+    // Copy the server's clock state. The client does not advance the simulation
+    // between updates. (TODO: change this? for client-side prediction?)
+    timeline.SetProgress(update.total_tics, 0, svanes::RationalNumber{0});
+    timeline.SetTicSize(update.tic_size);
+    if (update.paused) {
+        timeline.Pause();
+    } else {
+        timeline.Unpause();
+    }
+
+    world.GetComponent<svanes::TextLabel>(pause_label_entity).visible =
+        update.paused;
+
+    // We create the planet once, then update its displayed position and
+    // rotation given subsequent world updates.
+    if (!planet) {
+        planet.emplace(world, Planet::MakeDefinition());
+    }
+
+    planet->GetTransform(world) = update.planet_transform;
+    planet->UpdateVisuals(world);
+
+    // The server IDs of objects present in this complete world update.
+    std::unordered_set<svanes::Entity> present;
+
+    // For every object in the server's world, create it if necessary and update
+    // its displayed state. The server's world update is authoritative, so we
+    // copy the server's state to the client.
+    for (const auto &state : update.objects) {
+        present.insert(state.entity);
+
+        // Create the object if it does not already exist in the client's world.
+        if (!objects.contains(state.entity)) {
+            objects.emplace(state.entity, assets.CreateUnattached(
+                                              world, gameplay_timeline->Get(),
+                                              state.type, state.definition));
+        }
+
+        // And now at this point we know the object exists in the client's
+        // world, so we can update its displayed state to match the server's
+        // world update.
+
+        // The local object corresponding to this server entity.
+        auto &object = *objects.at(state.entity);
+        const auto entity = object.GetEntity();
+
+        object.GetTransform(world) = state.transform;
+        world.GetComponent<svanes::Timeline>(entity).SetProgress(
+            state.local_tics, 0, svanes::RationalNumber{0});
+
+        // Copy independent movement if present. Attached objects have no
+        // kinematic component while they follow their parent.
+        if (state.velocity) {
+            auto &motion = world.AddComponent<svanes::Kinematic2D>(entity);
+            motion.velocity_x = state.velocity->linear.x;
+            motion.velocity_y = state.velocity->linear.y;
+            motion.angular_velocity = state.velocity->angular;
+        } else {
+            world.RemoveComponent<svanes::Kinematic2D>(entity);
+        }
+
+        // Keep damageable objects' health in step with the server.
+        if (state.health) {
+            world.AddComponent<Health>(entity, Health{*state.health});
+        } else {
+            world.RemoveComponent<Health>(entity);
+        }
+    }
+
+    // Remove objects which are no longer in the server's world. Their owners
+    // also remove the associated visual entities from the registry.
+    std::erase_if(objects, [&](const auto &entry) {
+        return !present.contains(entry.first);
+    });
+
+    // All objects now exist, so translate attachment parent IDs to local
+    // entities. Their world poses already came from the server.
+    for (const auto &state : update.objects) {
+        auto &object = *objects.at(state.entity);
+        const auto entity = object.GetEntity();
+        if (state.attachment) {
+            world.AddComponent<Attachment>(
+                entity,
+                Attachment{objects.at(state.attachment->parent)->GetEntity(),
+                           state.attachment->transform});
+        } else {
+            world.RemoveComponent<Attachment>(entity);
+        }
+        object.UpdateVisuals(world);
+    }
+
+    // Follow this player's living ship. If it has been destroyed, keep the
+    // camera at its last position.
+    for (const auto &player : update.players) {
+        if (player.client == client_id && player.ship) {
+            const auto &pose = objects.at(*player.ship)->GetTransform(world);
+            frame.camera.x = pose.x;
+            frame.camera.y = pose.y;
+        }
+    }
 }
 
 bool OrbitalEscalationClient::ShouldQuit() const { return should_quit; }
