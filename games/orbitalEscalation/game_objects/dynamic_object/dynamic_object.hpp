@@ -66,11 +66,6 @@ struct DynamicObjectDefinition {
  */
 class DynamicObject {
 
-    // The OrbitalSimulation class needs to access the private members of
-    // DynamicObject to manage the simulation state and handle player
-    // interactions.
-    friend class OrbitalSimulation;
-
 public:
     /**
      * Destroys the DynamicObject entity, its visuals, and any objects still

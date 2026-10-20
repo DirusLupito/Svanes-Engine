@@ -1,5 +1,5 @@
 add_library(
-    svanes_orbital_simulation STATIC
+    svanes_orbital_common STATIC
     attachment_system.cpp
     attachment_system.hpp
     propulsion_system.cpp
@@ -51,24 +51,20 @@ FetchContent_Declare(
     SOURCE_DIR "${CMAKE_SOURCE_DIR}/thirdparty/nlohmann_json-src"
 )
 FetchContent_MakeAvailable(nlohmann_json)
-target_link_libraries(svanes_orbital_simulation PUBLIC
+target_link_libraries(svanes_orbital_common PUBLIC
     Svanes::Engine nlohmann_json::nlohmann_json
 )
 add_executable(svanes_game_orbital_escalation
     main.cpp
     orbital_escalation_game.cpp
-    orbital_simulation.cpp
-    orbital_simulation.hpp
-    serialization/world_snapshot.cpp
-    serialization/world_snapshot.hpp
 )
-target_link_libraries(svanes_game_orbital_escalation PRIVATE svanes_orbital_simulation)
+target_link_libraries(svanes_game_orbital_escalation PRIVATE svanes_orbital_common)
 add_executable(svanes_game_orbital_escalation_server
     server_main.cpp
     OrbitalEscalationServer.hpp
     OrbitalEscalationServer.cpp
 )
-target_link_libraries(svanes_game_orbital_escalation_server PRIVATE svanes_orbital_simulation)
+target_link_libraries(svanes_game_orbital_escalation_server PRIVATE svanes_orbital_common)
 
 
 svanes_game_package(svanes_game_orbital_escalation orbitalEscalation orbitalEscalation orbitalEscalation)

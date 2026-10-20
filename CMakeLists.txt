@@ -185,10 +185,6 @@ target_sources(
         src/network/msg_pipe_factory.hpp
         src/network/message_serialization.cpp
         src/network/network_message.cpp
-        src/network/network_session.cpp
-        src/network/peer_group.cpp
-        src/network/peer_join.hpp
-        src/network/peer_join.cpp
         src/network/clientserver/network_server.cpp
         src/network/tcp_msg_pipe.cpp
         src/network/udp_msg_pipe.cpp
@@ -237,9 +233,6 @@ target_sources(
             include/svanes/network/clientserver/network_client.hpp
             include/svanes/network/clientserver/IClient.hpp
             include/svanes/network/network_message.hpp
-            include/svanes/network/network_session.hpp
-            include/svanes/network/input_sync.hpp
-            include/svanes/network/peer_group.hpp
             include/svanes/network/clientserver/network_server.hpp
             include/svanes/network/clientserver/IServer.hpp
             include/svanes/network/tcp_msg_pipe.hpp
@@ -301,9 +294,6 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/network/clientserver/network_client.hpp
     include/svanes/network/clientserver/IClient.hpp
     include/svanes/network/network_message.hpp
-    include/svanes/network/network_session.hpp
-    include/svanes/network/input_sync.hpp
-    include/svanes/network/peer_group.hpp
     include/svanes/network/clientserver/network_server.hpp
     include/svanes/network/clientserver/IServer.hpp
     include/svanes/network/tcp_msg_pipe.hpp
@@ -352,10 +342,6 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/network/msg_pipe_factory.hpp
     src/network/message_serialization.cpp
     src/network/network_message.cpp
-    src/network/network_session.cpp
-    src/network/peer_group.cpp
-    src/network/peer_join.hpp
-    src/network/peer_join.cpp
     src/network/clientserver/network_server.cpp
     src/network/tcp_msg_pipe.cpp
     src/network/udp_msg_pipe.cpp
