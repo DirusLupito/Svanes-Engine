@@ -94,18 +94,15 @@ void UdpMsgPipe::Listen(const std::string &address) {
         throw std::logic_error(
             "UdpMsgPipe: close the pipe before configuring it again.");
     }
-
-    // Create a UDP datagram socket using this pipe's ZeroMQ context.
     zmq::socket_t new_socket(context, zmq::socket_type::dgram);
 
     // When this socket closes, discard any messages still waiting to be sent.
     new_socket.set(zmq::sockopt::linger, 0);
 
-    // Bind the socket to the specified address. ZMQ_DGRAM both sends and
-    // receives through this binding.
+    // Bind the socket to the specified address.
     new_socket.bind("udp://" + address);
 
-    // Now the pipe owns the socket and is ready to send and receive datagrams.
+    // Now the pipe owns the socket and is ready to send and receive datagrams.`
     socket = std::move(new_socket);
 }
 
@@ -173,8 +170,7 @@ bool UdpMsgPipe::Receive(std::string &address, NetworkMessage &message) {
             "UdpMsgPipe: received an address frame without a body frame.");
     }
 
-    // ZeroMQ writes the sender's address frame as NUL-terminated IPv4:PORT
-    // text.
+    // 0MQ writes the sender's address frame as NULL-terminated IPv4:PORT text.
     address = source.data<char>();
 
     // Copy the received bytes into the provided NetworkMessage object.

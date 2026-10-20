@@ -8,6 +8,7 @@
 #include "protocol.hpp"
 
 #include <chrono>
+#include <iostream>
 #include <limits>
 #include <stdexcept>
 #include <thread>
@@ -98,11 +99,13 @@ void NetworkServer::ReceiveMessages(IServer &server,
                     "Network server exhausted client IDs.");
             }
 
+            // An address can only identify one session. So we ignore duplicate
+            // join requests so the existing session remains unchanged.
             if (clients.contains(address)) {
-                throw std::runtime_error(
-                    "Network server: join request from an address that "
-                    "already has a session: " +
-                    address);
+                std::cerr << "Network server: ignoring join request from an "
+                             "address that already has a session: "
+                          << address << '\n';
+                continue;
             }
 
             // The rest of the message is the join request payload, which we
@@ -129,16 +132,11 @@ void NetworkServer::ReceiveMessages(IServer &server,
 
         } else if (kind == internal::ClientServerMessageKind::Game) {
             const auto client = clients.find(address);
-            if (client == clients.end() ||
-                !sessions[client->second - 1].accepted) {
-                // NAT port rebinding also lands here (see Quake 3's qport).
-                throw std::runtime_error(
-                    "Network server: game message from an address that was "
-                    "not admitted: " +
-                    address);
+            if (client != clients.end() &&
+                sessions[client->second - 1].accepted) {
+                pending.push_back(
+                    {client->second, internal::ReadPayload(reader)});
             }
-
-            pending.push_back({client->second, internal::ReadPayload(reader)});
         }
     }
 }

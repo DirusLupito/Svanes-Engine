@@ -68,10 +68,10 @@ public:
      * Receives one datagram from any sender at the listening endpoint.
      * Non-blocking, false indicates that no message was available.
      *
-     * @param address Set to the sender's address, in numeric IPv4:PORT form.
-     * Unchanged if no message is available.
-     * @param message Set to the message received. Unchanged if none is
-     * available.
+     * @param address Output parameter. Will be set to the sender's address, in
+     * numeric IPv4:PORT form. Unchanged if no message is available.
+     * @param message Output parameter. Will be set to the message received.
+     * Unchanged if none is available.
      *
      * @return True if a message was received, false otherwise.
      *

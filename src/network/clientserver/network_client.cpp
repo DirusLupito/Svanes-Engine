@@ -116,8 +116,7 @@ void NetworkClient::ReceiveMessages(IClient &client) {
         }
     }
 
-    // Only the server should be sending to this pipe, so the sender's address
-    // is not checked.
+    // The source address of the current message. Currently ignored.
     std::string address;
 
     // Case 2: Either we're connected or we're still waiting for a join
