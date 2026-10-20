@@ -4,9 +4,8 @@
 #include "../effects/collision_flashes.hpp"
 #include "damage_system.hpp"
 #include <svanes/registry.hpp>
-#include <svanes/stable_id.hpp>
 
-#include <set>
+#include <unordered_set>
 
 bool IgnoresFiringShip(const svanes::Registry &world, svanes::Entity missile,
                        svanes::Entity other) {
@@ -32,13 +31,7 @@ void UpdateMissileExplosions(
     svanes::Registry &world, svanes::Entity gameplay_timeline,
     std::span<const svanes::EntityCollision2D> contacts,
     std::vector<OwnedEntity> &flashes) {
-    // One explosion can trigger another, so process them in stable identity
-    // order.
-    const auto before = [&](svanes::Entity a, svanes::Entity b) {
-        return world.GetComponent<svanes::StableId>(a).value <
-               world.GetComponent<svanes::StableId>(b).value;
-    };
-    std::set<svanes::Entity, decltype(before)> pending(before);
+    std::unordered_set<svanes::Entity> pending;
 
     // Finds undetonated missiles whose health has reached zero and adds them to
     // pending. It is called before processing begins and after each explosion
