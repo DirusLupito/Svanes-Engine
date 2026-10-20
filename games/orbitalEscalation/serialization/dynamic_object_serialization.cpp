@@ -32,6 +32,8 @@ std::string WriteDynamicObjectType(DynamicObjectType type) {
         return "missile";
     case DynamicObjectType::MissileLauncher:
         return "missile_launcher";
+    case DynamicObjectType::Count:
+        break;
     }
 
     throw std::invalid_argument("Unsupported dynamic object type");

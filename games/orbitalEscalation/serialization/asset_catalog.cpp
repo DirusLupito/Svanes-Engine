@@ -113,6 +113,8 @@ AssetCatalog::GetDefinition(DynamicObjectType type,
             return found->second.object;
         }
         break;
+    case DynamicObjectType::Count:
+        break;
     }
 
     throw std::invalid_argument("Missing " + WriteDynamicObjectType(type) +
@@ -240,6 +242,8 @@ AssetCatalog::Create(svanes::Registry &world, svanes::Entity gameplay_timeline,
         return CreateMissile(world, gameplay_timeline, name);
     case DynamicObjectType::MissileLauncher:
         return CreateMissileLauncher(world, gameplay_timeline, name);
+    case DynamicObjectType::Count:
+        break;
     }
     throw std::invalid_argument("Unsupported dynamic object type");
 }
@@ -257,6 +261,8 @@ std::unique_ptr<DynamicObject> AssetCatalog::CreateUnattached(
     case DynamicObjectType::MissileLauncher:
         return std::make_unique<MissileLauncher>(world, gameplay_timeline,
                                                  missile_launchers.at(name));
+    case DynamicObjectType::Count:
+        break;
     }
 
     throw std::invalid_argument("Unsupported dynamic object type");

@@ -20,8 +20,10 @@
  * - Ship: A ship definition.
  * - Missile: A missile definition.
  * - MissileLauncher: A missile launcher definition.
+ * - Count: The number of valid object types and their exclusive upper bound.
+ *   This sentinel must remain last and does not represent an object type.
  */
-enum class DynamicObjectType { Ship, Missile, MissileLauncher };
+enum class DynamicObjectType { Ship, Missile, MissileLauncher, Count };
 
 /**
  * Defines an object attached to another object. This is a reference to a
