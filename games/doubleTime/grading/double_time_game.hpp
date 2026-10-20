@@ -10,7 +10,6 @@
 #include <svanes/game.hpp>
 #include <svanes/geometry/geometry.hpp>
 #include <svanes/network/network_client.hpp>
-#include <svanes/network/udp_msg_pipe.hpp>
 #include <svanes/render/basic_render_types.hpp>
 #include <svanes/timeline_system.hpp>
 #include <svanes/tilemaps/tilemap.hpp>
@@ -39,9 +38,7 @@ struct DoubleTimeLevelAssets {
 class DoubleTimeGame final : public svanes::IGame {
 public:
     explicit DoubleTimeGame(
-        std::string server_host = kDoubleTimeDefaultServerHost,
-        std::uint16_t input_bridge_port = 0,
-        bool input_bridge_controls_platforms = false);
+        std::string server_host = kDoubleTimeDefaultServerHost);
 
     void Initialize(svanes::GameContext &context) override;
     void Update(const svanes::FrameContext &frame) override;
@@ -54,18 +51,18 @@ private:
     void ActivateTilemap(svanes::Registry &world, std::size_t index);
     void CheckGoal(svanes::Registry &world);
     void SendInput(const svanes::FrameContext &frame);
-    void PollInputBridge();
+    void SimulateClientCharacter(const svanes::FrameContext &frame);
+    void EnsureClientCharacter(svanes::Registry &world);
     void ApplyServerState(svanes::Registry &world);
     void SynchronizeAudio(float elapsed_seconds);
     void UpdateCamera(svanes::Camera2D &camera, svanes::Registry &world);
 
     svanes::NetworkClient network_client;
-    std::unique_ptr<svanes::UdpMsgPipe> input_bridge_pipe;
-    bool input_bridge_controls_platforms = false;
-    bool has_bridge_input = false;
-    DoubleTimeBridgeInput bridge_input{};
     svanes::Entity character_entity = 0;
     bool has_character = false;
+    bool local_character_initialized = false;
+    float local_velocity_x = 0.0F;
+    float local_velocity_y = 0.0F;
     std::map<std::uint32_t, svanes::Entity> grading_character_entities;
     svanes::Timeline client_timeline;
 
@@ -82,21 +79,6 @@ private:
     float input_send_timer = 0.0F;
     bool action_requested_since_last_send = false;
     bool jump_on_beat_since_last_send = false;
-    bool platform_action_requested_since_last_send = false;
-    bool platform_left_was_down = false;
-    bool platform_right_was_down = false;
-    bool platform_up_was_down = false;
-    bool platform_down_was_down = false;
-    bool platform_left_on_beat = false;
-    bool platform_right_on_beat = false;
-    bool platform_up_on_beat = false;
-    bool platform_down_on_beat = false;
-    bool platform_action_on_beat = false;
-    std::uint64_t platform_left_beat_index = 0;
-    std::uint64_t platform_right_beat_index = 0;
-    std::uint64_t platform_up_beat_index = 0;
-    std::uint64_t platform_down_beat_index = 0;
-    std::uint64_t platform_action_beat_index = 0;
     std::map<std::uint32_t, svanes::Entity> platform_entities;
     std::map<std::uint32_t, svanes::Entity> door_entities;
     std::map<std::uint32_t, svanes::Entity> spike_entities;

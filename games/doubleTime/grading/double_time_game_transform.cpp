@@ -1,7 +1,9 @@
+#define DOUBLE_TIME_GRADING_CLIENT_POSITION 1
 #include "double_time_game.hpp"
 #include "tilemap_parser.hpp"
 
 #include <svanes/camera2d.hpp>
+#include <svanes/collision_system.hpp>
 #include <svanes/input.hpp>
 #include <svanes/registry.hpp>
 #include <svanes/render/render_system.hpp>
@@ -35,18 +37,77 @@ constexpr std::int32_t kPlatformZOrder = 2;
 constexpr svanes::Color kBackgroundColor{17, 24, 39, 255};
 
 constexpr const char *kTestTileSetFilename = "TestTileSet.png";
+constexpr float kCharacterMaxSpeedPerSecond = 547.0F * kDoubleTimeWorldScale;
+constexpr float kCharacterAccelerationPerSecondSquared =
+    2400.0F * kDoubleTimeWorldScale;
+constexpr float kCharacterDecelerationPerSecondSquared =
+    3200.0F * kDoubleTimeWorldScale;
+constexpr float kJumpSpeedPerSecond = 1200.0F * kDoubleTimeWorldScale;
+constexpr float kGravityPerSecondSquared = 3000.0F * kDoubleTimeWorldScale;
+constexpr float kCharacterColliderWidth = kDoubleTimeCharacterWidth * 0.8F;
+constexpr std::int32_t kMaxResolutionIterations = 4;
+
+struct ClientRigidBody {};
+
+void ResolveClientCharacterAxis(svanes::Registry &world,
+                                svanes::Entity character_entity,
+                                bool horizontal, float &velocity_x,
+                                float &velocity_y) {
+    svanes::Transform &character_transform =
+        world.GetComponent<svanes::Transform>(character_entity);
+    const svanes::Collider2D &character_collider =
+        world.GetComponent<svanes::Collider2D>(character_entity);
+    for (std::int32_t iteration = 0; iteration < kMaxResolutionIterations;
+         ++iteration) {
+        std::optional<svanes::Collision2D> deepest_collision;
+        const auto consider = [&](const svanes::Collision2D &collision) {
+            const bool axis_aligned = horizontal ? collision.normal.y == 0.0F
+                                                 : collision.normal.x == 0.0F;
+            if (axis_aligned &&
+                (!deepest_collision.has_value() ||
+                 collision.penetration_depth >
+                     deepest_collision->penetration_depth)) {
+                deepest_collision = collision;
+            }
+        };
+        world.ForEach<svanes::Transform, svanes::Collider2D, ClientRigidBody>(
+            [&](svanes::Entity candidate_entity,
+                const svanes::Transform &candidate_transform,
+                const svanes::Collider2D &candidate_collider,
+                const ClientRigidBody &) {
+                if (candidate_entity == character_entity) return;
+                for (const auto &collision : svanes::DetectCollisions(
+                         character_collider.geometry, character_transform,
+                         candidate_collider.geometry, candidate_transform)) {
+                    consider(collision);
+                }
+            });
+        world.ForEach<svanes::Transform, svanes::TileMap>(
+            [&](svanes::Entity, const svanes::Transform &tilemap_transform,
+                const svanes::TileMap &tilemap) {
+                for (const auto &collision : svanes::DetectTileMapCollisions(
+                         character_collider.geometry, character_transform,
+                         tilemap, tilemap_transform)) {
+                    consider(collision);
+                }
+            });
+        if (!deepest_collision.has_value()) break;
+        if (horizontal) {
+            character_transform.x += deepest_collision->normal.x *
+                                     deepest_collision->penetration_depth;
+            velocity_x = 0.0F;
+        } else {
+            character_transform.y += deepest_collision->normal.y *
+                                     deepest_collision->penetration_depth;
+            velocity_y = 0.0F;
+        }
+    }
+}
 
 } // namespace
 
-DoubleTimeGame::DoubleTimeGame(std::string server_host,
-                               std::uint16_t input_bridge_port,
-                               bool input_bridge_controls_platforms)
-    : network_client(std::move(server_host), kDoubleTimeServerJoinPort),
-      input_bridge_controls_platforms(input_bridge_controls_platforms) {
-    if (input_bridge_port != 0) {
-        input_bridge_pipe =
-            std::make_unique<svanes::UdpMsgPipe>(input_bridge_port);
-    }
+DoubleTimeGame::DoubleTimeGame(std::string server_host)
+    : network_client(std::move(server_host), kDoubleTimeServerJoinPort) {
     SDL_Log("Networking: joining Double Time server.");
 }
 
@@ -245,7 +306,7 @@ void DoubleTimeGame::Initialize(svanes::GameContext &context) {
 void DoubleTimeGame::SendInput(const svanes::FrameContext &frame) {
     if (!network_client.IsConnected()) return;
     const auto assigned_id = network_client.Id();
-    input_send_timer += static_cast<float>(client_timeline.GetDeltaTics()) /
+    input_send_timer += static_cast<float>(frame.real_delta_tics) /
                         static_cast<float>(svanes::TicsPerSecond);
     while (input_send_timer >= kInputSendIntervalSeconds) {
         input_send_timer -= kInputSendIntervalSeconds;
@@ -253,29 +314,6 @@ void DoubleTimeGame::SendInput(const svanes::FrameContext &frame) {
         float horizontal_input = 0.0F;
         bool jump_requested = action_requested_since_last_send;
         bool jump_on_beat = jump_on_beat_since_last_send;
-        bool platform_left = frame.input.IsDown(svanes::Key::Left);
-        bool platform_right = frame.input.IsDown(svanes::Key::Right);
-        bool platform_up = frame.input.IsDown(svanes::Key::Up);
-        bool platform_down = frame.input.IsDown(svanes::Key::Down);
-        bool platform_action = platform_action_requested_since_last_send;
-        if (input_bridge_pipe != nullptr) {
-            if (has_bridge_input) {
-                horizontal_input += bridge_input.character_horizontal;
-                jump_requested = jump_requested || bridge_input.character_jump;
-                jump_on_beat = jump_on_beat ||
-                               (bridge_input.character_jump &&
-                                double_time::IsOnBeat(
-                                    client_timeline.GetTotalTics(),
-                                    DoubleTimeAssetCatalog()[active_area_index]
-                                        .beats_per_minute,
-                                    kRhythmTolerance));
-                platform_left = platform_left || bridge_input.platform_left;
-                platform_right = platform_right || bridge_input.platform_right;
-                platform_up = platform_up || bridge_input.platform_up;
-                platform_down = platform_down || bridge_input.platform_down;
-                platform_action = platform_action || bridge_input.platform_action;
-            }
-        }
         if (frame.input.IsDown(svanes::Key::A)) {
             horizontal_input -= 1.0F;
         }
@@ -283,72 +321,92 @@ void DoubleTimeGame::SendInput(const svanes::FrameContext &frame) {
             horizontal_input += 1.0F;
         }
 
-        const PlayerInputMessage input{assigned_id, horizontal_input,
-                                       jump_requested, jump_on_beat,
-                                       input_bridge_controls_platforms,
-                                       platform_left,
-                                       platform_right, platform_up, platform_down,
-                                       platform_action,
-                                       platform_left_on_beat,
-                                       platform_right_on_beat,
-                                       platform_up_on_beat,
-                                       platform_down_on_beat,
-                                       platform_action_on_beat,
-                                       platform_left_beat_index,
-                                       platform_right_beat_index,
-                                       platform_up_beat_index,
-                                       platform_down_beat_index,
-                                       platform_action_beat_index};
         if constexpr (kDoubleTimeNetworkingStrategy ==
                       DoubleTimeNetworkingStrategy::InputAuthoritative) {
-            network_client.Send(input);
+            network_client.Send(PlayerInputMessage{
+                assigned_id, horizontal_input, jump_requested, jump_on_beat});
+        } else {
+            if (has_character && local_character_initialized) {
+                const auto &transform =
+                    frame.world.GetComponent<svanes::Transform>(character_entity);
+                network_client.Send(PlayerTransformMessage{
+                    assigned_id, transform,
+                    svanes::Vector2D{local_velocity_x, local_velocity_y}});
+            }
         }
         action_requested_since_last_send = false;
         jump_on_beat_since_last_send = false;
-        platform_action_requested_since_last_send = false;
     }
 }
 
-void DoubleTimeGame::PollInputBridge() {
-    if (input_bridge_pipe == nullptr) {
+void DoubleTimeGame::SimulateClientCharacter(
+    const svanes::FrameContext &frame) {
+    if (!has_character || !local_character_initialized) return;
+    const svanes::TicCount delta_tics = frame.real_delta_tics;
+    if (delta_tics <= 0) return;
+    auto &world = frame.world;
+    auto &transform = world.GetComponent<svanes::Transform>(character_entity);
+    float horizontal_input = 0.0F;
+    if (frame.input.IsDown(svanes::Key::A)) horizontal_input -= 1.0F;
+    if (frame.input.IsDown(svanes::Key::D)) horizontal_input += 1.0F;
+    const float target = horizontal_input *
+        svanes::PerSecondToPerTic(kCharacterMaxSpeedPerSecond);
+    const float acceleration = horizontal_input == 0.0F
+        ? kCharacterDecelerationPerSecondSquared
+        : kCharacterAccelerationPerSecondSquared;
+    const float change = svanes::PerSecondSquaredToPerTicSquared(
+        acceleration) * static_cast<float>(delta_tics);
+    local_velocity_x = std::clamp(target, local_velocity_x - change,
+                                  local_velocity_x + change);
+    if (action_requested_since_last_send && local_velocity_y == 0.0F) {
+        local_velocity_y = -svanes::PerSecondToPerTic(kJumpSpeedPerSecond);
+    }
+    local_velocity_y += svanes::PerSecondSquaredToPerTicSquared(
+        kGravityPerSecondSquared) * static_cast<float>(delta_tics);
+    transform.x += local_velocity_x * static_cast<float>(delta_tics);
+    transform.y += local_velocity_y * static_cast<float>(delta_tics);
+    ResolveClientCharacterAxis(world, character_entity, true,
+                               local_velocity_x, local_velocity_y);
+    ResolveClientCharacterAxis(world, character_entity, false,
+                               local_velocity_x, local_velocity_y);
+}
+
+void DoubleTimeGame::EnsureClientCharacter(svanes::Registry &world) {
+    if constexpr (kDoubleTimeNetworkingStrategy ==
+                  DoubleTimeNetworkingStrategy::InputAuthoritative) {
         return;
     }
-    svanes::NetworkMessage message;
-    while (input_bridge_pipe->Receive(message)) {
-        const DoubleTimeBridgeInput previous = bridge_input;
-        bridge_input = message.As<DoubleTimeBridgeInput>();
-        if (bridge_input.character_jump) {
-            jump_on_beat_since_last_send =
-                jump_on_beat_since_last_send ||
-                double_time::IsOnBeat(
-                    client_timeline.GetTotalTics(),
-                    DoubleTimeAssetCatalog()[active_area_index].beats_per_minute,
-                    kRhythmTolerance);
-        }
-        const auto capture = [&](bool down, bool was_down, bool &on_beat,
-                                 std::uint64_t &beat_index) {
-            if (down && !was_down) {
-                beat_index = double_time::BeatIndex(
-                    client_timeline.GetTotalTics(),
-                    DoubleTimeAssetCatalog()[active_area_index].beats_per_minute);
-                on_beat = double_time::IsOnBeat(
-                    client_timeline.GetTotalTics(),
-                    DoubleTimeAssetCatalog()[active_area_index].beats_per_minute,
-                    kRhythmTolerance);
-            }
-        };
-        capture(bridge_input.platform_left, previous.platform_left,
-                platform_left_on_beat, platform_left_beat_index);
-        capture(bridge_input.platform_right, previous.platform_right,
-                platform_right_on_beat, platform_right_beat_index);
-        capture(bridge_input.platform_up, previous.platform_up,
-                platform_up_on_beat, platform_up_beat_index);
-        capture(bridge_input.platform_down, previous.platform_down,
-                platform_down_on_beat, platform_down_beat_index);
-        capture(bridge_input.platform_action, previous.platform_action,
-                platform_action_on_beat, platform_action_beat_index);
-        has_bridge_input = true;
+    if (has_character || !network_client.IsConnected() || !has_active_tilemap) {
+        return;
     }
+    const auto &level = area_assets[active_area_index].levels[active_tilemap_index];
+    const auto &tilemap_transform =
+        world.GetComponent<svanes::Transform>(active_tilemap_entity);
+    const float x = level.spawn_point
+        ? tilemap_transform.x + (level.spawn_point->x + 0.5F) * kDoubleTimeTileSize
+        : 20.0F;
+    const float y = level.spawn_point
+        ? tilemap_transform.y + (level.spawn_point->y + 0.5F) * kDoubleTimeTileSize
+        : 20.0F;
+    const svanes::Entity entity = world.CreateEntity();
+    world.AddComponent<svanes::Transform>(entity, svanes::Transform{x, y, 0.0F});
+    world.AddComponent<svanes::SolidShape>(
+        entity, svanes::SolidShape{svanes::Color{76, 175, 80, 255},
+                                   svanes::Rectangle2D{
+                                       0.0F, 0.0F, kDoubleTimeCharacterWidth,
+                                       kDoubleTimeCharacterHeight}});
+    world.AddComponent<svanes::Collider2D>(
+        entity, svanes::Collider2D{svanes::Rectangle2D{
+            0.0F, 0.0F, kCharacterColliderWidth,
+            kDoubleTimeCharacterHeight}});
+    world.AddComponent<svanes::Timeline>(entity);
+    world.AddComponent<svanes::ZOrder>(entity, svanes::ZOrder{kCharacterZOrder});
+    grading_character_entities.emplace(network_client.Id(), entity);
+    character_entity = entity;
+    has_character = true;
+    local_character_initialized = true;
+    local_velocity_x = 0.0F;
+    local_velocity_y = 0.0F;
 }
 
 void DoubleTimeGame::ApplyServerState(svanes::Registry &world) {
@@ -387,6 +445,19 @@ void DoubleTimeGame::ApplyServerState(svanes::Registry &world) {
             continue;
         }
 
+        if (state.kind == DoubleTimeEntityKind::CharacterDespawn) {
+            const auto found = grading_character_entities.find(state.entity_id);
+            if (found != grading_character_entities.end()) {
+                world.DestroyEntity(found->second);
+                grading_character_entities.erase(found);
+            }
+            if (state.entity_id == network_client.Id()) {
+                has_character = false;
+                local_character_initialized = false;
+            }
+            continue;
+        }
+
         if (state.kind == DoubleTimeEntityKind::MovingPlatform) {
             auto found = platform_entities.find(state.entity_id);
             if (found == platform_entities.end()) {
@@ -398,6 +469,11 @@ void DoubleTimeGame::ApplyServerState(svanes::Registry &world) {
                         svanes::Color{110, 116, 134, 255},
                         svanes::Rectangle2D{0.0F, 0.0F, state.width,
                                             state.height}});
+                world.AddComponent<svanes::Collider2D>(
+                    entity, svanes::Collider2D{
+                        svanes::Rectangle2D{0.0F, 0.0F, state.width,
+                                            state.height}});
+                world.AddComponent<ClientRigidBody>(entity, ClientRigidBody{});
                 world.AddComponent<svanes::ZOrder>(
                     entity, svanes::ZOrder{kPlatformZOrder});
                 platform_entities.emplace(state.entity_id, entity);
@@ -475,6 +551,13 @@ void DoubleTimeGame::ApplyServerState(svanes::Registry &world) {
                                    svanes::Rectangle2D{
                                        0.0F, 0.0F, kDoubleTimeCharacterWidth,
                                        kDoubleTimeCharacterHeight}});
+            if constexpr (kDoubleTimeNetworkingStrategy ==
+                          DoubleTimeNetworkingStrategy::ClientPositionAuthoritative) {
+                world.AddComponent<svanes::Collider2D>(
+                    entity, svanes::Collider2D{svanes::Rectangle2D{
+                        0.0F, 0.0F, kCharacterColliderWidth,
+                        kDoubleTimeCharacterHeight}});
+            }
             world.AddComponent<svanes::Timeline>(entity);
             world.AddComponent<svanes::ZOrder>(
                 entity, svanes::ZOrder{kCharacterZOrder});
@@ -482,10 +565,19 @@ void DoubleTimeGame::ApplyServerState(svanes::Registry &world) {
             if (state.entity_id == network_client.Id()) {
                 character_entity = entity;
                 has_character = true;
+                local_character_initialized = true;
+                local_velocity_x = 0.0F;
+                local_velocity_y = 0.0F;
             }
         } else {
-            world.GetComponent<svanes::Transform>(found_character->second) =
-                state.transform;
+            if constexpr (kDoubleTimeNetworkingStrategy ==
+                          DoubleTimeNetworkingStrategy::InputAuthoritative) {
+                world.GetComponent<svanes::Transform>(found_character->second) =
+                    state.transform;
+            } else if (state.entity_id != network_client.Id()) {
+                world.GetComponent<svanes::Transform>(found_character->second) =
+                    state.transform;
+            }
         }
     }
 }
@@ -583,28 +675,6 @@ void DoubleTimeGame::UpdateCamera(svanes::Camera2D &camera,
 
 void DoubleTimeGame::Update(const svanes::FrameContext &frame) {
     client_timeline.Advance(frame.real_delta_tics);
-    PollInputBridge();
-    const auto capture = [&](bool down, bool &was_down, bool &on_beat,
-                             std::uint64_t &beat_index) {
-        if (down && !was_down) {
-            beat_index = double_time::BeatIndex(
-                client_timeline.GetTotalTics(),
-                DoubleTimeAssetCatalog()[active_area_index].beats_per_minute);
-            on_beat = double_time::IsOnBeat(
-                client_timeline.GetTotalTics(),
-                DoubleTimeAssetCatalog()[active_area_index].beats_per_minute,
-                kRhythmTolerance);
-        }
-        was_down = down;
-    };
-    capture(frame.input.IsDown(svanes::Key::Left), platform_left_was_down,
-            platform_left_on_beat, platform_left_beat_index);
-    capture(frame.input.IsDown(svanes::Key::Right), platform_right_was_down,
-            platform_right_on_beat, platform_right_beat_index);
-    capture(frame.input.IsDown(svanes::Key::Up), platform_up_was_down,
-            platform_up_on_beat, platform_up_beat_index);
-    capture(frame.input.IsDown(svanes::Key::Down), platform_down_was_down,
-            platform_down_on_beat, platform_down_beat_index);
     if (frame.input.WasPressed(svanes::Key::Up) ||
         frame.input.WasPressed(svanes::Key::W)) {
         action_requested_since_last_send = true;
@@ -613,19 +683,13 @@ void DoubleTimeGame::Update(const svanes::FrameContext &frame) {
             DoubleTimeAssetCatalog()[active_area_index].beats_per_minute,
             kRhythmTolerance);
     }
-    if (frame.input.WasPressed(svanes::Key::Space)) {
-        platform_action_requested_since_last_send = true;
-        platform_action_beat_index = double_time::BeatIndex(
-            client_timeline.GetTotalTics(),
-            DoubleTimeAssetCatalog()[active_area_index].beats_per_minute);
-        platform_action_on_beat = double_time::IsOnBeat(
-            client_timeline.GetTotalTics(),
-            DoubleTimeAssetCatalog()[active_area_index].beats_per_minute,
-            kRhythmTolerance);
-    }
-
-    SendInput(frame);
     ApplyServerState(frame.world);
+    EnsureClientCharacter(frame.world);
+    if constexpr (kDoubleTimeNetworkingStrategy ==
+                  DoubleTimeNetworkingStrategy::ClientPositionAuthoritative) {
+        SimulateClientCharacter(frame);
+    }
+    SendInput(frame);
     CheckGoal(frame.world);
     SynchronizeAudio(static_cast<float>(frame.real_delta_tics) /
                      static_cast<float>(svanes::TicsPerSecond));

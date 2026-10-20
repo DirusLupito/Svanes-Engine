@@ -119,12 +119,15 @@ void ResolveCharacterAxis(svanes::Registry &world,
 svanes::Entity SpawnCharacter(svanes::Registry &world, float x, float y) {
     const svanes::Entity entity = world.CreateEntity();
     world.AddComponent<svanes::Transform>(entity, svanes::Transform{x, y, 0.0F});
+    if constexpr (kDoubleTimeNetworkingStrategy ==
+                  DoubleTimeNetworkingStrategy::InputAuthoritative) {
     world.AddComponent<svanes::Kinematic2D>(entity, svanes::Kinematic2D{});
     world.AddComponent<svanes::Gravity>(entity, svanes::Gravity{});
     world.AddComponent<svanes::Collider2D>(
         entity, svanes::Collider2D{svanes::Rectangle2D{
                     kCharacterColliderOffsetX, 0.0F, kCharacterColliderWidth,
                     kDoubleTimeCharacterHeight}});
+    }
     world.AddComponent<svanes::Timeline>(entity);
     world.AddComponent<svanes::Networked>(entity);
     return entity;
@@ -192,8 +195,27 @@ int32_t main(int32_t argc, char **argv) {
     svanes::ServerRuntime runtime(network_server, world, gravity);
     runtime.Run(
         [&](const svanes::NetworkMessage &message) {
+            if constexpr (kDoubleTimeNetworkingStrategy ==
+                          DoubleTimeNetworkingStrategy::ClientPositionAuthoritative) {
+                const PlayerTransformMessage update =
+                    message.As<PlayerTransformMessage>();
+                const svanes::TicCount now = world.GetComponent<svanes::Timeline>(
+                    timeline_entity).GetTotalTics();
+                auto found = characters.find(update.client_id);
+                if (found == characters.end()) {
+                    const svanes::Entity entity =
+                        SpawnCharacter(world, update.transform.x,
+                                       update.transform.y);
+                    found = characters.emplace(
+                        update.client_id,
+                        GradingCharacter{entity, update.client_id}).first;
+                }
+                world.GetComponent<svanes::Transform>(found->second.entity) =
+                    update.transform;
+                found->second.last_input_tics = now;
+                return;
+            }
             const PlayerInputMessage input = message.As<PlayerInputMessage>();
-            if (input.platform_role) return;
             if constexpr (kDoubleTimeNetworkingStrategy ==
                           DoubleTimeNetworkingStrategy::ClientPositionAuthoritative) {
                 return;
@@ -235,6 +257,10 @@ int32_t main(int32_t argc, char **argv) {
                         platform.start.y +
                             (platform.end.y - platform.start.y) * wave,
                         0.0F};
+            }
+            if constexpr (kDoubleTimeNetworkingStrategy ==
+                          DoubleTimeNetworkingStrategy::ClientPositionAuthoritative) {
+                return;
             }
             for (auto &[client_id, character] : characters) {
                 (void)client_id;
@@ -280,6 +306,10 @@ int32_t main(int32_t argc, char **argv) {
             }
         },
         [&](std::span<const svanes::PhysicsTimeStep>) {
+            if constexpr (kDoubleTimeNetworkingStrategy ==
+                          DoubleTimeNetworkingStrategy::ClientPositionAuthoritative) {
+                return;
+            }
             for (auto &[client_id, character] : characters) {
                 (void)client_id;
                 ResolveCharacterAxis(world, character.entity, true);
@@ -338,6 +368,9 @@ int32_t main(int32_t argc, char **argv) {
                 kDisconnectTimeoutSeconds * svanes::TicsPerSecond);
             for (auto it = characters.begin(); it != characters.end();) {
                 if (now - it->second.last_input_tics > timeout) {
+                    network_server.Broadcast(DoubleTimeEntityState{
+                        {}, false, it->first,
+                        DoubleTimeEntityKind::CharacterDespawn, 0.0F, 0.0F});
                     world.DestroyEntity(it->second.entity);
                     it = characters.erase(it);
                 } else {
