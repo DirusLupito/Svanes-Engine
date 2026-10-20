@@ -4,6 +4,7 @@
 #include "combat/damage_system.hpp"
 #include "combat/missile_system.hpp"
 #include "effects/collision_flashes.hpp"
+#include "serialization/world_update.hpp"
 
 #include <svanes/kinematic_system.hpp>
 #include <svanes/network/message_serialization.hpp>
@@ -15,52 +16,12 @@
 #include <stdexcept>
 #include <utility>
 
-constexpr float kPlanetRadius = 4200.0F;
 constexpr float kPlayerHealth = 100.0F;
 constexpr float kPlanetImpactDamage = 25.0F;
-constexpr float kPlanetAttraction = 180000000.0F;
 constexpr float kCollisionAcceleration = 400000.0F;
 constexpr float kSpawnSpacing = 2000.0F;
 constexpr float kSpawnHeight = 48000.0F;
 constexpr float kSpawnSpeed = 300.0F;
-
-/**
- * Helper for the planet's gravitational field.
- * Returns the acceleration vector at a given offset from the planet's center.
- *
- * @param offset_to_source The offset vector from the planet's center to the
- * point of interest.
- * @return The acceleration vector at the given offset, pointing towards the
- * planet's center.
- */
-static svanes::Vector2D AttractionField(svanes::Vector2D offset_to_source) {
-    const float distance = std::hypot(offset_to_source.x, offset_to_source.y);
-
-    if (distance == 0.0F) {
-        return {};
-    }
-
-    const float strength =
-        svanes::PerSecondSquaredToPerTicSquared(kPlanetAttraction) /
-        (1.0F + distance * distance / kPlanetRadius);
-
-    return offset_to_source / distance * strength;
-}
-
-/**
- * Creates a desert planet layer with a given radius, color, and z-order.
- *
- * @param radius The radius of the planet layer.
- * @param color The color of the planet layer.
- * @param z_order The z-order of the planet layer for rendering.
- *
- * @return The visual representing the planet layer.
- */
-static Visual CreatePlanetLayer(float radius, svanes::Color color,
-                                std::int32_t z_order) {
-    return {svanes::SolidShape{color, svanes::Circle2D{0.0F, 0.0F, radius}},
-            z_order};
-}
 
 /**
  * Applies an acceleration to two entities based on their collision, if they
@@ -102,7 +63,7 @@ OrbitalEscalationServer::OrbitalEscalationServer(
 void OrbitalEscalationServer::Initialize(svanes::ServerContext &context) {
     gameplay_timeline.emplace(context.world);
     context.world.AddComponent<svanes::Timeline>(gameplay_timeline->Get());
-    planet.emplace(context.world, MakePlanetDefinition());
+    planet.emplace(context.world, Planet::MakeDefinition());
     planet->GetTransform(context.world) = {0.0F, 0.0F};
     context.network.Listen("*:" + std::to_string(port));
 
@@ -192,6 +153,109 @@ void OrbitalEscalationServer::PhysicsUpdate(
 
     svanes::AdvanceSpriteAnimations(world);
     UpdateCollisionFlashes(world, collision_flashes);
+
+    if (!players.empty()) {
+        // We need only advance towards sending the next snapshot if there is at
+        // least one player to send it to.
+        snapshot_tics += svanes::DefaultPhysicsStepTics;
+        if (snapshot_tics >= OrbitalSnapshotTics) {
+            snapshot_tics %= OrbitalSnapshotTics;
+            context.network.Broadcast(CreateWorldUpdate(world));
+        }
+    }
+}
+
+svanes::NetworkMessage OrbitalEscalationServer::CreateWorldUpdate(
+    const svanes::Registry &world) const {
+
+    // The encoding of the world update. A self contained message that
+    // tells clients everything they need to know about the current state of the
+    // game world.
+    WorldUpdate update;
+
+    // The master clock shared by all gameplay objects.
+    const auto &timeline =
+        world.GetComponent<svanes::Timeline>(gameplay_timeline->Get());
+
+    // All gameplay objects follow the master clock, so clients need its time,
+    // rate, and pause state along with the objects themselves.
+    update.total_tics = timeline.GetTotalTics();
+    update.tic_size = timeline.GetTicSize();
+    update.paused = timeline.IsPaused();
+
+    // The planet has a shared definition rather than a catalog entry. Only
+    // its identity and position need to come from the server (for now...)
+    update.planet = planet->GetEntity();
+    update.planet_transform =
+        world.GetComponent<svanes::Transform>(update.planet);
+
+    // The list of gameplay objects to include in the update.
+    std::vector<const DynamicObject *> pending;
+
+    // First we populate pending with living player ships...
+    for (const auto &[client, player] : players) {
+        update.players.push_back(
+            {client, player.ship ? std::optional{player.ship->GetEntity()}
+                                 : std::nullopt});
+        if (player.ship) {
+            pending.push_back(player.ship.get());
+        }
+    }
+
+    // ...then all projectiles...
+    for (const auto &projectile : projectiles) {
+        pending.push_back(projectile.get());
+    }
+
+    // ...then we visit each object to collect its state. Its attachments are
+    // added to pending as we go, so we eventually include the entire tree.
+    for (std::size_t index = 0; index < pending.size(); ++index) {
+        const auto &object = *pending[index];
+        const auto entity = object.GetEntity();
+
+        // The state of this object to include in the world update.
+        WorldUpdate::Object state{};
+
+        // The type and definition tell clients what to create. The server's
+        // entity ID tells them which existing object this state belongs to.
+        state.entity = entity;
+        state.type = object.GetType();
+        state.definition = object.GetName();
+
+        // Copy its current world pose and elapsed local time.
+        state.transform = world.GetComponent<svanes::Transform>(entity);
+        state.local_tics =
+            world.GetComponent<svanes::Timeline>(entity).GetTotalTics();
+
+        // Attached objects follow their parent and have no independent motion.
+        if (world.HasComponent<svanes::Kinematic2D>(entity)) {
+            const auto &motion =
+                world.GetComponent<svanes::Kinematic2D>(entity);
+            state.velocity =
+                WorldUpdate::Velocity{{motion.velocity_x, motion.velocity_y},
+                                      motion.angular_velocity};
+        }
+
+        // Only objects which can receive damage have health to report.
+        if (world.HasComponent<Health>(entity)) {
+            state.health = world.GetComponent<Health>(entity).remaining;
+        }
+
+        // Preserve the parent relationship and relative pose as well as the
+        // world pose, so clients can recreate the attachment.
+        if (world.HasComponent<Attachment>(entity)) {
+            state.attachment = world.GetComponent<Attachment>(entity);
+        }
+
+        update.objects.push_back(std::move(state));
+
+        // Add this object's children so we will visit them as well.
+        for (const auto &child : object.GetAttachments()) {
+            pending.push_back(child.get());
+        }
+    }
+
+    return update.Write();
 }
 
 /**
@@ -251,7 +315,7 @@ void OrbitalEscalationServer::AddPlayer(svanes::Registry &world,
 
     // Find an available spawn position.
     for (float x = 0.0F;;) {
-        ship->GetTransform(world) = {x, -kPlanetRadius - kSpawnHeight};
+        ship->GetTransform(world) = {x, -OrbitalPlanetRadius - kSpawnHeight};
 
         // Update the attachments of all objects, so that their transforms are
         // correct for collision detection.
@@ -357,17 +421,4 @@ void OrbitalEscalationServer::RespondToPhysics(
         object->RemoveDeadAttachments(world);
         return false;
     });
-}
-
-
-PlanetDefinition OrbitalEscalationServer::MakePlanetDefinition() {
-    return PlanetDefinition{
-        .attractor = {.accelerationField = AttractionField,
-                      .cutoff_radius = std::nullopt,
-                      .allow_parallel = true},
-        .collider = {svanes::Circle2D{0.0F, 0.0F, kPlanetRadius}},
-        .visuals = {CreatePlanetLayer(kPlanetRadius, {255, 127, 38, 255}, -3),
-                    CreatePlanetLayer(3900.0F, {185, 122, 87, 255}, -2),
-                    CreatePlanetLayer(3750.0F, {127, 127, 127, 255}, -1)},
-    };
 }

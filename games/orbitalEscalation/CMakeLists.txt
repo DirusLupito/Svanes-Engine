@@ -10,6 +10,8 @@ add_library(
     game_objects/owned_entity.hpp
     serialization/geometry_serialization.cpp
     serialization/geometry_serialization.hpp
+    serialization/world_update.cpp
+    serialization/world_update.hpp
     serialization/json.cpp
     serialization/json.hpp
     combat/weapon_system.cpp

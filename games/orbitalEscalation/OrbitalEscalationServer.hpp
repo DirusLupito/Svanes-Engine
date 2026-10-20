@@ -13,7 +13,8 @@
 #include <vector>
 
 inline constexpr std::uint16_t OrbitalServerPort = 45010;
-// The interval for sharing server snapshots and sending client controls.
+
+// The interval between sending server world updates.
 inline constexpr svanes::TicCount OrbitalSnapshotTics = 16666; // 1/60 second
 
 /**
@@ -107,13 +108,6 @@ private:
     };
 
     /**
-     * Defines the planet's physical properties and appearance.
-     *
-     * @return The definition used to create the server's planet.
-     */
-    static PlanetDefinition MakePlanetDefinition();
-
-    /**
      * Decodes and validates a client's gameplay controls.
      *
      * @param message The game's control message received from a client.
@@ -143,6 +137,17 @@ private:
     void RespondToPhysics(svanes::Registry &world,
                           svanes::AsyncParallelForDriver &driver);
 
+    /**
+     * Creates a message containing the current game state for clients
+     * to receive and use to update their local view of the world.
+     *
+     * @param world The server's current game world.
+     *
+     * @return The binary world state used to reconstruct the client's view.
+     */
+    svanes::NetworkMessage
+    CreateWorldUpdate(const svanes::Registry &world) const;
+
     // The definitions used to create gameplay objects.
     AssetCatalog assets;
 
@@ -165,4 +170,7 @@ private:
 
     // A list of all collision flashes in the game.
     std::vector<OwnedEntity> collision_flashes;
+
+    // Simulation time accumulated toward sending the next world update.
+    svanes::TicCount snapshot_tics = 0;
 };

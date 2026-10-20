@@ -1,6 +1,8 @@
 #include "orbital_escalation_client.hpp"
+#include "serialization/world_update.hpp"
 #include <algorithm>
 #include <cmath>
+#include <iomanip>
 #include <iostream>
 #include <numbers>
 #include <stdexcept>
@@ -95,6 +97,22 @@ svanes::TicCount OrbitalEscalationClient::GetFrameIntervalTics() const {
 }
 
 void OrbitalEscalationClient::Update(const svanes::ClientFrameContext &frame) {
+    // temporary debugging output of the world update messages received from the
+    // server
+    // TODO: remove this and replace it with an actual reader that turns server
+    // messages into game state updates.
+    for (const auto &message : frame.network.PollMessages()) {
+        const auto update = WorldUpdate::Read(message);
+        std::cout << "World update (" << message.bytes.size() << " bytes, "
+                  << update.objects.size() << " objects): ";
+        std::cout << std::hex << std::setfill('0');
+        for (const auto byte : message.bytes) {
+            std::cout << std::setw(2) << std::to_integer<std::uint32_t>(byte)
+                      << ' ';
+        }
+        std::cout << std::dec << std::setfill(' ') << std::endl;
+    }
+
     if (frame.input.WasPressed(svanes::Key::Escape)) {
         should_quit = true;
     }
