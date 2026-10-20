@@ -1,40 +1,31 @@
-#include "orbital_escalation_game.hpp"
-#include "OrbitalEscalationServer.hpp"
+#include "orbital_escalation_client.hpp"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <numbers>
+#include <stdexcept>
 #include <svanes/MenuUtilities/text_label.hpp>
 #include <svanes/asset_path.hpp>
 #include <svanes/camera2d.hpp>
 #include <svanes/input.hpp>
 #include <svanes/registry.hpp>
 #include <svanes/render/render_system.hpp>
+#include <utility>
 
 const svanes::TicCount kPauseFlashPeriod = svanes::SecondsToTics(1.0);
 constexpr std::uint8_t kPauseLabelMinimumAlpha = 64;
+constexpr svanes::TicCount kClientFrameTics = 16666;
 
-OrbitalEscalationGame::OrbitalEscalationGame(std::string server_host,
-                                             std::uint16_t server_port)
+OrbitalEscalationClient::OrbitalEscalationClient(std::string server_host,
+                                                 std::uint16_t server_port)
     : server_host(std::move(server_host)), port(server_port) {
     if (this->server_host.empty() || port == 0) {
-        throw std::invalid_argument(
-            "Choose a server host and nonzero TCP port.");
+        throw std::invalid_argument("Choose a server host and nonzero port.");
     }
 }
 
-void OrbitalEscalationGame::Initialize(svanes::GameContext &context) {
-    // OrbitalSimulation advances gameplay itself. Letting the application
-    // advance it too would move objects and their timelines twice.
-    context.automatic_simulation = false;
-    context.physics_step_tics = OrbitalStepTics;
-    simulation = std::make_unique<OrbitalSimulation>(
-        context.world, svanes::AssetPath("assets/orbitalEscalation"),
-        context.concurrency);
-
-    client = std::make_unique<svanes::NetworkClient>(server_host, port);
-    std::cout << "Connecting to " << server_host << ':' << port
-              << " over TCP.\n";
+void OrbitalEscalationClient::Initialize(svanes::ClientContext &context) {
+    std::cout << "Server configured as " << server_host << ':' << port << ".\n";
 
     pause_label_entity = context.world.CreateEntity();
     context.world.AddComponent<svanes::TextLabel>(
@@ -51,12 +42,6 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext &context) {
         });
 
     context.camera.zoom = 0.02F;
-    if (const auto entity = simulation->PlayerEntity(local_player)) {
-        const auto &player =
-            context.world.GetComponent<svanes::Transform>(*entity);
-        context.camera.x = player.x;
-        context.camera.y = player.y;
-    }
 
     const svanes::Rectangle2D view =
         context.camera.ScreenToWorld(context.camera.Viewport());
@@ -73,24 +58,47 @@ void OrbitalEscalationGame::Initialize(svanes::GameContext &context) {
                                                svanes::ZOrder{-100});
 }
 
-void OrbitalEscalationGame::UpdateServerClient(
-    const svanes::FrameContext &frame) {
-    for (const auto &message : client->PollBroadcast()) {
-        simulation->Load(message.bytes);
-    }
-    if (local_player != client->Id()) {
-        local_player = client->Id();
-        std::cout << "Connected as player " << local_player << ".\n";
-    }
+svanes::NetworkMessage OrbitalEscalationClient::CreateJoinRequest() {
+    return {};
+}
 
-    simulation->CaptureInput(frame, local_player);
-    client_loop_timeline.Advance(frame.real_delta_tics);
+void OrbitalEscalationClient::HandleJoinResult(
+    const svanes::JoinResult &result) {
+    switch (result.status) {
+    case svanes::JoinStatus::Accepted:
+        std::cout << "Connected as player " << result.client_id << ".\n";
+        break;
+    case svanes::JoinStatus::Rejected:
+        std::cout << "Server rejected the join request.\n";
+        break;
+    case svanes::JoinStatus::TimedOut:
+        std::cout << "Server join request timed out.\n";
+        break;
+    }
+}
+
+svanes::TicCount OrbitalEscalationClient::GetFrameIntervalTics() const {
+    const auto interval =
+        svanes::RationalNumber{kClientFrameTics} /
+        (svanes::RationalNumber{1} / client_loop_timeline.GetTicSize());
+
+    return interval.GetWholePart() +
+           (interval.GetFractionalPart().GetNumerator() != 0);
+}
+
+void OrbitalEscalationClient::Update(const svanes::ClientFrameContext &frame) {
+    if (frame.input.WasPressed(svanes::Key::Escape)) {
+        should_quit = true;
+    }
 
     // +/- will speed up or slow down the client loop.
-    auto input = simulation->TakeInput();
-    if (input.faster != input.slower) {
+    const bool faster = frame.input.WasPressed(svanes::Key::Equals) ||
+                        frame.input.WasPressed(svanes::Key::KeypadPlus);
+    const bool slower = frame.input.WasPressed(svanes::Key::Minus) ||
+                        frame.input.WasPressed(svanes::Key::KeypadMinus);
+    if (faster != slower) {
         client_loop_timeline.SetTicSize(client_loop_timeline.GetTicSize() /
-                                        (input.faster
+                                        (faster
                                              ? svanes::RationalNumber{2}
                                              : svanes::RationalNumber{1, 2}));
         std::cout << "Client loop rate: "
@@ -99,35 +107,8 @@ void OrbitalEscalationGame::UpdateServerClient(
                   << " updates/second requested.\n";
     }
 
-    svanes::MessageWriter writer;
-    simulation->EncodeInput(writer, input);
-    if (client->IsConnected()) {
-        client->Send(writer.Finish());
-    }
-}
-
-svanes::TicCount OrbitalEscalationGame::GetFrameIntervalTics() const {
-    const auto interval =
-        svanes::RationalNumber{OrbitalSnapshotTics} /
-        (svanes::RationalNumber{1} / client_loop_timeline.GetTicSize());
-
-    return interval.GetWholePart() +
-           (interval.GetFractionalPart().GetNumerator() != 0);
-}
-
-void OrbitalEscalationGame::Update(const svanes::FrameContext &frame) {
-    if (frame.input.WasPressed(svanes::Key::Escape)) {
-        should_quit = true;
-    }
-
-    UpdateServerClient(frame);
-
-    // The pause label must keep animating while gameplay is stopped,
-    // and so we keep its timeline separate from the overall game
-    // timeline which we pause (otherwise pausing would pause it too)
-    
+    // The pause label's animation follows local time.
     pause_timeline.Advance(frame.real_delta_tics);
-    simulation->UpdateVisuals();
     if (frame.input.WasPressed(svanes::Key::Tab)) {
         frame.camera.scale_mode =
             frame.camera.scale_mode == svanes::ScaleMode::Constant
@@ -137,8 +118,6 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext &frame) {
 
     auto &pause_label =
         frame.world.GetComponent<svanes::TextLabel>(pause_label_entity);
-
-    pause_label.visible = simulation->IsPaused();
 
     // I use a cosine wave to make the pause label flash while the game is
     // paused.
@@ -168,14 +147,6 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext &frame) {
         0.01F, 100.0F);
     frame.camera.zoom = zoom;
 
-    // Camera follows the player, centered on the screen.
-    if (const auto entity = simulation->PlayerEntity(local_player)) {
-        const svanes::Transform &player =
-            frame.world.GetComponent<svanes::Transform>(*entity);
-        frame.camera.x = player.x;
-        frame.camera.y = player.y;
-    }
-
     const svanes::Rectangle2D view =
         frame.camera.ScreenToWorld(frame.camera.Viewport());
     svanes::Transform &background =
@@ -189,4 +160,4 @@ void OrbitalEscalationGame::Update(const svanes::FrameContext &frame) {
     background_rectangle.height = view.height;
 }
 
-bool OrbitalEscalationGame::ShouldQuit() const { return should_quit; }
+bool OrbitalEscalationClient::ShouldQuit() const { return should_quit; }

@@ -1,6 +1,6 @@
-#include "orbital_escalation_game.hpp"
+#include "orbital_escalation_client.hpp"
 
-#include <svanes/application.hpp>
+#include <svanes/network/clientserver/network_client.hpp>
 
 #include <charconv>
 #include <iostream>
@@ -51,7 +51,7 @@ ReadAddress(std::string_view text) {
 }
 
 /**
- * Connects to a server using command-line options.
+ * Runs the Orbital Escalation client using command-line options.
  *
  * @param argc The argument count, including the program name.
  * @param argv The program name and command-line arguments.
@@ -67,7 +67,7 @@ int32_t main(int32_t argc, char **argv) {
                 std::cout
                     << "Usage: svanes_game_orbital_escalation --server "
                        "HOST:PORT\n"
-                    << "Connects to a headless Orbital Escalation server.\n";
+                    << "Selects the headless Orbital Escalation server.\n";
                 return 0;
             }
 
@@ -86,16 +86,16 @@ int32_t main(int32_t argc, char **argv) {
         if (!server_address) {
             throw std::invalid_argument("--server HOST:PORT is required.");
         }
-        svanes::Application application({
+        svanes::NetworkClient network({
             .title = "Orbital Escalation",
             .width = 1920,
             .height = 1080,
         });
 
-        OrbitalEscalationGame game(server_address->first,
-                                   server_address->second);
+        OrbitalEscalationClient client(server_address->first,
+                                       server_address->second);
 
-        return application.run(game);
+        return network.run(client);
     } catch (const std::exception &error) {
         std::cerr << "Orbital Escalation: " << error.what() << '\n';
         return 1;

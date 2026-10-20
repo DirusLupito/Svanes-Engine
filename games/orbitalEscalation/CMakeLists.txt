@@ -55,8 +55,9 @@ target_link_libraries(svanes_orbital_common PUBLIC
     Svanes::Engine nlohmann_json::nlohmann_json
 )
 add_executable(svanes_game_orbital_escalation
-    main.cpp
-    orbital_escalation_game.cpp
+    client_main.cpp
+    orbital_escalation_client.cpp
+    orbital_escalation_client.hpp
 )
 target_link_libraries(svanes_game_orbital_escalation PRIVATE svanes_orbital_common)
 add_executable(svanes_game_orbital_escalation_server
