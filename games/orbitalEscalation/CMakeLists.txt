@@ -1,5 +1,5 @@
 add_library(
-    svanes_orbital_simulation STATIC
+    svanes_orbital_common STATIC
     attachment_system.cpp
     attachment_system.hpp
     propulsion_system.cpp
@@ -10,6 +10,8 @@ add_library(
     game_objects/owned_entity.hpp
     serialization/geometry_serialization.cpp
     serialization/geometry_serialization.hpp
+    serialization/world_update.cpp
+    serialization/world_update.hpp
     serialization/json.cpp
     serialization/json.hpp
     combat/weapon_system.cpp
@@ -22,8 +24,6 @@ add_library(
     game_objects/dynamic_object/missile_launcher.hpp
     serialization/missile_launcher_serialization.cpp
     serialization/missile_launcher_serialization.hpp
-    serialization/world_snapshot.cpp
-    serialization/world_snapshot.hpp
     serialization/asset_catalog.cpp
     serialization/asset_catalog.hpp
     serialization/dynamic_object_serialization.cpp
@@ -34,8 +34,6 @@ add_library(
     game_objects/dynamic_object/missile.hpp
     serialization/ship_serialization.cpp
     serialization/ship_serialization.hpp
-    orbital_simulation.cpp
-    orbital_simulation.hpp
     game_objects/dynamic_object/dynamic_object.cpp
     game_objects/dynamic_object/dynamic_object.hpp
     game_objects/dynamic_object/ship.cpp
@@ -55,20 +53,21 @@ FetchContent_Declare(
     SOURCE_DIR "${CMAKE_SOURCE_DIR}/thirdparty/nlohmann_json-src"
 )
 FetchContent_MakeAvailable(nlohmann_json)
-target_link_libraries(svanes_orbital_simulation PUBLIC
+target_link_libraries(svanes_orbital_common PUBLIC
     Svanes::Engine nlohmann_json::nlohmann_json
 )
 add_executable(svanes_game_orbital_escalation
-    main.cpp
-    orbital_escalation_game.cpp
+    client_main.cpp
+    orbital_escalation_client.cpp
+    orbital_escalation_client.hpp
 )
-target_link_libraries(svanes_game_orbital_escalation PRIVATE svanes_orbital_simulation)
+target_link_libraries(svanes_game_orbital_escalation PRIVATE svanes_orbital_common)
 add_executable(svanes_game_orbital_escalation_server
     server_main.cpp
     OrbitalEscalationServer.hpp
     OrbitalEscalationServer.cpp
 )
-target_link_libraries(svanes_game_orbital_escalation_server PRIVATE svanes_orbital_simulation)
+target_link_libraries(svanes_game_orbital_escalation_server PRIVATE svanes_orbital_common)
 
 
 svanes_game_package(svanes_game_orbital_escalation orbitalEscalation orbitalEscalation orbitalEscalation)

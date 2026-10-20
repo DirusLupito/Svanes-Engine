@@ -19,7 +19,7 @@ int32_t main(int32_t argc, char **argv) {
         if (argc == 2 && std::string_view{argv[1]} == "--help") {
             std::cout
                 << "Usage: svanes_game_orbital_escalation_server [--port N]\n"
-                   "All clients join through this TCP port (default 45010).\n";
+                   "Listens on UDP port 45010 unless --port is supplied.\n";
             return 0;
         }
 
@@ -38,10 +38,12 @@ int32_t main(int32_t argc, char **argv) {
                 throw std::invalid_argument("Expected a port from 1 to 65535.");
             }
         }
+
+        svanes::NetworkServer network;
         OrbitalEscalationServer server(
             svanes::AssetPath("assets/orbitalEscalation"),
             static_cast<std::uint16_t>(port));
-        server.Run();
+        return network.run(server);
     } catch (const std::exception &error) {
         std::cerr << "Orbital Escalation server: " << error.what() << '\n';
         return 1;

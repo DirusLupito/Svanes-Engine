@@ -9,6 +9,9 @@ namespace svanes {
 class Registry;
 }
 
+/// The radius of the planet's collision circle.
+inline constexpr float OrbitalPlanetRadius = 4200.0F;
+
 /**
  * Defines the properties of a planet. A planet has a gravitational field, a
  * collision layer, and a set of visuals that represent its appearance in the
@@ -33,6 +36,12 @@ struct PlanetDefinition {
  */
 class Planet final {
 public:
+    /**
+     * Defines the planet's physical properties and appearance.
+     * @return The planet definition shared by the server and clients.
+     */
+    static PlanetDefinition MakeDefinition();
+
     /**
      * Constructs a Planet entity in the provided registry.
      *
