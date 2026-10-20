@@ -22,8 +22,6 @@ add_library(
     game_objects/dynamic_object/missile_launcher.hpp
     serialization/missile_launcher_serialization.cpp
     serialization/missile_launcher_serialization.hpp
-    serialization/world_snapshot.cpp
-    serialization/world_snapshot.hpp
     serialization/asset_catalog.cpp
     serialization/asset_catalog.hpp
     serialization/dynamic_object_serialization.cpp
@@ -34,8 +32,6 @@ add_library(
     game_objects/dynamic_object/missile.hpp
     serialization/ship_serialization.cpp
     serialization/ship_serialization.hpp
-    orbital_simulation.cpp
-    orbital_simulation.hpp
     game_objects/dynamic_object/dynamic_object.cpp
     game_objects/dynamic_object/dynamic_object.hpp
     game_objects/dynamic_object/ship.cpp
@@ -61,6 +57,10 @@ target_link_libraries(svanes_orbital_simulation PUBLIC
 add_executable(svanes_game_orbital_escalation
     main.cpp
     orbital_escalation_game.cpp
+    orbital_simulation.cpp
+    orbital_simulation.hpp
+    serialization/world_snapshot.cpp
+    serialization/world_snapshot.hpp
 )
 target_link_libraries(svanes_game_orbital_escalation PRIVATE svanes_orbital_simulation)
 add_executable(svanes_game_orbital_escalation_server
