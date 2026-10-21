@@ -66,16 +66,30 @@ NetworkMessage EncodeDisconnect(std::uint32_t client_id) {
     return writer.Finish();
 }
 
+NetworkMessage EncodeHeartbeat(std::uint32_t client_id) {
+    MessageWriter writer;
+
+    // A heartbeat consists of the following fields, in order:
+    // - 1 byte: ClientServerMessageKind::Heartbeat
+    // - 4 bytes: the assigned client ID, or zero if sent by the server
+    writer.WriteUint8(
+        static_cast<std::uint8_t>(ClientServerMessageKind::Heartbeat));
+    writer.WriteUint32(client_id);
+    return writer.Finish();
+}
+
 DecodedMessage DecodeMessage(const NetworkMessage &message) {
     MessageReader reader(message);
     const auto kind = static_cast<ClientServerMessageKind>(reader.ReadUint8());
 
-    // Acceptance, gameplay, and disconnect messages carry a client ID after
-    // the message kind. Server gameplay messages use zero for this field.
+    // Acceptance, gameplay, disconnect, and heartbeat messages carry a client
+    // ID after the message kind. Server gameplay messages and heartbeats use
+    // zero for this field.
     std::uint32_t client_id = 0;
     if (kind == ClientServerMessageKind::Accepted ||
         kind == ClientServerMessageKind::Game ||
-        kind == ClientServerMessageKind::Disconnect) {
+        kind == ClientServerMessageKind::Disconnect ||
+        kind == ClientServerMessageKind::Heartbeat) {
         client_id = reader.ReadUint32();
     }
 

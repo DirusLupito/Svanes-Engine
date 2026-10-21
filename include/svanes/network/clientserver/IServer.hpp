@@ -134,7 +134,8 @@ public:
     virtual JoinResponse HandleJoinRequest(const ServerJoinContext &context) = 0;
 
     /**
-     * Handles a client's disconnect notice after its session has ended.
+     * Handles a client's disconnect notice or timeout after its session has
+     * ended.
      * Called on the main thread during network polling.
      *
      * @param Registry The server's registry containing the client's game

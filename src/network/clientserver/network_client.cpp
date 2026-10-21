@@ -21,6 +21,7 @@
 #include <SDL3/SDL.h>
 
 #include <chrono>
+#include <iostream>
 #include <iterator>
 #include <stdexcept>
 #include <string>
@@ -109,6 +110,8 @@ void NetworkClient::CompleteJoin(IClient &client, const JoinResult &result) {
 
     if (result.status == JoinStatus::Accepted) {
         client_id = result.client_id;
+        last_received = std::chrono::steady_clock::now();
+        last_heartbeat = last_received;
     } else {
         outgoing.clear();
 
@@ -166,10 +169,10 @@ void NetworkClient::ReceiveMessages(IClient &client) {
         received.swap(incoming_messages);
     }
 
-    // For each message in the batch, we handle its join result or collect its
-    // gameplay payload for the current frame. The communication thread can
-    // receive more messages while we process this batch, they'll be collected
-    // in the next iteration.
+    // For each message in the batch, we handle its join result, refresh the
+    // connection's timeout, or collect its gameplay payload for the current
+    // frame. The communication thread can receive more messages while we
+    // process this batch, they'll be collected in the next iteration.
     for (const auto &message : received) {
         // An empty message has no engine message kind to read, so skip it.
         if (message.bytes.empty()) {
@@ -206,12 +209,27 @@ void NetworkClient::ReceiveMessages(IClient &client) {
             return;
         }
 
-        // Case 2c: Connected, and this is a gameplay message.
-        // So we store the game's bytes for Update to read through PollMessages.
+        // Case 2c: Connected, and the server sent gameplay or a heartbeat.
+        // Either confirms that the connection is still alive, but only the
+        // gameplay payload is passed to Update through PollMessages.
         if (IsConnected() &&
-            decoded.kind == internal::ClientServerMessageKind::Game) {
-            incoming.push_back(std::move(decoded.payload));
+            (decoded.kind == internal::ClientServerMessageKind::Game ||
+             decoded.kind == internal::ClientServerMessageKind::Heartbeat)) {
+            last_received = std::chrono::steady_clock::now();
+            if (decoded.kind == internal::ClientServerMessageKind::Game) {
+                incoming.push_back(std::move(decoded.payload));
+            }
         }
+    }
+
+    // Check for a connection timeout after processing the batch of messages. If
+    // the server has not sent a heartbeat or gameplay message within the
+    // timeout interval, we disconnect and notify the client implementation.
+    if (IsConnected() && std::chrono::steady_clock::now() - last_received >=
+                             internal::ConnectionTimeout) {
+        std::cerr << "Network client: server connection timed out.\n";
+        Disconnect();
+        client.HandleDisconnect();
     }
 }
 
@@ -220,13 +238,21 @@ void NetworkClient::SendMessages() {
         return;
     }
 
-    // The gameplay messages queued by the current frame.
+    // The gameplay messages and any heartbeat queued by the current frame.
     std::vector<NetworkMessage> batch;
 
     for (const NetworkMessage &message : outgoing) {
         batch.push_back(internal::EncodeGameMessage(message, client_id));
     }
     outgoing.clear();
+
+    // If it has been more than HeartbeatInterval since the last heartbeat,
+    // queue a heartbeat message to keep the connection alive.
+    const auto now = std::chrono::steady_clock::now();
+    if (now - last_heartbeat >= internal::HeartbeatInterval) {
+        batch.push_back(internal::EncodeHeartbeat(client_id));
+        last_heartbeat = now;
+    }
 
     // Append rather than replace, as the communication thread may not have
     // collected the previous frame's messages yet.
