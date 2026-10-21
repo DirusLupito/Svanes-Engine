@@ -11,7 +11,7 @@ namespace svanes {
 class NetworkServer;
 
 /**
- * Represents one join attempt presented to the server for an admission decision.
+ * Represents a join request presented to the server for an admission decision.
  *
  * FIELDS:
  * - world: The engine owned registry containing the server's entities.

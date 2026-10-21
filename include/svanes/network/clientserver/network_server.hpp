@@ -192,14 +192,14 @@ private:
     // The registry containing all entities and their components for the server.
     Registry world;
 
-    // Collection of client sessions, including rejected join attempts.
+    // Collection of client sessions, including rejected join requests.
     // The index of the session corresponds to the client ID minus one
-    // (i.e., client ID = index + 1). Rejected attempts occupy an entry with
+    // (i.e., client ID = index + 1). Rejected requests occupy an entry with
     // accepted = false, so admitted client IDs can have gaps.
     std::vector<Session> sessions;
 
     // The client ID of each session, keyed by its address, including rejected
-    // attempts.
+    // requests.
     std::unordered_map<std::string, ClientId> clients;
 
     // A vector of ClientInput structures representing input messages received

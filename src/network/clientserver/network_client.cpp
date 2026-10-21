@@ -21,6 +21,7 @@
 #include <SDL3/SDL.h>
 
 #include <chrono>
+#include <iterator>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -29,34 +30,39 @@
 namespace svanes {
 
 NetworkClient::NetworkClient(ClientSettings settings)
-    : settings(std::move(settings)) {}
+    : settings(std::move(settings)),
+      communication_thread(
+          [this](std::stop_token stop) { Communicate(stop); }) {}
 
-NetworkClient::~NetworkClient() = default;
+NetworkClient::~NetworkClient() {
+    communication_thread.request_stop();
+    communication_thread.join();
+}
 
 void NetworkClient::Connect(const std::string &target_server_address,
                             TicCount timeout_tics) {
-    if (pipe) {
+    if (connection_requested) {
         throw std::logic_error(
-            "Network client is already joining or connected.");
+            "Network client has already requested a connection.");
     }
 
     if (timeout_tics == 0) {
         throw std::invalid_argument(
-            "A join attempt requires a positive timeout.");
+            "A join request requires a positive timeout.");
     }
 
-    // The client sends first, so the system can choose any local port.
-    auto new_pipe = internal::MakePipe();
-    new_pipe->Listen("*:0");
-    pipe = std::move(new_pipe);
-    this->server_address = target_server_address;
     join_timeout_tics = timeout_tics;
+    connection_requested = true;
+
+    // The communication thread will set up the pipe for this join request.
+    std::lock_guard lock(outgoing_mutex);
+    server_address = target_server_address;
 }
 
 bool NetworkClient::IsConnected() const { return client_id != 0; }
 
 void NetworkClient::Send(const NetworkMessage &message) {
-    if (!pipe) {
+    if (!server_address) {
         throw std::logic_error("Network client has not connected to a server.");
     }
     outgoing.push_back(message);
@@ -72,36 +78,39 @@ void NetworkClient::CompleteJoin(IClient &client, const JoinResult &result) {
     if (result.status == JoinStatus::Accepted) {
         client_id = result.client_id;
     } else {
-        pipe.reset();
-        server_address.clear();
         outgoing.clear();
+
+        // Stop communication and discard queued messages now that the join
+        // has been rejected or timed out. The pipe is released when the
+        // communication thread exits.
+        communication_thread.request_stop();
+        std::lock_guard lock(outgoing_mutex);
+        server_address.reset();
+        outgoing_messages.clear();
     }
 
     client.HandleJoinResult(result);
 }
 
 void NetworkClient::ReceiveMessages(IClient &client) {
-    // If we haven't configured a pipe, there is nothing to poll.
-    if (!pipe) {
+    // If no connection has been requested, there is nothing to poll.
+    if (!server_address) {
         return;
     }
 
     // Case 1: Not connected.
     if (!IsConnected()) {
-        // Case 1a: Not connected and not yet started joining.
-        // So we send the join request and start the timeout timer.
+        // Case 1a: No join request has been queued.
+        // So we queue the join request and start the timeout timer.
         if (!join_started) {
-            const auto request =
+            auto request =
                 internal::EncodeJoinRequest(client.CreateJoinRequest());
 
-            if (!pipe->Send(server_address, request)) {
-                throw std::runtime_error(
-                    "Network client could not send its join request.");
-            }
-
+            std::lock_guard lock(outgoing_mutex);
+            outgoing_messages.push_back(std::move(request));
             join_started = std::chrono::steady_clock::now();
         } else {
-            // Case 1b: Not connected and already started joining.
+            // Case 1b: A join request is pending.
             // So we check for timeout. If it has expired, we notify the game
             // and return. Otherwise we continue polling for the join response.
             const auto elapsed = static_cast<TicCount>(
@@ -116,13 +125,20 @@ void NetworkClient::ReceiveMessages(IClient &client) {
         }
     }
 
-    // The source address of the current message. Currently ignored.
-    std::string address;
+    // The batch of messages received since the main thread last collected
+    // messages.
+    std::vector<NetworkMessage> received;
 
-    // Case 2: Either we're connected or we're still waiting for a join
-    // response.
-    NetworkMessage message;
-    while (pipe->Receive(address, message)) {
+    {
+        std::lock_guard lock(incoming_mutex);
+        received.swap(incoming_messages);
+    }
+
+    // For each message in the batch, we handle its join result or collect its
+    // gameplay payload for the current frame. The communication thread can
+    // receive more messages while we process this batch, they'll be collected
+    // in the next iteration.
+    for (const auto &message : received) {
         // An empty message has no engine message kind to read, so skip it.
         if (message.bytes.empty()) {
             continue;
@@ -147,15 +163,14 @@ void NetworkClient::ReceiveMessages(IClient &client) {
 
             CompleteJoin(client, {JoinStatus::Accepted, assigned_id,
                                   internal::ReadPayload(reader)});
-            // Leave any remaining messages for the next frame now that the
-            // game has been notified and the connection state has changed.
-            return;
+            // Now that the game has been notified, the remaining messages in
+            // this batch can be collected for this frame's Update.
+            continue;
         }
 
         // Case 2b: Still joining, and the server has rejected us.
-        // So we release the failed connection and notify the game with the
-        // rejection response. The callback may start another join attempt,
-        // which we will handle on the next frame.
+        // So we request cleanup of the failed connection and notify the game
+        // with the rejection response.
         if (!IsConnected() &&
             kind == internal::ClientServerMessageKind::Rejected) {
             CompleteJoin(client, {JoinStatus::Rejected, 0,
@@ -177,13 +192,101 @@ void NetworkClient::SendMessages() {
         return;
     }
 
+    // The gameplay messages queued by the current frame.
+    std::vector<NetworkMessage> batch;
+
     for (const NetworkMessage &message : outgoing) {
-        if (!pipe->Send(server_address, internal::EncodeGameMessage(message))) {
-            throw std::runtime_error(
-                "Network client could not send a message.");
-        }
+        batch.push_back(internal::EncodeGameMessage(message));
     }
     outgoing.clear();
+
+    // Append rather than replace, as the communication thread may not have
+    // collected the previous frame's messages yet.
+    std::lock_guard lock(outgoing_mutex);
+    outgoing_messages.insert(outgoing_messages.end(),
+                             std::make_move_iterator(batch.begin()),
+                             std::make_move_iterator(batch.end()));
+}
+
+void NetworkClient::Communicate(std::stop_token stop) {
+    // The pipe used to communicate with the server, created and destroyed on
+    // this thread.
+    std::unique_ptr<MsgPipe> pipe;
+
+    // The server's address, absent until Connect requests a connection.
+    std::optional<std::string> address;
+
+    // The outgoing batch of messages owned by this thread while sending.
+    std::vector<NetworkMessage> sending;
+
+    // The incoming batch of messages owned by this thread while receiving.
+    std::vector<NetworkMessage> received;
+
+    while (!stop.stop_requested()) {
+        // Collect the server's address if the pipe hasn't been created, and
+        // transfer queued outgoing messages to the sending batch. The main
+        // thread can queue the next batch once this lock is released.
+        {
+            std::lock_guard lock(outgoing_mutex);
+            if (!pipe) {
+                address = server_address;
+            }
+            sending.swap(outgoing_messages);
+        }
+
+        // If a server address has been supplied, set up the pipe once.
+        if (!pipe && address) {
+            pipe = internal::MakePipe();
+
+            // The client sends first, so the system can choose any local port.
+            pipe->Listen("*:0");
+        }
+
+        // If the pipe is available, send the queued messages.
+        if (pipe) {
+            for (const auto &message : sending) {
+                if (!pipe->Send(*address, message)) {
+                    throw std::runtime_error(
+                        "Network client could not send a message.");
+                }
+            }
+
+            // Clear the sending batch after sending all messages, so we don't
+            // resend them in the next iteration.
+            sending.clear();
+
+            // The source address of the current message. Currently ignored.
+            std::string source_address;
+
+            // The current datagram, reused for each receive.
+            NetworkMessage message;
+
+            // Receive messages from the pipe until there are no more, or until
+            // a stop is requested.
+            while (!stop.stop_requested() &&
+                   pipe->Receive(source_address, message)) {
+                received.push_back(std::move(message));
+            }
+
+            // Transfer the received messages to the main thread's incoming
+            // batch, preserving any messages it has not collected yet.
+            {
+                std::lock_guard lock(incoming_mutex);
+                incoming_messages.insert(
+                    incoming_messages.end(),
+                    std::make_move_iterator(received.begin()),
+                    std::make_move_iterator(received.end()));
+            }
+
+            // Clear the received batch after transferring, so we don't double
+            // add them in the next iteration.
+            received.clear();
+        }
+
+        // 1 millisecond sleep to avoid infinitely tight loop wasting CPU cycles
+        // when there is no work to do.
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
 }
 
 void NetworkClient::RunClientLoop(IClient &client, SDL_Window *window,

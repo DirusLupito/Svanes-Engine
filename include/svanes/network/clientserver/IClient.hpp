@@ -16,7 +16,7 @@ class Registry;
 class TextureManager;
 
 /**
- * Represents the outcome of a client's join attempt.
+ * Represents the outcome of a client's join request.
  *
  * MEMBERS:
  * - Accepted: The server admitted the client.
@@ -26,10 +26,10 @@ class TextureManager;
 enum class JoinStatus { Accepted, Rejected, TimedOut };
 
 /**
- * The result of a join attempt, delivered once by the engine.
+ * The join result, delivered once by the engine.
  *
  * FIELDS:
- * - status: Whether the attempt was accepted, rejected, or timed out.
+ * - status: Whether the join request was accepted, rejected, or timed out.
  * - client_id: The server assigned ID, or zero unless accepted.
  * - message: The game's response bytes, empty for a timeout.
  */
@@ -137,10 +137,9 @@ public:
     virtual NetworkMessage CreateJoinRequest() = 0;
 
     /**
-     * Handles acceptance, rejection, or timeout of a join attempt.
+     * Handles acceptance, rejection, or timeout of the join request.
      * Called once by the engine before the frame's Update. The connection
-     * state has already been updated, so accepted clients may queue messages
-     * and rejected or timed out clients may start another attempt.
+     * state has already been updated, so accepted clients may queue messages.
      *
      * @param result The outcome and the game's response bytes.
      */
