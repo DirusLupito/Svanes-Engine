@@ -9,6 +9,7 @@
 
 #include <chrono>
 #include <iostream>
+#include <iterator>
 #include <limits>
 #include <stdexcept>
 #include <thread>
@@ -16,20 +17,22 @@
 
 namespace svanes {
 
-// We need only use the default constructor and destructor, as all members
-// can be default-constructed and destructed.
+NetworkServer::NetworkServer()
+    : communication_thread(
+          [this](std::stop_token stop) { Communicate(stop); }) {}
 
-NetworkServer::NetworkServer() = default;
-NetworkServer::~NetworkServer() = default;
+NetworkServer::~NetworkServer() {
+    communication_thread.request_stop();
+    communication_thread.join();
+}
 
 void NetworkServer::Listen(const std::string &address) {
-    if (pipe) {
+    std::lock_guard lock(outgoing_mutex);
+    if (listen_address) {
         throw std::logic_error("Network server is already listening.");
     }
 
-    auto new_pipe = internal::MakePipe();
-    new_pipe->Listen(address);
-    pipe = std::move(new_pipe);
+    listen_address = address;
 }
 
 void NetworkServer::Send(ClientId client, const NetworkMessage &message) {
@@ -56,25 +59,21 @@ std::span<const ClientInput> NetworkServer::PollInputs() const {
 
 void NetworkServer::ReceiveMessages(IServer &server,
                                     std::vector<ClientInput> &pending) {
-    if (!pipe) {
-        return;
+    // The batch of messages received since the main thread last collected
+    // messages.
+    std::vector<AddressedMessage> received;
+
+    // Anonymous scope to limit the lifetime of the lock_guard.
+    {
+        std::lock_guard lock(incoming_mutex);
+        received.swap(incoming);
     }
 
-    // The address the message came from, set by the pipe alongside the
-    // message.
-    std::string address;
-
-    // Buffer to hold the incoming message while we read it.
-    // We only read one message at a time, so we can reuse the same object for
-    // each message.
-    NetworkMessage message;
-
-    // Poll for messages until there are no more to receive.
-    // In theory, if this loop is extremely slow, and a client
-    // sends a lot of messages, we can get stuck in this loop forever.
-    // TODO: Consider adding a timeout or a maximum number of messages to
-    // process per tick.
-    while (pipe->Receive(address, message)) {
+    // For each message in the batch, we handle its join request or collect its
+    // gameplay payload as input from an admitted client.
+    // The communication thread can receive more messages while we process this
+    // batch, they'll be collected in the next iteration.
+    for (const auto &[address, message] : received) {
         if (message.bytes.empty()) {
             continue;
         }
@@ -142,16 +141,105 @@ void NetworkServer::ReceiveMessages(IServer &server,
 }
 
 void NetworkServer::SendMessages() {
+    // The messages queued by the current iteration, with their destinations.
+    std::vector<AddressedMessage> batch;
+
+    // For each session, move its queued outgoing messages into the batch
+    // and clear the session's queue.
     for (Session &session : sessions) {
-        for (const NetworkMessage &message : session.outgoing) {
-            if (!pipe->Send(session.address, message)) {
-                throw std::runtime_error(
-                    "Network server could not send a message.");
-            }
+        for (NetworkMessage &message : session.outgoing) {
+            batch.push_back({session.address, std::move(message)});
         }
 
-        // No double-sending of messages
         session.outgoing.clear();
+    }
+
+    // Now, our batch contains all messages queued for sending. We need
+    // only transfer it to the communication thread, which owns the pipe and
+    // will send the messages.
+
+    // Append rather than replace, as the communication thread may not have
+    // collected the previous iteration's messages yet.
+    std::lock_guard lock(outgoing_mutex);
+    outgoing.insert(outgoing.end(), std::make_move_iterator(batch.begin()),
+                    std::make_move_iterator(batch.end()));
+}
+
+void NetworkServer::Communicate(std::stop_token stop) {
+    // The shared pipe for all clients, created and destroyed on this thread.
+    std::unique_ptr<MsgPipe> pipe;
+
+    // The outgoing batch owned by this thread while sending.
+    std::vector<AddressedMessage> sending;
+
+    // The incoming batch owned by this thread while receiving.
+    std::vector<AddressedMessage> received;
+
+    while (!stop.stop_requested()) {
+        // The requested local address, needed only until the pipe is created.
+        // Nullopt if the pipe has already been created.
+        std::optional<std::string> address;
+
+        // Set up the pipe if we haven't already, and transfer any queued
+        // outgoing messages to the sending batch. We only lock here so the main
+        // thread can queue the next batch while this one is being sent.
+        {
+            std::lock_guard lock(outgoing_mutex);
+            if (!pipe) {
+                address = listen_address;
+            }
+            sending.swap(outgoing);
+        }
+
+        // If we have a requested address, create the pipe and bind it to that
+        // address.
+        if (address) {
+            pipe = internal::MakePipe();
+            pipe->Listen(*address);
+        }
+
+        // If the pipe is available, send the queued messages.
+        if (pipe) {
+
+            // For each message in the sending batch, send it through the pipe.
+            for (const auto &message : sending) {
+                if (!pipe->Send(message.address, message.message)) {
+                    throw std::runtime_error(
+                        "Network server could not send a message.");
+                }
+            }
+
+            // Clear the sending batch after sending all messages, so we don't
+            // resend them in the next iteration.
+            sending.clear();
+
+            // The current datagram and its sender, reused for each receive.
+            AddressedMessage message;
+
+            // Receive messages from the pipe until there are no more, or until
+            // a stop is requested.
+            while (!stop.stop_requested() &&
+                   pipe->Receive(message.address, message.message)) {
+                received.push_back(std::move(message));
+            }
+
+            // Transfer the received messages to the main thread's incoming
+            // batch, so they can be processed in the next iteration.
+            {
+                std::lock_guard lock(incoming_mutex);
+                incoming.insert(incoming.end(),
+                                std::make_move_iterator(received.begin()),
+                                std::make_move_iterator(received.end()));
+            }
+
+            // Clear the received batch after transferring, so we don't double
+            // add them in the next iteration.
+            received.clear();
+        }
+
+        // 1 millisecond sleep to avoid infinitely tight loop wasting CPU cycles
+        // when there is no work to do.
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 }
 
