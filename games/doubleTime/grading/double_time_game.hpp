@@ -86,9 +86,12 @@ private:
     bool action_requested_since_last_send = false;
     bool jump_on_beat_since_last_send = false;
     std::map<std::uint32_t, svanes::Entity> platform_entities;
+    std::map<std::uint32_t, svanes::Transform> previous_platform_transforms;
     std::map<std::uint32_t, svanes::Entity> door_entities;
     std::map<std::uint32_t, svanes::Entity> spike_entities;
     std::map<std::uint32_t, svanes::Entity> collectible_entities;
+    std::vector<svanes::Entity> spawn_point_entities;
+    std::vector<svanes::Entity> death_zone_entities;
 
     bool has_audio_sync = false;
     std::uint64_t synced_audio_tics = 0;

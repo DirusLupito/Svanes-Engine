@@ -201,6 +201,29 @@ int32_t main(int32_t argc, char **argv) {
         kDoubleTimeWorldHeight * 0.5F);
     world.AddComponent<svanes::Transform>(tilemap_entity, tilemap_transform);
     world.AddComponent<svanes::TileMap>(tilemap_entity, std::move(level.tile_map));
+    std::vector<svanes::Entity> spawn_point_entities;
+    std::vector<svanes::Entity> death_zone_entities;
+    for (const DoubleTimeSpawnPoint &spawn : level.spawn_points) {
+        const svanes::Entity entity = world.CreateEntity();
+        world.AddComponent<svanes::Transform>(entity, svanes::Transform{
+            tilemap_transform.x + (spawn.x + 0.5F) * kDoubleTimeTileSize,
+            tilemap_transform.y + (spawn.y + 0.5F) * kDoubleTimeTileSize, 0.0F});
+        world.AddComponent<DoubleTimeSpawnPointComponent>(
+            entity, DoubleTimeSpawnPointComponent{});
+        spawn_point_entities.push_back(entity);
+    }
+    for (const DoubleTimeLevelArea &zone : level.death_zones) {
+        const svanes::Entity entity = world.CreateEntity();
+        world.AddComponent<svanes::Transform>(entity, svanes::Transform{
+            tilemap_transform.x + (zone.x + zone.width * 0.5F) * kDoubleTimeTileSize,
+            tilemap_transform.y + (zone.y + zone.height * 0.5F) * kDoubleTimeTileSize,
+            0.0F});
+        world.AddComponent<svanes::Collider2D>(entity, svanes::Collider2D{
+            svanes::Rectangle2D{0.0F, 0.0F,
+                                zone.width * kDoubleTimeTileSize,
+                                zone.height * kDoubleTimeTileSize}});
+        death_zone_entities.push_back(entity);
+    }
 
     const float spawn_x = level.spawn_point
         ? tilemap_transform.x + (level.spawn_point->x + 0.5F) * kDoubleTimeTileSize
@@ -401,7 +424,22 @@ int32_t main(int32_t argc, char **argv) {
                 }
                 svanes::Transform &transform =
                     active_world->GetComponent<svanes::Transform>(character.entity);
-                if (transform.y > kDoubleTimeWorldHeight * 2.0F) {
+                bool in_death_zone = false;
+                const auto &character_collider =
+                    active_world->GetComponent<svanes::Collider2D>(character.entity);
+                for (const svanes::Entity zone : death_zone_entities) {
+                    const auto &zone_transform =
+                        active_world->GetComponent<svanes::Transform>(zone);
+                    const auto &zone_collider =
+                        active_world->GetComponent<svanes::Collider2D>(zone);
+                    if (!svanes::DetectCollisions(
+                            character_collider.geometry, transform,
+                            zone_collider.geometry, zone_transform).empty()) {
+                        in_death_zone = true;
+                        break;
+                    }
+                }
+                if (in_death_zone || transform.y > kDoubleTimeWorldHeight * 2.0F) {
                     transform = svanes::Transform{spawn_x, spawn_y, 0.0F};
                     active_world->GetComponent<svanes::Kinematic2D>(character.entity)
                         .velocity_y = 0.0F;

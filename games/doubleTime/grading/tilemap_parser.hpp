@@ -48,6 +48,8 @@ struct DoubleTimeSpawnPoint {
     std::int32_t y = 0;
 };
 
+struct DoubleTimeSpawnPointComponent {};
+
 struct DoubleTimeGoalArea {
     std::int32_t x = 0;
     std::int32_t y = 0;
@@ -66,6 +68,7 @@ struct DoubleTimeLevelData {
     svanes::TileMap tile_map;
     std::vector<DoubleTimeMovingPlatform> moving_platforms;
     std::vector<DoubleTimeDoor> doors;
+    std::vector<DoubleTimeSpawnPoint> spawn_points;
     std::optional<DoubleTimeSpawnPoint> spawn_point;
     std::optional<DoubleTimeGoalArea> goal;
     std::vector<DoubleTimeLevelArea> death_zones;
@@ -200,9 +203,12 @@ inline DoubleTimeLevelData LoadDoubleTimeLevelData(
             std::uint8_t r = 0, g = 0, b = 0, a = 0;
             SDL_ReadSurfacePixel(image.get(), x, y, &r, &g, &b, &a);
             if (is_color(svanes::Color{r, g, b, a}, kSpawn)) {
-                result.spawn_point = DoubleTimeSpawnPoint{x, y};
+                result.spawn_points.push_back(DoubleTimeSpawnPoint{x, y});
             }
         }
+    }
+    if (!result.spawn_points.empty()) {
+        result.spawn_point = result.spawn_points.front();
     }
     std::vector<std::pair<std::int32_t, std::int32_t>> goal_cells;
     for (std::int32_t y = 0; y < image->h; ++y) {
