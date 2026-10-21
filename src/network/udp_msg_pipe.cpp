@@ -1,11 +1,29 @@
 #include <svanes/network/udp_msg_pipe.hpp>
 
+#include <svanes/network/message_serialization.hpp>
+
+#include <algorithm>
 #include <charconv>
+#include <limits>
+#include <span>
 #include <stdexcept>
 #include <string_view>
 #include <utility>
 
 namespace svanes {
+
+// The largest datagram supported by ZeroMQ's fixed UDP buffers.
+constexpr std::uint32_t DatagramSize = 8192;
+
+// Each datagram starts with an 8-byte message ID, a 4-byte fragment index,
+// and a 4-byte complete message size, all in big-endian order.
+constexpr std::uint32_t FragmentHeaderSize = 16;
+
+// The message bytes that fit after a datagram's fragment header.
+constexpr std::uint32_t FragmentPayloadSize = DatagramSize - FragmentHeaderSize;
+
+// The time allowed to assemble a message after its first fragment arrives.
+constexpr auto FragmentLifetime = std::chrono::seconds(1);
 
 /**
  * Validates a numeric IPv4:PORT address and normalizes it for ZMQ_DGRAM.
@@ -102,7 +120,7 @@ void UdpMsgPipe::Listen(const std::string &address) {
     // Bind the socket to the specified address.
     new_socket.bind("udp://" + address);
 
-    // Now the pipe owns the socket and is ready to send and receive datagrams.`
+    // Now the pipe owns the socket and is ready to send and receive datagrams.
     socket = std::move(new_socket);
 }
 
@@ -115,28 +133,51 @@ bool UdpMsgPipe::Send(const std::string &address,
     // ZMQ_DGRAM requires a destination address with each send.
     const std::string destination = CanonicalAddress(address);
 
-    // Check if the message exceeds the ZeroMQ DGRAM UDP buffer limit of 8192
-    // bytes.
-    if (message.bytes.size() > 8192) {
-        throw std::length_error("UdpMsgPipe: payload exceeds the ZeroMQ UDP "
-                                "buffer limit of 8192 bytes.");
+    if (message.bytes.size() > std::numeric_limits<std::uint32_t>::max()) {
+        throw std::length_error(
+            "UdpMsgPipe: message size exceeds the fragment header's range.");
     }
 
-    // First, we send the destination frame telling the socket where to send the
-    // datagram. (sndmore tells the socket that more frames are coming, so it
-    // should not send the datagram yet.)
-    if (!socket.send(zmq::buffer(destination),
-                     zmq::send_flags::sndmore | zmq::send_flags::dontwait)) {
-        return false;
-    }
+    const auto size = static_cast<std::uint32_t>(message.bytes.size());
+    const auto id = next_message_id++;
+    const auto count = size == 0 ? 1 : 1 + (size - 1) / FragmentPayloadSize;
+    const std::span<const std::byte> bytes = message.bytes;
 
-    // Next, we send the datagram body frame containing the actual message
-    // bytes, without blocking (dontwait). If the socket's internal buffers are
-    // full, this will return false.
-    if (!socket.send(zmq::buffer(message.bytes.data(), message.bytes.size()),
-                     zmq::send_flags::dontwait)) {
-        throw std::runtime_error(
-            "UdpMsgPipe: could not complete a datagram send.");
+    // For each fragment, send the following:
+    // 8 bytes: message ID
+    // 4 bytes: fragment index
+    // 4 bytes: complete message size
+    // 0 to 8176 bytes: fragment payload
+
+    for (std::uint32_t index = 0; index < count; ++index) {
+        const auto offset = index * FragmentPayloadSize;
+        const auto length = std::min(FragmentPayloadSize, size - offset);
+        MessageWriter writer;
+        writer.WriteUint64(id);
+        writer.WriteUint32(index);
+        writer.WriteUint32(size);
+        writer.WriteBytes(bytes.subspan(offset, length));
+        const auto fragment = writer.Finish();
+
+        // First, we send the destination frame telling the socket where to send
+        // the datagram. sndmore tells ZeroMQ that the datagram's body frame
+        // follows. dontwait returns false if the frame cannot be queued.
+        if (!socket.send(zmq::buffer(destination),
+                         zmq::send_flags::sndmore |
+                             zmq::send_flags::dontwait)) {
+            return false;
+        }
+
+        // Next, we send the datagram body frame containing the fragment header
+        // and payload, without blocking (dontwait). If this send returns false,
+        // we throw because the destination frame was already accepted but the
+        // datagram could not be completed.
+        if (!socket.send(
+                zmq::buffer(fragment.bytes.data(), fragment.bytes.size()),
+                zmq::send_flags::dontwait)) {
+            throw std::runtime_error(
+                "UdpMsgPipe: could not complete a datagram send.");
+        }
     }
 
     return true;
@@ -148,40 +189,103 @@ bool UdpMsgPipe::Receive(std::string &address, NetworkMessage &message) {
             "UdpMsgPipe: Receive requires a listening pipe.");
     }
 
-    zmq::message_t source;
+    // Expiration is based on the first fragment, so later fragments and
+    // duplicates cannot keep an unfinished message alive indefinitely.
+    const auto now = std::chrono::steady_clock::now();
+    std::erase_if(incomplete, [&](const auto &entry) {
+        return now - entry.second.started >= FragmentLifetime;
+    });
 
-    // We delegate to the socket's recv method, which will return an empty
-    // optional if no message is available. dontwait so we don't block if no
-    // message is available.
-    if (!socket.recv(source, zmq::recv_flags::dontwait).has_value()) {
-        return false;
+    // Consume available fragments until a message is complete or the socket
+    // has no more datagrams.
+    while (true) {
+        zmq::message_t source;
+        if (!socket.recv(source, zmq::recv_flags::dontwait)) {
+            return false;
+        }
+
+        // Every datagram has an address frame followed by its body frame.
+        zmq::message_t body;
+        if (!socket.recv(body, zmq::recv_flags::dontwait)) {
+            throw std::runtime_error(
+                "UdpMsgPipe: received an address frame without a body frame.");
+        }
+
+        // Read the fragment header and payload from the datagram body.
+        // Remember, it's 8 bytes of message ID, 4 bytes of fragment index, 4
+        // bytes of complete message size, and 0 to 8176 bytes of fragment
+        // payload.
+        MessageReader reader(
+            std::span<const std::byte>{body.data<std::byte>(), body.size()});
+        const auto id = reader.ReadUint64();
+        const auto index = reader.ReadUint32();
+        const auto size = reader.ReadUint32();
+        const auto count = size == 0 ? 1 : 1 + (size - 1) / FragmentPayloadSize;
+
+        // if the fragment index is out of range or the payload size does not
+        // match the expected size for this fragment, the datagram is invalid.
+        if (index >= count ||
+            reader.Remaining() !=
+                std::min(FragmentPayloadSize,
+                         size - index * FragmentPayloadSize)) {
+            throw std::invalid_argument(
+                "UdpMsgPipe: invalid message fragment.");
+        }
+
+        // 0MQ writes the sender's address frame as NULL-terminated IPv4:PORT
+        // text. Different senders might use the same message ID, so we need the
+        // tuple (sender, message ID) to identify a unique message assembly.
+        std::string sender = source.data<char>();
+        auto [entry, inserted] = incomplete.try_emplace(
+            std::pair{sender, id},
+            IncompleteMessage{size, {}, std::chrono::steady_clock::now()});
+
+        auto &assembly = entry->second;
+
+        // All fragments belonging to the same incomplete message must agree
+        // on the complete message size.
+        if (!inserted && assembly.size != size) {
+            throw std::invalid_argument(
+                "UdpMsgPipe: inconsistent message size between fragments.");
+        }
+
+        // Keep each fragment once, in index order, without allocating the
+        // complete message until all of its bytes have arrived.
+        const auto payload = reader.ReadBytes(reader.Remaining());
+        assembly.fragments.try_emplace(index, payload.begin(), payload.end());
+
+        // If the number of fragments received is not equal to the expected
+        // count, we cannot assemble the complete message yet, so we continue to
+        // receive more fragments.
+        if (assembly.fragments.size() != count) {
+            continue;
+        }
+
+        // At this point, we have received all fragments for the message, so we
+        // can assemble the complete message by concatenating the fragments in
+        // order.
+
+        // The complete message, to be returned to the caller.
+        NetworkMessage complete;
+        complete.bytes.reserve(size);
+
+        // For each fragment in the assembly, in order of their indices, we
+        // append their payloads to the complete message.
+        for (const auto &[fragment_index, fragment] : assembly.fragments) {
+            complete.bytes.insert(complete.bytes.end(), fragment.begin(),
+                                  fragment.end());
+        }
+
+        incomplete.erase(entry);
+        address = std::move(sender);
+        message = std::move(complete);
+        return true;
     }
-
-    // So if we're here there is a message available, but we need to receive the
-    // body frame as well.
-
-    zmq::message_t body;
-
-    // Every message should have an address frame followed by a body frame
-    // containing the actual datagram. If we receive an address frame but no
-    // body frame, that's an error.
-    if (!socket.recv(body, zmq::recv_flags::none).has_value()) {
-        throw std::runtime_error(
-            "UdpMsgPipe: received an address frame without a body frame.");
-    }
-
-    // 0MQ writes the sender's address frame as NULL-terminated IPv4:PORT text.
-    address = source.data<char>();
-
-    // Copy the received bytes into the provided NetworkMessage object.
-
-    const auto *bytes = body.data<std::byte>();
-    message =
-        NetworkMessage{std::vector<std::byte>(bytes, bytes + body.size())};
-
-    return true;
 }
 
-void UdpMsgPipe::Close() { socket.close(); }
+void UdpMsgPipe::Close() {
+    socket.close();
+    incomplete.clear();
+}
 
 } // namespace svanes
