@@ -142,7 +142,7 @@ private:
     // The square that rotates around its fixed center.
     std::optional<OwnedEntity> rotating_square;
 
-    // The red rectangles marking the world's deletion boxes.
+    // The invisible collision boxes that delete objects at the world's edges.
     std::vector<OwnedEntity> deletion_boxes;
 
     // The server-backed gameplay objects, keyed by their server entity IDs.

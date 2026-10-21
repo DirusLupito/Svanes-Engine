@@ -591,7 +591,8 @@ void OrbitalEscalationClient::Predict(svanes::Registry &world) {
             }
 
             // Predict the results of collisions with the deletion boxes.
-            for (const auto position : ApplyDeletionBoxes(world)) {
+            for (const auto position :
+                 ApplyDeletionBoxes(world, deletion_boxes)) {
                 CreateCollisionFlash(world, effects_timeline->Get(),
                                      collision_flashes, position);
             }
