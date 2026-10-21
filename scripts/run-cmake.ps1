@@ -6,7 +6,7 @@ param(
     [string[]] $CMakeArguments
 )
 
-$minimumVersion = [Version] '3.25.0'
+$minimumVersion = [Version] '3.26.0'
 $vswherePath = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
 $toolchainSpecs = @(
     [PSCustomObject]@{

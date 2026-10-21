@@ -12,7 +12,7 @@ Install the compiler for your operating system:
 
 On every platform, also install:
 
-- [CMake](https://cmake.org/download/) 3.25 or newer. The CMake bundled with Visual Studio can be used on Windows.
+- [CMake](https://cmake.org/download/) 3.26 or newer. The CMake bundled with Visual Studio can be used on Windows.
 - The [`just` command runner](https://github.com/casey/just#installation).
 
 After cloning the repository, open a terminal in its root directory and run:
