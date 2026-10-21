@@ -42,6 +42,8 @@ add_library(
     game_objects/dynamic_object/ship.hpp
     game_objects/planet.cpp
     game_objects/planet.hpp
+    game_objects/world_obstacles.cpp
+    game_objects/world_obstacles.hpp
     controls.cpp
     controls.hpp
     game_objects/visuals.cpp

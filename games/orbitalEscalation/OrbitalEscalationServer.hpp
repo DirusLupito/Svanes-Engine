@@ -170,6 +170,12 @@ private:
     // The central  planet which attacts and collides with gameplay objects.
     std::optional<Planet> planet;
 
+    // The stationary triangle and its repulsion field.
+    std::optional<OwnedEntity> repelling_triangle;
+
+    // The square that rotates around its fixed center.
+    std::optional<OwnedEntity> rotating_square;
+
     // The players admitted to the game, indexed by client ID.
     std::map<svanes::ClientId, Player> players;
 

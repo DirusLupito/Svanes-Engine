@@ -96,6 +96,9 @@ public:
     // The planet's position and rotation in the server's world.
     svanes::Transform planet_transform;
 
+    // The square's authoritative rotation around its fixed center.
+    float square_rotation = 0.0F;
+
     // All admitted players, including those whose ships have been destroyed.
     std::vector<Player> players;
 

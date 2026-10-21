@@ -5,6 +5,7 @@
 #include "controls.hpp"
 #include "effects/collision_flashes.hpp"
 #include "game_objects/deletion_boxes.hpp"
+#include "game_objects/world_obstacles.hpp"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -73,6 +74,9 @@ void OrbitalEscalationClient::Initialize(svanes::ClientContext &context) {
     context.world.AddComponent<svanes::Timeline>(effects_timeline->Get());
 
     deletion_boxes = CreateDeletionBoxes(context.world);
+    repelling_triangle.emplace(CreateRepellingTriangle(context.world));
+    rotating_square.emplace(
+        CreateRotatingSquare(context.world, gameplay_timeline->Get()));
 
     pause_label_entity = context.world.CreateEntity();
     context.world.AddComponent<svanes::TextLabel>(
@@ -298,6 +302,9 @@ void OrbitalEscalationClient::ApplyWorldUpdate(
 
     planet->GetTransform(world) = update.planet_transform;
     planet->UpdateVisuals(world);
+
+    world.GetComponent<svanes::Transform>(rotating_square->Get()).rotation =
+        update.square_rotation;
 
     // Collect the existing attachment trees into one list so their objects can
     // be kept even if they change parents or become independent in this update.

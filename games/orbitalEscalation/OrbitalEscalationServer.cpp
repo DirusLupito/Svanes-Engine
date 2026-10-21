@@ -4,6 +4,7 @@
 #include "combat/damage_system.hpp"
 #include "combat/missile_system.hpp"
 #include "game_objects/deletion_boxes.hpp"
+#include "game_objects/world_obstacles.hpp"
 #include "serialization/world_update.hpp"
 
 #include <svanes/kinematic_system.hpp>
@@ -65,6 +66,9 @@ void OrbitalEscalationServer::Initialize(svanes::ServerContext &context) {
     context.world.AddComponent<svanes::Timeline>(gameplay_timeline->Get());
     planet.emplace(context.world, Planet::MakeDefinition());
     planet->GetTransform(context.world) = {0.0F, 0.0F};
+    repelling_triangle.emplace(CreateRepellingTriangle(context.world));
+    rotating_square.emplace(
+        CreateRotatingSquare(context.world, gameplay_timeline->Get()));
     context.network.Listen("*:" + std::to_string(port));
 
     std::cout << "Orbital Escalation server: UDP port " << port << '.'
@@ -201,6 +205,9 @@ svanes::NetworkMessage OrbitalEscalationServer::CreateWorldUpdate(
     update.planet = planet->GetEntity();
     update.planet_transform =
         world.GetComponent<svanes::Transform>(update.planet);
+
+    update.square_rotation =
+        world.GetComponent<svanes::Transform>(rotating_square->Get()).rotation;
 
     // The list of gameplay objects to include in the update.
     std::vector<const DynamicObject *> pending;
