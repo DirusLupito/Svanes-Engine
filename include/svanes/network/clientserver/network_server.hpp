@@ -149,8 +149,8 @@ private:
      * Represents a single client session managed by the server.
      *
      * FIELDS:
-     * - address: The client's address, as reported by the pipe when its join
-     * request arrived.
+     * - address: The client's latest address, as reported by the pipe when its
+     * join request or an admitted gameplay message arrived.
      * - outgoing: A vector of NetworkMessage instances representing messages
      * queued for sending to the client.
      * - accepted: Whether the game admitted this client.
@@ -198,8 +198,8 @@ private:
     // accepted = false, so admitted client IDs can have gaps.
     std::vector<Session> sessions;
 
-    // The client ID of each session, keyed by its address, including rejected
-    // requests.
+    // The client ID assigned for each join request's address, including
+    // rejected requests. Used to identify duplicate join requests.
     std::unordered_map<std::string, ClientId> clients;
 
     // A vector of ClientInput structures representing input messages received

@@ -13,10 +13,10 @@ namespace svanes::internal {
  * between a client and server.
  *
  * MEMBERS:
- * - Join: The game's join request.
- * - Accepted: An assigned client ID followed by the game's response.
- * - Rejected: The game's rejection response.
- * - Game: Opaque game bytes.
+ * - Join: Enum used by a client to request joining a server.
+ * - Accepted: Enum used by a server to accept a client's join request.
+ * - Rejected: Enum used by a server to reject a client's join request.
+ * - Game: Enum used by both a client and server to send gameplay messages.
  */
 enum class ClientServerMessageKind : std::uint8_t {
     Join = 1,
@@ -51,21 +51,38 @@ NetworkMessage EncodeJoinResult(bool accepted, std::uint32_t client_id,
  * Encodes a game message to be sent between a client and the server.
  *
  * @param message The game's message payload.
+ * @param client_id The assigned client ID for messages from a client to the
+ * server. Zero for messages from the server to a client.
  *
  * @return A message containing the encoded game message.
  */
-NetworkMessage EncodeGameMessage(const NetworkMessage &message);
+NetworkMessage EncodeGameMessage(const NetworkMessage &message,
+                                 std::uint32_t client_id = 0);
 
 /**
- * Reads the remaining bytes from a message reader and returns them as a
- * NetworkMessage. Should only be called after the given reader has read
- * the engine header fields of the message, leaving only the game's payload
- * bytes remaining.
+ * Represents a decoded client-server message.
  *
- * @param reader The message reader from which to read the payload.
- *
- * @return A NetworkMessage containing the remaining bytes.
+ * FIELDS:
+ * - kind: The type of engine message received.
+ * - client_id: The assigned client ID in an acceptance or gameplay message.
+ * Zero for server gameplay messages and messages without a client ID field.
+ * - payload: The game's message bytes, without the engine protocol fields.
  */
-NetworkMessage ReadPayload(MessageReader &reader);
+struct DecodedMessage {
+    ClientServerMessageKind kind;
+    std::uint32_t client_id;
+    NetworkMessage payload;
+};
+
+/**
+ * Decodes the engine fields and game payload of a client-server message.
+ *
+ * @param message The complete message received from the pipe.
+ *
+ * @return The decoded message kind, client ID, and game payload.
+ *
+ * @throws std::invalid_argument if an engine field is truncated.
+ */
+DecodedMessage DecodeMessage(const NetworkMessage &message);
 
 } // namespace svanes::internal

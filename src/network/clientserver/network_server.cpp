@@ -78,21 +78,12 @@ void NetworkServer::ReceiveMessages(IServer &server,
             continue;
         }
 
-        MessageReader reader(message);
-
-        // What we do next depends on the kind of message.
-
-        // The first byte tells us what kind of engine message this is. See
-        // ClientServerMessageKind for the possible values.
-        const auto kind =
-            static_cast<internal::ClientServerMessageKind>(reader.ReadUint8());
+        // The decoded message from the raw NetworkMessage.
+        auto decoded = internal::DecodeMessage(message);
 
         // Case 1: A client is trying to join the server.
-        // We expect the following format, read in order:
-        // - 1 byte: ClientServerMessageKind::Join
-        // - remaining bytes: the join request payload
 
-        if (kind == internal::ClientServerMessageKind::Join) {
+        if (decoded.kind == internal::ClientServerMessageKind::Join) {
             if (sessions.size() >= std::numeric_limits<ClientId>::max()) {
                 throw std::overflow_error(
                     "Network server exhausted client IDs.");
@@ -107,15 +98,12 @@ void NetworkServer::ReceiveMessages(IServer &server,
                 continue;
             }
 
-            // The rest of the message is the join request payload, which we
-            // pass to the server's HandleJoinRequest method. Meaningless to the
-            // engine.
-            const auto request = internal::ReadPayload(reader);
-
             const auto id = static_cast<ClientId>(sessions.size() + 1);
 
+            // The game's join request payload is passed to HandleJoinRequest
+            // so the game can decide whether to admit this client.
             auto response =
-                server.HandleJoinRequest({world, *this, id, request});
+                server.HandleJoinRequest({world, *this, id, decoded.payload});
 
             sessions.push_back({address,
                                 {internal::EncodeJoinResult(
@@ -125,16 +113,15 @@ void NetworkServer::ReceiveMessages(IServer &server,
             clients.emplace(address, id);
 
             // Case 2: A client has been accepted and is sending gameplay
-            // messages. We expect the following format, read in order:
-            // - 1 byte: ClientServerMessageKind::Game
-            // - remaining bytes: the gameplay message payload
+            // messages.
 
-        } else if (kind == internal::ClientServerMessageKind::Game) {
-            const auto client = clients.find(address);
-            if (client != clients.end() &&
-                sessions[client->second - 1].accepted) {
-                pending.push_back(
-                    {client->second, internal::ReadPayload(reader)});
+        } else if (decoded.kind == internal::ClientServerMessageKind::Game) {
+            const auto id = decoded.client_id;
+            if (id != 0 && id <= sessions.size() && sessions[id - 1].accepted) {
+                // The client's latest source address is where replies should
+                // go, even if its socket has changed ports since joining.
+                sessions[id - 1].address = address;
+                pending.push_back({id, std::move(decoded.payload)});
             }
         }
     }

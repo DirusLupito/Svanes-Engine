@@ -144,25 +144,21 @@ void NetworkClient::ReceiveMessages(IClient &client) {
             continue;
         }
 
-        // The first byte tells us what kind of engine message this is.
-        // The remaining fields depend on that kind.
-        MessageReader reader(message);
-        const auto kind =
-            static_cast<internal::ClientServerMessageKind>(reader.ReadUint8());
+        // The decoded message from the raw NetworkMessage.
+        auto decoded = internal::DecodeMessage(message);
 
         // Case 2a: Still joining, and the server has accepted us.
-        // So we read our assigned ID and pass the game's response bytes to
+        // So we use our assigned ID and pass the game's response bytes to
         // HandleJoinResult. Zero is reserved for a client that isn't connected.
         if (!IsConnected() &&
-            kind == internal::ClientServerMessageKind::Accepted) {
-            const auto assigned_id = reader.ReadUint32();
-            if (assigned_id == 0) {
+            decoded.kind == internal::ClientServerMessageKind::Accepted) {
+            if (decoded.client_id == 0) {
                 throw std::invalid_argument(
                     "The server assigned client ID zero.");
             }
 
-            CompleteJoin(client, {JoinStatus::Accepted, assigned_id,
-                                  internal::ReadPayload(reader)});
+            CompleteJoin(client, {JoinStatus::Accepted, decoded.client_id,
+                                  std::move(decoded.payload)});
             // Now that the game has been notified, the remaining messages in
             // this batch can be collected for this frame's Update.
             continue;
@@ -172,17 +168,17 @@ void NetworkClient::ReceiveMessages(IClient &client) {
         // So we request cleanup of the failed connection and notify the game
         // with the rejection response.
         if (!IsConnected() &&
-            kind == internal::ClientServerMessageKind::Rejected) {
-            CompleteJoin(client, {JoinStatus::Rejected, 0,
-                                  internal::ReadPayload(reader)});
+            decoded.kind == internal::ClientServerMessageKind::Rejected) {
+            CompleteJoin(client,
+                         {JoinStatus::Rejected, 0, std::move(decoded.payload)});
             return;
         }
 
         // Case 2c: Connected, and this is a gameplay message.
-        // So we remove the engine fields and store only the game's bytes for
-        // Update to read through PollMessages.
-        if (IsConnected() && kind == internal::ClientServerMessageKind::Game) {
-            incoming.push_back(internal::ReadPayload(reader));
+        // So we store the game's bytes for Update to read through PollMessages.
+        if (IsConnected() &&
+            decoded.kind == internal::ClientServerMessageKind::Game) {
+            incoming.push_back(std::move(decoded.payload));
         }
     }
 }
@@ -196,7 +192,7 @@ void NetworkClient::SendMessages() {
     std::vector<NetworkMessage> batch;
 
     for (const NetworkMessage &message : outgoing) {
-        batch.push_back(internal::EncodeGameMessage(message));
+        batch.push_back(internal::EncodeGameMessage(message, client_id));
     }
     outgoing.clear();
 
