@@ -4,6 +4,7 @@
 #include "combat/weapon_system.hpp"
 #include "controls.hpp"
 #include "effects/collision_flashes.hpp"
+#include "game_objects/deletion_boxes.hpp"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -70,6 +71,8 @@ void OrbitalEscalationClient::Initialize(svanes::ClientContext &context) {
 
     effects_timeline.emplace(context.world);
     context.world.AddComponent<svanes::Timeline>(effects_timeline->Get());
+
+    deletion_boxes = CreateDeletionBoxes(context.world);
 
     pause_label_entity = context.world.CreateEntity();
     context.world.AddComponent<svanes::TextLabel>(
@@ -569,6 +572,12 @@ void OrbitalEscalationClient::Predict(svanes::Registry &world) {
             // Create explosion flashes for missiles that detonated this step.
             for (const auto position :
                  UpdateMissileExplosions(world, contacts)) {
+                CreateCollisionFlash(world, effects_timeline->Get(),
+                                     collision_flashes, position);
+            }
+
+            // Predict the results of collisions with the deletion boxes.
+            for (const auto position : ApplyDeletionBoxes(world)) {
                 CreateCollisionFlash(world, effects_timeline->Get(),
                                      collision_flashes, position);
             }
