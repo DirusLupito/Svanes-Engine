@@ -46,6 +46,9 @@ svanes::NetworkMessage WorldUpdate::Write() const {
     writer.WriteUint32(planet);
     WritePose(writer, planet_transform);
 
+    // We also write the square's rotation.
+    writer.WriteFloat32(square_rotation);
+
     // Next we send the entire player roster. A player can remain in the game
     // after losing their ship, so ship presence is separate from its entity ID.
     writer.WriteUint32(static_cast<std::uint32_t>(players.size()));
@@ -119,6 +122,9 @@ WorldUpdate WorldUpdate::Read(const svanes::NetworkMessage &message) {
     // come from the shared definition.
     update.planet = reader.ReadUint32();
     update.planet_transform = ReadPose(reader);
+
+    // Restore the square's rotation.
+    update.square_rotation = reader.ReadFloat32();
 
     // The number of players described by this update.
     const auto player_count = reader.ReadUint32();

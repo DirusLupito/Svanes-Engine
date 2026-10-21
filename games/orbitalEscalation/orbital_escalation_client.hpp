@@ -136,6 +136,12 @@ private:
     // The planet displayed in the client's world.
     std::optional<Planet> planet;
 
+    // The stationary triangle and its repulsion field.
+    std::optional<OwnedEntity> repelling_triangle;
+
+    // The square that rotates around its fixed center.
+    std::optional<OwnedEntity> rotating_square;
+
     // The red rectangles marking the world's deletion boxes.
     std::vector<OwnedEntity> deletion_boxes;
 
