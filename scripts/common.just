@@ -41,7 +41,7 @@ build-preset-prefix := if os() == "windows" {
 }
 
 bin-dir := "./out/build/" + configure-preset + "/bin/Debug/"
-release-bin-dir := "./out/build/" + configure-preset + "/bin/Release/"
+release-bin-dir := "./out/build/" + configure-preset + "/bin/RelWithDebInfo/"
 
 exe-suffix := if os() == "windows" {
     ".exe"
@@ -58,7 +58,7 @@ _build targets="": configure
     {{cmake}} --build --preset {{build-preset-prefix}}-debug --parallel {{if targets == "" { "" } else { "--target " + targets }}}
 
 _release targets="": configure
-    {{cmake}} --build --preset {{build-preset-prefix}}-release --parallel {{if targets == "" { "" } else { "--target " + targets }}}
+    {{cmake}} --build --preset {{build-preset-prefix}}-relwithdebinfo --parallel {{if targets == "" { "" } else { "--target " + targets }}}
 
 _package target: configure
-    {{cmake}} --build --preset {{build-preset-prefix}}-release --target package-{{target}} --parallel
+    {{cmake}} --build --preset {{build-preset-prefix}}-relwithdebinfo --target package-{{target}} --parallel

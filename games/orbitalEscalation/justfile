@@ -17,7 +17,7 @@ debug target="OrbitalEscalation": (build target)
 
 package target="orbitalEscalation": (_check-target target) (_package target)
 
-# Launch an existing Release Orbital Escalation client or server without compiling.
+# Launch an existing RelWithDebInfo Orbital Escalation client or server without compiling.
 nocompile target="OrbitalEscalation" *args:
     {{release-bin-dir}}{{if target == "OrbitalEscalationServer" { "svanes_game_orbital_escalation_server" } else if target =~ "^[Oo]rbitalEscalation$" { "svanes_game_orbital_escalation" } else { error("nocompile supports OrbitalEscalation and OrbitalEscalationServer") }}}{{exe-suffix}} {{args}}
 

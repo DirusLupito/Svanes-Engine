@@ -23,10 +23,10 @@ $toolchainSpecs = @(
 $presetToConfigurePreset = @{
     'windows-msvc' = 'windows-msvc'
     'windows-debug' = 'windows-msvc'
-    'windows-release' = 'windows-msvc'
+    'windows-relwithdebinfo' = 'windows-msvc'
     'windows-vs2022' = 'windows-vs2022'
     'windows-vs2022-debug' = 'windows-vs2022'
-    'windows-vs2022-release' = 'windows-vs2022'
+    'windows-vs2022-relwithdebinfo' = 'windows-vs2022'
 }
 
 function Get-CMakeCapabilities {
