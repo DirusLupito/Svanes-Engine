@@ -26,7 +26,7 @@ constexpr float kCollisionAcceleration = 400000.0F;
 constexpr float kSpawnSpeed = 300.0F;
 
 // The number of drifting junk ships.
-constexpr std::uint32_t kJunkShipCount = 60;
+constexpr std::uint32_t kJunkShipCount = 1200;
 
 // The health of a junk ship.
 constexpr float kJunkHealth = 10.0F;
