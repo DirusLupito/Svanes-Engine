@@ -25,8 +25,11 @@ constexpr float kPlanetImpactDamage = 25.0F;
 constexpr float kCollisionAcceleration = 400000.0F;
 constexpr float kSpawnSpeed = 300.0F;
 
-// The number of drifting junk ships.
-constexpr std::uint32_t kJunkShipCount = 60;
+// The total number of junk ships.
+constexpr std::uint32_t kJunkShipCount = 1200;
+
+// The number of junk ships that remain fixed in place without kinematics.
+constexpr std::uint32_t kStaticJunkShipCount = 1000;
 
 // The health of a junk ship.
 constexpr float kJunkHealth = 10.0F;
@@ -79,7 +82,7 @@ void OrbitalEscalationServer::Initialize(svanes::ServerContext &context) {
 
     deletion_boxes = CreateDeletionBoxes(context.world);
     spawn_zones.emplace(context.world);
-    CreateJunk(context.world);
+    CreateJunk(context.world, kJunkShipCount, kStaticJunkShipCount);
     context.network.Listen("*:" + std::to_string(port));
 
     std::cout << "Orbital Escalation server: UDP port " << port << '.'
@@ -238,7 +241,7 @@ svanes::NetworkMessage OrbitalEscalationServer::CreateWorldUpdate(
         pending.push_back(projectile.get());
     }
 
-    // ...then the drifting junk ships...
+    // ...then the junk ships...
     for (const auto &ship : junk_ships) {
         pending.push_back(ship.get());
     }
@@ -263,7 +266,7 @@ svanes::NetworkMessage OrbitalEscalationServer::CreateWorldUpdate(
         state.local_tics =
             world.GetComponent<svanes::Timeline>(entity).GetTotalTics();
 
-        // Attached objects follow their parent and have no independent motion.
+        // Static and attached objects have no independent motion.
         if (world.HasComponent<svanes::Kinematic2D>(entity)) {
             const auto &motion =
                 world.GetComponent<svanes::Kinematic2D>(entity);
@@ -339,7 +342,9 @@ void OrbitalEscalationServer::SpawnPlayer(svanes::Registry &world,
     UpdateAttachments(world);
 }
 
-void OrbitalEscalationServer::CreateJunk(svanes::Registry &world) {
+void OrbitalEscalationServer::CreateJunk(svanes::Registry &world,
+                                         std::uint32_t count,
+                                         std::uint32_t static_count) {
     std::mt19937 random(std::random_device{}());
 
     // Random positions around the planet, measured from its surface.
@@ -355,23 +360,30 @@ void OrbitalEscalationServer::CreateJunk(svanes::Registry &world) {
     // The three single-shape ship definitions used in turn.
     const std::array names{"junk_square", "junk_circle", "junk_triangle"};
 
-    for (std::uint32_t index = 0; index < kJunkShipCount; ++index) {
+    for (std::uint32_t index = 0; index < count; ++index) {
         auto ship = assets.CreateShip(world, gameplay_timeline->Get(),
                                       names[index % names.size()]);
         const auto entity = ship->GetEntity();
         const float angle = angle_dist(random);
         const float distance = OrbitalPlanetRadius + distance_dist(random);
         const float speed = svanes::PerSecondToPerTic(velocity_dist(random));
+        const float spin = svanes::PerSecondToPerTic(spin_dist(random));
 
         ship->GetTransform(world) = {std::cos(angle) * distance,
                                      std::sin(angle) * distance};
 
-        // Alternate clockwise and counterclockwise drift around the planet.
-        const float direction = index % 2 == 0 ? 1.0F : -1.0F;
-        auto &motion = ship->GetKinematic(world);
-        motion.velocity_x = -std::sin(angle) * speed * direction;
-        motion.velocity_y = std::cos(angle) * speed * direction;
-        motion.angular_velocity = svanes::PerSecondToPerTic(spin_dist(random));
+        if (index < static_count) {
+            // Without kinematics, these ships cannot drift, rotate, or be
+            // moved by gravity or collision response.
+            world.RemoveComponent<svanes::Kinematic2D>(entity);
+        } else {
+            // Alternate clockwise and counterclockwise drift around the planet.
+            const float direction = index % 2 == 0 ? 1.0F : -1.0F;
+            auto &motion = ship->GetKinematic(world);
+            motion.velocity_x = -std::sin(angle) * speed * direction;
+            motion.velocity_y = std::cos(angle) * speed * direction;
+            motion.angular_velocity = spin;
+        }
 
         world.AddComponent<Health>(entity, Health{kJunkHealth});
         world.AddComponent<svanes::Color>(
