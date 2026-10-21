@@ -3,6 +3,7 @@
 #include "attachment_system.hpp"
 #include "combat/damage_system.hpp"
 #include "combat/missile_system.hpp"
+#include "game_objects/deletion_boxes.hpp"
 #include "serialization/world_update.hpp"
 
 #include <svanes/kinematic_system.hpp>
@@ -411,6 +412,9 @@ void OrbitalEscalationServer::RespondToPhysics(
     }
 
     UpdateMissileExplosions(world, contacts);
+
+    // Objects touching the red boxes are removed with the other dead objects.
+    ApplyDeletionBoxes(world);
 
     // Explosions have finished using the entities' geometry. Now their owners
     // can remove dead objects, including dead missiles still inside launchers.

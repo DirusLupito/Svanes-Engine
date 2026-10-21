@@ -136,6 +136,9 @@ private:
     // The planet displayed in the client's world.
     std::optional<Planet> planet;
 
+    // The red rectangles marking the world's deletion boxes.
+    std::vector<OwnedEntity> deletion_boxes;
+
     // The server-backed gameplay objects, keyed by their server entity IDs.
     // Ownership belongs to root_objects or another object's attachment vector.
     std::unordered_map<svanes::Entity, DynamicObject *> objects;
