@@ -54,6 +54,7 @@ public:
      * - health: The remaining health, if the object can receive damage.
      * - attachment: The owner's server entity ID and relative pose, if
      * attached.
+     * - color: An optional override for the object's solid visual colors.
      */
     struct Object {
         svanes::Entity entity;
@@ -64,6 +65,7 @@ public:
         std::optional<Velocity> velocity;
         std::optional<float> health;
         std::optional<Attachment> attachment;
+        std::optional<svanes::Color> color;
     };
 
     /**

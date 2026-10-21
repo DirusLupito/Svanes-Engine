@@ -98,6 +98,15 @@ svanes::NetworkMessage WorldUpdate::Write() const {
             writer.WriteUint32(object.attachment->parent);
             WritePose(writer, object.attachment->transform);
         }
+
+        // Randomly colored ships override the catalog's default appearance.
+        writer.WriteBool(object.color.has_value());
+        if (object.color) {
+            writer.WriteUint8(object.color->red);
+            writer.WriteUint8(object.color->green);
+            writer.WriteUint8(object.color->blue);
+            writer.WriteUint8(object.color->alpha);
+        }
     }
     return writer.Finish();
 }
@@ -147,7 +156,7 @@ WorldUpdate WorldUpdate::Read(const svanes::NetworkMessage &message) {
     const auto object_count = reader.ReadUint32();
 
     // Finally read each object's identity, catalog definition, pose, local
-    // time, and optional movement, health, and attachment.
+    // time, and optional movement, health, attachment, and color.
     for (std::uint32_t index = 0; index < object_count; ++index) {
         // The state of the object currently being read.
         Object object{};
@@ -191,6 +200,13 @@ WorldUpdate WorldUpdate::Read(const svanes::NetworkMessage &message) {
             const auto parent = reader.ReadUint32();
 
             object.attachment = Attachment{parent, ReadPose(reader)};
+        }
+
+        // An optional color overrides the object's solid visual parts.
+        if (reader.ReadBool()) {
+            object.color =
+                svanes::Color{reader.ReadUint8(), reader.ReadUint8(),
+                              reader.ReadUint8(), reader.ReadUint8()};
         }
         update.objects.push_back(std::move(object));
     }

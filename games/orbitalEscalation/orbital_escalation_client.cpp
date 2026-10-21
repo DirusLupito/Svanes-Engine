@@ -373,6 +373,13 @@ void OrbitalEscalationClient::ApplyWorldUpdate(
             world.RemoveComponent<Health>(entity);
         }
 
+        // Apply any per-object color instead of the catalog's default color.
+        if (state.color) {
+            world.AddComponent<svanes::Color>(entity, *state.color);
+        } else {
+            world.RemoveComponent<svanes::Color>(entity);
+        }
+
         // Launch history is estimated locally rather than sent by the server.
         if (world.HasComponent<MissileExplosion>(entity)) {
             auto &explosion = world.GetComponent<MissileExplosion>(entity);
