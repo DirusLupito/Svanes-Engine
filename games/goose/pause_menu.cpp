@@ -134,7 +134,7 @@ svanes::Color Shown(svanes::Color color, bool visible)
  * @param area The area, in pixels from the viewport's top-left corner.
  * @param color The color to fill it with.
  */
-void PlaceShape(const svanes::FrameContext& frame, svanes::Entity entity, const svanes::Rectangle2D& area, svanes::Color color)
+void PlaceShape(const svanes::ClientFrameContext& frame, svanes::Entity entity, const svanes::Rectangle2D& area, svanes::Color color)
 {
     const svanes::Vector2D origin = TopLeft(frame.camera.Viewport());
     const svanes::Rectangle2D world_area = frame.camera.ScreenToWorld(
@@ -171,7 +171,7 @@ void PlaceLabel(
 
 }
 
-PauseMenu::PauseMenu(svanes::GameContext& context, bool on_server) : on_server(on_server)
+PauseMenu::PauseMenu(svanes::ClientContext& context)
 {
     const svanes::FontHandle large = LoadMenuFont(context.fonts, kLargeTextPoints);
     const svanes::FontHandle small = LoadMenuFont(context.fonts, kSmallTextPoints);
@@ -211,7 +211,7 @@ void PauseMenu::Layout(const svanes::Rectangle2D& viewport)
 
 bool PauseMenu::IsEnabled(std::size_t row, bool alone) const
 {
-    return row == kSpeedRow ? alone : on_server;
+    return row != kSpeedRow || alone;
 }
 
 void PauseMenu::KeepFocusEnabled(bool alone)
@@ -228,7 +228,7 @@ void PauseMenu::KeepFocusEnabled(bool alone)
     }
 }
 
-void PauseMenu::HandleInput(const svanes::FrameContext& frame, bool alone)
+void PauseMenu::HandleInput(const svanes::ClientFrameContext& frame, bool alone)
 {
     if (frame.input.WasPressed(svanes::Key::Escape)) {
         open = !open;
@@ -290,7 +290,7 @@ void PauseMenu::HandleInput(const svanes::FrameContext& frame, bool alone)
     }
 }
 
-void PauseMenu::Draw(const svanes::FrameContext& frame, bool alone)
+void PauseMenu::Draw(const svanes::ClientFrameContext& frame, bool alone)
 {
     const svanes::Rectangle2D viewport = frame.camera.Viewport();
     Layout(viewport);
@@ -303,7 +303,7 @@ void PauseMenu::Draw(const svanes::FrameContext& frame, bool alone)
 
     const std::array<const char*, 2> captions{
         alone ? "Game speed" : "Game speed - only while playing alone",
-        on_server ? "Loop rate" : "Loop rate - only on a goose server",
+        "Loop rate",
     };
     for (std::size_t row = 0; row < rows.size(); ++row) {
         const bool enabled = IsEnabled(row, alone);

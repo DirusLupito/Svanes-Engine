@@ -127,19 +127,10 @@ Use an existing peer's LAN address when joining from another computer. These
 options also work with `just run OrbitalEscalation` to build before launching.
 ### Titled Goose Game (Erik's game) multiplayer
 
-Run the commands below from `games/goose`.
-
-Peer-to-peer: one player hosts, others join any player already in the world.
-Every copy on one computer needs its own `--port`.
-
-```sh
-just run goose
-just run goose --join 127.0.0.1:45000 --port 45002
-```
-
-Client/server: start the headless server, then connect clients to its IP.
+Run the commands below from `games/goose`. Start the headless server, which
+listens on UDP port 46000, then connect any number of clients to it.
 
 ```sh
 just run goose-server
-just run goose --server 127.0.0.1
+just run goose 127.0.0.1:46000
 ```
