@@ -12,8 +12,11 @@
 #include <svanes/sprite_animation_system.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <iostream>
+#include <numbers>
+#include <random>
 #include <stdexcept>
 #include <utility>
 
@@ -23,6 +26,12 @@ constexpr float kCollisionAcceleration = 400000.0F;
 constexpr float kSpawnSpacing = 2000.0F;
 constexpr float kSpawnHeight = 48000.0F;
 constexpr float kSpawnSpeed = 300.0F;
+
+// The number of drifting junk ships.
+constexpr std::uint32_t kJunkShipCount = 60;
+
+// The health of a junk ship.
+constexpr float kJunkHealth = 10.0F;
 
 /**
  * Applies an acceleration to two entities based on their collision, if they
@@ -69,6 +78,7 @@ void OrbitalEscalationServer::Initialize(svanes::ServerContext &context) {
     repelling_triangle.emplace(CreateRepellingTriangle(context.world));
     rotating_square.emplace(
         CreateRotatingSquare(context.world, gameplay_timeline->Get()));
+    CreateJunk(context.world);
     context.network.Listen("*:" + std::to_string(port));
 
     std::cout << "Orbital Escalation server: UDP port " << port << '.'
@@ -227,6 +237,11 @@ svanes::NetworkMessage OrbitalEscalationServer::CreateWorldUpdate(
         pending.push_back(projectile.get());
     }
 
+    // ...then the drifting junk ships...
+    for (const auto &ship : junk_ships) {
+        pending.push_back(ship.get());
+    }
+
     // ...then we visit each object to collect its state. Its attachments are
     // added to pending as we go, so we eventually include the entire tree.
     for (std::size_t index = 0; index < pending.size(); ++index) {
@@ -265,6 +280,11 @@ svanes::NetworkMessage OrbitalEscalationServer::CreateWorldUpdate(
         // world pose, so clients can recreate the attachment.
         if (world.HasComponent<Attachment>(entity)) {
             state.attachment = world.GetComponent<Attachment>(entity);
+        }
+
+        // Preserve per-object colors, such as the randomly colored junk ships.
+        if (world.HasComponent<svanes::Color>(entity)) {
+            state.color = world.GetComponent<svanes::Color>(entity);
         }
 
         update.objects.push_back(std::move(state));
@@ -358,6 +378,51 @@ void OrbitalEscalationServer::AddPlayer(svanes::Registry &world,
     UpdateAttachments(world);
 }
 
+void OrbitalEscalationServer::CreateJunk(svanes::Registry &world) {
+    std::mt19937 random(std::random_device{}());
+
+    // Random positions around the planet, measured from its surface.
+    std::uniform_real_distribution<float> angle_dist(
+        0.0F, 2.0F * std::numbers::pi_v<float>);
+    std::uniform_real_distribution<float> distance_dist(7500.0F, 70000.0F);
+
+    // The initial tangential speed and spin, in units and radians per second.
+    std::uniform_real_distribution<float> velocity_dist(1000.0F, 4200.0F);
+    std::uniform_real_distribution<float> spin_dist(-1.0F, 1.0F);
+    std::uniform_int_distribution<std::uint16_t> color_dist(0, 255);
+
+    // The three single-shape ship definitions used in turn.
+    const std::array names{"junk_square", "junk_circle", "junk_triangle"};
+
+    for (std::uint32_t index = 0; index < kJunkShipCount; ++index) {
+        auto ship = assets.CreateShip(world, gameplay_timeline->Get(),
+                                      names[index % names.size()]);
+        const auto entity = ship->GetEntity();
+        const float angle = angle_dist(random);
+        const float distance = OrbitalPlanetRadius + distance_dist(random);
+        const float speed = svanes::PerSecondToPerTic(velocity_dist(random));
+
+        ship->GetTransform(world) = {std::cos(angle) * distance,
+                                     std::sin(angle) * distance};
+
+        // Alternate clockwise and counterclockwise drift around the planet.
+        const float direction = index % 2 == 0 ? 1.0F : -1.0F;
+        auto &motion = ship->GetKinematic(world);
+        motion.velocity_x = -std::sin(angle) * speed * direction;
+        motion.velocity_y = std::cos(angle) * speed * direction;
+        motion.angular_velocity = svanes::PerSecondToPerTic(spin_dist(random));
+
+        world.AddComponent<Health>(entity, Health{kJunkHealth});
+        world.AddComponent<svanes::Color>(
+            entity,
+            svanes::Color{static_cast<std::uint8_t>(color_dist(random)),
+                          static_cast<std::uint8_t>(color_dist(random)),
+                          static_cast<std::uint8_t>(color_dist(random)), 255});
+        ship->UpdateVisuals(world);
+        junk_ships.push_back(std::move(ship));
+    }
+}
+
 void OrbitalEscalationServer::RespondToPhysics(
     svanes::Registry &world, svanes::AsyncParallelForDriver &driver) {
 
@@ -395,28 +460,24 @@ void OrbitalEscalationServer::RespondToPhysics(
         ApplyCollisionAcceleration(world, pair);
     }
 
-    // For every player, check if they're contacting the planet.
-    for (auto &[client, player] : players) {
-        bool touching_planet = false;
-        if (player.ship && !IsDead(world, player.ship->GetEntity())) {
-            const auto entity = player.ship->GetEntity();
-            const auto surface = planet->GetEntity();
-            for (const auto &pair : contacts) {
-                if ((pair.a == entity && pair.b == surface) ||
-                    (pair.b == entity && pair.a == surface)) {
-                    touching_planet = true;
-                }
-            }
-
-            // Keep pushing the ship away from the surface, but only deal
-            // impact damage when contact begins. Otherwise sitting against
-            // the planet would deal damage on every tick.
-            if (touching_planet && !player.touching_planet) {
+    // The ships contacting the planet in this physics step, including junk.
+    std::unordered_set<svanes::Entity> contacting;
+    const auto surface = planet->GetEntity();
+    for (const auto &pair : contacts) {
+        if (pair.a != surface && pair.b != surface) {
+            continue;
+        }
+        const auto entity = pair.a == surface ? pair.b : pair.a;
+        if (world.HasComponent<Propulsion>(entity) && !IsDead(world, entity)) {
+            // Composite ships can have several contacts with the surface.
+            // Deal damage once when contact begins, rather than each tick.
+            if (contacting.insert(entity).second &&
+                !touching_planet.contains(entity)) {
                 ApplyDamage(world, entity, kPlanetImpactDamage);
             }
         }
-        player.touching_planet = touching_planet;
     }
+    touching_planet = std::move(contacting);
 
     UpdateMissileExplosions(world, contacts);
 
@@ -442,5 +503,9 @@ void OrbitalEscalationServer::RespondToPhysics(
         }
         object->RemoveDeadAttachments(world);
         return false;
+    });
+
+    std::erase_if(junk_ships, [&](const auto &ship) {
+        return IsDead(world, ship->GetEntity());
     });
 }

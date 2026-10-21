@@ -194,6 +194,7 @@ public:
      * Updates the visuals of the dynamic object entity to match its current
      * transform, including any attached objects. Attachment transforms should
      * be updated with UpdateAttachments first.
+     * A Color component on the object overrides its solid visual colors.
      *
      * @param world The registry containing the dynamic object entity and its
      * components.

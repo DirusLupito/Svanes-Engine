@@ -10,6 +10,7 @@
 
 #include <map>
 #include <optional>
+#include <unordered_set>
 #include <vector>
 
 inline constexpr std::uint16_t OrbitalServerPort = 45010;
@@ -107,13 +108,10 @@ private:
      * FIELDS:
      * - ship: The player's ship, or empty after its destruction.
      * - input: The client's latest controls and pending presses.
-     * - touching_planet: Whether the previous physics update contacted the
-     * planet.
      */
     struct Player {
         std::unique_ptr<DynamicObject> ship;
         Input input;
-        bool touching_planet = false;
     };
 
     /**
@@ -135,6 +133,14 @@ private:
      * represented.
      */
     void AddPlayer(svanes::Registry &world, svanes::ClientId client);
+
+    /**
+     * Populates the space around the planet with simple drifting ships,
+     * cycling through square, circle, and triangle shapes.
+     *
+     * @param world The registry in which to create the junk ships.
+     */
+    void CreateJunk(svanes::Registry &world);
 
     /**
      * Applies player controls and resolves gameplay interactions after
@@ -182,6 +188,12 @@ private:
     // A list of all projectiles in the game, including missiles and their
     // attachments.
     std::vector<std::unique_ptr<DynamicObject>> projectiles;
+
+    // The simple ships drifting around the planet without player controls.
+    std::vector<std::unique_ptr<Ship>> junk_ships;
+
+    // The ships touching the planet during the previous physics step.
+    std::unordered_set<svanes::Entity> touching_planet;
 
     // Simulation time accumulated toward sending the next world update.
     svanes::TicCount snapshot_tics = 0;

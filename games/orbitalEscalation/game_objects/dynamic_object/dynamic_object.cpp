@@ -54,6 +54,11 @@ svanes::Transform &DynamicObject::GetTransform(svanes::Registry &world) const {
 
 void DynamicObject::UpdateVisuals(svanes::Registry &world) const {
     visuals.SetTransform(world, GetTransform(world));
+    if (world.HasComponent<svanes::Color>(entity.Get())) {
+        visuals.SetColor(world,
+                         world.GetComponent<svanes::Color>(entity.Get()));
+    }
+
     for (const auto &attachment : attachments) {
         attachment->UpdateVisuals(world);
     }
