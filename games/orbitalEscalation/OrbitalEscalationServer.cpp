@@ -3,7 +3,6 @@
 #include "attachment_system.hpp"
 #include "combat/damage_system.hpp"
 #include "combat/missile_system.hpp"
-#include "effects/collision_flashes.hpp"
 #include "serialization/world_update.hpp"
 
 #include <svanes/kinematic_system.hpp>
@@ -160,7 +159,6 @@ void OrbitalEscalationServer::PhysicsUpdate(
     }
 
     svanes::AdvanceSpriteAnimations(world);
-    UpdateCollisionFlashes(world, collision_flashes);
 
     if (!players.empty()) {
         // We need only advance towards sending the next snapshot if there is at
@@ -406,8 +404,7 @@ void OrbitalEscalationServer::RespondToPhysics(
         player.touching_planet = touching_planet;
     }
 
-    UpdateMissileExplosions(world, gameplay_timeline->Get(), contacts,
-                            collision_flashes);
+    UpdateMissileExplosions(world, contacts);
 
     // Explosions have finished using the entities' geometry. Now their owners
     // can remove dead objects, including dead missiles still inside launchers.

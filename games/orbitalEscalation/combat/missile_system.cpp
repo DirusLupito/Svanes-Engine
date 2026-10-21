@@ -1,7 +1,6 @@
 #include "missile_system.hpp"
 
 #include "../attachment_system.hpp"
-#include "../effects/collision_flashes.hpp"
 #include "damage_system.hpp"
 #include <svanes/registry.hpp>
 
@@ -27,10 +26,11 @@ bool IgnoresFiringShip(const svanes::Registry &world, svanes::Entity missile,
     return now - explosion.launched_at < explosion.arming_tics;
 }
 
-void UpdateMissileExplosions(
-    svanes::Registry &world, svanes::Entity gameplay_timeline,
-    std::span<const svanes::EntityCollision2D> contacts,
-    std::vector<OwnedEntity> &flashes) {
+std::vector<svanes::Vector2D>
+UpdateMissileExplosions(svanes::Registry &world,
+                        std::span<const svanes::EntityCollision2D> contacts) {
+    // The positions of explosions produced by this update.
+    std::vector<svanes::Vector2D> explosions;
     std::unordered_set<svanes::Entity> pending;
 
     // Finds undetonated missiles whose health has reached zero and adds them to
@@ -81,11 +81,11 @@ void UpdateMissileExplosions(
         world.GetComponent<Health>(entity).remaining = 0.0F;
         const auto pose = world.GetComponent<svanes::Transform>(entity);
         ApplyAreaDamage(world, {pose.x, pose.y}, radius, damage);
-        CreateCollisionFlash(world, gameplay_timeline, flashes,
-                             {pose.x, pose.y});
+        explosions.push_back({pose.x, pose.y});
 
         // The blast may have killed additional missiles, so add them before
         // selecting the next pending explosion.
         collect_dead();
     }
+    return explosions;
 }
