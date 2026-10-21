@@ -143,7 +143,9 @@ void OrbitalEscalationClient::Update(const svanes::ClientFrameContext &frame) {
     }
 
     if (frame.input.WasPressed(svanes::Key::Escape)) {
+        frame.network.Disconnect();
         should_quit = true;
+        return;
     }
 
     // +/- will speed up or slow down the client loop.

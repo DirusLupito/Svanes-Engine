@@ -60,6 +60,15 @@ public:
     HandleJoinRequest(const svanes::ServerJoinContext &context) override;
 
     /**
+     * Removes a departing player and their ship, if it is still alive.
+     *
+     * @param world The server's game world.
+     * @param client The ID of the player leaving the game.
+     */
+    void HandleDisconnect(svanes::Registry &world,
+                          svanes::ClientId client) override;
+
+    /**
      * Processes player controls and pause requests for the current
      * gameplay tick.
      *

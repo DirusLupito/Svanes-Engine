@@ -54,15 +54,28 @@ NetworkMessage EncodeGameMessage(const NetworkMessage &message,
     return writer.Finish();
 }
 
+NetworkMessage EncodeDisconnect(std::uint32_t client_id) {
+    MessageWriter writer;
+
+    // A disconnect notice consists of the following fields, in order:
+    // - 1 byte: ClientServerMessageKind::Disconnect
+    // - 4 bytes: the assigned client ID
+    writer.WriteUint8(
+        static_cast<std::uint8_t>(ClientServerMessageKind::Disconnect));
+    writer.WriteUint32(client_id);
+    return writer.Finish();
+}
+
 DecodedMessage DecodeMessage(const NetworkMessage &message) {
     MessageReader reader(message);
     const auto kind = static_cast<ClientServerMessageKind>(reader.ReadUint8());
 
-    // Acceptance and gameplay messages carry a client ID after the message
-    // kind. Server gameplay messages use zero for this field.
+    // Acceptance, gameplay, and disconnect messages carry a client ID after
+    // the message kind. Server gameplay messages use zero for this field.
     std::uint32_t client_id = 0;
     if (kind == ClientServerMessageKind::Accepted ||
-        kind == ClientServerMessageKind::Game) {
+        kind == ClientServerMessageKind::Game ||
+        kind == ClientServerMessageKind::Disconnect) {
         client_id = reader.ReadUint32();
     }
 

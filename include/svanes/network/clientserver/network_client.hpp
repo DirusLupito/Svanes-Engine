@@ -86,6 +86,13 @@ public:
                  TicCount timeout_tics = 60 * TicsPerSecond);
 
     /**
+     * Queues a disconnect notice for an accepted client and ends the local
+     * connection. A pending join is canceled locally. The communication thread
+     * sends the queued notice before stopping.
+     */
+    void Disconnect();
+
+    /**
      * Determines whether the client is currently connected to the server.
      * 
      * @return Whether the server has accepted this client.
@@ -164,7 +171,8 @@ private:
     /**
      * Runs the client's communication loop on the communication thread, sending
      * queued outgoing messages and collecting incoming messages for the main
-     * thread until stopping is requested.
+     * thread until stopping is requested and queued outgoing messages have
+     * been sent.
      *
      * @param stop The stop token used to request termination of the
      * communication loop.

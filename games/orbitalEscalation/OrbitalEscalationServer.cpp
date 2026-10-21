@@ -77,6 +77,12 @@ svanes::JoinResponse OrbitalEscalationServer::HandleJoinRequest(
     return {true, {}};
 }
 
+void OrbitalEscalationServer::HandleDisconnect(svanes::Registry &,
+                                               svanes::ClientId client) {
+    players.erase(client);
+    std::cout << "Player " << client << " disconnected." << std::endl;
+}
+
 OrbitalEscalationServer::Input
 OrbitalEscalationServer::DecodeInput(const svanes::NetworkMessage &message) {
     svanes::MessageReader reader(message);

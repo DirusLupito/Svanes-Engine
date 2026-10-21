@@ -153,7 +153,7 @@ private:
      * join request or an admitted gameplay message arrived.
      * - outgoing: A vector of NetworkMessage instances representing messages
      * queued for sending to the client.
-     * - accepted: Whether the game admitted this client.
+     * - accepted: Whether the client is admitted and has not disconnected.
      */
     struct Session {
         std::string address;
@@ -192,7 +192,7 @@ private:
     // The registry containing all entities and their components for the server.
     Registry world;
 
-    // Collection of client sessions, including rejected join requests.
+    // Collection of client sessions, including rejected joins and disconnects.
     // The index of the session corresponds to the client ID minus one
     // (i.e., client ID = index + 1). Rejected requests occupy an entry with
     // accepted = false, so admitted client IDs can have gaps.
