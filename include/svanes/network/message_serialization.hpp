@@ -14,11 +14,11 @@ namespace svanes {
  * the write functions are called. Multi-byte values use big-endian order,
  * with the most significant byte first, so the format does not depend on
  * the sending machine's byte order or how a C++ struct is laid out in memory.
- * 
+ *
  * The message contains only the values written. Field names, types, and byte
  * array lengths are not added automatically. The sender and receiver agree
  * on the layout, and MessageReader reads those fields back in the same order.
- * 
+ *
  * Finish() transfers the completed message out and clears the writer for reuse.
  */
 class MessageWriter {
@@ -99,13 +99,13 @@ private:
 
 /**
  * Reads the fields of a NetworkMessage in the format produced by MessageWriter.
- * 
+ *
  * A cursor tracks the next unread byte, advancing as each field is read and
  * converting big-endian bytes back into the requested value. The reader does
  * not know the message's layout- the caller chooses the matching read functions
  * in the same order the fields were written. Each read checks that the whole
  * field is available and throws std::invalid_argument if it is truncated.
- * 
+ *
  * The source bytes are borrowed rather than copied, so they must stay alive
  * and unchanged while reading. Remaining() lets the caller check for unread
  * bytes after decoding the expected fields.
@@ -114,7 +114,8 @@ class MessageReader {
 public:
     /**
      * Creates a reader over an existing message without copying its bytes.
-     * @param message The message to read, kept alive and unchanged while reading.
+     * @param message The message to read, kept alive and unchanged while
+     * reading.
      */
     explicit MessageReader(const NetworkMessage &message);
 
@@ -145,7 +146,8 @@ public:
     std::uint64_t ReadUint64();
 
     /**
-     * @return The next signed 32-bit integer decoded from two's-complement bits.
+     * @return The next signed 32-bit integer decoded from two's-complement
+     * bits.
      */
     std::int32_t ReadInt32();
 
@@ -203,4 +205,4 @@ private:
     std::size_t cursor = 0;
 };
 
-}
+} // namespace svanes

@@ -131,7 +131,8 @@ public:
      * @param context The request, server world, and reserved client identity.
      * @return Whether to admit the client and the game's response bytes.
      */
-    virtual JoinResponse HandleJoinRequest(const ServerJoinContext &context) = 0;
+    virtual JoinResponse
+    HandleJoinRequest(const ServerJoinContext &context) = 0;
 
     /**
      * Handles a client's disconnect notice or timeout after its session has

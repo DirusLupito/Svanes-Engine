@@ -192,7 +192,8 @@ private:
     // The ID assigned by the server to this client, or zero if not connected.
     std::uint32_t client_id = 0;
 
-    // Stores how long the client will wait for a join response, in microseconds.
+    // Stores how long the client will wait for a join response, in
+    // microseconds.
     TicCount join_timeout_tics = 0;
 
     // The time point when the join request was queued, or std::nullopt if no
