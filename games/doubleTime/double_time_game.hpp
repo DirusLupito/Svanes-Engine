@@ -7,9 +7,9 @@
 
 #include <svanes/entity.hpp>
 #include <svanes/audio/audio_manager.hpp>
-#include <svanes/game.hpp>
+#include <svanes/network/clientserver/IClient.hpp>
+#include <svanes/network/clientserver/network_client.hpp>
 #include <svanes/geometry/geometry.hpp>
-#include <svanes/network/network_client.hpp>
 #include <svanes/network/udp_msg_pipe.hpp>
 #include <svanes/render/basic_render_types.hpp>
 #include <svanes/timeline_system.hpp>
@@ -19,6 +19,7 @@
 #include <map>
 #include <memory>
 #include <vector>
+#include <span>
 
 namespace svanes {
 class TextureManager;
@@ -35,15 +36,17 @@ struct DoubleTimeLevelAssets {
     svanes::MusicHandle music{};
 };
 
-class DoubleTimeGame final : public svanes::IGame {
+class DoubleTimeGame final : public svanes::IClient {
 public:
     explicit DoubleTimeGame(
         std::string server_host = kDoubleTimeDefaultServerHost,
         std::uint16_t input_bridge_port = 0,
         bool input_bridge_controls_platforms = false);
 
-    void Initialize(svanes::GameContext &context) override;
-    void Update(const svanes::FrameContext &frame) override;
+    void Initialize(svanes::ClientContext &context) override;
+    svanes::NetworkMessage CreateJoinRequest() override;
+    void HandleJoinResult(const svanes::JoinResult &result) override;
+    void Update(const svanes::ClientFrameContext &frame) override;
 
 private:
     void EnterState(DoubleTimeState next, svanes::Registry &world);
@@ -52,12 +55,14 @@ private:
     void ClearLevelEntities(svanes::Registry &world);
     void ActivateTilemap(svanes::Registry &world, std::size_t index);
     void CheckGoal(svanes::Registry &world);
-    void SendInput(const svanes::FrameContext &frame);
+    void SendInput(const svanes::ClientFrameContext &frame);
     void PollInputBridge();
-    void ApplyServerState(svanes::Registry &world);
+    void ApplyServerState(svanes::Registry &world,
+                          std::span<const svanes::NetworkMessage> messages);
     void SynchronizeAudio(float elapsed_seconds);
 
-    svanes::NetworkClient network_client;
+    std::string server_host;
+    std::uint32_t client_id = 0;
     std::unique_ptr<svanes::UdpMsgPipe> input_bridge_pipe;
     bool input_bridge_controls_platforms = false;
     bool has_bridge_input = false;

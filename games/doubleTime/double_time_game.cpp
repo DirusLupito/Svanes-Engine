@@ -41,11 +41,11 @@ constexpr const char *kTestTileSetFilename = "TestTileSet.png";
 DoubleTimeGame::DoubleTimeGame(std::string server_host,
                                std::uint16_t input_bridge_port,
                                bool input_bridge_controls_platforms)
-    : network_client(std::move(server_host), kDoubleTimeServerJoinPort),
+    : server_host(std::move(server_host)),
       input_bridge_controls_platforms(input_bridge_controls_platforms) {
     if (input_bridge_port != 0) {
-        input_bridge_pipe =
-            std::make_unique<svanes::UdpMsgPipe>(input_bridge_port);
+        input_bridge_pipe = std::make_unique<svanes::UdpMsgPipe>();
+        input_bridge_pipe->Listen("*:" + std::to_string(input_bridge_port));
     }
     SDL_Log("Networking: joining Double Time server.");
 }
@@ -193,7 +193,9 @@ void DoubleTimeGame::CheckGoal(svanes::Registry &world) {
     }
 }
 
-void DoubleTimeGame::Initialize(svanes::GameContext &context) {
+void DoubleTimeGame::Initialize(svanes::ClientContext &context) {
+    context.network.Connect(server_host + ":" +
+                            std::to_string(kDoubleTimeServerJoinPort));
     asset_manager = &context.assets;
     audio_manager = &context.audio;
     context.camera.scale_mode = svanes::ScaleMode::Proportional;
@@ -218,9 +220,19 @@ void DoubleTimeGame::Initialize(svanes::GameContext &context) {
     EnterState(DoubleTimeState::LevelOne, context.world);
 }
 
-void DoubleTimeGame::SendInput(const svanes::FrameContext &frame) {
-    if (!network_client.IsConnected()) return;
-    const auto assigned_id = network_client.Id();
+svanes::NetworkMessage DoubleTimeGame::CreateJoinRequest() {
+    return svanes::NetworkMessage{};
+}
+
+void DoubleTimeGame::HandleJoinResult(const svanes::JoinResult &result) {
+    if (result.status == svanes::JoinStatus::Accepted) {
+        client_id = result.client_id;
+    }
+}
+
+void DoubleTimeGame::SendInput(const svanes::ClientFrameContext &frame) {
+    if (!frame.network.IsConnected()) return;
+    const auto assigned_id = client_id;
     input_send_timer += static_cast<float>(client_timeline.GetDeltaTics()) /
                         static_cast<float>(svanes::TicsPerSecond);
     while (input_send_timer >= kInputSendIntervalSeconds) {
@@ -275,7 +287,7 @@ void DoubleTimeGame::SendInput(const svanes::FrameContext &frame) {
                                        platform_up_beat_index,
                                        platform_down_beat_index,
                                        platform_action_beat_index};
-        network_client.Send(input);
+        frame.network.Send(svanes::NetworkMessage::From(input));
         action_requested_since_last_send = false;
         jump_on_beat_since_last_send = false;
         platform_action_requested_since_last_send = false;
@@ -287,7 +299,8 @@ void DoubleTimeGame::PollInputBridge() {
         return;
     }
     svanes::NetworkMessage message;
-    while (input_bridge_pipe->Receive(message)) {
+    std::string source;
+    while (input_bridge_pipe->Receive(source, message)) {
         const DoubleTimeBridgeInput previous = bridge_input;
         bridge_input = message.As<DoubleTimeBridgeInput>();
         if (bridge_input.character_jump) {
@@ -324,8 +337,9 @@ void DoubleTimeGame::PollInputBridge() {
     }
 }
 
-void DoubleTimeGame::ApplyServerState(svanes::Registry &world) {
-    const auto messages = network_client.PollBroadcast();
+void DoubleTimeGame::ApplyServerState(
+    svanes::Registry &world,
+    std::span<const svanes::NetworkMessage> messages) {
     for (const svanes::NetworkMessage &message : messages) {
         const DoubleTimeEntityState state = message.As<DoubleTimeEntityState>();
         if (state.kind != DoubleTimeEntityKind::AudioTimeline) {
@@ -508,7 +522,7 @@ void DoubleTimeGame::SynchronizeAudio(float elapsed_seconds) {
     }
 }
 
-void DoubleTimeGame::Update(const svanes::FrameContext &frame) {
+void DoubleTimeGame::Update(const svanes::ClientFrameContext &frame) {
     client_timeline.Advance(frame.real_delta_tics);
     PollInputBridge();
     const auto capture = [&](bool down, bool &was_down, bool &on_beat,
@@ -552,7 +566,7 @@ void DoubleTimeGame::Update(const svanes::FrameContext &frame) {
     }
 
     SendInput(frame);
-    ApplyServerState(frame.world);
+    ApplyServerState(frame.world, frame.network.PollMessages());
     CheckGoal(frame.world);
     SynchronizeAudio(static_cast<float>(frame.real_delta_tics) /
                      static_cast<float>(svanes::TicsPerSecond));

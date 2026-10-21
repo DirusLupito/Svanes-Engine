@@ -7,9 +7,9 @@
 
 #include <svanes/entity.hpp>
 #include <svanes/audio/audio_manager.hpp>
-#include <svanes/game.hpp>
+#include <svanes/network/clientserver/IClient.hpp>
+#include <svanes/network/clientserver/network_client.hpp>
 #include <svanes/geometry/geometry.hpp>
-#include <svanes/network/network_client.hpp>
 #include <svanes/render/basic_render_types.hpp>
 #include <svanes/timeline_system.hpp>
 #include <svanes/tilemaps/tilemap.hpp>
@@ -18,6 +18,7 @@
 #include <map>
 #include <memory>
 #include <vector>
+#include <span>
 
 namespace svanes {
 class Camera2D;
@@ -35,13 +36,15 @@ struct DoubleTimeLevelAssets {
     svanes::MusicHandle music{};
 };
 
-class DoubleTimeGame final : public svanes::IGame {
+class DoubleTimeGame final : public svanes::IClient {
 public:
     explicit DoubleTimeGame(
         std::string server_host = kDoubleTimeDefaultServerHost);
 
-    void Initialize(svanes::GameContext &context) override;
-    void Update(const svanes::FrameContext &frame) override;
+    void Initialize(svanes::ClientContext &context) override;
+    svanes::NetworkMessage CreateJoinRequest() override;
+    void HandleJoinResult(const svanes::JoinResult &result) override;
+    void Update(const svanes::ClientFrameContext &frame) override;
 
 private:
     void EnterState(DoubleTimeState next, svanes::Registry &world);
@@ -50,14 +53,17 @@ private:
     void ClearLevelEntities(svanes::Registry &world);
     void ActivateTilemap(svanes::Registry &world, std::size_t index);
     void CheckGoal(svanes::Registry &world);
-    void SendInput(const svanes::FrameContext &frame);
-    void SimulateClientCharacter(const svanes::FrameContext &frame);
+    void SendInput(const svanes::ClientFrameContext &frame);
+    void SimulateClientCharacter(const svanes::ClientFrameContext &frame);
     void EnsureClientCharacter(svanes::Registry &world);
-    void ApplyServerState(svanes::Registry &world);
+    void ApplyServerState(svanes::Registry &world,
+                          std::span<const svanes::NetworkMessage> messages);
     void SynchronizeAudio(float elapsed_seconds);
     void UpdateCamera(svanes::Camera2D &camera, svanes::Registry &world);
 
-    svanes::NetworkClient network_client;
+    std::string server_host;
+    std::uint32_t client_id = 0;
+    svanes::NetworkClient *active_network = nullptr;
     svanes::Entity character_entity = 0;
     bool has_character = false;
     bool local_character_initialized = false;

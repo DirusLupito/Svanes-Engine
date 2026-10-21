@@ -82,11 +82,12 @@ int main(int argc, char **argv) {
         SDL_Log("Input bridge keyboard capture enabled.");
     }
 
-    svanes::UdpMsgPipe pipe(kDoubleTimeInputBridgePort);
-    const auto character_destination =
-        pipe.AddRemote("127.0.0.1", character_port);
-    const auto platform_destination =
-        pipe.AddRemote("127.0.0.1", platform_port);
+    svanes::UdpMsgPipe pipe;
+    pipe.Listen("*:" + std::to_string(kDoubleTimeInputBridgePort));
+    const std::string character_destination =
+        "127.0.0.1:" + std::to_string(character_port);
+    const std::string platform_destination =
+        "127.0.0.1:" + std::to_string(platform_port);
     BridgeKeys keys;
     bool running = true;
     auto previous_send = std::chrono::steady_clock::now();

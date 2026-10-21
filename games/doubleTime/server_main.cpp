@@ -6,9 +6,8 @@
 #include <svanes/async/async_parallel_for_driver.hpp>
 #include <svanes/collision_system.hpp>
 #include <svanes/kinematic_system.hpp>
-#include <svanes/network/network_replication.hpp>
-#include <svanes/network/network_server.hpp>
-#include <svanes/network/server_runtime.hpp>
+#include <svanes/network/clientserver/IServer.hpp>
+#include <svanes/network/clientserver/network_server.hpp>
 #include <svanes/network/udp_msg_pipe.hpp>
 #include <svanes/physics_system.hpp>
 #include <svanes/registry.hpp>
@@ -27,6 +26,7 @@
 #include <string_view>
 #include <variant>
 #include <vector>
+#include <functional>
 
 namespace {
 
@@ -184,11 +184,64 @@ svanes::Entity SpawnCharacter(svanes::Registry &world, float x, float y) {
                     kCharacterColliderOffsetX, 0.0F, kCharacterColliderWidth,
                     kDoubleTimeCharacterHeight}});
     world.AddComponent<svanes::Timeline>(entity);
-    world.AddComponent<svanes::Networked>(entity);
     return entity;
 }
 
 } // namespace
+
+class DoubleTimeServerRuntime final : public svanes::IServer {
+public:
+    using InitializeCallback = std::function<void(svanes::ServerContext &)>;
+    using InputCallback = std::function<void(const svanes::NetworkMessage &)>;
+    using UpdateCallback = std::function<void()>;
+    using PhysicsCallback =
+        std::function<void(std::span<const svanes::PhysicsTimeStep>)>;
+
+    DoubleTimeServerRuntime(InputCallback input_callback,
+                            UpdateCallback update_callback,
+                            PhysicsCallback physics_callback,
+                            UpdateCallback post_physics_callback,
+                            svanes::Vector2D gravity,
+                            InitializeCallback initialize_callback)
+        : input_callback(std::move(input_callback)),
+          update_callback(std::move(update_callback)),
+          physics_callback(std::move(physics_callback)),
+          post_physics_callback(std::move(post_physics_callback)),
+          gravity(gravity),
+          initialize_callback(std::move(initialize_callback)) {}
+
+    void Initialize(svanes::ServerContext &context) override {
+        initialize_callback(context);
+        context.gravity = gravity;
+    }
+
+    svanes::JoinResponse HandleJoinRequest(
+        const svanes::ServerJoinContext &) override {
+        return svanes::JoinResponse{true, svanes::NetworkMessage{}};
+    }
+
+    void Update(const svanes::ServerUpdateContext &context) override {
+        for (const svanes::ClientInput &input : context.network.PollInputs()) {
+            PlayerInputMessage decoded = input.message.As<PlayerInputMessage>();
+            decoded.client_id = input.client;
+            input_callback(svanes::NetworkMessage::From(decoded));
+        }
+        update_callback();
+    }
+
+    void PhysicsUpdate(const svanes::ServerPhysicsContext &context) override {
+        physics_callback(context.entity_steps);
+        post_physics_callback();
+    }
+
+private:
+    InputCallback input_callback;
+    UpdateCallback update_callback;
+    PhysicsCallback physics_callback;
+    UpdateCallback post_physics_callback;
+    svanes::Vector2D gravity;
+    InitializeCallback initialize_callback;
+};
 
 namespace {
 
@@ -198,13 +251,13 @@ int32_t main(int32_t argc, char **argv) {
     if (argc > 1) {
         throw std::invalid_argument("The Double Time server takes no arguments.");
     }
-    svanes::NetworkServer network_server(kDoubleTimeServerJoinPort);
-
+    svanes::NetworkServer network_server;
     svanes::Registry world;
-    const svanes::Entity authoritative_timeline_entity = world.CreateEntity();
-    world.AddComponent<svanes::Timeline>(authoritative_timeline_entity);
+    svanes::Registry *active_world = &world;
+    const svanes::Entity authoritative_timeline_entity = active_world->CreateEntity();
+    active_world->AddComponent<svanes::Timeline>(authoritative_timeline_entity);
 
-    svanes::Entity level_tilemap_entity = world.CreateEntity();
+    svanes::Entity level_tilemap_entity = active_world->CreateEntity();
     const DoubleTimeAssetCatalogEntry &starting_area = DoubleTimeAssetCatalog().front();
     DoubleTimeLevelData level = LoadDoubleTimeLevelData(
         std::string{DOUBLE_TIME_GAME_ASSETS_DIR} + "/" +
@@ -220,9 +273,9 @@ int32_t main(int32_t argc, char **argv) {
         ? tile_map_transform.y +
               (level.spawn_point->y + 0.5F) * kDoubleTimeTileSize
         : kCharacterSpawnTop;
-    world.AddComponent<svanes::Transform>(level_tilemap_entity,
+    active_world->AddComponent<svanes::Transform>(level_tilemap_entity,
                                           tile_map_transform);
-    world.AddComponent<svanes::TileMap>(level_tilemap_entity,
+    active_world->AddComponent<svanes::TileMap>(level_tilemap_entity,
                                         std::move(level.tile_map));
     std::size_t current_area_index = 0;
     std::size_t current_tilemap_index = 0;
@@ -242,15 +295,14 @@ int32_t main(int32_t argc, char **argv) {
             to_transform(definition.start_x, definition.start_y);
         const svanes::Transform end =
             to_transform(definition.end_x, definition.end_y);
-        const svanes::Entity entity = world.CreateEntity();
-        world.AddComponent<svanes::Transform>(entity, start);
-        world.AddComponent<svanes::Collider2D>(
+        const svanes::Entity entity = active_world->CreateEntity();
+        active_world->AddComponent<svanes::Transform>(entity, start);
+        active_world->AddComponent<svanes::Collider2D>(
             entity, svanes::Collider2D{svanes::Rectangle2D{
                          0.0F, 0.0F,
                          definition.width * kDoubleTimeTileSize,
                          definition.height * kDoubleTimeTileSize}});
-        world.AddComponent<RigidBody>(entity, RigidBody{});
-        world.AddComponent<svanes::Networked>(entity);
+        active_world->AddComponent<RigidBody>(entity, RigidBody{});
         platforms.push_back(
             ServerPlatform{definition, entity, start, end, start});
     }
@@ -262,15 +314,14 @@ int32_t main(int32_t argc, char **argv) {
             tile_map_transform.y +
                 (definition.y + definition.height * 0.5F) * kDoubleTimeTileSize,
             0.0F};
-        const svanes::Entity entity = world.CreateEntity();
-        world.AddComponent<svanes::Transform>(entity, transform);
-        world.AddComponent<svanes::Collider2D>(
+        const svanes::Entity entity = active_world->CreateEntity();
+        active_world->AddComponent<svanes::Transform>(entity, transform);
+        active_world->AddComponent<svanes::Collider2D>(
             entity, svanes::Collider2D{svanes::Rectangle2D{
                          0.0F, 0.0F,
                          definition.width * kDoubleTimeTileSize,
                          definition.height * kDoubleTimeTileSize}});
-        world.AddComponent<RigidBody>(entity, RigidBody{});
-        world.AddComponent<svanes::Networked>(entity);
+        active_world->AddComponent<RigidBody>(entity, RigidBody{});
         doors.push_back(ServerDoor{definition, entity, transform, transform});
     }
     std::vector<ServerAreaObject> death_zones;
@@ -285,10 +336,9 @@ int32_t main(int32_t argc, char **argv) {
                 tile_map_transform.y +
                     (definition.y + definition.height * 0.5F) * kDoubleTimeTileSize,
                 0.0F};
-            const svanes::Entity entity = world.CreateEntity();
-            world.AddComponent<svanes::Transform>(entity, transform);
+            const svanes::Entity entity = active_world->CreateEntity();
+            active_world->AddComponent<svanes::Transform>(entity, transform);
             if (networked) {
-                world.AddComponent<svanes::Networked>(entity);
             }
             return ServerAreaObject{definition, entity};
         };
@@ -303,16 +353,16 @@ int32_t main(int32_t argc, char **argv) {
 
     const auto rebuild_interactables = [&](const DoubleTimeLevelData &next_level) {
         for (const ServerPlatform &platform : platforms) {
-            world.DestroyEntity(platform.entity);
+            active_world->DestroyEntity(platform.entity);
         }
         for (const ServerDoor &door : doors) {
-            world.DestroyEntity(door.entity);
+            active_world->DestroyEntity(door.entity);
         }
         platforms.clear();
         doors.clear();
-        for (const auto &object : death_zones) world.DestroyEntity(object.entity);
-        for (const auto &object : spikes) world.DestroyEntity(object.entity);
-        for (const auto &object : collectibles) world.DestroyEntity(object.entity);
+        for (const auto &object : death_zones) active_world->DestroyEntity(object.entity);
+        for (const auto &object : spikes) active_world->DestroyEntity(object.entity);
+        for (const auto &object : collectibles) active_world->DestroyEntity(object.entity);
         death_zones.clear(); spikes.clear(); collectibles.clear();
         for (const DoubleTimeMovingPlatform &definition : next_level.moving_platforms) {
             const auto to_transform = [&](std::int32_t x, std::int32_t y) {
@@ -327,15 +377,14 @@ int32_t main(int32_t argc, char **argv) {
                 to_transform(definition.start_x, definition.start_y);
             const svanes::Transform end =
                 to_transform(definition.end_x, definition.end_y);
-            const svanes::Entity entity = world.CreateEntity();
-            world.AddComponent<svanes::Transform>(entity, start);
-            world.AddComponent<svanes::Collider2D>(
+            const svanes::Entity entity = active_world->CreateEntity();
+            active_world->AddComponent<svanes::Transform>(entity, start);
+            active_world->AddComponent<svanes::Collider2D>(
                 entity, svanes::Collider2D{svanes::Rectangle2D{
                              0.0F, 0.0F,
                              definition.width * kDoubleTimeTileSize,
                              definition.height * kDoubleTimeTileSize}});
-            world.AddComponent<RigidBody>(entity, RigidBody{});
-            world.AddComponent<svanes::Networked>(entity);
+            active_world->AddComponent<RigidBody>(entity, RigidBody{});
             platforms.push_back(ServerPlatform{definition, entity, start, end, start});
         }
         for (const DoubleTimeDoor &definition : next_level.doors) {
@@ -345,15 +394,14 @@ int32_t main(int32_t argc, char **argv) {
                 tile_map_transform.y +
                     (definition.y + definition.height * 0.5F) * kDoubleTimeTileSize,
                 0.0F};
-            const svanes::Entity entity = world.CreateEntity();
-            world.AddComponent<svanes::Transform>(entity, transform);
-            world.AddComponent<svanes::Collider2D>(
+            const svanes::Entity entity = active_world->CreateEntity();
+            active_world->AddComponent<svanes::Transform>(entity, transform);
+            active_world->AddComponent<svanes::Collider2D>(
                 entity, svanes::Collider2D{svanes::Rectangle2D{
                              0.0F, 0.0F,
                              definition.width * kDoubleTimeTileSize,
                              definition.height * kDoubleTimeTileSize}});
-            world.AddComponent<RigidBody>(entity, RigidBody{});
-            world.AddComponent<svanes::Networked>(entity);
+            active_world->AddComponent<RigidBody>(entity, RigidBody{});
             doors.push_back(ServerDoor{definition, entity, transform, transform});
         }
         create_area_objects(next_level);
@@ -383,15 +431,17 @@ int32_t main(int32_t argc, char **argv) {
         0.0F,
         svanes::PerSecondSquaredToPerTicSquared(kGravityPerSecondSquared)};
 
-    svanes::ServerRuntime runtime(network_server, world, gravity);
-    runtime.Run(
+    auto broadcast = [&](const DoubleTimeEntityState &state) {
+        network_server.Broadcast(svanes::NetworkMessage::From(state));
+    };
+    DoubleTimeServerRuntime runtime(
         [&](const svanes::NetworkMessage &message) {
             const PlayerInputMessage input = message.As<PlayerInputMessage>();
             const svanes::ClientId assigned_client_id = input.client_id;
 
             if (!character.has_value() && !input.platform_role) {
                 const svanes::Entity entity = SpawnCharacter(
-                    world, character_spawn_x, character_spawn_y);
+                    *active_world, character_spawn_x, character_spawn_y);
                 character = ServerCharacter{entity, assigned_client_id};
                 SDL_Log("Server: spawned the character for client %u.",
                         assigned_client_id);
@@ -421,7 +471,7 @@ int32_t main(int32_t argc, char **argv) {
                 input_down_on_beat = input.platform_down_on_beat;
                 input_action_on_beat = input.platform_action_on_beat;
                 const svanes::TicCount server_tics =
-                    world.GetComponent<svanes::Timeline>(
+                    active_world->GetComponent<svanes::Timeline>(
                         authoritative_timeline_entity)
                         .GetTotalTics();
                 if (input.platform_action_requested) {
@@ -438,9 +488,9 @@ int32_t main(int32_t argc, char **argv) {
                                         kPlatformHoldBeats));
                             door.nudge_remaining_seconds = 0.0F;
                             door.transform = door.base_transform;
-                            world.RemoveComponent<svanes::Collider2D>(
+                            active_world->RemoveComponent<svanes::Collider2D>(
                                 door.entity);
-                            world.RemoveComponent<RigidBody>(door.entity);
+                            active_world->RemoveComponent<RigidBody>(door.entity);
                         } else if (!door.open) {
                             door.nudge_remaining_seconds =
                                 kPlatformTravelDurationSeconds;
@@ -454,7 +504,7 @@ int32_t main(int32_t argc, char **argv) {
         [&]() {
             if (character.has_value()) {
                 svanes::Kinematic2D &motion =
-                    world.GetComponent<svanes::Kinematic2D>(character->entity);
+                    active_world->GetComponent<svanes::Kinematic2D>(character->entity);
                 const float target_velocity =
                     character->horizontal_input *
                     svanes::PerSecondToPerTic(kCharacterMaxSpeedPerSecond);
@@ -473,7 +523,7 @@ int32_t main(int32_t argc, char **argv) {
                 svanes::DefaultPhysicsStepTics) /
                 static_cast<float>(svanes::TicsPerSecond);
             const svanes::TicCount server_tics =
-                world.GetComponent<svanes::Timeline>(
+                active_world->GetComponent<svanes::Timeline>(
                     authoritative_timeline_entity)
                     .GetTotalTics();
             for (ServerDoor &door : doors) {
@@ -489,12 +539,12 @@ int32_t main(int32_t argc, char **argv) {
                     door.open = false;
                     door.close_tics.reset();
                     door.transform = door.base_transform;
-                    world.AddComponent<svanes::Collider2D>(
+                    active_world->AddComponent<svanes::Collider2D>(
                         door.entity, svanes::Collider2D{svanes::Rectangle2D{
                             0.0F, 0.0F,
                             door.definition.width * kDoubleTimeTileSize,
                             door.definition.height * kDoubleTimeTileSize}});
-                    world.AddComponent<RigidBody>(door.entity, RigidBody{});
+                    active_world->AddComponent<RigidBody>(door.entity, RigidBody{});
                 }
             }
             const auto advance_motion = [&](PlatformMotionTrack &track,
@@ -543,7 +593,7 @@ int32_t main(int32_t argc, char **argv) {
                                   0.0F}
                                            : platform.end_transform)
                             : platform.start_transform;
-                        world.GetComponent<svanes::Transform>(platform.entity) =
+                        active_world->GetComponent<svanes::Transform>(platform.entity) =
                             svanes::Transform{
                                 from.x + (to.x - from.x) * progress,
                                 from.y + (to.y - from.y) * progress, 0.0F};
@@ -597,15 +647,15 @@ int32_t main(int32_t argc, char **argv) {
             start_motion(down_motion, down_pressed, input_down_on_beat, 1.0F);
             if (character.has_value()) {
                 svanes::Transform &character_transform =
-                    world.GetComponent<svanes::Transform>(character->entity);
+                    active_world->GetComponent<svanes::Transform>(character->entity);
                 svanes::Kinematic2D &character_motion =
-                    world.GetComponent<svanes::Kinematic2D>(character->entity);
+                    active_world->GetComponent<svanes::Kinematic2D>(character->entity);
                 if (character_platform_index.has_value() &&
                     character_motion.velocity_y == 0.0F) {
                     ServerPlatform &platform =
                         platforms[*character_platform_index];
                     const svanes::Transform current_transform =
-                        world.GetComponent<svanes::Transform>(platform.entity);
+                        active_world->GetComponent<svanes::Transform>(platform.entity);
                     character_transform.x +=
                         current_transform.x - platform.previous_transform.x;
                     character_transform.y +=
@@ -614,7 +664,7 @@ int32_t main(int32_t argc, char **argv) {
             }
             for (ServerPlatform &platform : platforms) {
                 platform.previous_transform =
-                    world.GetComponent<svanes::Transform>(platform.entity);
+                    active_world->GetComponent<svanes::Transform>(platform.entity);
             }
             platform_left_was_held = platform_left_held;
             platform_right_was_held = platform_right_held;
@@ -624,16 +674,16 @@ int32_t main(int32_t argc, char **argv) {
         [&](std::span<const svanes::PhysicsTimeStep>) {
                     if (character.has_value()) {
                         svanes::Transform &transform =
-                            world.GetComponent<svanes::Transform>(
+                            active_world->GetComponent<svanes::Transform>(
                                 character->entity);
-                        ResolveCharacterAxis(world, character->entity, true);
-                        ResolveCharacterAxis(world, character->entity, false);
+                        ResolveCharacterAxis(*active_world, character->entity, true);
+                        ResolveCharacterAxis(*active_world, character->entity, false);
                         svanes::Kinematic2D &motion =
-                            world.GetComponent<svanes::Kinematic2D>(
+                            active_world->GetComponent<svanes::Kinematic2D>(
                                 character->entity);
                         const auto overlaps = [&](const ServerAreaObject &object) {
                             const auto &object_transform =
-                                world.GetComponent<svanes::Transform>(object.entity);
+                                active_world->GetComponent<svanes::Transform>(object.entity);
                             const float half_width = object.definition.width *
                                                      kDoubleTimeTileSize * 0.5F;
                             const float half_height = object.definition.height *
@@ -665,7 +715,7 @@ int32_t main(int32_t argc, char **argv) {
                         for (auto &collectible : collectibles) {
                             if (collectible.enabled && overlaps(collectible)) {
                                 collectible.enabled = false;
-                                world.RemoveComponent<svanes::Collider2D>(
+                                active_world->RemoveComponent<svanes::Collider2D>(
                                     collectible.entity);
                             }
                         }
@@ -716,15 +766,15 @@ int32_t main(int32_t argc, char **argv) {
                                         std::string{DOUBLE_TIME_GAME_ASSETS_DIR} +
                                         "/" + std::string{DoubleTimeAssetCatalog()[target_area]
                                                                .tilemap_filenames[target_tilemap]});
-                                world.DestroyEntity(level_tilemap_entity);
-                                level_tilemap_entity = world.CreateEntity();
+                                active_world->DestroyEntity(level_tilemap_entity);
+                                level_tilemap_entity = active_world->CreateEntity();
                                 tile_map_transform = GetCenteredTileMapTransform(
                                     next_level.tile_map,
                                     kDoubleTimeWorldWidth * 0.5F,
                                     kDoubleTimeWorldHeight * 0.5F);
-                                world.AddComponent<svanes::Transform>(
+                                active_world->AddComponent<svanes::Transform>(
                                     level_tilemap_entity, tile_map_transform);
-                                world.AddComponent<svanes::TileMap>(
+                                active_world->AddComponent<svanes::TileMap>(
                                     level_tilemap_entity,
                                     std::move(next_level.tile_map));
                                 rebuild_interactables(next_level);
@@ -780,7 +830,7 @@ int32_t main(int32_t argc, char **argv) {
                                  ++index) {
                                 const ServerPlatform &platform = platforms[index];
                                 const svanes::Transform platform_transform =
-                                    world.GetComponent<svanes::Transform>(
+                                    active_world->GetComponent<svanes::Transform>(
                                         platform.entity);
                                 const float platform_left =
                                     platform_transform.x -
@@ -810,23 +860,23 @@ int32_t main(int32_t argc, char **argv) {
         [&]() {
             if (character.has_value()) {
                 const svanes::Transform transform =
-                    world.GetComponent<svanes::Transform>(character->entity);
-                network_server.Broadcast(DoubleTimeEntityState{
+                    active_world->GetComponent<svanes::Transform>(character->entity);
+                broadcast(DoubleTimeEntityState{
                     transform, character->horizontal_input != 0.0F, 0,
                     DoubleTimeEntityKind::Character, kDoubleTimeCharacterWidth,
                     kDoubleTimeCharacterHeight});
             }
             for (const ServerPlatform &platform : platforms) {
                 const svanes::Transform transform =
-                    world.GetComponent<svanes::Transform>(platform.entity);
-                network_server.Broadcast(DoubleTimeEntityState{
+                    active_world->GetComponent<svanes::Transform>(platform.entity);
+                broadcast(DoubleTimeEntityState{
                     transform, false, platform.definition.id,
                     DoubleTimeEntityKind::MovingPlatform,
                     platform.definition.width * kDoubleTimeTileSize,
                     platform.definition.height * kDoubleTimeTileSize});
             }
             for (const ServerDoor &door : doors) {
-                network_server.Broadcast(DoubleTimeEntityState{
+                broadcast(DoubleTimeEntityState{
                     door.transform, false, door.definition.id,
                     DoubleTimeEntityKind::Door,
                     door.definition.width * kDoubleTimeTileSize,
@@ -834,29 +884,37 @@ int32_t main(int32_t argc, char **argv) {
                     !door.open});
             }
             for (const ServerAreaObject &spike : spikes) {
-                const auto transform = world.GetComponent<svanes::Transform>(spike.entity);
-                network_server.Broadcast(DoubleTimeEntityState{
+                const auto transform = active_world->GetComponent<svanes::Transform>(spike.entity);
+                broadcast(DoubleTimeEntityState{
                     transform, false, static_cast<std::uint32_t>(spike.entity), DoubleTimeEntityKind::Spikes,
                     spike.definition.width * kDoubleTimeTileSize,
                     spike.definition.height * kDoubleTimeTileSize, 0,
                     spike.enabled});
             }
             for (const ServerAreaObject &collectible : collectibles) {
-                const auto transform = world.GetComponent<svanes::Transform>(collectible.entity);
-                network_server.Broadcast(DoubleTimeEntityState{
+                const auto transform = active_world->GetComponent<svanes::Transform>(collectible.entity);
+                broadcast(DoubleTimeEntityState{
                     transform, false, static_cast<std::uint32_t>(collectible.entity), DoubleTimeEntityKind::Collectible,
                     collectible.definition.width * kDoubleTimeTileSize,
                     collectible.definition.height * kDoubleTimeTileSize, 0,
                     collectible.enabled});
             }
-            network_server.Broadcast(DoubleTimeEntityState{
+            broadcast(DoubleTimeEntityState{
                 {}, false, 0, DoubleTimeEntityKind::AudioTimeline, 0.0F,
                 0.0F,
-                world.GetComponent<svanes::Timeline>(
+                active_world->GetComponent<svanes::Timeline>(
                     authoritative_timeline_entity)
                     .GetTotalTics(),
                 true,
                 static_cast<std::uint32_t>(current_area_index),
                 static_cast<std::uint32_t>(current_tilemap_index)});
+        },
+        gravity,
+        [&](svanes::ServerContext &context) {
+            context.network.Listen("*:" +
+                                   std::to_string(kDoubleTimeServerJoinPort));
+            context.world = std::move(world);
+            active_world = &context.world;
         });
+    return network_server.run(runtime);
 }

@@ -1,6 +1,6 @@
 #include "double_time_game.hpp"
 
-#include <svanes/application.hpp>
+#include <svanes/network/clientserver/network_client.hpp>
 
 #include <stdexcept>
 #include <string>
@@ -12,12 +12,12 @@ int32_t main(int32_t argc, char **argv) {
     }
     const std::string server_host = argc > 1 ? argv[1] : kDoubleTimeDefaultServerHost;
 
-    svanes::Application application({
+    svanes::NetworkClient client({
         .title = "Double Time",
         .width = 1920,
         .height = 1080,
     });
 
     DoubleTimeGame game(server_host);
-    return application.run(game);
+    return client.run(game);
 }
