@@ -370,8 +370,8 @@ void OrbitalEscalationClient::ApplyWorldUpdate(
         world.GetComponent<svanes::Timeline>(entity).SetProgress(
             state.local_tics, 0, svanes::RationalNumber{0});
 
-        // Copy independent movement if present. Attached objects have no
-        // kinematic component while they follow their parent.
+        // Copy independent movement if present. Static and attached objects
+        // have no kinematic component.
         if (state.velocity) {
             auto &motion = world.AddComponent<svanes::Kinematic2D>(entity);
             motion.velocity_x = state.velocity->linear.x;
