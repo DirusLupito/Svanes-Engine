@@ -146,6 +146,14 @@ public:
     virtual void HandleJoinResult(const JoinResult &result) = 0;
 
     /**
+     * Handles the loss of an established server connection due to timeout.
+     * Called once on the main thread before Update, after the engine has
+     * marked the client as disconnected. A pending join's timeout is reported
+     * through HandleJoinResult instead.
+     */
+    virtual void HandleDisconnect() {}
+
+    /**
      * Updates the client's view and controls once per frame, after local input
      * and server messages have been collected and before rendering.
      * Messages queued here are sent to the server during this frame.

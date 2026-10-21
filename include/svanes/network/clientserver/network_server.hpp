@@ -3,6 +3,7 @@
 #include <svanes/network/network_message.hpp>
 #include <svanes/registry.hpp>
 
+#include <chrono>
 #include <cstdint>
 #include <mutex>
 #include <optional>
@@ -150,30 +151,46 @@ private:
      *
      * FIELDS:
      * - address: The client's latest address, as reported by the pipe when its
-     * join request or an admitted gameplay message arrived.
+     * join request, admitted gameplay message, or heartbeat arrived.
      * - outgoing: A vector of NetworkMessage instances representing messages
      * queued for sending to the client.
      * - accepted: Whether the client is admitted and has not disconnected.
+     * - last_received: The last time the client's gameplay message or
+     * heartbeat was collected, initially the time of its join response.
      */
     struct Session {
         std::string address;
         std::vector<NetworkMessage> outgoing;
         bool accepted;
+        std::chrono::steady_clock::time_point last_received;
     };
 
     /**
-     * Collects messages from the communication thread, handles join callbacks,
-     * and collects gameplay messages from accepted clients for the next
-     * simulation tick.
+     * Collects messages from the communication thread, handles joins and
+     * disconnections, checks connection timeouts, and collects gameplay
+     * messages from accepted clients for the next simulation tick.
      *
-     * @param server The game server handling join requests.
+     * @param server The game server handling joins and disconnections.
      * @param pending A reference to a vector where received ClientInput
      * structures will be stored.
      */
     void ReceiveMessages(IServer &server, std::vector<ClientInput> &pending);
 
     /**
-     * Transfers all queued messages to the communication thread for sending.
+     * Ends a client's session, discards its pending input and outgoing
+     * messages, and notifies the server implementation that the client has
+     * disconnected.
+     *
+     * @param server The game server handling the disconnection.
+     * @param client The assigned ID of an accepted client.
+     * @param pending The inputs awaiting the next simulation step.
+     */
+    void DisconnectClient(IServer &server, ClientId client,
+                          std::vector<ClientInput> &pending);
+
+    /**
+     * Queues periodic heartbeats and transfers all queued messages to the
+     * communication thread for sending.
      * Called each loop iteration after any simulation work, so admission
      * responses are queued even when a simulation step is not performed.
      */
@@ -205,6 +222,10 @@ private:
     // A vector of ClientInput structures representing input messages received
     // from admitted clients during the current update tick.
     std::vector<ClientInput> inputs;
+
+    // The last time heartbeats were queued for the server's accepted clients.
+    std::chrono::steady_clock::time_point last_heartbeat =
+        std::chrono::steady_clock::now();
 
     // The mutex protecting the listen request and outgoing messages.
     std::mutex outgoing_mutex;

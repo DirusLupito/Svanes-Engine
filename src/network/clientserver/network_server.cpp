@@ -69,8 +69,9 @@ void NetworkServer::ReceiveMessages(IServer &server,
         received.swap(incoming);
     }
 
-    // For each message in the batch, we handle its join request or collect its
-    // gameplay payload as input from an admitted client.
+    // For each message in the batch, we handle its join request, heartbeat,
+    // or disconnect notice, or collect its gameplay payload as input from an
+    // admitted client.
     // The communication thread can receive more messages while we process this
     // batch, they'll be collected in the next iteration.
     for (const auto &[address, message] : received) {
@@ -108,20 +109,29 @@ void NetworkServer::ReceiveMessages(IServer &server,
             sessions.push_back({address,
                                 {internal::EncodeJoinResult(
                                     response.accepted, id, response.message)},
-                                response.accepted});
+                                response.accepted,
+                                std::chrono::steady_clock::now()});
 
             clients.emplace(address, id);
 
-            // Case 2: A client has been accepted and is sending gameplay
-            // messages.
+            // Case 2: An accepted client sent gameplay or a heartbeat.
 
-        } else if (decoded.kind == internal::ClientServerMessageKind::Game) {
+        } else if (decoded.kind == internal::ClientServerMessageKind::Game ||
+                   decoded.kind ==
+                       internal::ClientServerMessageKind::Heartbeat) {
             const auto id = decoded.client_id;
             if (id != 0 && id <= sessions.size() && sessions[id - 1].accepted) {
                 // The client's latest source address is where replies should
                 // go, even if its socket has changed ports since joining.
                 sessions[id - 1].address = address;
-                pending.push_back({id, std::move(decoded.payload)});
+                sessions[id - 1].last_received =
+                    std::chrono::steady_clock::now();
+
+                // Both message kinds keep the session alive, but only game
+                // messages contain input for the simulation.
+                if (decoded.kind == internal::ClientServerMessageKind::Game) {
+                    pending.push_back({id, std::move(decoded.payload)});
+                }
             }
 
             // Case 3: An admitted client is leaving the server.
@@ -129,26 +139,57 @@ void NetworkServer::ReceiveMessages(IServer &server,
                    internal::ClientServerMessageKind::Disconnect) {
             const auto id = decoded.client_id;
             if (id != 0 && id <= sessions.size() && sessions[id - 1].accepted) {
-                sessions[id - 1].accepted = false;
-                sessions[id - 1].outgoing.clear();
-
-                // Forget the join address and any inputs waiting for a
-                // simulation step before the game removes this player.
-                std::erase_if(clients, [id](const auto &entry) {
-                    return entry.second == id;
-                });
-
-                std::erase_if(pending, [id](const auto &input) {
-                    return input.client == id;
-                });
-
-                server.HandleDisconnect(world, id);
+                DisconnectClient(server, id, pending);
             }
+        }
+    }
+
+    // Check for and disconnect any clients that have not sent a heartbeat or
+    // gameplay message within the timeout interval.
+
+    const auto now = std::chrono::steady_clock::now();
+    for (std::size_t index = 0; index < sessions.size(); ++index) {
+        if (sessions[index].accepted && now - sessions[index].last_received >=
+                                            internal::ConnectionTimeout) {
+            const auto id = static_cast<ClientId>(index + 1);
+            std::cerr << "Network server: client " << id << " timed out.\n";
+            DisconnectClient(server, id, pending);
         }
     }
 }
 
+void NetworkServer::DisconnectClient(IServer &server, ClientId client,
+                                     std::vector<ClientInput> &pending) {
+    sessions[client - 1].accepted = false;
+    sessions[client - 1].outgoing.clear();
+
+    // Forget the join address and any inputs waiting for a simulation step
+    // before the game removes this player.
+    std::erase_if(clients, [client](const auto &entry) {
+        return entry.second == client;
+    });
+    std::erase_if(pending, [client](const auto &input) {
+        return input.client == client;
+    });
+    server.HandleDisconnect(world, client);
+}
+
 void NetworkServer::SendMessages() {
+
+    // If it has been more than HeartbeatInterval since the last heartbeat,
+    // queue a heartbeat message to each accepted client to keep the connection
+    // alive.
+
+    const auto now = std::chrono::steady_clock::now();
+    if (now - last_heartbeat >= internal::HeartbeatInterval) {
+        for (Session &session : sessions) {
+            if (session.accepted) {
+                session.outgoing.push_back(internal::EncodeHeartbeat());
+            }
+        }
+        last_heartbeat = now;
+    }
+
     // The messages queued by the current iteration, with their destinations.
     std::vector<AddressedMessage> batch;
 

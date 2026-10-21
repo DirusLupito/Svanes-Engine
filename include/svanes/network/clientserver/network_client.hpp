@@ -94,8 +94,9 @@ public:
 
     /**
      * Determines whether the client is currently connected to the server.
-     * 
-     * @return Whether the server has accepted this client.
+     *
+     * @return Whether the client has been accepted and has not disconnected
+     * or timed out.
      */
     bool IsConnected() const;
 
@@ -142,12 +143,12 @@ private:
                        SDL_Renderer *renderer);
 
     /**
-     * Handles the pending join and collects gameplay messages from the
-     * communication thread into incoming.
+     * Handles the pending join, checks for a connection timeout, and collects
+     * gameplay messages from the communication thread into incoming.
      * Called before Update so join callbacks and this frame's messages are
      * available to the game without blocking the frame loop.
      *
-     * @param client The game client supplying the handshake callbacks.
+     * @param client The game client handling join results and disconnections.
      */
     void ReceiveMessages(IClient &client);
 
@@ -162,9 +163,9 @@ private:
     void CompleteJoin(IClient &client, const JoinResult &result);
 
     /**
-     * Transfers queued gameplay messages to the communication thread after
-     * acceptance. Should be called once per frame after all input has been
-     * processed for that frame.
+     * Queues periodic heartbeats and transfers outgoing messages to the
+     * communication thread after acceptance. Should be called once per frame
+     * after all input has been processed for that frame.
      */
     void SendMessages();
 
@@ -197,6 +198,13 @@ private:
     // The time point when the join request was queued, or std::nullopt if no
     // join is pending. Used to determine if the pending join has timed out.
     std::optional<std::chrono::steady_clock::time_point> join_started;
+
+    // The last time a heartbeat or gameplay message from the server was
+    // collected, initially the time this client's join was accepted.
+    std::chrono::steady_clock::time_point last_received;
+
+    // The last time a heartbeat was queued, initially the join acceptance time.
+    std::chrono::steady_clock::time_point last_heartbeat;
 
     // A vector of NetworkMessage instances representing messages received
     // from the server during the current frame.

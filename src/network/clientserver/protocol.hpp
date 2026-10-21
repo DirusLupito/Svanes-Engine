@@ -2,9 +2,16 @@
 
 #include <svanes/network/message_serialization.hpp>
 
+#include <chrono>
 #include <cstdint>
 
 namespace svanes::internal {
+
+// The interval between heartbeats sent by an established connection.
+constexpr auto HeartbeatInterval = std::chrono::seconds(1);
+
+// The time an established connection can remain silent before it times out.
+constexpr auto ConnectionTimeout = std::chrono::seconds(10);
 
 /**
  * All client-server messages types recognized by the engine. Used to identify
@@ -18,13 +25,15 @@ namespace svanes::internal {
  * - Rejected: Enum used by a server to reject a client's join request.
  * - Game: Enum used by both a client and server to send gameplay messages.
  * - Disconnect: Enum used by a client to leave its server session.
+ * - Heartbeat: Enum used by either side to keep its connection alive.
  */
 enum class ClientServerMessageKind : std::uint8_t {
     Join = 1,
     Accepted,
     Rejected,
     Game,
-    Disconnect
+    Disconnect,
+    Heartbeat
 };
 
 /**
@@ -70,13 +79,21 @@ NetworkMessage EncodeGameMessage(const NetworkMessage &message,
 NetworkMessage EncodeDisconnect(std::uint32_t client_id);
 
 /**
+ * Encodes a heartbeat indicating that the sender is still connected.
+ *
+ * @param client_id The assigned client ID, or zero if sent by the server.
+ * @return The encoded heartbeat.
+ */
+NetworkMessage EncodeHeartbeat(std::uint32_t client_id = 0);
+
+/**
  * Represents a decoded client-server message.
  *
  * FIELDS:
  * - kind: The type of engine message received.
- * - client_id: The assigned client ID in an acceptance, gameplay, or disconnect
- * message.
- * Zero for server gameplay messages and messages without a client ID field.
+ * - client_id: The assigned client ID in an acceptance, gameplay, disconnect,
+ * or heartbeat message. Zero for server gameplay messages, server heartbeats,
+ * and messages without a client ID field.
  * - payload: The game's message bytes, without the engine protocol fields.
  */
 struct DecodedMessage {
