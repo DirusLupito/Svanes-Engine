@@ -3,6 +3,7 @@
 #include "combat/weapon_system.hpp"
 #include "game_objects/dynamic_object/ship.hpp"
 #include "game_objects/planet.hpp"
+#include "game_objects/spawn_zones.hpp"
 #include "propulsion_system.hpp"
 #include "serialization/asset_catalog.hpp"
 
@@ -53,9 +54,6 @@ public:
      * @param context The client's join request and the server's game context.
      *
      * @return The admission decision and any game response for the client.
-     *
-     * @throws std::overflow_error if an available spawn position cannot be
-     * represented.
      */
     svanes::JoinResponse
     HandleJoinRequest(const svanes::ServerJoinContext &context) override;
@@ -124,15 +122,24 @@ private:
     static Input DecodeInput(const svanes::NetworkMessage &message);
 
     /**
-     * Adds a player to the game and spawns their ship in an available position.
+     * Adds a player to the game and spawns their ship at a spawn zone.
      *
      * @param world The engine owned registry in which to create the ship.
      * @param client The unique, nonzero client ID assigned by the server.
      * @throws std::invalid_argument if the ID is zero or already has a player.
-     * @throws std::overflow_error if an available spawn position cannot be
-     * represented.
      */
     void AddPlayer(svanes::Registry &world, svanes::ClientId client);
+
+    /**
+     * Spawns a player's ship at the next unoccupied spawn zone. Each occupied
+     * zone advances the choice to the next one. If all eight are occupied,
+     * the following zone is used anyway.
+     *
+     * @param world The registry containing the spawn zones, ships, and
+     * missiles.
+     * @param player The player whose ship needs to be created.
+     */
+    void SpawnPlayer(svanes::Registry &world, Player &player);
 
     /**
      * Populates the space around the planet with simple drifting ships,
@@ -184,6 +191,9 @@ private:
 
     // The players admitted to the game, indexed by client ID.
     std::map<svanes::ClientId, Player> players;
+
+    // The spawn zones and the choice of where the next player ship appears.
+    std::optional<SpawnZones> spawn_zones;
 
     // A list of all projectiles in the game, including missiles and their
     // attachments.

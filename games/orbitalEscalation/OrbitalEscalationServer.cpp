@@ -23,8 +23,6 @@
 constexpr float kPlayerHealth = 100.0F;
 constexpr float kPlanetImpactDamage = 25.0F;
 constexpr float kCollisionAcceleration = 400000.0F;
-constexpr float kSpawnSpacing = 2000.0F;
-constexpr float kSpawnHeight = 48000.0F;
 constexpr float kSpawnSpeed = 300.0F;
 
 // The number of drifting junk ships.
@@ -78,6 +76,8 @@ void OrbitalEscalationServer::Initialize(svanes::ServerContext &context) {
     repelling_triangle.emplace(CreateRepellingTriangle(context.world));
     rotating_square.emplace(
         CreateRotatingSquare(context.world, gameplay_timeline->Get()));
+
+    spawn_zones.emplace(context.world);
     CreateJunk(context.world);
     context.network.Listen("*:" + std::to_string(port));
 
@@ -298,42 +298,6 @@ svanes::NetworkMessage OrbitalEscalationServer::CreateWorldUpdate(
     return update.Write();
 }
 
-/**
- * Checks whether an object and its attachments fit at their current positions
- * without colliding with the existing world.
- *
- * @param world The registry containing the object and obstacles.
- * @param object The object whose spawn position to check.
- * @param obstacles The existing entities to avoid.
- * @return true if the object and all its attachments are clear of obstacles.
- * @throws std::out_of_range if a checked entity lacks a transform or collider.
- */
-static bool SpawnIsClear(const svanes::Registry &world,
-                         const DynamicObject &object,
-                         std::span<const svanes::Entity> obstacles) {
-    const auto entity = object.GetEntity();
-    const auto &geometry =
-        world.GetComponent<svanes::Collider2D>(entity).geometry;
-
-    const auto &transform = world.GetComponent<svanes::Transform>(entity);
-    for (const auto obstacle : obstacles) {
-        if (!svanes::DetectCollisions(
-                 geometry, transform,
-                 world.GetComponent<svanes::Collider2D>(obstacle).geometry,
-                 world.GetComponent<svanes::Transform>(obstacle))
-                 .empty()) {
-            return false;
-        }
-    }
-
-    for (const auto &child : object.GetAttachments()) {
-        if (!SpawnIsClear(world, *child, obstacles)) {
-            return false;
-        }
-    }
-    return true;
-}
-
 void OrbitalEscalationServer::AddPlayer(svanes::Registry &world,
                                         svanes::ClientId client) {
     if (client == 0 || players.contains(client)) {
@@ -341,40 +305,36 @@ void OrbitalEscalationServer::AddPlayer(svanes::Registry &world,
             "Orbital player requires a unique, nonzero client ID.");
     }
 
-    // Collect existing geometry before creating the ship so it cannot block
-    // its own spawn position.
-    std::vector<svanes::Entity> obstacles;
-    world.ForEach<svanes::Transform, svanes::Collider2D>(
-        [&](svanes::Entity entity, const auto &, const auto &) {
-            obstacles.push_back(entity);
-        });
+    auto &player = players.try_emplace(client).first->second;
+    SpawnPlayer(world, player);
+}
 
-    auto ship =
-        assets.CreateShip(world, gameplay_timeline->Get(), "player_ship");
-    world.AddComponent<Health>(ship->GetEntity(), Health{kPlayerHealth});
-
-    // Find an available spawn position.
-    for (float x = 0.0F;;) {
-        ship->GetTransform(world) = {x, -OrbitalPlanetRadius - kSpawnHeight};
-
-        // Update the attachments of all objects, so that their transforms are
-        // correct for collision detection.
-        UpdateAttachments(world);
-        if (SpawnIsClear(world, *ship, obstacles)) {
-            break;
+void OrbitalEscalationServer::SpawnPlayer(svanes::Registry &world,
+                                          Player &player) {
+    // The ships and missiles whose geometry can occupy a spawn zone.
+    std::vector<const DynamicObject *> objects;
+    for (const auto &[client, other] : players) {
+        if (other.ship) {
+            objects.push_back(other.ship.get());
         }
-
-        const float next = x + kSpawnSpacing;
-        if (!std::isfinite(next) || next == x) {
-            throw std::overflow_error("Orbital spawn positions exhausted.");
-        }
-
-        x = next;
     }
 
-    ship->GetKinematic(world).velocity_x =
+    for (const auto &ship : junk_ships) {
+        objects.push_back(ship.get());
+    }
+
+    for (const auto &projectile : projectiles) {
+        objects.push_back(projectile.get());
+    }
+
+    const auto position = spawn_zones->ChoosePosition(world, objects);
+    player.ship =
+        assets.CreateShip(world, gameplay_timeline->Get(), "player_ship");
+
+    player.ship->GetTransform(world) = {position.x, position.y};
+    player.ship->GetKinematic(world).velocity_x =
         svanes::PerSecondToPerTic(kSpawnSpeed);
-    players.emplace(client, Player{std::move(ship)});
+    world.AddComponent<Health>(player.ship->GetEntity(), Health{kPlayerHealth});
     UpdateAttachments(world);
 }
 
@@ -486,7 +446,7 @@ void OrbitalEscalationServer::RespondToPhysics(
 
     // Explosions have finished using the entities' geometry. Now their owners
     // can remove dead objects, including dead missiles still inside launchers.
-    // A player's roster entry remains even when their ship is removed.
+    // A player's roster entry remains so their ship can be respawned.
     for (auto &[client, player] : players) {
         if (player.ship) {
             if (IsDead(world, player.ship->GetEntity())) {
@@ -508,4 +468,11 @@ void OrbitalEscalationServer::RespondToPhysics(
     std::erase_if(junk_ships, [&](const auto &ship) {
         return IsDead(world, ship->GetEntity());
     });
+
+    // Respawn any players whose ships were destroyed.
+    for (auto &[client, player] : players) {
+        if (!player.ship) {
+            SpawnPlayer(world, player);
+        }
+    }
 }
