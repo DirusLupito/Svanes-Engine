@@ -168,9 +168,6 @@ private:
     // attachments.
     std::vector<std::unique_ptr<DynamicObject>> projectiles;
 
-    // A list of all collision flashes in the game.
-    std::vector<OwnedEntity> collision_flashes;
-
     // Simulation time accumulated toward sending the next world update.
     svanes::TicCount snapshot_tics = 0;
 };

@@ -1,6 +1,9 @@
 #include "orbital_escalation_client.hpp"
 #include "combat/damage_system.hpp"
+#include "combat/missile_system.hpp"
+#include "combat/weapon_system.hpp"
 #include "controls.hpp"
+#include "effects/collision_flashes.hpp"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -11,14 +14,43 @@
 #include <svanes/camera2d.hpp>
 #include <svanes/input.hpp>
 #include <svanes/network/clientserver/network_client.hpp>
+#include <svanes/physics_system.hpp>
 #include <svanes/registry.hpp>
 #include <svanes/render/render_system.hpp>
+#include <svanes/sprite_animation_system.hpp>
 #include <unordered_set>
 #include <utility>
 
 const svanes::TicCount kPauseFlashPeriod = svanes::SecondsToTics(1.0);
 constexpr std::uint8_t kPauseLabelMinimumAlpha = 64;
 constexpr svanes::TicCount kClientFrameTics = 16666;
+constexpr float kPlanetImpactDamage = 25.0F;
+constexpr float kCollisionAcceleration = 400000.0F;
+
+/**
+ * Pushes colliding objects apart using the contact normals.
+ *
+ * @param world The registry containing the colliding objects.
+ * @param pair The objects and their collision contacts.
+ */
+static void ApplyCollisionAcceleration(svanes::Registry &world,
+                                       const svanes::EntityCollision2D &pair) {
+    for (const auto &collision : pair.collisions) {
+        const auto acceleration =
+            collision.normal *
+            svanes::PerSecondSquaredToPerTicSquared(kCollisionAcceleration);
+        if (world.HasComponent<svanes::Kinematic2D>(pair.a)) {
+            auto &motion = world.GetComponent<svanes::Kinematic2D>(pair.a);
+            motion.acceleration_x += acceleration.x;
+            motion.acceleration_y += acceleration.y;
+        }
+        if (world.HasComponent<svanes::Kinematic2D>(pair.b)) {
+            auto &motion = world.GetComponent<svanes::Kinematic2D>(pair.b);
+            motion.acceleration_x -= acceleration.x;
+            motion.acceleration_y -= acceleration.y;
+        }
+    }
+}
 
 OrbitalEscalationClient::OrbitalEscalationClient(std::string server_address)
     : server_address(std::move(server_address)),
@@ -34,6 +66,9 @@ void OrbitalEscalationClient::Initialize(svanes::ClientContext &context) {
 
     gameplay_timeline.emplace(context.world);
     context.world.AddComponent<svanes::Timeline>(gameplay_timeline->Get());
+
+    effects_timeline.emplace(context.world);
+    context.world.AddComponent<svanes::Timeline>(effects_timeline->Get());
 
     pause_label_entity = context.world.CreateEntity();
     context.world.AddComponent<svanes::TextLabel>(
@@ -166,6 +201,38 @@ void OrbitalEscalationClient::Update(const svanes::ClientFrameContext &frame) {
         0.01F, 100.0F);
     frame.camera.zoom = zoom;
 
+    // Use the same controls for the server and the local prediction.
+    SendInput(frame);
+
+    // A snapshot supplies this frame's gameplay state. Hold that clock still
+    // while advancing local effects, then restore the server's pause state.
+    auto &timeline =
+        frame.world.GetComponent<svanes::Timeline>(gameplay_timeline->Get());
+    const bool paused = timeline.IsPaused();
+    if (!messages.empty() || !planet) {
+        timeline.Pause();
+    }
+    svanes::AdvanceTimelines(frame.world, frame.real_delta_tics);
+    if (!paused) {
+        timeline.Unpause();
+    }
+
+    // Between snapshots, move and update gameplay objects locally. Prediction
+    // starts only after the first world update has supplied the planet.
+    if (messages.empty() && planet && !paused) {
+        Predict(frame.world);
+    }
+
+    svanes::AdvanceSpriteAnimations(frame.world);
+    UpdateCollisionFlashes(frame.world, collision_flashes);
+
+    // Follow the ship after either prediction or an authoritative update.
+    if (player_ship) {
+        const auto &pose = objects.at(*player_ship)->GetTransform(frame.world);
+        frame.camera.x = pose.x;
+        frame.camera.y = pose.y;
+    }
+
     const svanes::Rectangle2D view =
         frame.camera.ScreenToWorld(frame.camera.Viewport());
     svanes::Transform &background =
@@ -177,8 +244,6 @@ void OrbitalEscalationClient::Update(const svanes::ClientFrameContext &frame) {
             .geometry);
     background_rectangle.width = view.width;
     background_rectangle.height = view.height;
-
-    SendInput(frame);
 }
 
 void OrbitalEscalationClient::ApplyWorldUpdate(
@@ -190,14 +255,15 @@ void OrbitalEscalationClient::ApplyWorldUpdate(
     auto &timeline =
         world.GetComponent<svanes::Timeline>(gameplay_timeline->Get());
 
-    // Copy the server's clock state. The client does not advance the simulation
-    // between updates. (TODO: change this? for client-side prediction?)
+    // Replace predicted gameplay time with the server's clock state.
     timeline.SetProgress(update.total_tics, 0, svanes::RationalNumber{0});
     timeline.SetTicSize(update.tic_size);
     if (update.paused) {
         timeline.Pause();
+        world.GetComponent<svanes::Timeline>(effects_timeline->Get()).Pause();
     } else {
         timeline.Unpause();
+        world.GetComponent<svanes::Timeline>(effects_timeline->Get()).Unpause();
     }
 
     world.GetComponent<svanes::TextLabel>(pause_label_entity).visible =
@@ -223,6 +289,8 @@ void OrbitalEscalationClient::ApplyWorldUpdate(
 
     // The owners of existing and newly created objects, keyed by their local
     // entity IDs until ownership is transferred to the new attachment trees.
+    // Predicted-only objects have no entry in objects, so they stay here and
+    // are destroyed when the authoritative update finishes.
     std::unordered_map<svanes::Entity, std::unique_ptr<DynamicObject>> owned;
     for (auto &object : root_objects) {
         const auto entity = object->GetEntity();
@@ -276,6 +344,25 @@ void OrbitalEscalationClient::ApplyWorldUpdate(
         } else {
             world.RemoveComponent<Health>(entity);
         }
+
+        // Launch history is estimated locally rather than sent by the server.
+        if (world.HasComponent<MissileExplosion>(entity)) {
+            auto &explosion = world.GetComponent<MissileExplosion>(entity);
+            explosion.firing_ship.reset();
+            explosion.launched_at = state.local_tics;
+            explosion.detonated = false;
+        }
+    }
+
+    // Show a flash where a server-backed missile disappeared. It uses the last
+    // locally known position and survives subsequent world updates.
+    for (const auto &[id, object] : objects) {
+        if (!present.contains(id) &&
+            object->GetType() == DynamicObjectType::Missile) {
+            const auto &pose = object->GetTransform(world);
+            CreateCollisionFlash(world, effects_timeline->Get(),
+                                 collision_flashes, {pose.x, pose.y});
+        }
     }
 
     // Remove lookup entries for objects which are no longer in the server's
@@ -304,6 +391,27 @@ void OrbitalEscalationClient::ApplyWorldUpdate(
     // exact world poses now that the complete attachment trees exist.
     for (const auto &state : update.objects) {
         objects.at(state.entity)->GetTransform(world) = state.transform;
+    }
+
+    // Estimate launcher readiness from the ammunition actually attached in
+    // this snapshot. An empty slot starts a fresh local reload countdown.
+    for (const auto &state : update.objects) {
+        const auto &object = *objects.at(state.entity);
+        const auto entity = object.GetEntity();
+        if (world.HasComponent<MissileLauncherState>(entity)) {
+            auto &launcher = world.GetComponent<MissileLauncherState>(entity);
+            launcher.loaded_missile.reset();
+            launcher.emptied_at = state.local_tics;
+            launcher.ammunition_lost = false;
+            for (const auto &child : object.GetAttachments()) {
+                if (child->GetType() == DynamicObjectType::Missile) {
+                    launcher.loaded_missile = child->GetEntity();
+                    launcher.emptied_at.reset();
+                    break;
+                }
+            }
+            world.GetComponent<WeaponControl>(entity).fire = false;
+        }
     }
 
     // Update the complete trees' visuals from their roots.
@@ -349,6 +457,9 @@ void OrbitalEscalationClient::SendInput(
             frame.world.GetComponent<svanes::Kinematic2D>(entity),
             frame.world.GetComponent<Propulsion>(entity));
         fire = frame.input.WasMouseButtonPressed(svanes::MouseButton::Right);
+
+        frame.world.GetComponent<PropulsionControl>(entity) = control;
+        SetWeaponControls(frame.world, *objects.at(*player_ship), {fire});
     }
 
     // The writer collecting this frame's gameplay controls.
@@ -367,6 +478,104 @@ void OrbitalEscalationClient::SendInput(
     writer.WriteBool(fire);
     writer.WriteBool(frame.input.WasPressed(svanes::Key::P));
     frame.network.Send(writer.Finish());
+}
+
+void OrbitalEscalationClient::Predict(svanes::Registry &world) {
+    svanes::AdvancePhysics(
+        world, {}, parallel_for, [&](std::span<const svanes::PhysicsTimeStep>) {
+            ApplyPropulsion(world);
+            UpdateAttachments(world);
+
+            // The living colliders participating in this prediction step.
+            std::vector<svanes::Entity> colliders;
+            world.ForEach<svanes::Collider2D, svanes::Transform>(
+                [&](svanes::Entity entity, const auto &, const auto &) {
+                    if (!IsDead(world, entity)) {
+                        colliders.push_back(entity);
+                    }
+                });
+            auto contacts =
+                svanes::DetectEntityCollisions(world, colliders, parallel_for);
+
+            // Attached parts do not collide with each other, and freshly fired
+            // missiles ignore their firing ship while arming.
+            std::erase_if(contacts, [&](const auto &pair) {
+                return GetAttachmentRoot(world, pair.a) ==
+                           GetAttachmentRoot(world, pair.b) ||
+                       IgnoresFiringShip(world, pair.a, pair.b) ||
+                       IgnoresFiringShip(world, pair.b, pair.a);
+            });
+            for (const auto &pair : contacts) {
+                ApplyCollisionAcceleration(world, pair);
+            }
+
+            // The ships touching the planet in this step.
+            std::unordered_set<svanes::Entity> contacting;
+            for (const auto &[id, object] : objects) {
+                const auto entity = object->GetEntity();
+                if (object->GetType() != DynamicObjectType::Ship ||
+                    IsDead(world, entity)) {
+                    continue;
+                }
+                for (const auto &pair : contacts) {
+                    const auto surface = planet->GetEntity();
+                    if ((pair.a == entity && pair.b == surface) ||
+                        (pair.b == entity && pair.a == surface)) {
+                        contacting.insert(entity);
+                    }
+                }
+                if (contacting.contains(entity) &&
+                    !touching_planet.contains(entity)) {
+                    ApplyDamage(world, entity, kPlanetImpactDamage);
+                }
+            }
+            touching_planet = std::move(contacting);
+
+            // Gameplay explosions also create visual effects owned only by
+            // this client.
+            for (const auto position :
+                 UpdateMissileExplosions(world, contacts)) {
+                CreateCollisionFlash(world, effects_timeline->Get(),
+                                     collision_flashes, position);
+            }
+
+            // Remove lookup entries before destroying objects. A dead parent
+            // also destroys its children, even if those children survived.
+            std::erase_if(objects, [&](const auto &entry) {
+                auto entity = entry.second->GetEntity();
+                while (true) {
+                    if (IsDead(world, entity)) {
+                        return true;
+                    }
+                    if (!world.HasComponent<Attachment>(entity)) {
+                        return false;
+                    }
+                    entity = world.GetComponent<Attachment>(entity).parent;
+                }
+            });
+            if (player_ship && !objects.contains(*player_ship)) {
+                player_ship.reset();
+            }
+            std::erase_if(root_objects, [&](const auto &object) {
+                if (IsDead(world, object->GetEntity())) {
+                    return true;
+                }
+                object->RemoveDeadAttachments(world);
+                return false;
+            });
+
+            // Updating weapons can append fired missiles. Visit the roots
+            // which existed at the start so new missiles wait until next time.
+            const auto count = root_objects.size();
+            for (std::size_t index = 0; index < count; ++index) {
+                UpdateWeapons(world, *root_objects[index], assets,
+                              gameplay_timeline->Get(), root_objects);
+            }
+            UpdateAttachments(world);
+            for (const auto &object : root_objects) {
+                object->UpdateVisuals(world);
+            }
+        });
 }
 
 bool OrbitalEscalationClient::ShouldQuit() const { return should_quit; }

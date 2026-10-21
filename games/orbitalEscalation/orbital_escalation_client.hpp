@@ -4,16 +4,18 @@
 #include "serialization/asset_catalog.hpp"
 #include "serialization/world_update.hpp"
 
+#include <svanes/async/async_parallel_for_driver.hpp>
 #include <svanes/entity.hpp>
 #include <svanes/network/clientserver/IClient.hpp>
 
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 /**
- * Implements Orbital Escalation's client view and local controls.
+ * Implements Orbital Escalation's client view, local controls, and prediction.
  */
 class OrbitalEscalationClient final : public svanes::IClient {
 public:
@@ -75,6 +77,7 @@ private:
      * Applies the server's complete world state to the client's
      * view of the game. This should be called once per frame if
      * the server has sent any world update messages.
+     * Discards predicted-only gameplay objects and preserves local effects.
      *
      * TODO: Consider optimizing this to only update objects that have changed
      * since the last update, or perhaps only objects that the client can see or
@@ -88,12 +91,21 @@ private:
                           const WorldUpdate &update);
 
     /**
-     * Reads this player's controls and queues them for the server to apply.
+     * Reads this player's controls for local prediction and queues them for
+     * the server to apply.
      *
      * @param frame The local input, displayed world, camera, and network client
      * for this frame.
      */
     void SendInput(const svanes::ClientFrameContext &frame);
+
+    /**
+     * Predicts movement, collisions, damage, and weapons between server
+     * updates.
+     *
+     * @param world The client's world after its timelines have advanced.
+     */
+    void Predict(svanes::Registry &world);
 
     // The server's address for admission and gameplay messages.
     std::string server_address;
@@ -108,20 +120,35 @@ private:
     // world update or after its destruction.
     std::optional<svanes::Entity> player_ship;
 
-    // The master clock shared by displayed gameplay objects. Its state comes
-    // from server updates.
+    // The master clock shared by gameplay objects. Server updates replace its
+    // state, and prediction advances it between those updates.
     std::optional<OwnedEntity> gameplay_timeline;
+
+    // The local clock for visual effects. It follows the server's pause state,
+    // but its elapsed time is never replaced by a server update.
+    std::optional<OwnedEntity> effects_timeline;
 
     // The planet displayed in the client's world.
     std::optional<Planet> planet;
 
-    // The displayed gameplay objects, keyed by their server entity IDs.
+    // The server-backed gameplay objects, keyed by their server entity IDs.
     // Ownership belongs to root_objects or another object's attachment vector.
     std::unordered_map<svanes::Entity, DynamicObject *> objects;
 
     // The owners of independent gameplay objects. Each object owns its attached
-    // objects, along with its local entity and visuals.
+    // objects, along with its local entity and visuals. Includes server-backed
+    // objects and objects created only by prediction.
     std::vector<std::unique_ptr<DynamicObject>> root_objects;
+
+    // The flashes whose lifetimes belong entirely to the client.
+    std::vector<OwnedEntity> collision_flashes;
+
+    // The local IDs of ships touching the planet during the previous prediction
+    // step, so sustained contact does not repeatedly deal impact damage.
+    std::unordered_set<svanes::Entity> touching_planet;
+
+    // The driver used by local physics and collision detection.
+    svanes::AsyncParallelForDriver parallel_for{1};
 
     // The timeline controlling the client's frame rate.
     svanes::Timeline client_loop_timeline;

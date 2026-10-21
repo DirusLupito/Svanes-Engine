@@ -1,6 +1,5 @@
 #pragma once
 
-#include "../game_objects/owned_entity.hpp"
 #include <optional>
 #include <span>
 #include <svanes/collision_pass.hpp>
@@ -57,11 +56,9 @@ bool IgnoresFiringShip(const svanes::Registry &world, svanes::Entity missile,
  * owners remove them after all explosions have finished using their geometry.
  *
  * @param world The registry containing missiles and collision targets.
- * @param gameplay_timeline The parent timeline for the explosion flashes.
  * @param contacts The filtered collisions from this physics step.
- * @param flashes The owners of the active explosion flashes.
+ * @return The world positions of the missiles which exploded.
  */
-void UpdateMissileExplosions(
-    svanes::Registry &world, svanes::Entity gameplay_timeline,
-    std::span<const svanes::EntityCollision2D> contacts,
-    std::vector<OwnedEntity> &flashes);
+std::vector<svanes::Vector2D>
+UpdateMissileExplosions(svanes::Registry &world,
+                        std::span<const svanes::EntityCollision2D> contacts);
