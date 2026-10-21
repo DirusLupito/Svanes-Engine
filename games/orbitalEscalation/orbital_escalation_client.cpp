@@ -223,32 +223,47 @@ void OrbitalEscalationClient::Update(const svanes::ClientFrameContext &frame) {
     // Forward the player's input to the server.
     SendInput(frame);
 
-    // A snapshot supplies this frame's gameplay state. Hold that clock still
-    // while advancing local effects, then restore the server's pause state.
+    // Local effects follow frame time while gameplay waits for a complete
+    // physics step or takes its state from a server update.
     auto &timeline =
         frame.world.GetComponent<svanes::Timeline>(gameplay_timeline->Get());
 
     const bool paused = timeline.IsPaused();
-    if (!messages.empty() || !planet) {
-        timeline.Pause();
-    }
-
-    // For local effects and client-side prediction, we must
-    // advance our own timelines.
+    timeline.Pause();
     svanes::AdvanceTimelines(frame.world, frame.real_delta_tics);
+    svanes::AdvanceSpriteAnimations(frame.world);
     if (!paused) {
         timeline.Unpause();
     }
 
-    // Between snapshots, move and update gameplay objects locally. Prediction
-    // starts only after the first world update has supplied the planet.
+    // As on the server, advance one complete step when due, retain the
+    // fractional interval, and discard overdue whole steps. A server update
+    // or pause discards time accumulated for the previous predicted state.
     if (messages.empty() && planet && !paused) {
-        Predict(frame.world);
+        pending_physics_tics += frame.real_delta_tics;
+        if (pending_physics_tics >= svanes::DefaultPhysicsStepTics) {
+            auto &effects = frame.world.GetComponent<svanes::Timeline>(
+                effects_timeline->Get());
+            const bool effects_paused = effects.IsPaused();
+
+            // Effects already advanced for this frame and must not also
+            // advance with the gameplay step.
+            effects.Pause();
+            svanes::AdvanceTimelines(frame.world,
+                                     svanes::DefaultPhysicsStepTics);
+            Predict(frame.world);
+            svanes::AdvanceSpriteAnimations(frame.world);
+            if (!effects_paused) {
+                effects.Unpause();
+            }
+            pending_physics_tics %= svanes::DefaultPhysicsStepTics;
+        }
+    } else {
+        pending_physics_tics = 0;
     }
 
     // Update the visuals of all purely client effects.
 
-    svanes::AdvanceSpriteAnimations(frame.world);
     UpdateCollisionFlashes(frame.world, collision_flashes);
 
     // Follow the ship after either prediction or an authoritative update.
@@ -495,7 +510,10 @@ void OrbitalEscalationClient::SendInput(
         fire = frame.input.WasMouseButtonPressed(svanes::MouseButton::Right);
 
         frame.world.GetComponent<PropulsionControl>(entity) = control;
-        SetWeaponControls(frame.world, *objects.at(*player_ship), {fire});
+        // Keep a firing request until a physics step can consume it.
+        if (fire) {
+            SetWeaponControls(frame.world, *objects.at(*player_ship), {true});
+        }
     }
 
     // The writer collecting this frame's gameplay controls.
