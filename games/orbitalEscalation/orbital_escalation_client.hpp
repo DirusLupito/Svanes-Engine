@@ -105,8 +105,8 @@ private:
     void SendInput(const svanes::ClientFrameContext &frame);
 
     /**
-     * Predicts movement, collisions, damage, and weapons between server
-     * updates.
+     * Predicts movement, collisions, damage, and weapons for one fixed
+     * physics step between server updates.
      *
      * @param world The client's world after its timelines have advanced.
      */
@@ -128,6 +128,9 @@ private:
     // The master clock shared by gameplay objects. Server updates replace its
     // state, and prediction advances it between those updates.
     std::optional<OwnedEntity> gameplay_timeline;
+
+    // Real time accumulated toward the next fixed prediction step.
+    svanes::TicCount pending_physics_tics = 0;
 
     // The local clock for visual effects. It follows the server's pause state,
     // but its elapsed time is never replaced by a server update.
