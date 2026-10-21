@@ -15,7 +15,7 @@
 inline constexpr std::uint16_t OrbitalServerPort = 45010;
 
 // The interval between sending server world updates.
-inline constexpr svanes::TicCount OrbitalSnapshotTics = 16666; // 1/60 second
+inline constexpr svanes::TicCount OrbitalSnapshotTics = 50000; // 1/20 second
 
 /**
  * Implements the server for Orbital Escalation. Responsible for managing the
