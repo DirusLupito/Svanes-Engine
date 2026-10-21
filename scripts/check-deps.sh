@@ -2,7 +2,7 @@
 set -u
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-min_cmake_version="3.25.0"
+min_cmake_version="3.26.0"
 ok=1
 
 case "$(uname -s)" in
