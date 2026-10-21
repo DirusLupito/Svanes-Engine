@@ -59,6 +59,38 @@ void NetworkClient::Connect(const std::string &target_server_address,
     server_address = target_server_address;
 }
 
+void NetworkClient::Disconnect() {
+    if (!server_address) {
+        return;
+    }
+
+    // No more outgoing messages
+    outgoing.clear();
+
+    // and no more join data.
+    join_started.reset();
+
+
+    {
+        std::lock_guard lock(outgoing_mutex);
+
+        // we will send one single message, a disconnect notice,
+        // and then stop the communication thread without any
+        // other messages queued
+
+        outgoing_messages.clear();
+        if (IsConnected()) {
+            outgoing_messages.push_back(internal::EncodeDisconnect(client_id));
+        }
+        server_address.reset();
+    }
+
+    // Clean up our client state and stop communication.
+
+    client_id = 0;
+    communication_thread.request_stop();
+}
+
 bool NetworkClient::IsConnected() const { return client_id != 0; }
 
 void NetworkClient::Send(const NetworkMessage &message) {
@@ -218,12 +250,18 @@ void NetworkClient::Communicate(std::stop_token stop) {
     // The incoming batch of messages owned by this thread while receiving.
     std::vector<NetworkMessage> received;
 
-    while (!stop.stop_requested()) {
+    while (true) {
         // Collect the server's address if the pipe hasn't been created, and
         // transfer queued outgoing messages to the sending batch. The main
         // thread can queue the next batch once this lock is released.
         {
             std::lock_guard lock(outgoing_mutex);
+            // A disconnect notice may still be queued when the frame loop
+            // ends. Finish sending it before releasing the pipe.
+            if (stop.stop_requested() && outgoing_messages.empty()) {
+                break;
+            }
+
             if (!pipe) {
                 address = server_address;
             }

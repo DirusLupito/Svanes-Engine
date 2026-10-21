@@ -123,6 +123,27 @@ void NetworkServer::ReceiveMessages(IServer &server,
                 sessions[id - 1].address = address;
                 pending.push_back({id, std::move(decoded.payload)});
             }
+
+            // Case 3: An admitted client is leaving the server.
+        } else if (decoded.kind ==
+                   internal::ClientServerMessageKind::Disconnect) {
+            const auto id = decoded.client_id;
+            if (id != 0 && id <= sessions.size() && sessions[id - 1].accepted) {
+                sessions[id - 1].accepted = false;
+                sessions[id - 1].outgoing.clear();
+
+                // Forget the join address and any inputs waiting for a
+                // simulation step before the game removes this player.
+                std::erase_if(clients, [id](const auto &entry) {
+                    return entry.second == id;
+                });
+
+                std::erase_if(pending, [id](const auto &input) {
+                    return input.client == id;
+                });
+
+                server.HandleDisconnect(world, id);
+            }
         }
     }
 }

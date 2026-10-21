@@ -17,12 +17,14 @@ namespace svanes::internal {
  * - Accepted: Enum used by a server to accept a client's join request.
  * - Rejected: Enum used by a server to reject a client's join request.
  * - Game: Enum used by both a client and server to send gameplay messages.
+ * - Disconnect: Enum used by a client to leave its server session.
  */
 enum class ClientServerMessageKind : std::uint8_t {
     Join = 1,
     Accepted,
     Rejected,
-    Game
+    Game,
+    Disconnect
 };
 
 /**
@@ -60,11 +62,20 @@ NetworkMessage EncodeGameMessage(const NetworkMessage &message,
                                  std::uint32_t client_id = 0);
 
 /**
+ * Encodes a client's notice that it is leaving the server.
+ *
+ * @param client_id The assigned ID of the disconnecting client.
+ * @return The encoded disconnect notice.
+ */
+NetworkMessage EncodeDisconnect(std::uint32_t client_id);
+
+/**
  * Represents a decoded client-server message.
  *
  * FIELDS:
  * - kind: The type of engine message received.
- * - client_id: The assigned client ID in an acceptance or gameplay message.
+ * - client_id: The assigned client ID in an acceptance, gameplay, or disconnect
+ * message.
  * Zero for server gameplay messages and messages without a client ID field.
  * - payload: The game's message bytes, without the engine protocol fields.
  */

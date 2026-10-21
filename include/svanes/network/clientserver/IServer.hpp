@@ -134,6 +134,16 @@ public:
     virtual JoinResponse HandleJoinRequest(const ServerJoinContext &context) = 0;
 
     /**
+     * Handles a client's disconnect notice after its session has ended.
+     * Called on the main thread during network polling.
+     *
+     * @param Registry The server's registry containing the client's game
+     * objects.
+     * @param ClientId The assigned ID of the disconnected client.
+     */
+    virtual void HandleDisconnect(Registry &, ClientId) {}
+
+    /**
      * Updates the server's state based on the provided context.
      * This method is called once per update tick.
      *
