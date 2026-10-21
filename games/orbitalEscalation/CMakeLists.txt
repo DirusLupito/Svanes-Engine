@@ -8,6 +8,8 @@ add_library(
     combat/damage_system.hpp
     game_objects/owned_entity.cpp
     game_objects/owned_entity.hpp
+    game_objects/spawn_zones.cpp
+    game_objects/spawn_zones.hpp
     game_objects/deletion_boxes.cpp
     game_objects/deletion_boxes.hpp
     serialization/geometry_serialization.cpp
