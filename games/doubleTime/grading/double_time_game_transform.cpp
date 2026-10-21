@@ -107,7 +107,7 @@ void ResolveClientCharacterAxis(svanes::Registry &world,
 } // namespace
 
 DoubleTimeGame::DoubleTimeGame(std::string server_host)
-    : network_client(std::move(server_host), kDoubleTimeServerJoinPort) {
+    : server_host(std::move(server_host)) {
     SDL_Log("Networking: joining Double Time server.");
 }
 
@@ -278,7 +278,9 @@ void DoubleTimeGame::CheckGoal(svanes::Registry &world) {
     }
 }
 
-void DoubleTimeGame::Initialize(svanes::GameContext &context) {
+void DoubleTimeGame::Initialize(svanes::ClientContext &context) {
+    context.network.Connect(server_host + ":" +
+                            std::to_string(kDoubleTimeServerJoinPort));
     asset_manager = &context.assets;
     audio_manager = &context.audio;
     context.camera.scale_mode = svanes::ScaleMode::Proportional;
@@ -303,9 +305,15 @@ void DoubleTimeGame::Initialize(svanes::GameContext &context) {
     EnterState(DoubleTimeState::LevelOne, context.world);
 }
 
-void DoubleTimeGame::SendInput(const svanes::FrameContext &frame) {
-    if (!network_client.IsConnected()) return;
-    const auto assigned_id = network_client.Id();
+svanes::NetworkMessage DoubleTimeGame::CreateJoinRequest() { return {}; }
+
+void DoubleTimeGame::HandleJoinResult(const svanes::JoinResult &result) {
+    if (result.status == svanes::JoinStatus::Accepted) client_id = result.client_id;
+}
+
+void DoubleTimeGame::SendInput(const svanes::ClientFrameContext &frame) {
+    if (active_network == nullptr || !active_network->IsConnected()) return;
+    const auto assigned_id = client_id;
     input_send_timer += static_cast<float>(frame.real_delta_tics) /
                         static_cast<float>(svanes::TicsPerSecond);
     while (input_send_timer >= kInputSendIntervalSeconds) {
@@ -323,15 +331,15 @@ void DoubleTimeGame::SendInput(const svanes::FrameContext &frame) {
 
         if constexpr (kDoubleTimeNetworkingStrategy ==
                       DoubleTimeNetworkingStrategy::InputAuthoritative) {
-            network_client.Send(PlayerInputMessage{
-                assigned_id, horizontal_input, jump_requested, jump_on_beat});
+            active_network->Send(svanes::NetworkMessage::From(PlayerInputMessage{
+                assigned_id, horizontal_input, jump_requested, jump_on_beat}));
         } else {
             if (has_character && local_character_initialized) {
                 const auto &transform =
                     frame.world.GetComponent<svanes::Transform>(character_entity);
-                network_client.Send(PlayerTransformMessage{
+                active_network->Send(svanes::NetworkMessage::From(PlayerTransformMessage{
                     assigned_id, transform,
-                    svanes::Vector2D{local_velocity_x, local_velocity_y}});
+                    svanes::Vector2D{local_velocity_x, local_velocity_y}}));
             }
         }
         action_requested_since_last_send = false;
@@ -340,7 +348,7 @@ void DoubleTimeGame::SendInput(const svanes::FrameContext &frame) {
 }
 
 void DoubleTimeGame::SimulateClientCharacter(
-    const svanes::FrameContext &frame) {
+    const svanes::ClientFrameContext &frame) {
     if (!has_character || !local_character_initialized) return;
     const svanes::TicCount delta_tics = frame.real_delta_tics;
     if (delta_tics <= 0) return;
@@ -376,7 +384,7 @@ void DoubleTimeGame::EnsureClientCharacter(svanes::Registry &world) {
                   DoubleTimeNetworkingStrategy::InputAuthoritative) {
         return;
     }
-    if (has_character || !network_client.IsConnected() || !has_active_tilemap) {
+    if (has_character || active_network == nullptr || !active_network->IsConnected() || !has_active_tilemap) {
         return;
     }
     const auto &level = area_assets[active_area_index].levels[active_tilemap_index];
@@ -401,7 +409,7 @@ void DoubleTimeGame::EnsureClientCharacter(svanes::Registry &world) {
             kDoubleTimeCharacterHeight}});
     world.AddComponent<svanes::Timeline>(entity);
     world.AddComponent<svanes::ZOrder>(entity, svanes::ZOrder{kCharacterZOrder});
-    grading_character_entities.emplace(network_client.Id(), entity);
+    grading_character_entities.emplace(client_id, entity);
     character_entity = entity;
     has_character = true;
     local_character_initialized = true;
@@ -409,8 +417,9 @@ void DoubleTimeGame::EnsureClientCharacter(svanes::Registry &world) {
     local_velocity_y = 0.0F;
 }
 
-void DoubleTimeGame::ApplyServerState(svanes::Registry &world) {
-    const auto messages = network_client.PollBroadcast();
+void DoubleTimeGame::ApplyServerState(
+    svanes::Registry &world,
+    std::span<const svanes::NetworkMessage> messages) {
     for (const svanes::NetworkMessage &message : messages) {
         const DoubleTimeEntityState state = message.As<DoubleTimeEntityState>();
         if (state.kind != DoubleTimeEntityKind::AudioTimeline) {
@@ -451,7 +460,7 @@ void DoubleTimeGame::ApplyServerState(svanes::Registry &world) {
                 world.DestroyEntity(found->second);
                 grading_character_entities.erase(found);
             }
-            if (state.entity_id == network_client.Id()) {
+            if (state.entity_id == client_id) {
                 has_character = false;
                 local_character_initialized = false;
             }
@@ -562,7 +571,7 @@ void DoubleTimeGame::ApplyServerState(svanes::Registry &world) {
             world.AddComponent<svanes::ZOrder>(
                 entity, svanes::ZOrder{kCharacterZOrder});
             grading_character_entities.emplace(state.entity_id, entity);
-            if (state.entity_id == network_client.Id()) {
+            if (state.entity_id == client_id) {
                 character_entity = entity;
                 has_character = true;
                 local_character_initialized = true;
@@ -574,7 +583,7 @@ void DoubleTimeGame::ApplyServerState(svanes::Registry &world) {
                           DoubleTimeNetworkingStrategy::InputAuthoritative) {
                 world.GetComponent<svanes::Transform>(found_character->second) =
                     state.transform;
-            } else if (state.entity_id != network_client.Id()) {
+            } else if (state.entity_id != client_id) {
                 world.GetComponent<svanes::Transform>(found_character->second) =
                     state.transform;
             }
@@ -673,7 +682,8 @@ void DoubleTimeGame::UpdateCamera(svanes::Camera2D &camera,
                    : tilemap_transform.y + tilemap_height * 0.5F;
 }
 
-void DoubleTimeGame::Update(const svanes::FrameContext &frame) {
+void DoubleTimeGame::Update(const svanes::ClientFrameContext &frame) {
+    active_network = &frame.network;
     client_timeline.Advance(frame.real_delta_tics);
     if (frame.input.WasPressed(svanes::Key::Up) ||
         frame.input.WasPressed(svanes::Key::W)) {
@@ -683,7 +693,7 @@ void DoubleTimeGame::Update(const svanes::FrameContext &frame) {
             DoubleTimeAssetCatalog()[active_area_index].beats_per_minute,
             kRhythmTolerance);
     }
-    ApplyServerState(frame.world);
+    ApplyServerState(frame.world, frame.network.PollMessages());
     EnsureClientCharacter(frame.world);
     if constexpr (kDoubleTimeNetworkingStrategy ==
                   DoubleTimeNetworkingStrategy::ClientPositionAuthoritative) {

@@ -1,9 +1,9 @@
 #include "double_time_game.hpp"
 
-#include <svanes/application.hpp>
+#include <svanes/network/clientserver/network_client.hpp>
 
-#include <stdexcept>
 #include <charconv>
+#include <stdexcept>
 #include <string>
 
 int32_t main(int32_t argc, char **argv) {
@@ -29,13 +29,12 @@ int32_t main(int32_t argc, char **argv) {
     if (argc > 3 && !platform_role && std::string{argv[3]} != "character") {
         throw std::invalid_argument("The bridge role must be 'character' or 'platform'.");
     }
-
-    svanes::Application application({
+    svanes::NetworkClient client({
         .title = "Double Time",
         .width = 1920,
         .height = 1080,
     });
 
     DoubleTimeGame game(server_host, bridge_port, platform_role);
-    return application.run(game);
+    return client.run(game);
 }

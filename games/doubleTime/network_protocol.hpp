@@ -3,6 +3,7 @@
 #include <svanes/entity.hpp>
 #include <svanes/geometry/geometry.hpp>
 #include <svanes/network/network_message.hpp>
+#include <svanes/network/clientserver/network_server.hpp>
 
 #include <cstdint>
 
