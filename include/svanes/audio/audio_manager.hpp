@@ -69,7 +69,7 @@ public:
 
     /**
      * Plays a stored sound once.
-     * 
+     *
      * @param sound The stored sound to be played.
      */
     void PlaySound(SoundHandle sound);
@@ -77,9 +77,10 @@ public:
     /**
      * Plays a stored piece of music on an audio track.
      * Optionally plays on a loop.
-     * 
+     *
      * @param music The music being played
-     * @param loop Flag determining whether the music loops or not. Set true to loop.
+     * @param loop Flag determining whether the music loops or not. Set true to
+     * loop.
      */
     void PlayMusic(MusicHandle music, bool loop = true);
 
@@ -90,7 +91,7 @@ public:
 
     /**
      * Change the playback volume on the audio track to the target value.
-     * 
+     *
      * @param volume The target volume to set on the track.
      */
     void SetMusicVolume(float volume);
@@ -100,7 +101,7 @@ public:
      * progressed. A stopped or paused track reports the position it halted at.
      * For a looping track, this is the position within the current loop, not
      * the cumulative time played.
-     * 
+     *
      * @return The playback position, in milliseconds.
      * @throws std::runtime_error if the position cannot be determined.
      */
@@ -108,7 +109,7 @@ public:
 
     /**
      * Reports the length of the currently assigned music track.
-     * 
+     *
      * @return The track's duration, in milliseconds.
      * @throws std::runtime_error if no music is assigned, or its duration
      * cannot be determined.
@@ -118,7 +119,7 @@ public:
     /**
      * Seeks the currently assigned music track to the given position. Requires
      * an audio format that supports seeking; not all formats do.
-     * 
+     *
      * @param position_milliseconds The position to seek to, in milliseconds.
      * @throws std::runtime_error if the seek fails.
      */
@@ -129,7 +130,7 @@ public:
      * against its normal speed. Values above/below 1.0 speed the track up/down
      * and raise/lower its pitch to match, the same way changing a record
      * player's speed would.
-     * 
+     *
      * @param ratio The playback speed ratio. Must be between 0.01 and 100.
      * @throws std::runtime_error if the ratio cannot be set.
      */

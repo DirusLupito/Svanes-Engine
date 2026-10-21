@@ -7,7 +7,7 @@ class InputManager;
 class Camera2D;
 struct Transform;
 struct Kinematic2D;
-}
+} // namespace svanes
 
 /**
  * Reads the current state of the ship's controls based on the input manager.

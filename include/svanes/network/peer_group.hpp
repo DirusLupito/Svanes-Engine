@@ -21,7 +21,8 @@ class PeerJoin;
 }
 
 /**
- * Message types PeerGroup sends for itself, in the range reserved for the engine.
+ * Message types PeerGroup sends for itself, in the range reserved for the
+ * engine.
  * - SnapshotChunk: One piece of a world snapshot sent to an admitted joiner.
  * - JoinRequest: A contact from a process asking to join, with its rules hash.
  * - JoinPending: A contact reply saying the request is queued for the next
@@ -61,7 +62,8 @@ struct PeerSettings {
  * The identity and address of one member of a peer group.
  * FIELDS:
  * - peer: The member's shared id.
- * - address: The numeric IPv4 address and UDP port on which that member listens.
+ * - address: The numeric IPv4 address and UDP port on which that member
+ * listens.
  */
 struct PeerEndpoint {
     PeerId peer;
@@ -319,7 +321,8 @@ public:
     /**
      * Borrows the current roster, which changes only when a roster change is
      * applied.
-     * @return The sorted roster including the local member, empty before admission.
+     * @return The sorted roster including the local member, empty before
+     * admission.
      */
     std::span<const PeerId> Peers() const;
 
@@ -558,7 +561,8 @@ private:
     /** Freezes the participant and records the departure and queued joins. */
     void BeginRosterChange();
 
-    /** Advances the agreement and applies the change once every member agrees. */
+    /** Advances the agreement and applies the change once every member agrees.
+     */
     void UpdateRosterChange();
 
     /**

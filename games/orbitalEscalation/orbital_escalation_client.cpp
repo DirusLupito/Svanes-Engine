@@ -363,7 +363,7 @@ void OrbitalEscalationClient::ApplyWorldUpdate(
         }
     }
 
-    // For every server object, if it is a missile that is no longer present, 
+    // For every server object, if it is a missile that is no longer present,
     // it must have blown up. so we need to create a flash for it.
     // Assumes that missiles can only be destroyed by detonating.
     for (const auto &[id, object] : objects) {
@@ -526,18 +526,20 @@ void OrbitalEscalationClient::Predict(svanes::Registry &world) {
             // The ships touching the planet in this step.
             std::unordered_set<svanes::Entity> contacting;
 
-            // For every ship touching the planet, apply impact damage once per contact.
+            // For every ship touching the planet, apply impact damage once per
+            // contact.
             for (const auto &[id, object] : objects) {
                 const auto entity = object->GetEntity();
 
-                // Only ships can take impact damage, and only if they are alive.
+                // Only ships can take impact damage, and only if they are
+                // alive.
                 if (object->GetType() != DynamicObjectType::Ship ||
                     IsDead(world, entity)) {
                     continue;
                 }
 
-                // Check if this ship is touching the planet. If so, add it to the
-                // set of ships touching the planet this step.
+                // Check if this ship is touching the planet. If so, add it to
+                // the set of ships touching the planet this step.
                 for (const auto &pair : contacts) {
                     const auto surface = planet->GetEntity();
                     if ((pair.a == entity && pair.b == surface) ||
@@ -546,8 +548,8 @@ void OrbitalEscalationClient::Predict(svanes::Registry &world) {
                     }
                 }
 
-                // If this ship is touching the planet now but was not touching it in the
-                // previous step, apply impact damage once.
+                // If this ship is touching the planet now but was not touching
+                // it in the previous step, apply impact damage once.
                 if (contacting.contains(entity) &&
                     !touching_planet.contains(entity)) {
                     ApplyDamage(world, entity, kPlanetImpactDamage);
@@ -562,7 +564,11 @@ void OrbitalEscalationClient::Predict(svanes::Registry &world) {
                                      collision_flashes, position);
             }
 
-            // Remove dead objects from the world, including their attachments. If a parent is dead, its children are also dead, so we can remove the entire attachment tree at once. If a child is dead, we remove it from its parent's attachment vector, but the parent remains alive.
+            // Remove dead objects from the world, including their attachments.
+            // If a parent is dead, its children are also dead, so we can remove
+            // the entire attachment tree at once. If a child is dead, we remove
+            // it from its parent's attachment vector, but the parent remains
+            // alive.
             std::erase_if(objects, [&](const auto &entry) {
                 auto entity = entry.second->GetEntity();
                 while (true) {
