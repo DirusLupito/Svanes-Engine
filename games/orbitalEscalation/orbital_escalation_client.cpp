@@ -123,6 +123,11 @@ void OrbitalEscalationClient::HandleJoinResult(
     }
 }
 
+void OrbitalEscalationClient::HandleDisconnect() {
+    std::cout << "Disconnected from the server.\n";
+    should_quit = true;
+}
+
 svanes::TicCount OrbitalEscalationClient::GetFrameIntervalTics() const {
     const auto interval =
         svanes::RationalNumber{kClientFrameTics} /
@@ -133,6 +138,10 @@ svanes::TicCount OrbitalEscalationClient::GetFrameIntervalTics() const {
 }
 
 void OrbitalEscalationClient::Update(const svanes::ClientFrameContext &frame) {
+    if (should_quit) {
+        return;
+    }
+
     // The world update messages received for this frame.
     const auto messages = frame.network.PollMessages();
 

@@ -48,6 +48,11 @@ public:
     void HandleJoinResult(const svanes::JoinResult &result) override;
 
     /**
+     * Closes the game when its connection to the server is lost.
+     */
+    void HandleDisconnect() override;
+
+    /**
      * Updates the client's view and local controls once per frame.
      * @param frame The context for the current frame, providing access to the
      * InputManager and the time elapsed since the last frame.
