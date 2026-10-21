@@ -26,7 +26,7 @@ void UpdateCollisionFlashes(svanes::Registry &world,
  * Its Timeline supplies the elapsed lifetime; there is no second accumulator.
  *
  * @param world The registry to create the collision flash entity in.
- * @param gameplay_timeline The parent timeline entity to which the new flash's
+ * @param effects_timeline The parent timeline entity to which the new flash's
  * Timeline will be linked.
  * @param collision_flashes The list to which the new collision flash will be
  * added.
@@ -34,6 +34,6 @@ void UpdateCollisionFlashes(svanes::Registry &world,
  * be drawn.
  */
 void CreateCollisionFlash(svanes::Registry &world,
-                          svanes::Entity gameplay_timeline,
+                          svanes::Entity effects_timeline,
                           std::vector<OwnedEntity> &collision_flashes,
                           svanes::Vector2D contact_point);
