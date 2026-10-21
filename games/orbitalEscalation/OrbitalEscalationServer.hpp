@@ -142,12 +142,16 @@ private:
     void SpawnPlayer(svanes::Registry &world, Player &player);
 
     /**
-     * Populates the space around the planet with simple drifting ships,
+     * Populates the space around the planet with simple ships,
      * cycling through square, circle, and triangle shapes.
      *
      * @param world The registry in which to create the junk ships.
+     * @param count The total number of junk ships to create.
+     * @param static_count The number of ships to leave without kinematics,
+     * up to the total count. The remaining ships drift and rotate.
      */
-    void CreateJunk(svanes::Registry &world);
+    void CreateJunk(svanes::Registry &world, std::uint32_t count,
+                    std::uint32_t static_count);
 
     /**
      * Applies player controls and resolves gameplay interactions after
@@ -202,7 +206,7 @@ private:
     // attachments.
     std::vector<std::unique_ptr<DynamicObject>> projectiles;
 
-    // The simple ships drifting around the planet without player controls.
+    // The simple static and drifting ships without player controls.
     std::vector<std::unique_ptr<Ship>> junk_ships;
 
     // The ships touching the planet during the previous physics step.
