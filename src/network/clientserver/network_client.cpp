@@ -33,7 +33,7 @@ NetworkClient::NetworkClient(ClientSettings settings)
 
 NetworkClient::~NetworkClient() = default;
 
-void NetworkClient::Connect(const std::string &server_address,
+void NetworkClient::Connect(const std::string &target_server_address,
                             TicCount timeout_tics) {
     if (pipe) {
         throw std::logic_error(
@@ -49,7 +49,7 @@ void NetworkClient::Connect(const std::string &server_address,
     auto new_pipe = internal::MakePipe();
     new_pipe->Listen("*:0");
     pipe = std::move(new_pipe);
-    this->server_address = server_address;
+    this->server_address = target_server_address;
     join_timeout_tics = timeout_tics;
 }
 
