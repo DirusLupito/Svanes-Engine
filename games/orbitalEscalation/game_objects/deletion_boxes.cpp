@@ -4,7 +4,6 @@
 
 #include <svanes/collision_system.hpp>
 #include <svanes/registry.hpp>
-#include <svanes/render/render_system.hpp>
 
 #include <array>
 
@@ -16,23 +15,21 @@ static constexpr std::array<svanes::Rectangle2D, 4> boxes = {
     svanes::Rectangle2D{0.0F, 200000.0F, 500000.0F, 100000.0F}};
 
 std::vector<OwnedEntity> CreateDeletionBoxes(svanes::Registry &world) {
-    // The owners of the red rectangles displayed by the client.
-    std::vector<OwnedEntity> visuals;
+    // The owners of the invisible colliders defining the world's boundaries.
+    std::vector<OwnedEntity> zones;
     for (const auto &box : boxes) {
-        auto &entity = visuals.emplace_back(world);
-        world.AddComponent<svanes::Transform>(entity.Get(),
-                                              svanes::Transform{box.x, box.y});
-        world.AddComponent<svanes::SolidShape>(
-            entity.Get(),
-            svanes::SolidShape{
-                svanes::Color{255, 0, 0, 255},
-                svanes::Rectangle2D{0.0F, 0.0F, box.width, box.height}});
+        auto &entity = zones.emplace_back(world);
+
+        world.AddComponent<svanes::Collider2D>(entity.Get(),
+                                               svanes::Collider2D{box});
     }
-    return visuals;
+    return zones;
 }
 
-std::vector<svanes::Vector2D> ApplyDeletionBoxes(svanes::Registry &world) {
-    // The positions of this step's impacts with deletion boxes.
+std::vector<svanes::Vector2D>
+ApplyDeletionBoxes(svanes::Registry &world,
+                   std::span<const OwnedEntity> boxes) {
+    // List of the positions of objects that were deleted by the deletion boxes.
     std::vector<svanes::Vector2D> impacts;
 
     world.ForEach<svanes::Transform, svanes::Collider2D>(
@@ -43,10 +40,10 @@ std::vector<svanes::Vector2D> ApplyDeletionBoxes(svanes::Registry &world) {
             }
 
             for (const auto &box : boxes) {
-                const svanes::Rectangle2D geometry{0.0F, 0.0F, box.width,
-                                                   box.height};
-                if (!svanes::DetectCollisions(collider.geometry, pose, geometry,
-                                              {box.x, box.y})
+                const auto &zone =
+                    world.GetComponent<svanes::Collider2D>(box.Get());
+                if (!svanes::DetectCollisions(collider.geometry, pose,
+                                              zone.geometry, {})
                          .empty()) {
                     world.AddComponent<Health>(entity, Health{0.0F});
                     impacts.push_back({pose.x, pose.y});

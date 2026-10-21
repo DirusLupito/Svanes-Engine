@@ -189,6 +189,9 @@ private:
     // The square that rotates around its fixed center.
     std::optional<OwnedEntity> rotating_square;
 
+    // The invisible collision boxes that delete objects at the world's edges.
+    std::vector<OwnedEntity> deletion_boxes;
+
     // The players admitted to the game, indexed by client ID.
     std::map<svanes::ClientId, Player> players;
 

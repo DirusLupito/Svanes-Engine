@@ -77,6 +77,7 @@ void OrbitalEscalationServer::Initialize(svanes::ServerContext &context) {
     rotating_square.emplace(
         CreateRotatingSquare(context.world, gameplay_timeline->Get()));
 
+    deletion_boxes = CreateDeletionBoxes(context.world);
     spawn_zones.emplace(context.world);
     CreateJunk(context.world);
     context.network.Listen("*:" + std::to_string(port));
@@ -441,8 +442,8 @@ void OrbitalEscalationServer::RespondToPhysics(
 
     UpdateMissileExplosions(world, contacts);
 
-    // Objects touching the red boxes are removed with the other dead objects.
-    ApplyDeletionBoxes(world);
+    // Objects touching the deletion boxes are removed with other dead objects.
+    ApplyDeletionBoxes(world, deletion_boxes);
 
     // Explosions have finished using the entities' geometry. Now their owners
     // can remove dead objects, including dead missiles still inside launchers.
