@@ -23,7 +23,7 @@
 
 const svanes::TicCount kPauseFlashPeriod = svanes::SecondsToTics(1.0);
 constexpr std::uint8_t kPauseLabelMinimumAlpha = 64;
-constexpr svanes::TicCount kClientFrameTics = 16666;
+constexpr svanes::TicCount kClientFrameTics = 5000; // 1/200 second
 constexpr float kPlanetImpactDamage = 25.0F;
 constexpr float kCollisionAcceleration = 400000.0F;
 
