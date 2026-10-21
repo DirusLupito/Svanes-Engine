@@ -173,6 +173,7 @@ void DoubleTimeGame::ClearLevelEntities(svanes::Registry &world) {
         world.DestroyEntity(entity);
     }
     platform_entities.clear();
+    previous_platform_transforms.clear();
     door_entities.clear();
     for (const auto &[id, entity] : spike_entities) {
         (void)id;
@@ -184,6 +185,14 @@ void DoubleTimeGame::ClearLevelEntities(svanes::Registry &world) {
     }
     spike_entities.clear();
     collectible_entities.clear();
+    for (const svanes::Entity entity : spawn_point_entities) {
+        world.DestroyEntity(entity);
+    }
+    spawn_point_entities.clear();
+    for (const svanes::Entity entity : death_zone_entities) {
+        world.DestroyEntity(entity);
+    }
+    death_zone_entities.clear();
     if (has_character) {
         world.DestroyEntity(character_entity);
         has_character = false;
@@ -217,12 +226,34 @@ void DoubleTimeGame::ActivateTilemap(svanes::Registry &world,
     world.AddComponent<svanes::TileMap>(active_tilemap_entity, tilemap);
     world.AddComponent<svanes::ZOrder>(
         active_tilemap_entity, svanes::ZOrder{kGroundZOrder});
+    const auto &level = area_assets[active_area_index].levels[index];
+    const auto &tilemap_transform =
+        world.GetComponent<svanes::Transform>(active_tilemap_entity);
+    for (const DoubleTimeSpawnPoint &spawn : level.spawn_points) {
+        const svanes::Entity entity = world.CreateEntity();
+        world.AddComponent<svanes::Transform>(entity, svanes::Transform{
+            tilemap_transform.x + (spawn.x + 0.5F) * kDoubleTimeTileSize,
+            tilemap_transform.y + (spawn.y + 0.5F) * kDoubleTimeTileSize, 0.0F});
+        world.AddComponent<DoubleTimeSpawnPointComponent>(
+            entity, DoubleTimeSpawnPointComponent{});
+        spawn_point_entities.push_back(entity);
+    }
+    for (const DoubleTimeLevelArea &zone : level.death_zones) {
+        const svanes::Entity entity = world.CreateEntity();
+        world.AddComponent<svanes::Transform>(entity, svanes::Transform{
+            tilemap_transform.x + (zone.x + zone.width * 0.5F) * kDoubleTimeTileSize,
+            tilemap_transform.y + (zone.y + zone.height * 0.5F) * kDoubleTimeTileSize,
+            0.0F});
+        world.AddComponent<svanes::Collider2D>(entity, svanes::Collider2D{
+            svanes::Rectangle2D{0.0F, 0.0F,
+                                zone.width * kDoubleTimeTileSize,
+                                zone.height * kDoubleTimeTileSize}});
+        death_zone_entities.push_back(entity);
+    }
     const float tilemap_width =
         static_cast<float>(tilemap.columns) * tilemap.tile_width;
     const float tilemap_height =
         static_cast<float>(tilemap.rows) * tilemap.tile_height;
-    const auto &tilemap_transform =
-        world.GetComponent<svanes::Transform>(active_tilemap_entity);
     const float background_width =
         std::max(kDoubleTimeWorldWidth, tilemap_width);
     world.GetComponent<svanes::Transform>(background_entity) =
@@ -486,9 +517,38 @@ void DoubleTimeGame::ApplyServerState(
                     entity, svanes::ZOrder{kPlatformZOrder});
                 platform_entities.emplace(state.entity_id, entity);
             } else {
-                world.GetComponent<svanes::Transform>(found->second) =
-                    state.transform;
+                const svanes::Transform previous =
+                    world.GetComponent<svanes::Transform>(found->second);
+                if constexpr (kDoubleTimeNetworkingStrategy ==
+                              DoubleTimeNetworkingStrategy::ClientPositionAuthoritative) {
+                    if (has_character && local_character_initialized &&
+                        local_velocity_y == 0.0F) {
+                        const svanes::Transform character =
+                            world.GetComponent<svanes::Transform>(character_entity);
+                        const float character_left =
+                            character.x - kCharacterColliderWidth * 0.5F;
+                        const float character_right =
+                            character.x + kCharacterColliderWidth * 0.5F;
+                        const float platform_left =
+                            previous.x - state.width * 0.5F;
+                        const float platform_right =
+                            previous.x + state.width * 0.5F;
+                        const float character_bottom =
+                            character.y + kDoubleTimeCharacterHeight * 0.5F;
+                        const float platform_top = previous.y - state.height * 0.5F;
+                        if (character_right > platform_left &&
+                            character_left < platform_right &&
+                            std::abs(character_bottom - platform_top) < 0.2F) {
+                            auto &carried =
+                                world.GetComponent<svanes::Transform>(character_entity);
+                            carried.x += state.transform.x - previous.x;
+                            carried.y += state.transform.y - previous.y;
+                        }
+                    }
+                }
+                world.GetComponent<svanes::Transform>(found->second) = state.transform;
             }
+            previous_platform_transforms[state.entity_id] = state.transform;
             continue;
         }
 

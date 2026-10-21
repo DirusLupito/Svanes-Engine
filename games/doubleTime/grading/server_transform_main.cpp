@@ -202,6 +202,29 @@ int32_t main(int32_t argc, char **argv) {
         kDoubleTimeWorldHeight * 0.5F);
     world.AddComponent<svanes::Transform>(tilemap_entity, tilemap_transform);
     world.AddComponent<svanes::TileMap>(tilemap_entity, std::move(level.tile_map));
+    std::vector<svanes::Entity> spawn_point_entities;
+    std::vector<svanes::Entity> death_zone_entities;
+    for (const DoubleTimeSpawnPoint &spawn : level.spawn_points) {
+        const svanes::Entity entity = world.CreateEntity();
+        world.AddComponent<svanes::Transform>(entity, svanes::Transform{
+            tilemap_transform.x + (spawn.x + 0.5F) * kDoubleTimeTileSize,
+            tilemap_transform.y + (spawn.y + 0.5F) * kDoubleTimeTileSize, 0.0F});
+        world.AddComponent<DoubleTimeSpawnPointComponent>(
+            entity, DoubleTimeSpawnPointComponent{});
+        spawn_point_entities.push_back(entity);
+    }
+    for (const DoubleTimeLevelArea &zone : level.death_zones) {
+        const svanes::Entity entity = world.CreateEntity();
+        world.AddComponent<svanes::Transform>(entity, svanes::Transform{
+            tilemap_transform.x + (zone.x + zone.width * 0.5F) * kDoubleTimeTileSize,
+            tilemap_transform.y + (zone.y + zone.height * 0.5F) * kDoubleTimeTileSize,
+            0.0F});
+        world.AddComponent<svanes::Collider2D>(entity, svanes::Collider2D{
+            svanes::Rectangle2D{0.0F, 0.0F,
+                                zone.width * kDoubleTimeTileSize,
+                                zone.height * kDoubleTimeTileSize}});
+        death_zone_entities.push_back(entity);
+    }
 
     const float spawn_x = level.spawn_point
         ? tilemap_transform.x + (level.spawn_point->x + 0.5F) * kDoubleTimeTileSize
