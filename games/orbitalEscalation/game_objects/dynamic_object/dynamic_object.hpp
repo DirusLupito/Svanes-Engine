@@ -128,6 +128,15 @@ public:
     std::span<const std::unique_ptr<DynamicObject>> GetAttachments() const;
 
     /**
+     * Transfers ownership of the directly attached objects to the caller.
+     * Their registry components remain unchanged so the caller can rebuild
+     * their attachment relationships.
+     *
+     * @return The objects previously owned as direct attachments.
+     */
+    std::vector<std::unique_ptr<DynamicObject>> ReleaseAttachments();
+
+    /**
      * Detaches one object and transfers its ownership to the caller.
      *
      * @param world The registry containing the objects.

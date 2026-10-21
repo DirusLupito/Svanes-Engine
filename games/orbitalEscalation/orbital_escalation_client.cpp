@@ -212,6 +212,25 @@ void OrbitalEscalationClient::ApplyWorldUpdate(
     planet->GetTransform(world) = update.planet_transform;
     planet->UpdateVisuals(world);
 
+    // Collect the existing attachment trees into one list so their objects can
+    // be kept even if they change parents or become independent in this update.
+    for (std::size_t index = 0; index < root_objects.size(); ++index) {
+        auto attachments = root_objects[index]->ReleaseAttachments();
+        for (auto &attachment : attachments) {
+            root_objects.push_back(std::move(attachment));
+        }
+    }
+
+    // The owners of existing and newly created objects, keyed by their local
+    // entity IDs until ownership is transferred to the new attachment trees.
+    std::unordered_map<svanes::Entity, std::unique_ptr<DynamicObject>> owned;
+    for (auto &object : root_objects) {
+        const auto entity = object->GetEntity();
+        world.RemoveComponent<Attachment>(entity);
+        owned.emplace(entity, std::move(object));
+    }
+    root_objects.clear();
+
     // The server IDs of objects present in this complete world update.
     std::unordered_set<svanes::Entity> present;
 
@@ -223,9 +242,10 @@ void OrbitalEscalationClient::ApplyWorldUpdate(
 
         // Create the object if it does not already exist in the client's world.
         if (!objects.contains(state.entity)) {
-            objects.emplace(state.entity, assets.CreateUnattached(
-                                              world, gameplay_timeline->Get(),
-                                              state.type, state.definition));
+            auto object = assets.CreateUnattached(
+                world, gameplay_timeline->Get(), state.type, state.definition);
+            objects.emplace(state.entity, object.get());
+            owned.emplace(object->GetEntity(), std::move(object));
         }
 
         // And now at this point we know the object exists in the client's
@@ -236,7 +256,6 @@ void OrbitalEscalationClient::ApplyWorldUpdate(
         auto &object = *objects.at(state.entity);
         const auto entity = object.GetEntity();
 
-        object.GetTransform(world) = state.transform;
         world.GetComponent<svanes::Timeline>(entity).SetProgress(
             state.local_tics, 0, svanes::RationalNumber{0});
 
@@ -259,26 +278,37 @@ void OrbitalEscalationClient::ApplyWorldUpdate(
         }
     }
 
-    // Remove objects which are no longer in the server's world. Their owners
-    // also remove the associated visual entities from the registry.
+    // Remove lookup entries for objects which are no longer in the server's
+    // world. Their owners remain in owned and destroy them when it goes out of
+    // scope.
     std::erase_if(objects, [&](const auto &entry) {
         return !present.contains(entry.first);
     });
 
-    // All objects now exist, so translate attachment parent IDs to local
-    // entities. Their world poses already came from the server.
+    // Rebuild the owning attachment vectors and registry relationships using
+    // the server's parent IDs. Objects without parents remain independently
+    // owned by the client.
     for (const auto &state : update.objects) {
         auto &object = *objects.at(state.entity);
         const auto entity = object.GetEntity();
         if (state.attachment) {
-            world.AddComponent<Attachment>(
-                entity,
-                Attachment{objects.at(state.attachment->parent)->GetEntity(),
-                           state.attachment->transform});
+            objects.at(state.attachment->parent)
+                ->AddAttachment(world, std::move(owned.at(entity)),
+                                state.attachment->transform);
         } else {
-            world.RemoveComponent<Attachment>(entity);
+            root_objects.push_back(std::move(owned.at(entity)));
         }
-        object.UpdateVisuals(world);
+    }
+
+    // Attaching objects recalculates their positions. Restore the server's
+    // exact world poses now that the complete attachment trees exist.
+    for (const auto &state : update.objects) {
+        objects.at(state.entity)->GetTransform(world) = state.transform;
+    }
+
+    // Update the complete trees' visuals from their roots.
+    for (const auto &object : root_objects) {
+        object->UpdateVisuals(world);
     }
 
     // Follow this player's living ship. If it has been destroyed, keep the

@@ -10,6 +10,7 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 /**
  * Implements Orbital Escalation's client view and local controls.
@@ -114,9 +115,13 @@ private:
     // The planet displayed in the client's world.
     std::optional<Planet> planet;
 
-    // The displayed gameplay objects, keyed by their server entity IDs. Each
-    // object owns its local entity and visuals; attachments are owned here too.
-    std::unordered_map<svanes::Entity, std::unique_ptr<DynamicObject>> objects;
+    // The displayed gameplay objects, keyed by their server entity IDs.
+    // Ownership belongs to root_objects or another object's attachment vector.
+    std::unordered_map<svanes::Entity, DynamicObject *> objects;
+
+    // The owners of independent gameplay objects. Each object owns its attached
+    // objects, along with its local entity and visuals.
+    std::vector<std::unique_ptr<DynamicObject>> root_objects;
 
     // The timeline controlling the client's frame rate.
     svanes::Timeline client_loop_timeline;

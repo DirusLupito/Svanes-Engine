@@ -87,6 +87,11 @@ DynamicObject::GetAttachments() const {
     return attachments;
 }
 
+std::vector<std::unique_ptr<DynamicObject>>
+DynamicObject::ReleaseAttachments() {
+    return std::exchange(attachments, {});
+}
+
 std::unique_ptr<DynamicObject>
 DynamicObject::Detach(svanes::Registry &world, svanes::Entity child,
                       svanes::Vector2D added_velocity) {
