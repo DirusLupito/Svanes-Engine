@@ -31,6 +31,7 @@ const svanes::TicCount kDashCooldownTics = svanes::SecondsToTics(1.0);
 const svanes::TicCount kFireInterval = svanes::SecondsToTics(0.15);
 const svanes::TicCount kKnockbackLockTics = svanes::SecondsToTics(0.25);
 const svanes::TicCount kInvincibleTics = svanes::SecondsToTics(0.8);
+const svanes::TicCount kRespawnTics = svanes::SecondsToTics(3.0);
 
 /**
  * Subtracts elapsed time from a countdown without unsigned underflow.
@@ -47,7 +48,8 @@ void AdvanceCountdown(svanes::TicCount &remaining,
 
 Goose::Goose(svanes::Registry &world, svanes::Entity clock,
              svanes::Vector2D position)
-    : entity(world.CreateEntity()), fly_time_remaining(kMaxFlyTics) {
+    : entity(world.CreateEntity()), spawn(position), health(GooseMaxHealth),
+      fly_time_remaining(kMaxFlyTics) {
     const svanes::Rectangle2D body{.width = GooseWidth,
                                    .height = GooseHeight};
 
@@ -84,6 +86,16 @@ void Goose::Advance(svanes::Registry &world, const GooseIntent &intent) {
     svanes::Kinematic2D &motion =
         world.GetComponent<svanes::Kinematic2D>(entity);
     motion.acceleration_y = 0.0F;
+
+    if (IsDead()) {
+        motion.velocity_x = 0.0F;
+        state = GooseState::Idle;
+        AdvanceCountdown(respawn_timer, delta_tics);
+        if (respawn_timer == 0) {
+            Respawn(world);
+        }
+        return;
+    }
 
     bool flying = false;
 
@@ -179,16 +191,16 @@ void Goose::ResolveCollisions(svanes::Registry &world) {
         });
 }
 
-void Goose::ApplyKnockback(svanes::Registry &world, svanes::Vector2D direction,
-                           float speed) {
-    if (invincible_timer > 0) {
+void Goose::Hit(svanes::Registry &world, svanes::Vector2D direction,
+                float speed, std::uint32_t damage) {
+    if (IsDead() || invincible_timer > 0) {
         return;
     }
 
     const float length = std::hypot(direction.x, direction.y);
     if (!std::isfinite(length) || length <= 0.0F) {
         throw std::invalid_argument(
-            "Goose::ApplyKnockback requires a finite and nonzero direction.");
+            "Goose::Hit requires a finite and nonzero direction.");
     }
 
     const svanes::Vector2D velocity =
@@ -203,6 +215,43 @@ void Goose::ApplyKnockback(svanes::Registry &world, svanes::Vector2D direction,
     invincible_timer = kInvincibleTics;
     dash_timer = 0;
     grounded = false;
+    health -= std::min(health, damage);
+    if (health == 0) {
+        Die();
+    }
+}
+
+void Goose::Kill() {
+    if (!IsDead()) {
+        Die();
+    }
+}
+
+void Goose::Die() {
+    health = 0;
+    respawn_timer = kRespawnTics;
+}
+
+bool Goose::IsDead() const { return health == 0; }
+
+std::uint32_t Goose::GetHealth() const { return health; }
+
+void Goose::Respawn(svanes::Registry &world) {
+    svanes::Transform &transform = world.GetComponent<svanes::Transform>(entity);
+    transform.x = spawn.x;
+    transform.y = spawn.y;
+    world.GetComponent<svanes::Kinematic2D>(entity) = svanes::Kinematic2D{};
+
+    health = GooseMaxHealth;
+    state = GooseState::Idle;
+    grounded = false;
+    fly_time_remaining = kMaxFlyTics;
+    dash_timer = 0;
+    dash_cooldown = 0;
+    fire_cooldown = 0;
+    knockback_timer = 0;
+    invincible_timer = 0;
+    respawn_timer = 0;
 }
 
 svanes::Entity Goose::GetEntity() const { return entity; }

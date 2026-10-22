@@ -76,7 +76,6 @@ svanes::NetworkMessage EncodePlayerInput(const PlayerInput &input) {
     writer.WriteBool(input.intent.fire);
     WritePosition(writer, input.intent.aim);
     WriteClock(writer, input.clock);
-    writer.WriteBool(input.leaving);
     return writer.Finish();
 }
 
@@ -89,7 +88,6 @@ PlayerInput DecodePlayerInput(const svanes::NetworkMessage &message) {
     input.intent.fire = reader.ReadBool();
     input.intent.aim = ReadPosition(reader);
     input.clock = ReadClock(reader);
-    input.leaving = reader.ReadBool();
     RequireFullyRead(reader);
     return input;
 }
@@ -103,6 +101,7 @@ svanes::NetworkMessage EncodeSnapshot(const Snapshot &snapshot) {
         writer.WriteUint32(goose.client);
         WritePosition(writer, goose.position);
         writer.WriteUint8(static_cast<std::uint8_t>(goose.state));
+        writer.WriteUint32(goose.health);
     }
 
     writer.WriteBool(snapshot.enemy.has_value());
@@ -128,7 +127,8 @@ Snapshot DecodeSnapshot(const svanes::NetworkMessage &message) {
         const svanes::ClientId client = reader.ReadUint32();
         const svanes::Vector2D position = ReadPosition(reader);
         const auto state = static_cast<GooseState>(reader.ReadUint8());
-        snapshot.geese.push_back({client, position, state});
+        const std::uint32_t health = reader.ReadUint32();
+        snapshot.geese.push_back({client, position, state, health});
     }
 
     if (reader.ReadBool()) {

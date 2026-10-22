@@ -64,8 +64,9 @@ std::vector<BulletHit> UpdateBullets(svanes::Registry &world) {
                     world.GetComponent<svanes::Collider2D>(target).geometry,
                     world.GetComponent<svanes::Transform>(target));
                 if (!collisions.empty()) {
-                    hits.push_back(
-                        {target, {motion.velocity_x, motion.velocity_y}});
+                    hits.push_back({target,
+                                    bullet.owner,
+                                    {motion.velocity_x, motion.velocity_y}});
                     struck.push_back(entity);
                     return;
                 }

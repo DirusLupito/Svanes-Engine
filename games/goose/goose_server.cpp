@@ -10,12 +10,12 @@
 #include <svanes/registry.hpp>
 #include <svanes/timeline_system.hpp>
 
-#include <array>
-#include <chrono>
+#include <algorithm>
 #include <cstdint>
 #include <exception>
 #include <iostream>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -23,15 +23,12 @@
 namespace {
 
 constexpr std::uint16_t kPort = 46000;
-constexpr std::chrono::seconds kPlayerTimeout{3};
 
 constexpr float kGravity = 2000.0F;
-constexpr std::array<float, 8> kSpawnX{400.0F,  550.0F,  700.0F,  850.0F,
-                                       1000.0F, 1150.0F, 1300.0F, 1450.0F};
-constexpr float kSpawnY = 700.0F;
 
 constexpr float kBulletKnockbackSpeed = 350.0F;
 constexpr float kEnemyKnockbackSpeed = 550.0F;
+constexpr std::uint32_t kEnemyBulletDamage = 1;
 
 /**
  * One client's goose and what that client last asked for.
@@ -42,18 +39,16 @@ constexpr float kEnemyKnockbackSpeed = 550.0F;
  *   replaced. Its dash is kept until a step uses it, even if later messages
  *   carry no dash.
  * - clock: How the client last asked the world's clock to run.
- * - last_heard: When the client's latest input arrived.
  */
 struct Player {
     Goose goose;
     GooseIntent intent;
     ClockSetting clock;
-    std::chrono::steady_clock::time_point last_heard;
 };
 
 /**
  * The authoritative goose world. Every client that sends input has a goose,
- * created by its first input and removed once it goes silent. After every step,
+ * created by its first input and removed once the client disconnects. After every step,
  * each player is sent a snapshot of the world.
  *
  * Everything that moves follows one world clock. While exactly one player is
@@ -72,6 +67,7 @@ public:
         clock = context.world.CreateEntity();
         context.world.AddComponent<svanes::Timeline>(clock);
         CreateArena(context.world);
+        CreateSpawnPoints(context.world);
         enemy.emplace(context.world, clock);
 
         context.network.Listen("*:" + std::to_string(kPort));
@@ -84,19 +80,18 @@ public:
         return {true, {}};
     }
 
-    void Update(const svanes::ServerUpdateContext &context) override {
-        const auto now = std::chrono::steady_clock::now();
+    void HandleDisconnect(svanes::Registry &world,
+                          svanes::ClientId client) override {
+        if (players.contains(client)) {
+            RemovePlayer(world, client);
+        }
+        std::cout << "Player " << client << " left.\n";
+    }
 
+    void Update(const svanes::ServerUpdateContext &context) override {
         for (const svanes::ClientInput &received :
              context.network.PollInputs()) {
             const PlayerInput input = DecodePlayerInput(received.message);
-            if (input.leaving) {
-                if (players.contains(received.client)) {
-                    RemovePlayer(context.world, received.client);
-                    std::cout << "Player " << received.client << " left.\n";
-                }
-                continue;
-            }
             Player &player = FindOrSpawn(context.world, received.client);
 
             const float pending_dash = player.intent.dash;
@@ -105,18 +100,6 @@ public:
                 player.intent.dash = pending_dash;
             }
             player.clock = input.clock;
-            player.last_heard = now;
-        }
-
-        std::vector<svanes::ClientId> silent;
-        for (const auto &[client, player] : players) {
-            if (now - player.last_heard > kPlayerTimeout) {
-                silent.push_back(client);
-            }
-        }
-        for (const svanes::ClientId client : silent) {
-            RemovePlayer(context.world, client);
-            std::cout << "Player " << client << " timed out.\n";
         }
 
         clock_setting = ClockSetting{};
@@ -147,10 +130,13 @@ public:
             if (hit.target == enemy->GetEntity()) {
                 enemy->Hit(world);
             }
+
+            const std::uint32_t damage =
+                hit.owner == enemy->GetEntity() ? kEnemyBulletDamage : 0;
             for (auto &[client, player] : players) {
                 if (hit.target == player.goose.GetEntity()) {
-                    player.goose.ApplyKnockback(world, hit.direction,
-                                                kBulletKnockbackSpeed);
+                    player.goose.Hit(world, hit.direction,
+                                     kBulletKnockbackSpeed, damage);
                 }
             }
         }
@@ -158,6 +144,8 @@ public:
         if (enemy->IsAlive()) {
             KnockBackGeeseTouchingEnemy(world);
         }
+
+        KillGeeseInDeathZones(world);
 
         const svanes::NetworkMessage snapshot =
             EncodeSnapshot(TakeSnapshot(world));
@@ -171,6 +159,7 @@ private:
      * @param world The registry to spawn a goose in.
      * @param client The client an input arrived from.
      * @return The client's player, spawning its goose if it has none.
+     * @throws std::logic_error if the world has no spawn points.
      */
     Player &FindOrSpawn(svanes::Registry &world, svanes::ClientId client) {
         const auto found = players.find(client);
@@ -178,9 +167,20 @@ private:
             return found->second;
         }
 
-        const svanes::Vector2D spawn{kSpawnX[client % kSpawnX.size()], kSpawnY};
+        std::vector<svanes::Vector2D> spawns;
+        world.ForEach<SpawnPoint, svanes::Transform>(
+            [&](svanes::Entity, const SpawnPoint &,
+                const svanes::Transform &transform) {
+                spawns.push_back({transform.x, transform.y});
+            });
+        if (spawns.empty()) {
+            throw std::logic_error("The goose server has no spawn points.");
+        }
+        std::ranges::sort(spawns, {}, &svanes::Vector2D::x);
+
+        const svanes::Vector2D spawn = spawns[(client - 1) % spawns.size()];
         std::cout << "Player " << client << " joined.\n";
-        const Player player{Goose(world, clock, spawn), {}, {}, {}};
+        const Player player{Goose(world, clock, spawn), {}, {}};
         return players.emplace(client, player).first->second;
     }
 
@@ -210,10 +210,35 @@ private:
                 world.GetComponent<svanes::Collider2D>(enemy_entity).geometry,
                 world.GetComponent<svanes::Transform>(enemy_entity));
             if (!contacts.empty()) {
-                player.goose.ApplyKnockback(world, contacts.front().normal,
-                                            kEnemyKnockbackSpeed);
+                player.goose.Hit(world, contacts.front().normal,
+                                 kEnemyKnockbackSpeed, 0);
             }
         }
+    }
+
+    /**
+     * Kills every goose overlapping a death zone.
+     *
+     * @param world The registry containing the geese and the death zones.
+     */
+    void KillGeeseInDeathZones(svanes::Registry &world) {
+        world.ForEach<DeathZone, svanes::Transform, svanes::Collider2D>(
+            [&](svanes::Entity, const DeathZone &,
+                const svanes::Transform &zone_transform,
+                const svanes::Collider2D &zone_collider) {
+                for (auto &[client, player] : players) {
+                    const svanes::Entity goose_entity =
+                        player.goose.GetEntity();
+                    const auto contacts = svanes::DetectCollisions(
+                        world.GetComponent<svanes::Collider2D>(goose_entity)
+                            .geometry,
+                        world.GetComponent<svanes::Transform>(goose_entity),
+                        zone_collider.geometry, zone_transform);
+                    if (!contacts.empty()) {
+                        player.goose.Kill();
+                    }
+                }
+            });
     }
 
     /**
@@ -227,8 +252,10 @@ private:
         for (const auto &[client, player] : players) {
             const svanes::Transform &transform =
                 world.GetComponent<svanes::Transform>(player.goose.GetEntity());
-            snapshot.geese.push_back(
-                {client, {transform.x, transform.y}, player.goose.GetState()});
+            snapshot.geese.push_back({client,
+                                      {transform.x, transform.y},
+                                      player.goose.GetState(),
+                                      player.goose.GetHealth()});
         }
 
         if (enemy->IsAlive()) {

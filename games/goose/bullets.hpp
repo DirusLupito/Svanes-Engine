@@ -31,11 +31,13 @@ struct Bullet {
  *
  * FIELDS:
  * - target: The entity the bullet struck.
+ * - owner: The entity that fired the bullet.
  * - direction: The bullet's velocity at the moment of impact, so the target
  *   can be pushed along the bullet's line of travel.
  */
 struct BulletHit {
     svanes::Entity target;
+    svanes::Entity owner;
     svanes::Vector2D direction;
 };
 

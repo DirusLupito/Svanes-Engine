@@ -31,8 +31,14 @@
 
 namespace {
 
-// how much larger than the view the sky is drawn, so its edges stay offscreen
+// how much larger than the view the sky and death tint are drawn, so their edges
+// stay offscreen
 constexpr float kSkyMargin = 1.5F;
+
+// drawn over the world while the player's goose is dead, but under the pause menu
+constexpr svanes::Color kDeathTintColor{
+    .red = 90, .green = 90, .blue = 90, .alpha = 150};
+constexpr std::int32_t kDeathTintZ = 500;
 
 // where in the window the goose is held, as a fraction of the output size, placing
 // it centered horizontally and below center vertically to show more of what is ahead
@@ -47,10 +53,15 @@ constexpr double kFlySecondsPerFrame = 0.06;
 
 constexpr svanes::Color kEnemyColor{200, 60, 60, 255};
 constexpr svanes::Color kGooseBulletColor{255, 230, 120, 255};
+
+// the health bar spans the goose's width and floats just above its head
+constexpr float kHealthBarHeight = 5.0F;
+constexpr float kHealthBarGap = 6.0F;
+constexpr svanes::Color kHealthColor{.red = 60, .green = 200, .blue = 60};
+constexpr svanes::Color kMissingHealthColor{.red = 200, .green = 40, .blue = 40};
 constexpr svanes::Color kEnemyBulletColor{255, 90, 90, 255};
 
 const svanes::TicCount kDoubleTapTics = svanes::SecondsToTics(0.25);
-const svanes::TicCount kServerTimeout = svanes::SecondsToTics(3.0);
 
 /**
  * Subtracts elapsed time from a countdown without unsigned underflow.
@@ -88,11 +99,60 @@ bool CompletesDoubleTap(bool pressed, svanes::TicCount &window) {
  * FIELDS:
  * - entity: The entity drawing it.
  * - state: The animation its sprite is set up for.
+ * - health_bar: The entity drawing the left part of its health bar, sized to
+ *   the health it has.
+ * - missing_health_bar: The entity drawing the right part of its health bar,
+ *   sized to the health it has lost.
  */
 struct DrawnGoose {
     svanes::Entity entity;
     GooseState state;
+    svanes::Entity health_bar;
+    svanes::Entity missing_health_bar;
 };
+
+/**
+ * Moves and resizes one part of a health bar.
+ *
+ * @param world The registry holding the part.
+ * @param entity The part's entity.
+ * @param center_x The world x position of the part's center.
+ * @param center_y The world y position of the part's center.
+ * @param width The part's width.
+ */
+void PlaceHealthBarPart(svanes::Registry &world, svanes::Entity entity,
+                        float center_x, float center_y, float width) {
+    svanes::Transform &transform = world.GetComponent<svanes::Transform>(entity);
+    transform.x = center_x;
+    transform.y = center_y;
+    std::get<svanes::Rectangle2D>(
+        world.GetComponent<svanes::SolidShape>(entity).geometry)
+        .width = width;
+}
+
+/**
+ * Centers a goose's health bar above it, split between the health it has and
+ * the health it has lost.
+ *
+ * @param world The registry holding the goose's bar.
+ * @param goose The goose the bar belongs to.
+ * @param position The goose's world position.
+ * @param health The goose's health, from zero up to GooseMaxHealth.
+ */
+void PlaceHealthBar(svanes::Registry &world, const DrawnGoose &goose,
+                    svanes::Vector2D position, std::uint32_t health) {
+    const float filled = GooseWidth * static_cast<float>(health) /
+                         static_cast<float>(GooseMaxHealth);
+    const float missing = GooseWidth - filled;
+    const float left = position.x - GooseWidth * 0.5F;
+    const float center_y = position.y - GooseHeight * 0.5F - kHealthBarGap -
+                           kHealthBarHeight * 0.5F;
+
+    PlaceHealthBarPart(world, goose.health_bar, left + filled * 0.5F, center_y,
+                       filled);
+    PlaceHealthBarPart(world, goose.missing_health_bar,
+                       left + filled + missing * 0.5F, center_y, missing);
+}
 
 /**
  * The goose game's window. It sends the server what the player wants each
@@ -119,10 +179,21 @@ public:
         // drawn behind everything else, and resized to cover the view each frame in Update
         world.AddComponent<svanes::ZOrder>(background, svanes::ZOrder{-100});
 
+        death_tint = world.CreateEntity();
+        world.AddComponent<svanes::Transform>(death_tint);
+        svanes::Color hidden_tint = kDeathTintColor;
+        hidden_tint.alpha = 0;
+        world.AddComponent<svanes::SolidShape>(
+            death_tint, svanes::SolidShape{.color = hidden_tint,
+                                           .geometry = svanes::Rectangle2D{}});
+        world.AddComponent<svanes::ZOrder>(death_tint,
+                                           svanes::ZOrder{kDeathTintZ});
+
         clock = world.CreateEntity();
         world.AddComponent<svanes::Timeline>(clock);
 
         CreateArena(world);
+        CreateSpawnPoints(world);
         CreateOrb(context);
 
         enemy = world.CreateEntity();
@@ -159,19 +230,18 @@ public:
     }
 
     /**
-     * @throws std::runtime_error if the server has sent nothing for too long.
+     * @throws std::runtime_error always, since the goose game cannot run
+     * without its server.
      */
+    void HandleDisconnect() override {
+        throw std::runtime_error("Lost the goose server at " + server_address +
+                                 ".");
+    }
+
     void Update(const svanes::ClientFrameContext &frame) override {
         const auto snapshots = frame.network.PollMessages();
         if (!snapshots.empty()) {
             ApplySnapshot(frame.world, DecodeSnapshot(snapshots.back()));
-            silent_tics = 0;
-        } else if (frame.network.IsConnected()) {
-            silent_tics += frame.real_delta_tics;
-            if (silent_tics > kServerTimeout) {
-                throw std::runtime_error("Lost the goose server at " +
-                                         server_address + ".");
-            }
         }
 
         svanes::AdvanceTimelines(frame.world, frame.real_delta_tics);
@@ -182,8 +252,7 @@ public:
             menu->ResetSpeed();
         }
         menu->HandleInput(frame, alone);
-        should_quit = should_quit || menu->TakeQuitRequest() ||
-                      frame.input.WasCloseRequested();
+        should_quit = should_quit || menu->TakeQuitRequest();
 
         // TASK 6, scaling: Tab switches the camera between the two scale modes.
         // Constant draws everything at its literal pixel size, so resizing the window
@@ -196,10 +265,13 @@ public:
                     : svanes::ScaleMode::Constant;
         }
 
+        if (should_quit && frame.network.IsConnected()) {
+            frame.network.Disconnect();
+        }
+
         const PlayerInput input{
             ReadIntent(frame),
-            ClockSetting{.speed = menu->Speed(), .paused = menu->IsOpen()},
-            should_quit};
+            ClockSetting{.speed = menu->Speed(), .paused = menu->IsOpen()}};
         if (frame.network.IsConnected()) {
             frame.network.Send(EncodePlayerInput(input));
         }
@@ -335,10 +407,17 @@ private:
                 ShowState(world, drawn.entity, goose.state);
                 drawn.state = goose.state;
             }
+            PlaceHealthBar(world, drawn, goose.position, goose.health);
+            if (goose.client == player) {
+                world.GetComponent<svanes::SolidShape>(death_tint).color.alpha =
+                    goose.health == 0 ? kDeathTintColor.alpha : 0;
+            }
             geese.emplace(goose.client, drawn);
         }
         for (const auto &[client, departed] : remaining) {
             world.DestroyEntity(departed.entity);
+            world.DestroyEntity(departed.health_bar);
+            world.DestroyEntity(departed.missing_health_bar);
         }
 
         if (snapshot.enemy) {
@@ -372,7 +451,7 @@ private:
 
     /**
      * @param world The registry to create it in.
-     * @return A newly drawn goose, standing idle.
+     * @return A newly drawn goose, standing idle, with an unplaced health bar.
      */
     DrawnGoose CreateGoose(svanes::Registry &world) {
         const svanes::Entity entity = world.CreateEntity();
@@ -383,7 +462,25 @@ private:
                            .geometry = svanes::Rectangle2D{
                                .width = GooseWidth, .height = GooseHeight}});
         world.AddComponent<svanes::Timeline>(entity, svanes::Timeline{clock});
-        return {entity, GooseState::Idle};
+        return {entity, GooseState::Idle,
+                CreateHealthBarPart(world, kHealthColor),
+                CreateHealthBarPart(world, kMissingHealthColor)};
+    }
+
+    /**
+     * @param world The registry to create it in.
+     * @param color The color to draw it in.
+     * @return A part of a health bar, placed by PlaceHealthBar.
+     */
+    svanes::Entity CreateHealthBarPart(svanes::Registry &world,
+                                       svanes::Color color) {
+        const svanes::Entity entity = world.CreateEntity();
+        world.AddComponent<svanes::Transform>(entity);
+        world.AddComponent<svanes::SolidShape>(
+            entity, svanes::SolidShape{.color = color,
+                                       .geometry = svanes::Rectangle2D{
+                                           .height = kHealthBarHeight}});
+        return entity;
     }
 
     /**
@@ -422,7 +519,7 @@ private:
 
     /**
      * Keeps the camera on the player's goose, once it exists, and sizes the
-     * sky to the view.
+     * sky and death tint to the view.
      *
      * @param frame The frame's world and camera.
      */
@@ -447,15 +544,17 @@ private:
              static_cast<float>(frame.output_width),
              static_cast<float>(frame.output_height)});
 
-        svanes::Transform &sky =
-            frame.world.GetComponent<svanes::Transform>(background);
-        sky.x = view.x;
-        sky.y = view.y;
+        for (const svanes::Entity cover : {background, death_tint}) {
+            svanes::Transform &transform =
+                frame.world.GetComponent<svanes::Transform>(cover);
+            transform.x = view.x;
+            transform.y = view.y;
 
-        svanes::Rectangle2D &sky_body = std::get<svanes::Rectangle2D>(
-            frame.world.GetComponent<svanes::SolidShape>(background).geometry);
-        sky_body.width = view.width * kSkyMargin;
-        sky_body.height = view.height * kSkyMargin;
+            svanes::Rectangle2D &body = std::get<svanes::Rectangle2D>(
+                frame.world.GetComponent<svanes::SolidShape>(cover).geometry);
+            body.width = view.width * kSkyMargin;
+            body.height = view.height * kSkyMargin;
+        }
     }
 
     std::string server_address;
@@ -463,7 +562,6 @@ private:
     std::optional<PauseMenu> menu;
     bool should_quit = false;
 
-    svanes::TicCount silent_tics = 0;
     svanes::TicCount left_tap_window = 0;
     svanes::TicCount right_tap_window = 0;
 
@@ -474,6 +572,10 @@ private:
 
     // the sky, kept centered on the camera and sized to cover the view every frame
     svanes::Entity background = 0;
+
+    // the gray shown over the view while the player's goose is dead, kept covering
+    // the view the same way as the sky
+    svanes::Entity death_tint = 0;
 
     svanes::Entity enemy = 0;
     std::unordered_map<svanes::ClientId, DrawnGoose> geese;

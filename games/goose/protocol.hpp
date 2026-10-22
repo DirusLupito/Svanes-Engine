@@ -53,13 +53,10 @@ struct ClockSetting {
  * - intent: What the player wants their goose to do.
  * - clock: How the player wants the world's clock to run. The server follows
  *   it only while this player is alone.
- * - leaving: Whether the player is quitting. The server removes their goose
- *   as soon as it reads this, instead of waiting for them to time out.
  */
 struct PlayerInput {
     GooseIntent intent;
     ClockSetting clock;
-    bool leaving = false;
 };
 
 /**
@@ -69,11 +66,13 @@ struct PlayerInput {
  * - client: The client controlling it.
  * - position: Its world position.
  * - state: Which animation it is showing.
+ * - health: Its health, from zero up to GooseMaxHealth.
  */
 struct SnapshotGoose {
     svanes::ClientId client;
     svanes::Vector2D position;
     GooseState state;
+    std::uint32_t health;
 };
 
 /**
