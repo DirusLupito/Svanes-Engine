@@ -5,6 +5,7 @@
 #include <svanes/timeline_system.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <utility>
 
 const svanes::TicCount kCollisionFlashLifetime = svanes::SecondsToTics(0.5);
