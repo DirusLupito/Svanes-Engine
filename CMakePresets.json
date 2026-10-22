@@ -2,7 +2,7 @@
   "version": 3,
   "cmakeMinimumRequired": {
     "major": 3,
-    "minor": 25,
+    "minor": 26,
     "patch": 0
   },
   "configurePresets": [
@@ -67,10 +67,10 @@
       "configuration": "Debug"
     },
     {
-      "name": "windows-release",
-      "displayName": "Release",
+      "name": "windows-relwithdebinfo",
+      "displayName": "RelWithDebInfo",
       "configurePreset": "windows-msvc",
-      "configuration": "Release"
+      "configuration": "RelWithDebInfo"
     },
     {
       "name": "windows-vs2022-debug",
@@ -79,10 +79,10 @@
       "configuration": "Debug"
     },
     {
-      "name": "windows-vs2022-release",
-      "displayName": "Visual Studio 2022 Release",
+      "name": "windows-vs2022-relwithdebinfo",
+      "displayName": "Visual Studio 2022 RelWithDebInfo",
       "configurePreset": "windows-vs2022",
-      "configuration": "Release"
+      "configuration": "RelWithDebInfo"
     },
     {
       "name": "linux-debug",
@@ -91,10 +91,10 @@
       "configuration": "Debug"
     },
     {
-      "name": "linux-release",
-      "displayName": "Release",
+      "name": "linux-relwithdebinfo",
+      "displayName": "RelWithDebInfo",
       "configurePreset": "linux-gcc",
-      "configuration": "Release"
+      "configuration": "RelWithDebInfo"
     },
     {
       "name": "macos-debug",
@@ -103,10 +103,10 @@
       "configuration": "Debug"
     },
     {
-      "name": "macos-release",
-      "displayName": "Release",
+      "name": "macos-relwithdebinfo",
+      "displayName": "RelWithDebInfo",
       "configurePreset": "macos-clang",
-      "configuration": "Release"
+      "configuration": "RelWithDebInfo"
     }
   ]
 }

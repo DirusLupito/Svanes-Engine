@@ -67,7 +67,7 @@ PropulsionControl ReadShipControls(const svanes::InputManager &input,
 
     const float angular_velocity =
         motion.angular_velocity * svanes::TicsPerSecond;
-    
+
     constexpr float response = 6.0F;
     const float acceleration =
         response * response * error - 2.0F * response * angular_velocity;

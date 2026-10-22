@@ -1,302 +1,398 @@
-#include "goose_session.hpp"
-#include "goose_simulation.hpp"
-#include "server_protocol.hpp"
+#include "arena.hpp"
+#include "bullets.hpp"
+#include "enemy.hpp"
+#include "goose.hpp"
+#include "minions.hpp"
+#include "protocol.hpp"
 
-#include <svanes/network/network_server.hpp>
-#include <svanes/network/server_runtime.hpp>
-#include <svanes/network/udp_msg_pipe.hpp>
+#include <svanes/collision_system.hpp>
+#include <svanes/network/clientserver/IServer.hpp>
+#include <svanes/network/clientserver/network_server.hpp>
 #include <svanes/registry.hpp>
 #include <svanes/timeline_system.hpp>
 
 #include <algorithm>
-#include <array>
-#include <chrono>
-#include <condition_variable>
 #include <cstdint>
 #include <exception>
 #include <iostream>
-#include <memory>
-#include <mutex>
 #include <optional>
-#include <stop_token>
-#include <thread>
-#include <utility>
+#include <stdexcept>
+#include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace {
 
+constexpr std::uint16_t kPort = 46000;
+
+constexpr float kGravity = 2000.0F;
+
+constexpr float kBulletKnockbackSpeed = 350.0F;
+constexpr float kEnemyKnockbackSpeed = 550.0F;
+constexpr std::uint32_t kEnemyBulletDamage = 1;
+constexpr std::uint32_t kPlayerBulletDamage = 1;
+constexpr std::uint32_t kMinionDamage = 1;
+constexpr float kMinionKnockbackSpeed = 400.0F;
+
 /**
- * One client's place on the server, with its own port and network thread.
+ * One client's goose and what that client last asked for.
+ *
  * FIELDS:
- * - client: The id of the client holding the slot, or empty while it is free.
- * - peer: The player that client controls.
- * - intent: The latest intent the client sent, used for every step until replaced.
- * - pending_dash: A dash the client sent that no step has used yet.
- * - clock: The latest clock request the client sent.
- * - last_heard: When the client was last heard from.
+ * - goose: The client's goose.
+ * - intent: The latest intent the client sent, used for every step until
+ *   replaced. Its dash is kept until a step uses it, even if later messages
+ *   carry no dash.
+ * - clock: How the client last asked the world's clock to run.
  */
-struct Slot {
-    std::optional<svanes::ClientId> client;
-    svanes::PeerId peer{};
-    GooseIntent intent{};
-    float pending_dash = 0.0F;
-    ClockRequest clock{};
-    std::chrono::steady_clock::time_point last_heard{};
+struct Player {
+    Goose goose;
+    GooseIntent intent;
+    ClockSetting clock;
 };
 
 /**
- * @return One factory per slot, each opening a UDP pipe on that slot's port.
+ * The authoritative goose world. Every client that sends input has a goose,
+ * created by its first input and removed once the client disconnects. After
+ * every step, each player is sent a snapshot of the world.
+ *
+ * Everything that moves follows one world clock. While exactly one player is
+ * in the world, that player's pause and speed settings drive the clock;
+ * otherwise it runs at 1x, so no player can pause or change the pace of the
+ * world for anyone else.
+ *
+ * Whether the enemy drops minions is shared differently: any player can turn
+ * it on or off for everyone.
  */
-std::vector<svanes::NetworkServer::PipeFactory> SlotPipes()
-{
-    std::vector<svanes::NetworkServer::PipeFactory> factories;
-    for (std::uint32_t slot = 0; slot < GooseServerSlots; ++slot) {
-        factories.push_back([slot] {
-            return std::make_unique<svanes::UdpMsgPipe>(static_cast<std::uint16_t>(GooseServerFirstPort + slot));
-        });
-    }
-    return factories;
-}
-
-/**
- * Sends finished worlds to clients on its own thread, so encoding and queueing
- * snapshots runs alongside the simulation instead of after it. The simulation
- * thread publishes each world it finishes; a world the thread has not yet sent
- * is replaced by a newer one, since clients only need the latest.
- */
-class SnapshotBroadcaster final {
+class GooseServer final : public svanes::IServer {
 public:
-    /**
-     * Starts the broadcasting thread.
-     * @param network The server whose slots the snapshots are sent through.
-     */
-    explicit SnapshotBroadcaster(svanes::NetworkServer& network)
-        : network(network), thread([this](std::stop_token stop) { Run(stop); })
-    {
+    void Initialize(svanes::ServerContext &context) override {
+        // the world gravity vector, applied by the engine every frame to any entity
+        // holding both Kinematic2D and Gravity. Positive y is down
+        context.gravity = {0.0F,
+                           svanes::PerSecondSquaredToPerTicSquared(kGravity)};
+
+        clock = context.world.CreateEntity();
+        context.world.AddComponent<svanes::Timeline>(clock);
+        CreateArena(context.world);
+        CreateSpawnPoints(context.world);
+        CreateDeathZones(context.world);
+        enemy.emplace(context.world, clock);
+
+        context.network.Listen("*:" + std::to_string(kPort));
+        std::cout << "Goose server listening on UDP port " << kPort << ".\n";
     }
 
-    /**
-     * Hands a finished world to the broadcasting thread.
-     * @param recipients The slots of every connected client.
-     * @param roster Every player in ascending id order.
-     * @param world Bytes from GooseSimulation::Save.
-     */
-    void Publish(std::vector<std::size_t> recipients, std::vector<svanes::PeerId> roster, svanes::NetworkMessage world)
-    {
-        {
-            std::lock_guard lock(mutex);
-            pending = World{std::move(recipients), std::move(roster), std::move(world)};
+    svanes::JoinResponse
+    HandleJoinRequest(const svanes::ServerJoinContext &context) override {
+        std::cout << "Client " << context.client << " connected.\n";
+        return {true, {}};
+    }
+
+    void HandleDisconnect(svanes::Registry &world,
+                          svanes::ClientId client) override {
+        if (players.contains(client)) {
+            RemovePlayer(world, client);
         }
-        ready.notify_one();
+        std::cout << "Player " << client << " left.\n";
+    }
+
+    void Update(const svanes::ServerUpdateContext &context) override {
+        for (const svanes::ClientInput &received :
+             context.network.PollInputs()) {
+            const PlayerInput input = DecodePlayerInput(received.message);
+            Player &player = FindOrSpawn(context.world, received.client);
+
+            const float pending_dash = player.intent.dash;
+            player.intent = input.intent;
+            if (player.intent.dash == 0.0F) {
+                player.intent.dash = pending_dash;
+            }
+            player.clock = input.clock;
+            if (input.minion_spawning) {
+                minion_spawning = *input.minion_spawning;
+            }
+        }
+
+        clock_setting = ClockSetting{};
+        if (players.size() == 1) {
+            clock_setting = players.begin()->second.clock;
+        }
+
+        svanes::Timeline &timeline =
+            context.world.GetComponent<svanes::Timeline>(clock);
+        timeline.SetTicSize(TicSize(clock_setting.speed));
+        if (clock_setting.paused) {
+            timeline.Pause();
+        } else {
+            timeline.Unpause();
+        }
+    }
+
+    void PhysicsUpdate(const svanes::ServerPhysicsContext &context) override {
+        svanes::Registry &world = context.world;
+
+        for (auto &[client, player] : players) {
+            player.goose.Advance(world, player.intent);
+            player.intent.dash = 0.0F;
+        }
+        enemy->Advance(world, minion_spawning);
+
+        std::vector<svanes::Vector2D> living_geese;
+        for (const auto &[client, player] : players) {
+            if (!player.goose.IsDead()) {
+                const svanes::Transform &transform =
+                    world.GetComponent<svanes::Transform>(
+                        player.goose.GetEntity());
+                living_geese.push_back({transform.x, transform.y});
+            }
+        }
+        AdvanceMinions(world, living_geese);
+
+        for (const BulletHit &hit : UpdateBullets(world)) {
+            if (hit.target == enemy->GetEntity()) {
+                enemy->Hit(world);
+            }
+
+            const bool from_enemy = hit.owner == enemy->GetEntity();
+            const std::uint32_t damage =
+                from_enemy ? kEnemyBulletDamage : kPlayerBulletDamage;
+            const HitSource source =
+                from_enemy ? HitSource::Enemy : HitSource::Player;
+            if (world.HasComponent<Minion>(hit.target)) {
+                DamageMinion(world, hit.target, damage);
+            }
+            for (auto &[client, player] : players) {
+                if (hit.target == player.goose.GetEntity()) {
+                    player.goose.Hit(world, hit.direction,
+                                     kBulletKnockbackSpeed, damage, source);
+                }
+            }
+        }
+
+        if (enemy->IsAlive()) {
+            KnockBackGeeseTouchingEnemy(world);
+        }
+        HurtGeeseTouchingMinions(world);
+
+        ApplyDeathZones(world);
+
+        const svanes::NetworkMessage snapshot =
+            EncodeSnapshot(TakeSnapshot(world));
+        for (const auto &[client, player] : players) {
+            context.network.Send(client, snapshot);
+        }
     }
 
 private:
     /**
-     * A finished world waiting to be sent.
-     * FIELDS:
-     * - recipients: The slots of every connected client.
-     * - roster: Every player in ascending id order.
-     * - world: Bytes from GooseSimulation::Save.
+     * @param world The registry to spawn a goose in.
+     * @param client The client an input arrived from.
+     * @return The client's player, spawning its goose if it has none.
+     * @throws std::logic_error if the world has no spawn points.
      */
-    struct World {
-        std::vector<std::size_t> recipients;
-        std::vector<svanes::PeerId> roster;
-        svanes::NetworkMessage world;
-    };
+    Player &FindOrSpawn(svanes::Registry &world, svanes::ClientId client) {
+        const auto found = players.find(client);
+        if (found != players.end()) {
+            return found->second;
+        }
+
+        std::vector<svanes::Vector2D> spawns;
+        world.ForEach<SpawnPoint, svanes::Transform>(
+            [&](svanes::Entity, const SpawnPoint &,
+                const svanes::Transform &transform) {
+                spawns.push_back({transform.x, transform.y});
+            });
+        if (spawns.empty()) {
+            throw std::logic_error("The goose server has no spawn points.");
+        }
+        std::ranges::sort(spawns, {}, &svanes::Vector2D::x);
+
+        const svanes::Vector2D spawn = spawns[(client - 1) % spawns.size()];
+        std::cout << "Player " << client << " joined.\n";
+        const Player player{Goose(world, clock, spawn), {}, {}};
+        return players.emplace(client, player).first->second;
+    }
 
     /**
-     * Waits for each published world, encodes it, and sends it to its recipients.
-     * @param stop Ends the loop when the server shuts down.
+     * Destroys a client's goose and forgets the client.
+     *
+     * @param world The registry containing the goose.
+     * @param client A client that currently has a goose.
      */
-    void Run(std::stop_token stop)
-    {
-        while (true) {
-            World next;
-            {
-                std::unique_lock lock(mutex);
-                if (!ready.wait(lock, stop, [this] { return pending.has_value(); })) {
+    void RemovePlayer(svanes::Registry &world, svanes::ClientId client) {
+        world.DestroyEntity(players.at(client).goose.GetEntity());
+        players.erase(client);
+    }
+
+    /**
+     * Throws every goose overlapping the living enemy away from it.
+     *
+     * @param world The registry containing the geese and the enemy.
+     */
+    void KnockBackGeeseTouchingEnemy(svanes::Registry &world) {
+        const svanes::Entity enemy_entity = enemy->GetEntity();
+        for (auto &[client, player] : players) {
+            const svanes::Entity goose_entity = player.goose.GetEntity();
+            const auto contacts = svanes::DetectCollisions(
+                world.GetComponent<svanes::Collider2D>(goose_entity).geometry,
+                world.GetComponent<svanes::Transform>(goose_entity),
+                world.GetComponent<svanes::Collider2D>(enemy_entity).geometry,
+                world.GetComponent<svanes::Transform>(enemy_entity));
+            if (!contacts.empty()) {
+                player.goose.Hit(world, contacts.front().normal,
+                                 kEnemyKnockbackSpeed, 0, HitSource::Enemy);
+            }
+        }
+    }
+
+    /**
+     * Kills every goose and destroys every minion overlapping a death zone.
+     *
+     * @param world The registry containing the geese, minions, and death
+     * zones.
+     */
+    void ApplyDeathZones(svanes::Registry &world) {
+        std::vector<svanes::Entity> doomed_minions;
+        world.ForEach<DeathZone, svanes::Transform, svanes::Collider2D>(
+            [&](svanes::Entity, const DeathZone &,
+                const svanes::Transform &zone_transform,
+                const svanes::Collider2D &zone_collider) {
+                for (auto &[client, player] : players) {
+                    if (Touches(world, player.goose.GetEntity(),
+                                zone_transform, zone_collider)) {
+                        player.goose.Kill();
+                    }
+                }
+
+                world.ForEach<Minion>(
+                    [&](svanes::Entity minion, const Minion &) {
+                        if (Touches(world, minion, zone_transform,
+                                    zone_collider)) {
+                            doomed_minions.push_back(minion);
+                        }
+                    });
+            });
+
+        for (const svanes::Entity minion : doomed_minions) {
+            if (world.HasComponent<Minion>(minion)) {
+                world.DestroyEntity(minion);
+            }
+        }
+    }
+
+    /**
+     * Hurts every living goose touching a melee minion, throwing it away from
+     * the minion.
+     *
+     * @param world The registry containing the geese and the minions.
+     */
+    void HurtGeeseTouchingMinions(svanes::Registry &world) {
+        world.ForEach<Minion, svanes::Transform, svanes::Collider2D>(
+            [&](svanes::Entity, const Minion &minion,
+                const svanes::Transform &minion_transform,
+                const svanes::Collider2D &minion_collider) {
+                if (minion.kind != MinionKind::Melee) {
                     return;
                 }
-                next = std::move(*pending);
-                pending.reset();
-            }
-            const svanes::NetworkMessage snapshot = EncodeSnapshot(next.roster, next.world);
-            for (const std::size_t slot : next.recipients) {
-                network.Send(slot, snapshot);
-            }
-        }
-    }
-
-    svanes::NetworkServer& network;
-    std::mutex mutex;
-    std::condition_variable_any ready;
-    std::optional<World> pending;
-    std::jthread thread;
-};
-
-/**
- * The authoritative goose world. Clients send input to their slots; every
- * step the server advances the one simulation everyone shares and hands the
- * result to its broadcaster, which sends it to each client on another thread.
- * While exactly one client is connected, that client's
- * clock request pauses or changes the speed of the world, as it would playing
- * alone peer-to-peer.
- */
-class GooseServer final {
-public:
-    GooseServer()
-        : simulation(world, {0.0F, svanes::PerSecondSquaredToPerTicSquared(GooseGravity)}, GooseTextures{}),
-          network(SlotPipes()),
-          broadcaster(network)
-    {
-    }
-
-    /**
-     * Serves clients until the process is stopped.
-     * @throws std::invalid_argument if a client sends a malformed message.
-     */
-    void Run()
-    {
-        svanes::ServerRuntime::Run(
-            network, GooseStepTics,
-            [this](const svanes::ServerMessage& received) {
-                Handle(received.session, DecodeGooseMessage(received.message, simulation));
-            },
-            [this] { Step(); }
-        );
-    }
-
-private:
-    /**
-     * Acts on one message from a slot.
-     * @param index The slot it arrived on.
-     * @param message The decoded message.
-     * @throws std::invalid_argument for a message only the server sends.
-     */
-    void Handle(std::size_t index, const GooseMessage& message)
-    {
-        Slot& slot = slots[index];
-        const auto now = std::chrono::steady_clock::now();
-        switch (message.type) {
-        case GooseMessageType::Hello:
-            if (!slot.client) {
-                slot = Slot{.client = message.client, .peer = {next_peer++}, .last_heard = now};
-                simulation.AddPlayer(slot.peer);
-                std::cout << "Slot " << index << ": player " << slot.peer.value << " joined.\n";
-            }
-            if (*slot.client == message.client) {
-                network.Send(index, EncodeWelcome(message.client, slot.peer));
-            } else {
-                network.Send(index, EncodeTaken(message.client));
-            }
-            return;
-        case GooseMessageType::Input:
-            if (slot.client) {
-                slot.intent = message.intent;
-                if (message.intent.dash != 0.0F) {
-                    slot.pending_dash = message.intent.dash;
+                for (auto &[client, player] : players) {
+                    const svanes::Entity goose_entity =
+                        player.goose.GetEntity();
+                    const auto contacts = svanes::DetectCollisions(
+                        world.GetComponent<svanes::Collider2D>(goose_entity)
+                            .geometry,
+                        world.GetComponent<svanes::Transform>(goose_entity),
+                        minion_collider.geometry, minion_transform);
+                    if (!contacts.empty()) {
+                        player.goose.Hit(world, contacts.front().normal,
+                                         kMinionKnockbackSpeed, kMinionDamage,
+                                         HitSource::Enemy);
+                    }
                 }
-                slot.clock = message.clock;
-                slot.last_heard = now;
-            }
-            return;
-        case GooseMessageType::Goodbye:
-            if (slot.client) {
-                Release(index, "left");
-            }
-            return;
-        case GooseMessageType::Welcome:
-        case GooseMessageType::Taken:
-        case GooseMessageType::Snapshot:
-            break;
-        }
-        throw std::invalid_argument("A client sent a message only the server sends.");
+            });
     }
 
     /**
-     * Drops silent clients, advances the world by however many steps the world
-     * clock allows, and sends every client the result.
+     * @param world The registry containing the entity.
+     * @param entity An entity with a Transform and Collider2D.
+     * @param other_transform Where the other shape is.
+     * @param other_collider The other shape.
+     * @return Whether the entity overlaps the other shape.
      */
-    void Step()
-    {
-        const auto now = std::chrono::steady_clock::now();
-        for (std::size_t index = 0; index < slots.size(); ++index) {
-            if (slots[index].client && now - slots[index].last_heard > GooseServerTimeout) {
-                Release(index, "timed out");
-            }
-        }
-
-        std::vector<std::size_t> players;
-        for (std::size_t index = 0; index < slots.size(); ++index) {
-            if (slots[index].client) {
-                players.push_back(index);
-            }
-        }
-        std::sort(players.begin(), players.end(), [this](std::size_t left, std::size_t right) {
-            return slots[left].peer.value < slots[right].peer.value;
-        });
-
-        const bool alone = players.size() == 1;
-        const ClockRequest request = alone ? slots[players.front()].clock : ClockRequest{};
-        pending_tics += AdvanceWorldClock(clock, GooseStepTics, request, alone);
-        while (pending_tics >= GooseStepTics) {
-            std::vector<GooseIntent> inputs;
-            for (const std::size_t index : players) {
-                GooseIntent intent = slots[index].intent;
-                intent.dash = slots[index].pending_dash;
-                slots[index].pending_dash = 0.0F;
-                inputs.push_back(intent);
-            }
-            simulation.Step(inputs);
-            pending_tics -= GooseStepTics;
-        }
-
-        std::vector<svanes::PeerId> roster;
-        for (const std::size_t index : players) {
-            roster.push_back(slots[index].peer);
-        }
-        broadcaster.Publish(std::move(players), std::move(roster), simulation.Save());
+    static bool Touches(const svanes::Registry &world, svanes::Entity entity,
+                        const svanes::Transform &other_transform,
+                        const svanes::Collider2D &other_collider) {
+        return !svanes::DetectCollisions(
+                    world.GetComponent<svanes::Collider2D>(entity).geometry,
+                    world.GetComponent<svanes::Transform>(entity),
+                    other_collider.geometry, other_transform)
+                    .empty();
     }
 
     /**
-     * Frees a slot and removes its player from the world.
-     * @param index The slot.
-     * @param reason Why the player is leaving, for the console.
+     * @param world The registry containing the world.
+     * @return What every player needs to draw the world.
      */
-    void Release(std::size_t index, const char* reason)
-    {
-        std::cout << "Slot " << index << ": player " << slots[index].peer.value << ' ' << reason << ".\n";
-        simulation.RemovePlayer(slots[index].peer);
-        slots[index] = Slot{};
+    Snapshot TakeSnapshot(const svanes::Registry &world) const {
+        Snapshot snapshot{};
+        snapshot.clock = clock_setting;
+        snapshot.minion_spawning = minion_spawning;
+
+        for (const auto &[client, player] : players) {
+            const svanes::Transform &transform =
+                world.GetComponent<svanes::Transform>(player.goose.GetEntity());
+            snapshot.geese.push_back({client,
+                                      {transform.x, transform.y},
+                                      player.goose.GetState(),
+                                      player.goose.GetHealth()});
+        }
+
+        if (enemy->IsAlive()) {
+            const svanes::Transform &transform =
+                world.GetComponent<svanes::Transform>(enemy->GetEntity());
+            snapshot.enemy =
+                SnapshotEnemy{{transform.x, transform.y}, enemy->GetHealth()};
+        }
+
+        world.ForEach<Bullet, svanes::Transform>(
+            [&](svanes::Entity, const Bullet &bullet,
+                const svanes::Transform &transform) {
+                snapshot.bullets.push_back(
+                    {{transform.x, transform.y},
+                     bullet.owner == enemy->GetEntity()});
+            });
+
+        world.ForEach<Minion, svanes::Transform>(
+            [&](svanes::Entity, const Minion &minion,
+                const svanes::Transform &transform) {
+                snapshot.minions.push_back(
+                    {{transform.x, transform.y}, minion.kind, minion.health});
+            });
+        return snapshot;
     }
 
-    svanes::Registry world;
-    GooseSimulation simulation;
-    svanes::NetworkServer network;
-    SnapshotBroadcaster broadcaster;
-    std::array<Slot, GooseServerSlots> slots{};
-    svanes::Timeline clock;
-    svanes::TicCount pending_tics = 0;
-    std::uint32_t next_peer = 1;
+    svanes::Entity clock = 0;
+    ClockSetting clock_setting;
+    bool minion_spawning = true;
+    std::optional<Enemy> enemy;
+    std::unordered_map<svanes::ClientId, Player> players;
 };
 
-}
+} // namespace
 
-int32_t main(int32_t argc, char**)
-{
+int32_t main(int32_t argc, char **) {
     if (argc > 1) {
-        std::cerr << "The goose server takes no arguments. Clients find it on UDP ports "
-            << GooseServerFirstPort << " to " << GooseServerFirstPort + GooseServerSlots - 1 << ".\n";
+        std::cerr << "The goose server takes no arguments. It listens on UDP "
+                     "port "
+                  << kPort << ".\n";
         return 1;
     }
+
     try {
+        svanes::NetworkServer network;
         GooseServer server;
-        std::cout << "Goose server listening on UDP ports " << GooseServerFirstPort << " to "
-            << GooseServerFirstPort + GooseServerSlots - 1 << ".\n";
-        server.Run();
-    } catch (const std::exception& error) {
+        return network.run(server);
+    } catch (const std::exception &error) {
         std::cerr << "Goose server: " << error.what() << '\n';
         return 1;
     }
-    return 0;
 }

@@ -1,22 +1,23 @@
 #pragma once
 
-#include "goose_session.hpp"
+#include "protocol.hpp"
 
 #include <svanes/entity.hpp>
-#include <svanes/game.hpp>
 #include <svanes/geometry/rectangle_geometry.hpp>
+#include <svanes/network/clientserver/IClient.hpp>
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 
 /**
  * The menu Escape opens and closes. Q or the Quit button asks to leave.
  *
  * It has two rows of three options. The game speed row (0.5x, 1x, 2x) works
  * only while the local player is alone. The loop rate row (15, 60, 120 frames
- * per second) works only on a goose server, where it changes how often this
- * client runs its loop and sends input, without affecting anyone else.
+ * per second) always works, and changes how often this client runs its loop
+ * and sends input, without affecting anyone else.
  *
  * The applied option of each row is filled in, and a border marks the
  * highlighted one. Up and Down, or W and S, move between enabled rows. Left
@@ -24,31 +25,35 @@
  * option highlights and applies it at once. Closing the menu forgets a
  * highlight that was not applied. A disabled row is greyed out and ignores input.
  *
- * A label in the corner of the screen shows any setting that is not 1x.
+ * Below the rows, a button, or M, asks to turn the enemy's minion spawning on
+ * or off. That setting is shared by everyone in the world, so the button shows
+ * the value the server last reported rather than the request.
+ *
+ * A label in the corner of the screen shows any setting that is not 1x, and
+ * when minion spawning is off.
  */
 class PauseMenu final {
 public:
     /**
      * Creates the menu's shapes and labels, hidden until the menu opens.
      * @param context The world to create them in and the fonts to draw with.
-     * @param on_server Whether this process plays on a goose server, which enables the loop rate row.
      * @throws std::runtime_error if the menu font cannot be loaded.
      */
-    PauseMenu(svanes::GameContext& context, bool on_server);
+    explicit PauseMenu(svanes::ClientContext& context);
 
     /**
      * Opens or closes the menu on Escape and, while it is open, handles its keys and clicks.
      * @param frame The frame's input and camera.
      * @param alone Whether the local player is the only one in the world.
      */
-    void HandleInput(const svanes::FrameContext& frame, bool alone);
+    void HandleInput(const svanes::ClientFrameContext& frame, bool alone);
 
     /**
      * Places the menu and corner label over the current view. Call after the camera has moved.
      * @param frame The frame's world and camera.
      * @param alone Whether the local player is the only one in the world.
      */
-    void Draw(const svanes::FrameContext& frame, bool alone);
+    void Draw(const svanes::ClientFrameContext& frame, bool alone);
 
     /** @return Whether the menu is showing. */
     bool IsOpen() const;
@@ -70,6 +75,18 @@ public:
 
     /** Returns the game speed to 1x, as when another player joins. */
     void ResetSpeed();
+
+    /**
+     * Shows whether the enemy drops minions.
+     * @param spawning The setting the server last reported.
+     */
+    void ShowMinionSpawning(bool spawning);
+
+    /**
+     * Reports a request to change minion spawning once.
+     * @return The setting the player asked for since the last call, or empty if they did not ask.
+     */
+    std::optional<bool> TakeMinionSpawningRequest();
 
 private:
     /**
@@ -117,9 +134,10 @@ private:
      */
     void Layout(const svanes::Rectangle2D& viewport);
 
-    bool on_server;
     bool open = false;
     bool quit_requested = false;
+    bool minion_spawning = true;
+    std::optional<bool> minion_spawning_request;
     std::size_t focused_row = 0;
     GooseSpeed highlighted = GooseSpeed::Normal;
 
@@ -127,6 +145,7 @@ private:
     svanes::Entity backdrop{};
     svanes::Entity highlight{};
     std::array<Row, 2> rows{};
+    Button minion_button{};
     Button quit_button{};
     svanes::Entity title{};
     svanes::Entity note{};

@@ -1,55 +1,40 @@
-#include "chris_game.hpp"
-#include "p2p_game.hpp"
+#include "double_time_game.hpp"
 
-#include <svanes/application.hpp>
+#include <svanes/network/clientserver/network_client.hpp>
 
+#include <charconv>
 #include <stdexcept>
 #include <string>
-#include <string_view>
-
-namespace {
-
-ClientRole ParseRole(std::string_view role_text) {
-    if (role_text == "character") {
-        return ClientRole::Character;
-    }
-    if (role_text == "platform") {
-        return ClientRole::Platform;
-    }
-    if (role_text == "spectator") {
-        return ClientRole::Spectator;
-    }
-    throw std::invalid_argument(
-        "Unrecognized client role \"" + std::string{role_text} +
-        "\"; expected \"character\", \"platform\", or \"spectator\"."
-    );
-}
-
-} // namespace
 
 int32_t main(int32_t argc, char **argv) {
-    if (argc > 1 && std::string_view{argv[1]} == "p2p") {
-        if (argc > 4) throw std::invalid_argument("P2P expects an optional port and entry host.");
-        const auto port = argc > 2 ? static_cast<std::uint16_t>(std::stoul(argv[2])) : kDoubleTimeP2PHostPort;
-        std::optional<svanes::UdpAddress> entry;
-        if (argc > 3) entry = svanes::UdpAddress{argv[3], kDoubleTimeP2PHostPort};
-        svanes::Application application({.title = "Double Time P2P", .width = 640, .height = 360});
-        DoubleTimeP2PGame game(port, entry);
-        return application.run(game);
-    }
-    if (argc > 3) {
+    if (argc > 4) {
         throw std::invalid_argument(
-            "Expected at most a server host and client role.");
+            "Usage: svanes_game_double_time [server-host] [bridge-port] [platform]");
     }
-    const std::string server_host = argc > 1 ? argv[1] : kChrisDefaultServerHost;
-    const ClientRole role = argc > 2 ? ParseRole(argv[2]) : ClientRole::Character;
-
-    svanes::Application application({
+    const std::string server_host = argc > 1 ? argv[1] : kDoubleTimeDefaultServerHost;
+    std::uint16_t bridge_port = 0;
+    if (argc > 2) {
+        unsigned int parsed_port = 0;
+        const std::string port_text = argv[2];
+        const auto result = std::from_chars(
+            port_text.data(), port_text.data() + port_text.size(), parsed_port);
+        if (result.ec != std::errc{} || result.ptr != port_text.data() +
+                                                  port_text.size() ||
+            parsed_port == 0 || parsed_port > 65535) {
+            throw std::invalid_argument("The bridge port must be between 1 and 65535.");
+        }
+        bridge_port = static_cast<std::uint16_t>(parsed_port);
+    }
+    const bool platform_role = argc > 3 && std::string{argv[3]} == "platform";
+    if (argc > 3 && !platform_role && std::string{argv[3]} != "character") {
+        throw std::invalid_argument("The bridge role must be 'character' or 'platform'.");
+    }
+    svanes::NetworkClient client({
         .title = "Double Time",
         .width = 1920,
         .height = 1080,
     });
 
-    ChrisGame game(server_host, role);
-    return application.run(game);
+    DoubleTimeGame game(server_host, bridge_port, platform_role);
+    return client.run(game);
 }

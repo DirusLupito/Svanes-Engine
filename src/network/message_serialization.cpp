@@ -12,15 +12,21 @@ static_assert(sizeof(float) == 4 && std::numeric_limits<float>::is_iec559);
 void MessageWriter::WriteUnsigned(std::uint64_t value, std::uint32_t width) {
     // Extract bytes explicitly instead of copying the machine's integer layout.
     for (std::uint32_t remaining = width; remaining > 0; --remaining) {
-        message.bytes.push_back(static_cast<std::byte>(
-            (value >> ((remaining - 1) * 8)) & 0xff));
+        message.bytes.push_back(
+            static_cast<std::byte>((value >> ((remaining - 1) * 8)) & 0xff));
     }
 }
 
 void MessageWriter::WriteUint8(std::uint8_t value) { WriteUnsigned(value, 1); }
-void MessageWriter::WriteUint16(std::uint16_t value) { WriteUnsigned(value, 2); }
-void MessageWriter::WriteUint32(std::uint32_t value) { WriteUnsigned(value, 4); }
-void MessageWriter::WriteUint64(std::uint64_t value) { WriteUnsigned(value, 8); }
+void MessageWriter::WriteUint16(std::uint16_t value) {
+    WriteUnsigned(value, 2);
+}
+void MessageWriter::WriteUint32(std::uint32_t value) {
+    WriteUnsigned(value, 4);
+}
+void MessageWriter::WriteUint64(std::uint64_t value) {
+    WriteUnsigned(value, 8);
+}
 
 void MessageWriter::WriteInt32(std::int32_t value) {
     WriteUint32(std::bit_cast<std::uint32_t>(value));
@@ -113,4 +119,4 @@ std::string MessageReader::ReadText() {
 
 std::size_t MessageReader::Remaining() const { return bytes.size() - cursor; }
 
-}
+} // namespace svanes

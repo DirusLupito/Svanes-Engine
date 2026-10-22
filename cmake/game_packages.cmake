@@ -14,7 +14,7 @@ function(svanes_game_package target name source_folder asset_folder)
     add_custom_target(${target}_assets
         COMMAND ${CMAKE_COMMAND} -E make_directory
             "$<TARGET_FILE_DIR:${target}>/assets/${asset_folder}"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
             "${asset_source}" "$<TARGET_FILE_DIR:${target}>/assets/${asset_folder}"
         VERBATIM)
     add_dependencies(${target} ${target}_assets)

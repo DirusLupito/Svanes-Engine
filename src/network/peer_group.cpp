@@ -235,8 +235,8 @@ void PeerGroup::Update() {
     if (HasFailed()) {
         return;
     }
-    if (!roster_change && (leave_requested || !join_requests.empty() ||
-                           !unreachable.empty())) {
+    if (!roster_change &&
+        (leave_requested || !join_requests.empty() || !unreachable.empty())) {
         BeginRosterChange();
     }
     if (roster_change) {
@@ -317,8 +317,8 @@ void PeerGroup::LoadJoinSnapshot(const NetworkMessage &snapshot) {
 }
 
 void PeerGroup::SendSnapshot(PeerId peer, const NetworkMessage &snapshot) {
-    const auto count = (snapshot.bytes.size() + kSnapshotChunkBytes - 1) /
-                       kSnapshotChunkBytes;
+    const auto count =
+        (snapshot.bytes.size() + kSnapshotChunkBytes - 1) / kSnapshotChunkBytes;
     if (count == 0 || count > kMaximumSnapshotChunks) {
         throw std::length_error("World snapshot is empty or too large to "
                                 "send.");
@@ -669,7 +669,8 @@ void PeerGroup::UpdateRosterChange() {
         }
         change.abandoned = true;
     }
-    status = "Finishing up to roster boundary " + std::to_string(boundary) + ".";
+    status =
+        "Finishing up to roster boundary " + std::to_string(boundary) + ".";
     if (!participant->SettleAt(boundary)) {
         return;
     }
@@ -735,11 +736,11 @@ void PeerGroup::UpdateRosterChange() {
                                 address, PeerAddress({sponsor}).host)});
         }
         if (sponsor == LocalPeer().value) {
-            const auto candidate = std::find_if(
-                change.sponsored.begin(), change.sponsored.end(),
-                [&](const auto &sponsored) {
-                    return sponsored.address == address;
-                });
+            const auto candidate =
+                std::find_if(change.sponsored.begin(), change.sponsored.end(),
+                             [&](const auto &sponsored) {
+                                 return sponsored.address == address;
+                             });
             answers.emplace_back(*candidate, id);
         }
     }

@@ -356,8 +356,7 @@ private:
      * @param tick The tick the input belongs to.
      * @param input The player's actual input.
      */
-    void RecordInput(std::size_t index, std::uint64_t tick,
-                     const Input &input);
+    void RecordInput(std::size_t index, std::uint64_t tick, const Input &input);
 
     /**
      * @param index The player's roster position.
@@ -389,7 +388,8 @@ private:
     /** Restores the earliest mispredicted tick and replays to the present. */
     void ApplyCorrection();
 
-    /** Saves the world and advances one tick with actual or predicted inputs. */
+    /** Saves the world and advances one tick with actual or predicted inputs.
+     */
     void AdvanceTick();
 
     /** Removes ticks and inputs older than the history limit. */
@@ -503,9 +503,11 @@ void InputSync<Input, Use>::Update(const FrameContext &frame) {
     }
 
     simulation.CaptureInput(frame, peers.LocalPeer());
-    const TicCount max_backlog = settings.max_backlog_steps * settings.step_tics;
+    const TicCount max_backlog =
+        settings.max_backlog_steps * settings.step_tics;
     if (!first_frame) {
-        pending_tics += std::min(frame.real_delta_tics, max_backlog - pending_tics);
+        pending_tics +=
+            std::min(frame.real_delta_tics, max_backlog - pending_tics);
     }
     for (std::uint32_t step = 0; step < settings.steps_per_frame; ++step) {
         const auto pacing_tics = PacingStepTics();
@@ -676,7 +678,8 @@ void InputSync<Input, Use>::CheckStateHashes() {
         const auto first = checkpoints.begin();
         const auto &checkpoint = first->second;
         if (first->first != verified_tick + settings.hash_interval_ticks ||
-            !checkpoint.sent || checkpoint.remote.size() != players.size() - 1) {
+            !checkpoint.sent ||
+            checkpoint.remote.size() != players.size() - 1) {
             break;
         }
         verified_tick = first->first;
@@ -729,8 +732,9 @@ Input InputSync<Input, Use>::InputFor(std::size_t index,
 }
 
 template <typename Input, typename Use>
-NetworkMessage InputSync<Input, Use>::EncodeTickInput(std::uint64_t input_tick,
-                                                      const Input &input) const {
+NetworkMessage
+InputSync<Input, Use>::EncodeTickInput(std::uint64_t input_tick,
+                                       const Input &input) const {
     MessageWriter writer;
     writer.WriteUint64(input_tick);
     simulation.EncodeInput(writer, input);
@@ -821,7 +825,8 @@ template <typename Input, typename Use>
 bool InputSync<Input, Use>::CanPredict() const {
     for (std::size_t index = 0; index < players.size(); ++index) {
         if (index != local_index &&
-            players[index].next_input_tick + settings.prediction_ticks <= tick) {
+            players[index].next_input_tick + settings.prediction_ticks <=
+                tick) {
             return false;
         }
     }

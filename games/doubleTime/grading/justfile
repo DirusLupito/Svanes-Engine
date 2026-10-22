@@ -1,0 +1,34 @@
+default:
+    @just --justfile "{{justfile()}}" --list
+
+set working-directory := "../../.."
+
+import '../../../scripts/common.just'
+
+build target="doubleTime-grading": (_check-target target) (_build if target == "doubleTime-grading-server" { "svanes_game_double_time_grading_server" } else if target == "doubleTime-grading-benchmark" { "svanes_game_double_time_grading_benchmark" } else { "svanes_game_double_time_grading" })
+
+release target="doubleTime-grading": (_check-target target) (_release if target == "doubleTime-grading-server" { "svanes_game_double_time_grading_server" } else if target == "doubleTime-grading-benchmark" { "svanes_game_double_time_grading_benchmark" } else { "svanes_game_double_time_grading" })
+
+run target="doubleTime-grading": (release target)
+    {{if target == "doubleTime-grading-server" { 'just --justfile "' + justfile() + '" _run-server ' + release-bin-dir } else if target == "doubleTime-grading-benchmark" { 'just --justfile "' + justfile() + '" _run-benchmark ' + release-bin-dir } else { 'just --justfile "' + justfile() + '" _run-client ' + release-bin-dir }}}
+
+debug target="doubleTime-grading": (build target)
+    {{if target == "doubleTime-grading-server" { 'just --justfile "' + justfile() + '" _run-server ' + bin-dir } else if target == "doubleTime-grading-benchmark" { 'just --justfile "' + justfile() + '" _run-benchmark ' + bin-dir } else { 'just --justfile "' + justfile() + '" _run-client ' + bin-dir }}}
+
+package target="doubleTime-grading": (_check-target target) (_package target)
+
+_check-target target:
+    @{{if target =~ "^doubleTime-grading(-server|-benchmark)?$" { "" } else { error("no grading target named '" + target + "'. Try doubleTime-grading, doubleTime-grading-server, or doubleTime-grading-benchmark.") }}}
+
+_run-server directory=bin-dir:
+    {{if os() == "windows" { "Start-Process -WorkingDirectory " + directory + " -FilePath " + directory + "svanes_game_double_time_grading_server" + exe-suffix } else { "cd " + directory + " && exec ./svanes_game_double_time_grading_server" }}}
+
+_run-client directory=bin-dir:
+    {{if os() == "windows" { "Start-Process -WorkingDirectory " + directory + " -FilePath " + directory + "svanes_game_double_time_grading" + exe-suffix } else { "cd " + directory + " && exec ./svanes_game_double_time_grading" }}}
+
+_run-benchmark directory=bin-dir:
+    {{if os() == "windows" { "Start-Process -WorkingDirectory " + directory + " -FilePath " + directory + "svanes_game_double_time_grading_benchmark" + exe-suffix } else { "cd " + directory + " && exec ./svanes_game_double_time_grading_benchmark" }}}
+
+benchmark-matrix output="double_time_benchmark_matrix.csv":
+    just --justfile "{{justfile()}}" build doubleTime-grading-benchmark
+    python3 games/doubleTime/grading/benchmark_matrix.py --output "{{output}}"

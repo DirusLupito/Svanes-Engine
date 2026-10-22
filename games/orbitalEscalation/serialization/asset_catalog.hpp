@@ -36,14 +36,6 @@ public:
                      DynamicObjectType type, const std::string &name) const;
 
     /**
-     * Gets a hash of the gameplay definitions so peers can check that their
-     * assets are compatible.
-     *
-     * @return The gameplay definition hash.
-     */
-    std::uint64_t RulesHash() const;
-
-    /**
      * Loads the JSON files in the ships, missiles, and missile_launchers
      * folders underneath root, including any subfolders.
      *

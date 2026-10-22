@@ -62,4 +62,4 @@ Primary
 - include/svanes/network/input_sync.hpp
 - include/svanes/network/peer_join.hpp
 - src/network/peer_join.cpp
-- src/peer_to_peer.md
+- docs/peer_to_peer.md

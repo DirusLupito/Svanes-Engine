@@ -89,6 +89,14 @@ public:
     void SetTransform(svanes::Registry &world,
                       const svanes::Transform &transform) const;
 
+    /**
+     * Sets the color of the object's solid visual parts.
+     *
+     * @param world The registry containing the visual entities.
+     * @param color The color to apply to the solid shapes.
+     */
+    void SetColor(svanes::Registry &world, svanes::Color color) const;
+
 private:
     // A list of entities in the registry that represent the visual components
     // of the game object.

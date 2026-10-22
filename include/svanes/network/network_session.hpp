@@ -83,13 +83,18 @@ struct SessionConfiguration {
  * Controls retry timing and the amount of data retained by a session.
  *
  * FIELDS:
- * - retry_interval: Real time between send attempts for an unacknowledged message.
- * - delivery_timeout: Real time from the first send attempt before reporting failure.
- * - max_pending_per_peer: Maximum pending count and outgoing message id span per peer.
- *   Also bounds how far ahead of a missing message incoming ids are accepted.
- * - max_incoming_messages: Maximum game messages waiting for Receive(), across all peers.
- * - max_packets_per_update: Maximum incoming packets processed per Update(), including
- *   acknowledgments and duplicates, before handling outgoing traffic and returning.
+ * - retry_interval: Real time between send attempts for an unacknowledged
+ * message.
+ * - delivery_timeout: Real time from the first send attempt before reporting
+ * failure.
+ * - max_pending_per_peer: Maximum pending count and outgoing message id span
+ * per peer. Also bounds how far ahead of a missing message incoming ids are
+ * accepted.
+ * - max_incoming_messages: Maximum game messages waiting for Receive(), across
+ * all peers.
+ * - max_packets_per_update: Maximum incoming packets processed per Update(),
+ * including acknowledgments and duplicates, before handling outgoing traffic
+ * and returning.
  */
 struct ReliabilitySettings {
     std::chrono::milliseconds retry_interval{100};
@@ -114,13 +119,15 @@ struct SessionMessage {
 };
 
 /**
- * A message outside every reliable stream: a contact packet from any connection,
- * or data from a connection outside the roster, which is left unacknowledged.
+ * A message outside every reliable stream: a contact packet from any
+ * connection, or data from a connection outside the roster, which is left
+ * unacknowledged.
  *
  * FIELDS:
  * - connection: The local transport handle the message arrived on.
  * - message: The claimed sender, game type, and payload.
- * - contact: Whether it arrived as a contact packet rather than unacknowledged data.
+ * - contact: Whether it arrived as a contact packet rather than unacknowledged
+ * data.
  */
 struct StrangerMessage {
     ConnectionId connection;
@@ -129,16 +136,19 @@ struct StrangerMessage {
 };
 
 /**
- * Identifies a data message within one sender-to-recipient stream. Zero is invalid.
+ * Identifies a data message within one sender-to-recipient stream. Zero is
+ * invalid.
  */
 using MessageId = std::uint64_t;
 
 /**
  * Identifies what a session packet carries.
  * - Data: A game message with an id assigned by its sender.
- * - Acknowledgment: Confirmation that the recipient accepted the given message id.
+ * - Acknowledgment: Confirmation that the recipient accepted the given message
+ * id.
  * - Contact: An unreliable game message outside every peer's stream, never
- *   acknowledged or deduplicated. Used to talk to peers that are not yet admitted.
+ *   acknowledged or deduplicated. Used to talk to peers that are not yet
+ * admitted.
  */
 enum class SessionPacketKind : std::uint8_t {
     Data = 1,
@@ -171,8 +181,8 @@ struct SessionPacket {
  * @param session The nonzero session id to include.
  * @param packet The packet kind, identities, and optional game payload.
  * @return The complete packet ready for the transport.
- * @throws std::invalid_argument for zero ids, an unknown kind, or an acknowledgment
- * carrying a game type or payload.
+ * @throws std::invalid_argument for zero ids, an unknown kind, or an
+ * acknowledgment carrying a game type or payload.
  * @throws std::length_error if the payload exceeds MaxSessionPayloadBytes.
  */
 NetworkMessage EncodeSessionPacket(SessionId session,
@@ -184,17 +194,17 @@ NetworkMessage EncodeSessionPacket(SessionId session,
  * @param session The session id the message must belong to.
  * @param message The complete received bytes to decode.
  * @return The decoded packet. The game still needs to validate data payloads.
- * @throws std::invalid_argument if the header, size, ids, kind, or acknowledgment
- * contents are invalid.
+ * @throws std::invalid_argument if the header, size, ids, kind, or
+ * acknowledgment contents are invalid.
  */
 SessionPacket DecodeSessionPacket(SessionId session,
                                   const NetworkMessage &message);
 
 /**
  * Sends and receives game messages through an owned MsgPipe using a configured
- * peer roster. Each participant has a PeerId shared across the session, and 
+ * peer roster. Each participant has a PeerId shared across the session, and
  * the roster maps remote peers to the local ConnectionIds used to reach them.
- * 
+ *
  * Send() retains a packet with its own per-peer message id. Update() transmits
  * it and retries until the destination acknowledges it or delivery times out.
  * Incoming data is checked against the roster, acknowledged, and queued for
@@ -208,15 +218,15 @@ SessionPacket DecodeSessionPacket(SessionId session,
  *
  * Data from a connection outside the roster is reported by ReceiveStranger()
  * but not acknowledged, so the stranger keeps retrying. Once the game admits it
- * with AddPeer(), the next retry is acknowledged and delivered normally. Contact
- * packets, sent with SendStranger(), are always reported by ReceiveStranger(),
- * whether or not their connection is in the roster. Packets carrying a
- * different session id, and malformed packets or acknowledgments from outside
- * the roster, are dropped and logged once per connection.
+ * with AddPeer(), the next retry is acknowledged and delivered normally.
+ * Contact packets, sent with SendStranger(), are always reported by
+ * ReceiveStranger(), whether or not their connection is in the roster. Packets
+ * carrying a different session id, and malformed packets or acknowledgments
+ * from outside the roster, are dropped and logged once per connection.
  *
  * A process not yet admitted has local peer id zero and no roster. It can only
- * use SendStranger() and ReceiveStranger(), and its contact packets carry sender
- * zero. Admit() gives it an id, after which AddPeer() builds its roster.
+ * use SendStranger() and ReceiveStranger(), and its contact packets carry
+ * sender zero. Admit() gives it an id, after which AddPeer() builds its roster.
  *
  * The game defines the payload contents and decides how they affect its world.
  * The caller supplies the initial roster when constructing the session.
@@ -229,9 +239,9 @@ public:
      * @param pipe The transport whose connection handles appear in the roster.
      * @param configuration The session id, local peer, and remote mappings.
      * @param settings The retry intervals and queue limits.
-     * @throws std::invalid_argument for a null pipe, invalid/duplicate mappings,
-     * a roster without a local peer, nonpositive limits or intervals, or a
-     * timeout shorter than the retry interval.
+     * @throws std::invalid_argument for a null pipe, invalid/duplicate
+     * mappings, a roster without a local peer, nonpositive limits or intervals,
+     * or a timeout shorter than the retry interval.
      */
     NetworkSession(std::unique_ptr<MsgPipe> pipe,
                    SessionConfiguration configuration,
@@ -266,8 +276,8 @@ public:
      * Borrows the remote roster held in the configuration. Retired entries stay
      * in the span, since their ids remain reserved for the rest of the session.
      *
-     * @return Known remote mappings, including retired routes, borrowed from the session
-     * until the next AddPeer().
+     * @return Known remote mappings, including retired routes, borrowed from
+     * the session until the next AddPeer().
      */
     std::span<const PeerConnection> RemotePeers() const;
 
@@ -277,8 +287,8 @@ public:
      * @param destination The configured peer to send to.
      * @param type The game-defined payload type.
      * @param payload The bytes to send, up to MaxSessionPayloadBytes.
-     * @return Whether the session accepted the message. Returns false for a failed peer
-     * or a full send window. Acceptance does not confirm delivery.
+     * @return Whether the session accepted the message. Returns false for a
+     * failed peer or a full send window. Acceptance does not confirm delivery.
      * @throws std::logic_error before admission.
      * @throws std::invalid_argument if the destination is outside the roster.
      * @throws std::length_error if the payload is too large.
@@ -293,7 +303,8 @@ public:
      *
      * @param type The game-defined payload type.
      * @param payload The bytes to send, up to MaxSessionPayloadBytes.
-     * @return Whether every peer's queue accepted the message. Returns true for an empty roster.
+     * @return Whether every peer's queue accepted the message. Returns true for
+     * an empty roster.
      * @throws std::logic_error before admission.
      * @throws std::length_error if the payload is too large.
      * @throws std::overflow_error if a peer's message ids are exhausted.
@@ -305,32 +316,36 @@ public:
      * Reads at most max_packets_per_update packets so incoming traffic cannot
      * indefinitely delay outgoing work or the next game frame.
      * New data is acknowledged only after entering the game-message queue.
-     * Expired deliveries mark their peer as failed and queue one failure report.
-     * Call each frame, independently of simulation time or pause state.
-     * @throws std::invalid_argument for invalid packets from a roster connection, or
-     * a roster connection claiming another sender.
+     * Expired deliveries mark their peer as failed and queue one failure
+     * report. Call each frame, independently of simulation time or pause state.
+     * @throws std::invalid_argument for invalid packets from a roster
+     * connection, or a roster connection claiming another sender.
      */
     void Update();
 
     /**
      * Takes the next game message accepted by Update().
      *
-     * @param received Receives the sender, game type, and payload when available.
+     * @param received Receives the sender, game type, and payload when
+     * available.
      * @return Whether a queued game message was available.
      */
     bool Receive(SessionMessage &received);
 
     /**
-     * Takes the next peer failure reported by Update(). Each peer is reported once.
+     * Takes the next peer failure reported by Update(). Each peer is reported
+     * once.
      * @param peer Receives the failed peer's id when a report is available.
      * @return Whether a failure report was available.
      */
     bool ReceivePeerFailure(PeerId &peer);
 
     /**
-     * Takes the next contact packet, or data message from a connection outside the roster.
-     * A stranger retries unacknowledged data, so one may be reported repeatedly.
-     * @param stranger Receives the connection and message when a report is available.
+     * Takes the next contact packet, or data message from a connection outside
+     * the roster. A stranger retries unacknowledged data, so one may be
+     * reported repeatedly.
+     * @param stranger Receives the connection and message when a report is
+     * available.
      * @return Whether a report was available.
      */
     bool ReceiveStranger(StrangerMessage &stranger);
@@ -338,44 +353,50 @@ public:
     /**
      * Adds a remote peer to the roster, typically a stranger the game admitted.
      * @param peer The new peer's id and the pipe connection used to reach it.
-     * A retired peer still holding the connection is released immediately, since
-     * a new process now owns that address.
-     * @throws std::invalid_argument for a zero or local id, an unknown connection,
-     * a peer id already used in this session, or a connection held by an active peer.
+     * A retired peer still holding the connection is released immediately,
+     * since a new process now owns that address.
+     * @throws std::invalid_argument for a zero or local id, an unknown
+     * connection, a peer id already used in this session, or a connection held
+     * by an active peer.
      * @throws std::logic_error before admission.
      */
     void AddPeer(PeerConnection peer);
 
     /**
      * @param connection The connection to look up.
-     * @return The active (not retired) roster peer using the connection, if any.
+     * @return The active (not retired) roster peer using the connection, if
+     * any.
      */
     std::optional<PeerId> ActivePeerAt(ConnectionId connection) const;
 
     /**
      * Sends one contact packet to any known connection, without retries or
      * acknowledgment. Used to talk with peers before they are admitted.
-     * @param connection The destination, such as one reported by ReceiveStranger().
+     * @param connection The destination, such as one reported by
+     * ReceiveStranger().
      * @param type The game-defined payload type.
      * @param payload The bytes to send, up to MaxSessionPayloadBytes.
-     * @return Whether the transport accepted the datagram, not whether it arrived.
+     * @return Whether the transport accepted the datagram, not whether it
+     * arrived.
      * @throws std::invalid_argument if the connection is unknown to the pipe.
      * @throws std::length_error if the payload is too large.
      */
-    bool SendStranger(ConnectionId connection, MessageType type, const NetworkMessage &payload);
+    bool SendStranger(ConnectionId connection, MessageType type,
+                      const NetworkMessage &payload);
 
     /**
      * Stops new traffic to a departed peer while draining accepted sends.
      * Late data is acknowledged and discarded so departure retries can finish.
      * After delivery_timeout, once nothing is pending, the peer's connection is
-     * released: its packets arrive as strangers again, but its id stays reserved.
-     * Retiring an already retired peer has no effect.
+     * released: its packets arrive as strangers again, but its id stays
+     * reserved. Retiring an already retired peer has no effect.
      * @param peer The configured remote identity to retire.
      * @throws std::invalid_argument if the peer is not configured.
      */
     void RetirePeer(PeerId peer);
 
-    /** @return Whether every accepted outgoing message has left the retry queues. */
+    /** @return Whether every accepted outgoing message has left the retry
+     * queues. */
     bool OutgoingDrained() const;
 
 
@@ -385,7 +406,8 @@ private:
      * FIELDS:
      * - packet: Encoded bytes reused for each send attempt.
      * - first_attempt: Time of the first attempt, or empty before transmission.
-     * - last_attempt: Time of the most recent attempt, used after first_attempt is set.
+     * - last_attempt: Time of the most recent attempt, used after first_attempt
+     * is set.
      */
     struct PendingMessage {
         NetworkMessage packet;
@@ -399,11 +421,15 @@ private:
      * - next_message_id: Next outgoing id. Zero marks an exhausted sequence.
      * - pending: Outgoing packets indexed by message id.
      * - received_through: Highest incoming id with every preceding id accepted.
-     * - received_ahead: Accepted incoming ids above a gap, retained for duplicate checks.
+     * - received_ahead: Accepted incoming ids above a gap, retained for
+     * duplicate checks.
      * - failed: Whether delivery timed out and further traffic is stopped.
-     * - retired: Whether new sends and game delivery are disabled after departure.
-     * - retired_at: When the peer was retired, used to decide when to release it.
-     * - released: Whether the connection no longer identifies this retired peer.
+     * - retired: Whether new sends and game delivery are disabled after
+     * departure.
+     * - retired_at: When the peer was retired, used to decide when to release
+     * it.
+     * - released: Whether the connection no longer identifies this retired
+     * peer.
      */
     struct PeerState {
         MessageId next_message_id = 1;
@@ -419,12 +445,14 @@ private:
     /**
      * Finds the unreleased roster entry that uses a connection.
      * @param connection The connection to look up.
-     * @return The entry's index, or empty if the connection is outside the roster.
+     * @return The entry's index, or empty if the connection is outside the
+     * roster.
      */
     std::optional<std::size_t> FindConnection(ConnectionId connection) const;
 
     /**
-     * Checks failure status, queue capacity, and distance from the oldest pending id.
+     * Checks failure status, queue capacity, and distance from the oldest
+     * pending id.
      * @param peer The peer state to inspect.
      * @return Whether another outgoing message can be accepted.
      * @throws std::overflow_error if the message id sequence is exhausted.
@@ -437,12 +465,14 @@ private:
      * @param type The game-defined message type.
      * @param payload The game bytes to encode.
      */
-    void QueueMessage(PeerState &peer, MessageType type, const NetworkMessage &payload);
+    void QueueMessage(PeerState &peer, MessageType type,
+                      const NetworkMessage &payload);
 
     /**
      * Processes a validated packet from a configured peer.
      * @param index The peer's index in the roster and state array.
-     * @param packet The packet whose sender has been checked against its connection.
+     * @param packet The packet whose sender has been checked against its
+     * connection.
      */
     void ProcessPacket(std::size_t index, SessionPacket packet);
 
@@ -451,7 +481,8 @@ private:
      * @param connection The connection the packet arrived on.
      * @param reason Why its packets are dropped.
      */
-    void LogDroppedConnection(ConnectionId connection, const std::string &reason);
+    void LogDroppedConnection(ConnectionId connection,
+                              const std::string &reason);
 
     // The owned transport every packet travels through.
     std::unique_ptr<MsgPipe> pipe;
@@ -484,4 +515,4 @@ private:
     std::set<std::uint32_t> dropped_connections;
 };
 
-}
+} // namespace svanes

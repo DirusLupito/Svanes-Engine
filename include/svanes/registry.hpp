@@ -13,7 +13,7 @@ namespace svanes {
  * The entity component system registry. This class manages entities and their
  * components.
  *
- * Read through entity_components.md for a more detailed explanation of how
+ * Read through docs/entity_components.md for a more detailed explanation of how
  * components work with entities.
  *
  * It allows for creation and destruction of entities, as well as adding,

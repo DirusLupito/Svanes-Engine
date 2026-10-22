@@ -134,7 +134,7 @@ svanes::Color Shown(svanes::Color color, bool visible)
  * @param area The area, in pixels from the viewport's top-left corner.
  * @param color The color to fill it with.
  */
-void PlaceShape(const svanes::FrameContext& frame, svanes::Entity entity, const svanes::Rectangle2D& area, svanes::Color color)
+void PlaceShape(const svanes::ClientFrameContext& frame, svanes::Entity entity, const svanes::Rectangle2D& area, svanes::Color color)
 {
     const svanes::Vector2D origin = TopLeft(frame.camera.Viewport());
     const svanes::Rectangle2D world_area = frame.camera.ScreenToWorld(
@@ -171,7 +171,7 @@ void PlaceLabel(
 
 }
 
-PauseMenu::PauseMenu(svanes::GameContext& context, bool on_server) : on_server(on_server)
+PauseMenu::PauseMenu(svanes::ClientContext& context)
 {
     const svanes::FontHandle large = LoadMenuFont(context.fonts, kLargeTextPoints);
     const svanes::FontHandle small = LoadMenuFont(context.fonts, kSmallTextPoints);
@@ -186,6 +186,8 @@ PauseMenu::PauseMenu(svanes::GameContext& context, bool on_server) : on_server(o
             button.label = CreateLabel(world, small, svanes::TextAlignment::Center);
         }
     }
+    minion_button.shape = CreateShape(world, kButtonZ);
+    minion_button.label = CreateLabel(world, small, svanes::TextAlignment::Center);
     quit_button.shape = CreateShape(world, kButtonZ);
     quit_button.label = CreateLabel(world, large, svanes::TextAlignment::Center);
     title = CreateLabel(world, large, svanes::TextAlignment::Center);
@@ -198,7 +200,7 @@ void PauseMenu::Layout(const svanes::Rectangle2D& viewport)
 {
     const float center_x = viewport.width * 0.5F;
     const float center_y = viewport.height * 0.5F;
-    backdrop_area = {center_x, center_y + 15.0F, 500.0F, 490.0F};
+    backdrop_area = {center_x, center_y + 45.0F, 500.0F, 550.0F};
     for (std::size_t row = 0; row < rows.size(); ++row) {
         const float row_y = center_y - 70.0F + static_cast<float>(row) * 110.0F;
         for (std::size_t index = 0; index < rows[row].buttons.size(); ++index) {
@@ -206,12 +208,13 @@ void PauseMenu::Layout(const svanes::Rectangle2D& viewport)
             rows[row].buttons[index].area = {center_x + offset, row_y, 120.0F, 50.0F};
         }
     }
-    quit_button.area = {center_x, center_y + 160.0F, 220.0F, 56.0F};
+    minion_button.area = {center_x, center_y + 160.0F, 260.0F, 50.0F};
+    quit_button.area = {center_x, center_y + 225.0F, 220.0F, 56.0F};
 }
 
 bool PauseMenu::IsEnabled(std::size_t row, bool alone) const
 {
-    return row == kSpeedRow ? alone : on_server;
+    return row != kSpeedRow || alone;
 }
 
 void PauseMenu::KeepFocusEnabled(bool alone)
@@ -228,7 +231,7 @@ void PauseMenu::KeepFocusEnabled(bool alone)
     }
 }
 
-void PauseMenu::HandleInput(const svanes::FrameContext& frame, bool alone)
+void PauseMenu::HandleInput(const svanes::ClientFrameContext& frame, bool alone)
 {
     if (frame.input.WasPressed(svanes::Key::Escape)) {
         open = !open;
@@ -248,6 +251,9 @@ void PauseMenu::HandleInput(const svanes::FrameContext& frame, bool alone)
 
     if (frame.input.WasPressed(svanes::Key::Q) || (clicked && Contains(quit_button.area, pointer))) {
         quit_requested = true;
+    }
+    if (frame.input.WasPressed(svanes::Key::M) || (clicked && Contains(minion_button.area, pointer))) {
+        minion_spawning_request = !minion_spawning;
     }
 
     KeepFocusEnabled(alone);
@@ -290,7 +296,7 @@ void PauseMenu::HandleInput(const svanes::FrameContext& frame, bool alone)
     }
 }
 
-void PauseMenu::Draw(const svanes::FrameContext& frame, bool alone)
+void PauseMenu::Draw(const svanes::ClientFrameContext& frame, bool alone)
 {
     const svanes::Rectangle2D viewport = frame.camera.Viewport();
     Layout(viewport);
@@ -303,7 +309,7 @@ void PauseMenu::Draw(const svanes::FrameContext& frame, bool alone)
 
     const std::array<const char*, 2> captions{
         alone ? "Game speed" : "Game speed - only while playing alone",
-        on_server ? "Loop rate" : "Loop rate - only on a goose server",
+        "Loop rate",
     };
     for (std::size_t row = 0; row < rows.size(); ++row) {
         const bool enabled = IsEnabled(row, alone);
@@ -331,9 +337,14 @@ void PauseMenu::Draw(const svanes::FrameContext& frame, bool alone)
     PlaceLabel(frame.world, note, "Up/Down row, Left/Right choose, Enter apply",
         {center_x, center_y + 100.0F}, kTextColor, open && any_enabled);
 
+    PlaceShape(frame, minion_button.shape, minion_button.area,
+        Shown(minion_spawning ? kAppliedColor : kButtonColor, open));
+    PlaceLabel(frame.world, minion_button.label, minion_spawning ? "Minions: On (M)" : "Minions: Off (M)",
+        {minion_button.area.x, minion_button.area.y}, kTextColor, open);
+
     PlaceShape(frame, quit_button.shape, quit_button.area, Shown(kQuitColor, open));
     PlaceLabel(frame.world, quit_button.label, "Quit (Q)", {quit_button.area.x, quit_button.area.y}, kTextColor, open);
-    PlaceLabel(frame.world, hint, "Esc to resume", {center_x, center_y + 225.0F}, kTextColor, open);
+    PlaceLabel(frame.world, hint, "Esc to resume", {center_x, center_y + 290.0F}, kTextColor, open);
 
     std::string corner;
     for (std::size_t row = 0; row < rows.size(); ++row) {
@@ -341,6 +352,10 @@ void PauseMenu::Draw(const svanes::FrameContext& frame, bool alone)
             corner += corner.empty() ? "" : "  ";
             corner += kOptionNames[row][static_cast<std::size_t>(rows[row].applied)];
         }
+    }
+    if (!minion_spawning) {
+        corner += corner.empty() ? "" : "  ";
+        corner += "No minions";
     }
     PlaceLabel(frame.world, corner_label, corner, {viewport.width - kCornerMargin, kCornerMargin}, kTextColor,
         !corner.empty());
@@ -374,4 +389,16 @@ void PauseMenu::ResetSpeed()
     if (focused_row == kSpeedRow) {
         highlighted = GooseSpeed::Normal;
     }
+}
+
+void PauseMenu::ShowMinionSpawning(bool spawning)
+{
+    minion_spawning = spawning;
+}
+
+std::optional<bool> PauseMenu::TakeMinionSpawningRequest()
+{
+    const std::optional<bool> request = minion_spawning_request;
+    minion_spawning_request.reset();
+    return request;
 }

@@ -54,6 +54,11 @@ svanes::Transform &DynamicObject::GetTransform(svanes::Registry &world) const {
 
 void DynamicObject::UpdateVisuals(svanes::Registry &world) const {
     visuals.SetTransform(world, GetTransform(world));
+    if (world.HasComponent<svanes::Color>(entity.Get())) {
+        visuals.SetColor(world,
+                         world.GetComponent<svanes::Color>(entity.Get()));
+    }
+
     for (const auto &attachment : attachments) {
         attachment->UpdateVisuals(world);
     }
@@ -85,6 +90,11 @@ DynamicObject::DetachAttachments(svanes::Registry &world,
 std::span<const std::unique_ptr<DynamicObject>>
 DynamicObject::GetAttachments() const {
     return attachments;
+}
+
+std::vector<std::unique_ptr<DynamicObject>>
+DynamicObject::ReleaseAttachments() {
+    return std::exchange(attachments, {});
 }
 
 std::unique_ptr<DynamicObject>

@@ -1,0 +1,38 @@
+{
+    "name": "junk_triangle",
+    "max_acceleration": 0.0,
+    "max_angular_acceleration": 0.0,
+    "forward": [
+        0.0,
+        -1.0
+    ],
+    "collider": "visuals",
+    "visuals": [
+        {
+            "geometry": {
+                "type": "triangle",
+                "vertices": [
+                    [
+                        0.0,
+                        100.0
+                    ],
+                    [
+                        -50.0,
+                        -50.0
+                    ],
+                    [
+                        50.0,
+                        -50.0
+                    ]
+                ]
+            },
+            "color": [
+                255,
+                255,
+                255,
+                255
+            ],
+            "z_order": 0
+        }
+    ]
+}

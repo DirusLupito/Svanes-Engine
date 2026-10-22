@@ -12,55 +12,64 @@ Install the compiler for your operating system:
 
 On every platform, also install:
 
-- [CMake](https://cmake.org/download/) 3.25 or newer. The CMake bundled with Visual Studio can be used on Windows.
+- [CMake](https://cmake.org/download/) 3.26 or newer. The CMake bundled with Visual Studio can be used on Windows.
 - The [`just` command runner](https://github.com/casey/just#installation).
 
 After cloning the repository, open a terminal in its root directory and run:
 
 ```sh
 just fetch-deps
-just build
+```
+
+Then build your desired game:
+```sh
+just --justfile games/doubleTime/justfile build
+just --justfile games/goose/justfile build
+just --justfile games/orbitalEscalation/justfile build
 ```
 
 On Windows, CMake generates the Visual Studio solution during this process. Open
 the solution matching the Visual Studio version selected by the build scripts:
 
 - **Visual Studio 2026:** `out/build/windows-msvc/SvanesEngine.slnx`
-- **Visual Studio 2022:** `out/build/windows-vs2022/SvanesEngine.slnx`
+- **Visual Studio 2022:** `out/build/windows-vs2022/SvanesEngine.sln`
 
-Regardless of whether or not you use Visual Studio, you can build and launch optimized Release versions of the games from the command line:
+Regardless of whether or not you use Visual Studio, you can build and launch
+optimized versions with debug symbols (`RelWithDebInfo`) from the command line:
 
 ```sh
-just run
-just run goose
-just run orbitalEscalation
-just run OrbitalEscalationServer
-just run doubleTime-host
-just run doubleTime
-just run doubleTime-spec
-just run doubleTime p2p
+just --justfile games/orbitalEscalation/justfile run OrbitalEscalationServer
+just --justfile games/orbitalEscalation/justfile run OrbitalEscalation --server 127.0.0.1:45010
+just --justfile games/goose/justfile run
+just --justfile games/doubleTime/justfile run doubleTime-server
+just --justfile games/doubleTime/justfile run doubleTime-input
+just --justfile games/doubleTime/justfile run doubleTime
 ```
 
 Use `just debug` instead to build and launch a Debug version:
 
 ```sh
-just debug
-just debug goose
-just debug orbitalEscalation
-just debug OrbitalEscalationServer
-just debug doubleTime
+just --justfile games/orbitalEscalation/justfile debug OrbitalEscalationServer
+just --justfile games/goose/justfile debug
+just --justfile games/doubleTime/justfile debug
 ```
 
-Both commands accept the same game targets and default to Orbital Escalation.
-To build without launching, use `just release [target]` for Release or
-`just build [target]` for Debug. Omit the target to build all games.
+You can also run `just` from a game's directory if you don't want to specify `--justfile`.
+Running `just build`, `just release`, `just run`, or `just debug` from a game
+directory defaults to that game. Orbital Escalation clients require a server
+address; see below. For example, from `games/doubleTime`:
+
+```sh
+just build
+just run
+just run doubleTime
+```
 
 ## Orbital Escalation multiplayer
 
-Orbital Escalation supports both a dedicated server and P2P. Run the commands
-below from the repository root, with each running process in its own terminal.
-
-### Dedicated server
+Orbital Escalation uses a dedicated server.
+Run the commands below from `games/orbitalEscalation`, with each running
+process in its own terminal.
 
 Build and start the server:
 
@@ -74,7 +83,7 @@ Build and start a client on the same computer:
 just run OrbitalEscalation --server 127.0.0.1:45010
 ```
 
-Once both Release executables have been built, skip compilation with:
+Once both `RelWithDebInfo` executables have been built, skip compilation with:
 
 ```sh
 just nocompile OrbitalEscalationServer
@@ -82,10 +91,11 @@ just nocompile OrbitalEscalation --server 127.0.0.1:45010
 ```
 
 Repeat the client command in additional terminals to join more players, even
-on the same computer. `nocompile` will try to run a previously built Release
-executable, and will fail if none exists.
+on the same computer. `nocompile` runs a previously built `RelWithDebInfo`
+executable, and will fail if none exists. The client requires `--server` and
+chooses its local UDP port automatically.
 
-To select another joining port, pass `--port` to the server and use that port
+To select another server port, pass `--port` to the server and use that port
 in every client's address:
 
 ```sh
@@ -93,42 +103,20 @@ just nocompile OrbitalEscalationServer --port 50000
 just nocompile OrbitalEscalation --server 127.0.0.1:50000
 ```
 
-The default joining port is TCP 45010. On another LAN computer, replace `127.0.0.1` 
-with the server computer's LAN IPv4 address. 
+The default server port is UDP 45010, used for both admission and gameplay.
+On another LAN computer, replace `127.0.0.1` with the server computer's LAN IPv4
+address. For players outside the LAN, forward that UDP port to the server and
+give them its public IPv4 address. Allow the server through its firewall.
 
-### P2P
-
-Without `--server`, Orbital Escalation uses P2P lockstep. Start a world, then
-join it from another terminal:
-
-```sh
-just nocompile OrbitalEscalation
-just nocompile OrbitalEscalation --join 127.0.0.1:45000
-```
-
-The first process listens on UDP port 45000. The joining process defaults to
-45001. Each additional P2P process on the same computer needs a distinct local
-port, for example:
-
-```sh
-just nocompile OrbitalEscalation --join 127.0.0.1:45000 --port 45002
-```
 
 Use an existing peer's LAN address when joining from another computer. These
 options also work with `just run OrbitalEscalation` to build before launching.
 ### Titled Goose Game (Erik's game) multiplayer
 
-Peer-to-peer: one player hosts, others join any player already in the world.
-Every copy on one computer needs its own `--port`.
-
-```sh
-just run goose
-just run goose --join 127.0.0.1:45000 --port 45002
-```
-
-Client/server: start the headless server, then connect clients to its IP.
+Run the commands below from `games/goose`. Start the headless server, which
+listens on UDP port 46000, then connect any number of clients to it.
 
 ```sh
 just run goose-server
-just run goose --server 127.0.0.1
+just run goose 127.0.0.1:46000
 ```

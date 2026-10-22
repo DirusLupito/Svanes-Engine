@@ -5,6 +5,7 @@
 #include <svanes/timeline_system.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <utility>
 
 const svanes::TicCount kCollisionFlashLifetime = svanes::SecondsToTics(0.5);
@@ -49,13 +50,13 @@ void UpdateCollisionFlashes(svanes::Registry &world,
 }
 
 void CreateCollisionFlash(svanes::Registry &world,
-                          svanes::Entity gameplay_timeline,
+                          svanes::Entity effects_timeline,
                           std::vector<OwnedEntity> &collision_flashes,
                           svanes::Vector2D contact_point) {
 
     OwnedEntity owned(world);
     const auto flash = owned.Get();
-    world.AddComponent<svanes::Timeline>(flash, gameplay_timeline);
+    world.AddComponent<svanes::Timeline>(flash, effects_timeline);
     world.AddComponent<svanes::ZOrder>(flash, svanes::ZOrder{100});
     world.AddComponent<svanes::Transform>(
         flash, svanes::Transform{contact_point.x, contact_point.y});

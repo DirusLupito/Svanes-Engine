@@ -1,0 +1,32 @@
+{
+    "name": "junk_square",
+    "max_acceleration": 0.0,
+    "max_angular_acceleration": 0.0,
+    "forward": [
+        0.0,
+        -1.0
+    ],
+    "collider": "visuals",
+    "visuals": [
+        {
+            "geometry": {
+                "type": "rectangle",
+                "center": [
+                    0.0,
+                    0.0
+                ],
+                "size": [
+                    100.0,
+                    100.0
+                ]
+            },
+            "color": [
+                255,
+                255,
+                255,
+                255
+            ],
+            "z_order": 0
+        }
+    ]
+}

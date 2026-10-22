@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstddef>
-#include <cstdint>
 #include <cstring>
 #include <stdexcept>
 #include <string>
@@ -11,27 +10,22 @@
 namespace svanes {
 
 /**
- * The ID of the client that is associated with this message
- */
-using ClientId = std::uint32_t;
-
-/**
- * Generates IDs for game clients to use in communication.
- */
-ClientId GenerateClientId();
-
-/**
- * Builds URI string for 0MQ TCP
- */
-std::string MakeTcpEndpoint(const std::string &host, std::uint16_t port);
-
-std::string MakeUdpEndpoint(const std::string &host, std::uint16_t port);
-
-/**
  * Representation of an arbitrary message being sent over the network.
  * All messages are sent as raw bytes
  */
-struct NetworkMessage {
+class NetworkMessage {
+public:
+    /**
+     * Constructs an empty message.
+     */
+    NetworkMessage();
+
+    /**
+     * Constructs a message owning the provided bytes.
+     * @param bytes The bytes to store in the message.
+     */
+    explicit NetworkMessage(std::vector<std::byte> bytes);
+
     std::vector<std::byte> bytes;
 
     template <typename T> static NetworkMessage From(const T &value) {

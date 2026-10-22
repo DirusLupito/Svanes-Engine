@@ -29,3 +29,11 @@ void Visuals::SetTransform(svanes::Registry &world,
         world.GetComponent<svanes::Transform>(entity.Get()) = transform;
     }
 }
+
+void Visuals::SetColor(svanes::Registry &world, svanes::Color color) const {
+    for (const auto &entity : entities) {
+        if (world.HasComponent<svanes::SolidShape>(entity.Get())) {
+            world.GetComponent<svanes::SolidShape>(entity.Get()).color = color;
+        }
+    }
+}

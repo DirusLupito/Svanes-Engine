@@ -1,7 +1,7 @@
 #pragma once
 
-#include <SDL3/SDL_filesystem.h>
 #include <SDL3/SDL_error.h>
+#include <SDL3/SDL_filesystem.h>
 
 #include <filesystem>
 #include <stdexcept>
@@ -16,13 +16,14 @@ namespace svanes {
  * @return An absolute path independent of the terminal's working directory.
  * @throws std::runtime_error if SDL cannot locate the executable directory.
  */
-inline std::string AssetPath(std::string_view relative_path)
-{
-    const char* base = SDL_GetBasePath();
+inline std::string AssetPath(std::string_view relative_path) {
+    const char *base = SDL_GetBasePath();
     if (!base) {
-        throw std::runtime_error(std::string{"Cannot locate game assets: "} + SDL_GetError());
+        throw std::runtime_error(std::string{"Cannot locate game assets: "} +
+                                 SDL_GetError());
     }
-    return (std::filesystem::path{base} / std::filesystem::path{relative_path}).string();
+    return (std::filesystem::path{base} / std::filesystem::path{relative_path})
+        .string();
 }
 
-}
+} // namespace svanes

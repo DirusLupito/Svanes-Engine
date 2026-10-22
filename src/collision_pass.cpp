@@ -100,8 +100,9 @@ DetectEntityCollisions(const Registry &world,
             auto [a, b] = pairs[index];
 
             // Choose argument order before testing the geometry. Sorting just
-            // the results would not fix a tie break issue, as tied penetration choices depend on
-            // whichever local entity ID happened to be smaller.
+            // the results would not fix a tie break issue, as tied penetration
+            // choices depend on whichever local entity ID happened to be
+            // smaller.
             if (order == CollisionOrder::InputOrder &&
                 input_order.at(a) > input_order.at(b)) {
                 std::swap(a, b);

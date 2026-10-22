@@ -6,7 +6,7 @@ param(
     [string[]] $CMakeArguments
 )
 
-$minimumVersion = [Version] '3.25.0'
+$minimumVersion = [Version] '3.26.0'
 $vswherePath = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
 $toolchainSpecs = @(
     [PSCustomObject]@{
@@ -23,10 +23,10 @@ $toolchainSpecs = @(
 $presetToConfigurePreset = @{
     'windows-msvc' = 'windows-msvc'
     'windows-debug' = 'windows-msvc'
-    'windows-release' = 'windows-msvc'
+    'windows-relwithdebinfo' = 'windows-msvc'
     'windows-vs2022' = 'windows-vs2022'
     'windows-vs2022-debug' = 'windows-vs2022'
-    'windows-vs2022-release' = 'windows-vs2022'
+    'windows-vs2022-relwithdebinfo' = 'windows-vs2022'
 }
 
 function Get-CMakeCapabilities {

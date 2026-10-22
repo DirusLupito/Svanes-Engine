@@ -20,8 +20,10 @@
  * - Ship: A ship definition.
  * - Missile: A missile definition.
  * - MissileLauncher: A missile launcher definition.
+ * - Count: The number of valid object types and their exclusive upper bound.
+ *   This sentinel must remain last and does not represent an object type.
  */
-enum class DynamicObjectType { Ship, Missile, MissileLauncher };
+enum class DynamicObjectType { Ship, Missile, MissileLauncher, Count };
 
 /**
  * Defines an object attached to another object. This is a reference to a
@@ -65,11 +67,6 @@ struct DynamicObjectDefinition {
  * and collidable geometry, and a kinematic component for movement.
  */
 class DynamicObject {
-
-    // The OrbitalSimulation class needs to access the private members of
-    // DynamicObject to manage the simulation state and handle player
-    // interactions.
-    friend class OrbitalSimulation;
 
 public:
     /**
@@ -131,6 +128,15 @@ public:
     std::span<const std::unique_ptr<DynamicObject>> GetAttachments() const;
 
     /**
+     * Transfers ownership of the directly attached objects to the caller.
+     * Their registry components remain unchanged so the caller can rebuild
+     * their attachment relationships.
+     *
+     * @return The objects previously owned as direct attachments.
+     */
+    std::vector<std::unique_ptr<DynamicObject>> ReleaseAttachments();
+
+    /**
      * Detaches one object and transfers its ownership to the caller.
      *
      * @param world The registry containing the objects.
@@ -188,6 +194,7 @@ public:
      * Updates the visuals of the dynamic object entity to match its current
      * transform, including any attached objects. Attachment transforms should
      * be updated with UpdateAttachments first.
+     * A Color component on the object overrides its solid visual colors.
      *
      * @param world The registry containing the dynamic object entity and its
      * components.

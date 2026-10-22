@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 3.26)
 
 if(package_windows)
     if(NOT package_arch EQUAL 8)
@@ -25,8 +25,8 @@ elseif(package_system STREQUAL "Darwin")
     endif()
     set(extension "tar.gz")
 endif()
-if(NOT package_config STREQUAL "Release")
-    message(FATAL_ERROR "Package with the Release configuration.")
+if(NOT package_config STREQUAL "RelWithDebInfo")
+    message(FATAL_ERROR "Package with the RelWithDebInfo configuration.")
 endif()
 
 string(TIMESTAMP stamp "%Y%m%d-%H%M%S")

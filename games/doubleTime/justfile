@@ -1,0 +1,32 @@
+default:
+    @just --justfile "{{justfile()}}" --list
+
+set working-directory := "../.."
+
+import '../../scripts/common.just'
+
+build target="doubleTime": (_check-target target) (_build if target == "doubleTime-server" { "svanes_game_double_time_server" } else if target == "doubleTime-input" { "svanes_game_double_time_input_bridge" } else { "svanes_game_double_time" })
+
+release target="doubleTime": (_check-target target) (_release if target == "doubleTime-server" { "svanes_game_double_time_server" } else if target == "doubleTime-input" { "svanes_game_double_time_input_bridge" } else { "svanes_game_double_time" })
+
+run target="doubleTime": (release target)
+    {{if target == "doubleTime-server" { 'just --justfile "' + justfile() + '" _run-double-time-server ' + release-bin-dir } else if target == "doubleTime-input" { 'just --justfile "' + justfile() + '" _run-double-time-input ' + release-bin-dir } else { 'just --justfile "' + justfile() + '" _run-double-time-clients ' + release-bin-dir }}}
+
+debug target="doubleTime": (build target)
+    {{if target == "doubleTime-server" { 'just --justfile "' + justfile() + '" _run-double-time-server ' + bin-dir } else if target == "doubleTime-input" { 'just --justfile "' + justfile() + '" _run-double-time-input ' + bin-dir } else { 'just --justfile "' + justfile() + '" _run-double-time-clients ' + bin-dir }}}
+
+package target="doubleTime": (_check-target target) (_package target)
+
+_check-target target:
+    @{{if target =~ "^doubleTime(-server|-input)?$" { "" } else { error("no Double Time target named '" + target + "'. Try doubleTime, doubleTime-server, or doubleTime-input.") }}}
+
+# Launch the character and platform clients. Start the server and input bridge
+# separately with doubleTime-server and doubleTime-input.
+_run-double-time-clients directory=bin-dir:
+    {{if os() == "windows" { "Start-Process -WorkingDirectory " + directory + " -FilePath " + directory + "svanes_game_double_time" + exe-suffix + " -ArgumentList '127.0.0.1 5601 character'" } else { "cd " + directory + "; ./svanes_game_double_time 127.0.0.1 5601 character & character_pid=$!; ./svanes_game_double_time 127.0.0.1 5602 platform & platform_pid=$!; trap 'kill $character_pid $platform_pid 2>/dev/null || true' EXIT INT TERM; wait" }}}
+
+_run-double-time-server directory=bin-dir:
+    {{if os() == "windows" { "Start-Process -WorkingDirectory " + directory + " -FilePath " + directory + "svanes_game_double_time_server" + exe-suffix } else { "cd " + directory + " && exec ./svanes_game_double_time_server" }}}
+
+_run-double-time-input directory=bin-dir:
+    {{if os() == "windows" { "Start-Process -WorkingDirectory " + directory + " -FilePath " + directory + "svanes_game_double_time_input_bridge" + exe-suffix } else { "cd " + directory + " && exec ./svanes_game_double_time_input_bridge" }}}
