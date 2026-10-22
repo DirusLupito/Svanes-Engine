@@ -76,6 +76,10 @@ svanes::NetworkMessage EncodePlayerInput(const PlayerInput &input) {
     writer.WriteBool(input.intent.fire);
     WritePosition(writer, input.intent.aim);
     WriteClock(writer, input.clock);
+    writer.WriteBool(input.minion_spawning.has_value());
+    if (input.minion_spawning) {
+        writer.WriteBool(*input.minion_spawning);
+    }
     return writer.Finish();
 }
 
@@ -88,6 +92,9 @@ PlayerInput DecodePlayerInput(const svanes::NetworkMessage &message) {
     input.intent.fire = reader.ReadBool();
     input.intent.aim = ReadPosition(reader);
     input.clock = ReadClock(reader);
+    if (reader.ReadBool()) {
+        input.minion_spawning = reader.ReadBool();
+    }
     RequireFullyRead(reader);
     return input;
 }
@@ -101,11 +108,13 @@ svanes::NetworkMessage EncodeSnapshot(const Snapshot &snapshot) {
         writer.WriteUint32(goose.client);
         WritePosition(writer, goose.position);
         writer.WriteUint8(static_cast<std::uint8_t>(goose.state));
+        writer.WriteUint32(goose.health);
     }
 
     writer.WriteBool(snapshot.enemy.has_value());
     if (snapshot.enemy) {
-        WritePosition(writer, *snapshot.enemy);
+        WritePosition(writer, snapshot.enemy->position);
+        writer.WriteUint32(snapshot.enemy->health);
     }
 
     writer.WriteUint32(static_cast<std::uint32_t>(snapshot.bullets.size()));
@@ -113,6 +122,14 @@ svanes::NetworkMessage EncodeSnapshot(const Snapshot &snapshot) {
         WritePosition(writer, bullet.position);
         writer.WriteBool(bullet.from_enemy);
     }
+
+    writer.WriteUint32(static_cast<std::uint32_t>(snapshot.minions.size()));
+    for (const SnapshotMinion &minion : snapshot.minions) {
+        WritePosition(writer, minion.position);
+        writer.WriteUint8(static_cast<std::uint8_t>(minion.kind));
+        writer.WriteUint32(minion.health);
+    }
+    writer.WriteBool(snapshot.minion_spawning);
     return writer.Finish();
 }
 
@@ -126,11 +143,14 @@ Snapshot DecodeSnapshot(const svanes::NetworkMessage &message) {
         const svanes::ClientId client = reader.ReadUint32();
         const svanes::Vector2D position = ReadPosition(reader);
         const auto state = static_cast<GooseState>(reader.ReadUint8());
-        snapshot.geese.push_back({client, position, state});
+        const std::uint32_t health = reader.ReadUint32();
+        snapshot.geese.push_back({client, position, state, health});
     }
 
     if (reader.ReadBool()) {
-        snapshot.enemy = ReadPosition(reader);
+        const svanes::Vector2D position = ReadPosition(reader);
+        const std::uint32_t health = reader.ReadUint32();
+        snapshot.enemy = SnapshotEnemy{position, health};
     }
 
     const std::uint32_t bullet_count = reader.ReadUint32();
@@ -139,6 +159,15 @@ Snapshot DecodeSnapshot(const svanes::NetworkMessage &message) {
         const bool from_enemy = reader.ReadBool();
         snapshot.bullets.push_back({position, from_enemy});
     }
+
+    const std::uint32_t minion_count = reader.ReadUint32();
+    for (std::uint32_t index = 0; index < minion_count; ++index) {
+        const svanes::Vector2D position = ReadPosition(reader);
+        const auto kind = static_cast<MinionKind>(reader.ReadUint8());
+        const std::uint32_t health = reader.ReadUint32();
+        snapshot.minions.push_back({position, kind, health});
+    }
+    snapshot.minion_spawning = reader.ReadBool();
 
     RequireFullyRead(reader);
     return snapshot;

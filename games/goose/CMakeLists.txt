@@ -18,6 +18,7 @@ add_executable(
     goose.cpp
     enemy.cpp
     bullets.cpp
+    minions.cpp
 )
 target_link_libraries(svanes_game_goose_server PRIVATE Svanes::Engine)
 
