@@ -182,7 +182,8 @@ public:
             menu->ResetSpeed();
         }
         menu->HandleInput(frame, alone);
-        should_quit = should_quit || menu->TakeQuitRequest();
+        should_quit = should_quit || menu->TakeQuitRequest() ||
+                      frame.input.WasCloseRequested();
 
         // TASK 6, scaling: Tab switches the camera between the two scale modes.
         // Constant draws everything at its literal pixel size, so resizing the window
@@ -197,7 +198,8 @@ public:
 
         const PlayerInput input{
             ReadIntent(frame),
-            ClockSetting{.speed = menu->Speed(), .paused = menu->IsOpen()}};
+            ClockSetting{.speed = menu->Speed(), .paused = menu->IsOpen()},
+            should_quit};
         if (frame.network.IsConnected()) {
             frame.network.Send(EncodePlayerInput(input));
         }

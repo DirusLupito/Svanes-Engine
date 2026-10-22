@@ -76,6 +76,7 @@ svanes::NetworkMessage EncodePlayerInput(const PlayerInput &input) {
     writer.WriteBool(input.intent.fire);
     WritePosition(writer, input.intent.aim);
     WriteClock(writer, input.clock);
+    writer.WriteBool(input.leaving);
     return writer.Finish();
 }
 
@@ -88,6 +89,7 @@ PlayerInput DecodePlayerInput(const svanes::NetworkMessage &message) {
     input.intent.fire = reader.ReadBool();
     input.intent.aim = ReadPosition(reader);
     input.clock = ReadClock(reader);
+    input.leaving = reader.ReadBool();
     RequireFullyRead(reader);
     return input;
 }

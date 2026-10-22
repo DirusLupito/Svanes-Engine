@@ -90,6 +90,13 @@ public:
         for (const svanes::ClientInput &received :
              context.network.PollInputs()) {
             const PlayerInput input = DecodePlayerInput(received.message);
+            if (input.leaving) {
+                if (players.contains(received.client)) {
+                    RemovePlayer(context.world, received.client);
+                    std::cout << "Player " << received.client << " left.\n";
+                }
+                continue;
+            }
             Player &player = FindOrSpawn(context.world, received.client);
 
             const float pending_dash = player.intent.dash;
@@ -108,8 +115,7 @@ public:
             }
         }
         for (const svanes::ClientId client : silent) {
-            context.world.DestroyEntity(players.at(client).goose.GetEntity());
-            players.erase(client);
+            RemovePlayer(context.world, client);
             std::cout << "Player " << client << " timed out.\n";
         }
 
@@ -176,6 +182,17 @@ private:
         std::cout << "Player " << client << " joined.\n";
         const Player player{Goose(world, clock, spawn), {}, {}, {}};
         return players.emplace(client, player).first->second;
+    }
+
+    /**
+     * Destroys a client's goose and forgets the client.
+     *
+     * @param world The registry containing the goose.
+     * @param client A client that currently has a goose.
+     */
+    void RemovePlayer(svanes::Registry &world, svanes::ClientId client) {
+        world.DestroyEntity(players.at(client).goose.GetEntity());
+        players.erase(client);
     }
 
     /**
