@@ -17,7 +17,8 @@ inline constexpr float BulletSize = 8.0F;
 /**
  * Component marking an entity as a projectile, along with the entity that
  * fired it. Bullets ignore collisions with their owner so they do not strike
- * the shooter they spawn on top of.
+ * the shooter they spawn on top of, and pass through anything their owner
+ * spawned.
  *
  * FIELDS:
  * - owner: The entity that fired this bullet.
@@ -60,8 +61,9 @@ void SpawnBullet(svanes::Registry &world, svanes::Entity owner,
 
 /**
  * Destroys every bullet that overlaps something with a Collider2D other than
- * its owner or another bullet, and reports what each one struck. Hits are
- * reported, not applied, so the caller decides what being hit does to a target.
+ * its owner, a minion its owner spawned, or another bullet, and reports what
+ * each one struck. Hits are reported, not applied, so the caller decides what
+ * being hit does to a target.
  * The arena is closed on every side, so every bullet eventually strikes
  * something.
  *

@@ -2,6 +2,7 @@
 #include "bullets.hpp"
 #include "enemy.hpp"
 #include "goose.hpp"
+#include "minions.hpp"
 #include "pause_menu.hpp"
 #include "protocol.hpp"
 
@@ -40,6 +41,11 @@ constexpr svanes::Color kDeathTintColor{
     .red = 90, .green = 90, .blue = 90, .alpha = 150};
 constexpr std::int32_t kDeathTintZ = 500;
 
+constexpr float kBossBarWidthFraction = 0.45F;
+constexpr float kBossBarHeight = 28.0F;
+constexpr float kBossBarTop = 30.0F;
+constexpr std::int32_t kBossBarZ = 600;
+
 // where in the window the goose is held, as a fraction of the output size, placing
 // it centered horizontally and below center vertically to show more of what is ahead
 constexpr float kCameraAnchorX = 0.5F;
@@ -53,6 +59,7 @@ constexpr double kFlySecondsPerFrame = 0.06;
 
 constexpr svanes::Color kEnemyColor{200, 60, 60, 255};
 constexpr svanes::Color kGooseBulletColor{255, 230, 120, 255};
+constexpr svanes::Color kMinionColor{.red = 230, .green = 120, .blue = 30};
 
 // the health bar spans the goose's width and floats just above its head
 constexpr float kHealthBarHeight = 5.0F;
@@ -116,42 +123,40 @@ struct DrawnGoose {
  *
  * @param world The registry holding the part.
  * @param entity The part's entity.
- * @param center_x The world x position of the part's center.
- * @param center_y The world y position of the part's center.
- * @param width The part's width.
+ * @param area The part's world center and size.
  */
 void PlaceHealthBarPart(svanes::Registry &world, svanes::Entity entity,
-                        float center_x, float center_y, float width) {
+                        const svanes::Rectangle2D &area) {
     svanes::Transform &transform = world.GetComponent<svanes::Transform>(entity);
-    transform.x = center_x;
-    transform.y = center_y;
-    std::get<svanes::Rectangle2D>(
-        world.GetComponent<svanes::SolidShape>(entity).geometry)
-        .width = width;
+    transform.x = area.x;
+    transform.y = area.y;
+    world.GetComponent<svanes::SolidShape>(entity).geometry =
+        svanes::Rectangle2D{.width = area.width, .height = area.height};
 }
 
 /**
- * Centers a goose's health bar above it, split between the health it has and
- * the health it has lost.
+ * Lays out a health bar, split between the health remaining on the left and
+ * the health lost on the right.
  *
- * @param world The registry holding the goose's bar.
- * @param goose The goose the bar belongs to.
- * @param position The goose's world position.
- * @param health The goose's health, from zero up to GooseMaxHealth.
+ * @param world The registry holding the bar's parts.
+ * @param filled_part The entity drawing the health remaining.
+ * @param missing_part The entity drawing the health lost.
+ * @param bar The whole bar's world center and size.
+ * @param health The health remaining, from zero up to max_health.
+ * @param max_health The health a full bar stands for.
  */
-void PlaceHealthBar(svanes::Registry &world, const DrawnGoose &goose,
-                    svanes::Vector2D position, std::uint32_t health) {
-    const float filled = GooseWidth * static_cast<float>(health) /
-                         static_cast<float>(GooseMaxHealth);
-    const float missing = GooseWidth - filled;
-    const float left = position.x - GooseWidth * 0.5F;
-    const float center_y = position.y - GooseHeight * 0.5F - kHealthBarGap -
-                           kHealthBarHeight * 0.5F;
+void PlaceHealthBar(svanes::Registry &world, svanes::Entity filled_part,
+                    svanes::Entity missing_part, const svanes::Rectangle2D &bar,
+                    std::uint32_t health, std::uint32_t max_health) {
+    const float filled = bar.width * static_cast<float>(health) /
+                         static_cast<float>(max_health);
+    const float missing = bar.width - filled;
+    const float left = bar.x - bar.width * 0.5F;
 
-    PlaceHealthBarPart(world, goose.health_bar, left + filled * 0.5F, center_y,
-                       filled);
-    PlaceHealthBarPart(world, goose.missing_health_bar,
-                       left + filled + missing * 0.5F, center_y, missing);
+    PlaceHealthBarPart(world, filled_part,
+                       {left + filled * 0.5F, bar.y, filled, bar.height});
+    PlaceHealthBarPart(world, missing_part, {left + filled + missing * 0.5F,
+                                             bar.y, missing, bar.height});
 }
 
 /**
@@ -189,11 +194,16 @@ public:
         world.AddComponent<svanes::ZOrder>(death_tint,
                                            svanes::ZOrder{kDeathTintZ});
 
+        boss_bar = CreateHealthBarPart(world, kHealthColor);
+        missing_boss_bar = CreateHealthBarPart(world, kMissingHealthColor);
+        world.AddComponent<svanes::ZOrder>(boss_bar, svanes::ZOrder{kBossBarZ});
+        world.AddComponent<svanes::ZOrder>(missing_boss_bar,
+                                           svanes::ZOrder{kBossBarZ});
+
         clock = world.CreateEntity();
         world.AddComponent<svanes::Timeline>(clock);
 
         CreateArena(world);
-        CreateSpawnPoints(world);
         CreateOrb(context);
 
         enemy = world.CreateEntity();
@@ -253,11 +263,11 @@ public:
         }
         menu->HandleInput(frame, alone);
         should_quit = should_quit || menu->TakeQuitRequest();
+        if (const std::optional<bool> request =
+                menu->TakeMinionSpawningRequest()) {
+            pending_minion_spawning = request;
+        }
 
-        // TASK 6, scaling: Tab switches the camera between the two scale modes.
-        // Constant draws everything at its literal pixel size, so resizing the window
-        // reveals more of the world. Proportional rescales with the window, so
-        // everything keeps the same fraction of the screen at any size.
         if (frame.input.WasPressed(svanes::Key::Tab)) {
             frame.camera.scale_mode =
                 frame.camera.scale_mode == svanes::ScaleMode::Constant
@@ -271,12 +281,14 @@ public:
 
         const PlayerInput input{
             ReadIntent(frame),
-            ClockSetting{.speed = menu->Speed(), .paused = menu->IsOpen()}};
+            ClockSetting{.speed = menu->Speed(), .paused = menu->IsOpen()},
+            pending_minion_spawning};
         if (frame.network.IsConnected()) {
             frame.network.Send(EncodePlayerInput(input));
         }
 
         UpdateCamera(frame);
+        PlaceBossBar(frame);
         menu->Draw(frame, alone);
     }
 
@@ -372,12 +384,18 @@ private:
     }
 
     /**
-     * Makes the drawn world match a snapshot.
+     * Makes the drawn world and the menu match a snapshot, and stops sending a
+     * minion spawning request once the server has carried it out.
      *
      * @param world The registry holding everything drawn.
      * @param snapshot The latest snapshot from the server.
      */
     void ApplySnapshot(svanes::Registry &world, const Snapshot &snapshot) {
+        menu->ShowMinionSpawning(snapshot.minion_spawning);
+        if (pending_minion_spawning == snapshot.minion_spawning) {
+            pending_minion_spawning.reset();
+        }
+
         svanes::Timeline &timeline = world.GetComponent<svanes::Timeline>(clock);
         timeline.SetTicSize(TicSize(snapshot.clock.speed));
         if (snapshot.clock.paused) {
@@ -407,7 +425,13 @@ private:
                 ShowState(world, drawn.entity, goose.state);
                 drawn.state = goose.state;
             }
-            PlaceHealthBar(world, drawn, goose.position, goose.health);
+            const svanes::Rectangle2D above_goose{
+                goose.position.x,
+                goose.position.y - GooseHeight * 0.5F - kHealthBarGap -
+                    kHealthBarHeight * 0.5F,
+                GooseWidth, kHealthBarHeight};
+            PlaceHealthBar(world, drawn.health_bar, drawn.missing_health_bar,
+                           above_goose, goose.health, GooseMaxHealth);
             if (goose.client == player) {
                 world.GetComponent<svanes::SolidShape>(death_tint).color.alpha =
                     goose.health == 0 ? kDeathTintColor.alpha : 0;
@@ -423,9 +447,10 @@ private:
         if (snapshot.enemy) {
             svanes::Transform &enemy_transform =
                 world.GetComponent<svanes::Transform>(enemy);
-            enemy_transform.x = snapshot.enemy->x;
-            enemy_transform.y = snapshot.enemy->y;
+            enemy_transform.x = snapshot.enemy->position.x;
+            enemy_transform.y = snapshot.enemy->position.y;
         }
+        boss_health = snapshot.enemy ? snapshot.enemy->health : 0;
         world.GetComponent<svanes::SolidShape>(enemy).color.alpha =
             snapshot.enemy ? 255 : 0;
 
@@ -446,6 +471,44 @@ private:
                     .geometry = svanes::Rectangle2D{.width = BulletSize,
                                                     .height = BulletSize}});
             bullets.push_back(bullet);
+        }
+
+        for (const svanes::Entity part : minion_parts) {
+            world.DestroyEntity(part);
+        }
+        minion_parts.clear();
+        for (const SnapshotMinion &minion : snapshot.minions) {
+            const bool archer = minion.kind == MinionKind::Archer;
+            const float width = archer ? ArcherMinionWidth : MeleeMinionWidth;
+            const float height =
+                archer ? ArcherMinionHeight : MeleeMinionHeight;
+
+            const svanes::Entity body = world.CreateEntity();
+            world.AddComponent<svanes::Transform>(
+                body, svanes::Transform{.x = minion.position.x,
+                                        .y = minion.position.y});
+            world.AddComponent<svanes::SolidShape>(
+                body, svanes::SolidShape{
+                          .color = kMinionColor,
+                          .geometry = svanes::Rectangle2D{.width = width,
+                                                          .height = height}});
+            minion_parts.push_back(body);
+
+            if (minion.health < MinionMaxHealth) {
+                const svanes::Entity filled =
+                    CreateHealthBarPart(world, kHealthColor);
+                const svanes::Entity missing =
+                    CreateHealthBarPart(world, kMissingHealthColor);
+                const svanes::Rectangle2D above_minion{
+                    minion.position.x,
+                    minion.position.y - height * 0.5F - kHealthBarGap -
+                        kHealthBarHeight * 0.5F,
+                    width, kHealthBarHeight};
+                PlaceHealthBar(world, filled, missing, above_minion,
+                               minion.health, MinionMaxHealth);
+                minion_parts.push_back(filled);
+                minion_parts.push_back(missing);
+            }
         }
     }
 
@@ -478,8 +541,7 @@ private:
         world.AddComponent<svanes::Transform>(entity);
         world.AddComponent<svanes::SolidShape>(
             entity, svanes::SolidShape{.color = color,
-                                       .geometry = svanes::Rectangle2D{
-                                           .height = kHealthBarHeight}});
+                                       .geometry = svanes::Rectangle2D{}});
         return entity;
     }
 
@@ -515,6 +577,25 @@ private:
                         .frame_count = kGooseWalkFrames,
                         .tics_per_frame =
                             svanes::SecondsToTics(seconds_per_frame)});
+    }
+
+    /**
+     * Pins the boss's health bar to the top center of the view, hidden once
+     * the boss is dead. Call after the camera has moved.
+     *
+     * @param frame The frame's world and camera.
+     */
+    void PlaceBossBar(const svanes::ClientFrameContext &frame) {
+        const svanes::Rectangle2D viewport = frame.camera.Viewport();
+        const float width =
+            boss_health > 0 ? viewport.width * kBossBarWidthFraction : 0.0F;
+        const svanes::Rectangle2D bar = frame.camera.ScreenToWorld(
+            {viewport.x,
+             viewport.y - viewport.height * 0.5F + kBossBarTop +
+                 kBossBarHeight * 0.5F,
+             width, kBossBarHeight});
+        PlaceHealthBar(frame.world, boss_bar, missing_boss_bar, bar,
+                       boss_health, EnemyMaxHealth);
     }
 
     /**
@@ -561,6 +642,7 @@ private:
     svanes::ClientId player = 0;
     std::optional<PauseMenu> menu;
     bool should_quit = false;
+    std::optional<bool> pending_minion_spawning;
 
     svanes::TicCount left_tap_window = 0;
     svanes::TicCount right_tap_window = 0;
@@ -578,14 +660,16 @@ private:
     svanes::Entity death_tint = 0;
 
     svanes::Entity enemy = 0;
+    svanes::Entity boss_bar = 0;
+    svanes::Entity missing_boss_bar = 0;
+    std::uint32_t boss_health = 0;
     std::unordered_map<svanes::ClientId, DrawnGoose> geese;
     std::vector<svanes::Entity> bullets;
+    std::vector<svanes::Entity> minion_parts;
 };
 
 } // namespace
 
-// TASK 1, running the engine: the client is handed to a svanes::NetworkClient, which
-// opens the window and runs the engine's loop until the client asks to quit
 int32_t main(int32_t argc, char **argv) {
     if (argc != 2 || std::string_view{argv[1]} == "--help") {
         std::cerr << "Usage: svanes_game_goose IPv4:PORT\n"

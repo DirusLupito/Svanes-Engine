@@ -1,6 +1,7 @@
 #pragma once
 
 #include "goose.hpp"
+#include "minions.hpp"
 
 #include <svanes/network/clientserver/network_server.hpp>
 #include <svanes/network/network_message.hpp>
@@ -53,10 +54,14 @@ struct ClockSetting {
  * - intent: What the player wants their goose to do.
  * - clock: How the player wants the world's clock to run. The server follows
  *   it only while this player is alone.
+ * - minion_spawning: Whether the player wants the enemy to drop minions, or
+ *   empty if they have not asked for a change. Any player may change it for
+ *   everyone.
  */
 struct PlayerInput {
     GooseIntent intent;
     ClockSetting clock;
+    std::optional<bool> minion_spawning;
 };
 
 /**
@@ -88,19 +93,49 @@ struct SnapshotBullet {
 };
 
 /**
+ * The enemy as the server last saw it.
+ *
+ * FIELDS:
+ * - position: Its world position.
+ * - health: Its health, from zero up to EnemyMaxHealth.
+ */
+struct SnapshotEnemy {
+    svanes::Vector2D position;
+    std::uint32_t health;
+};
+
+/**
+ * One minion as the server last saw it.
+ *
+ * FIELDS:
+ * - position: Its world position.
+ * - kind: How it fights, which decides how it is drawn.
+ * - health: Its health, from one up to MinionMaxHealth.
+ */
+struct SnapshotMinion {
+    svanes::Vector2D position;
+    MinionKind kind;
+    std::uint32_t health;
+};
+
+/**
  * The only message the server sends, to every player after each step.
  *
  * FIELDS:
  * - clock: How the world's clock is running.
  * - geese: Every player's goose.
- * - enemy: The enemy's position, or empty once it is dead.
+ * - enemy: The enemy, or empty once it is dead.
  * - bullets: Every live bullet.
+ * - minions: Every live minion.
+ * - minion_spawning: Whether the enemy is allowed to drop minions.
  */
 struct Snapshot {
     ClockSetting clock;
     std::vector<SnapshotGoose> geese;
-    std::optional<svanes::Vector2D> enemy;
+    std::optional<SnapshotEnemy> enemy;
     std::vector<SnapshotBullet> bullets;
+    std::vector<SnapshotMinion> minions;
+    bool minion_spawning = true;
 };
 
 /**

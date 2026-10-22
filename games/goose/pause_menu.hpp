@@ -9,6 +9,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 
 /**
  * The menu Escape opens and closes. Q or the Quit button asks to leave.
@@ -24,7 +25,12 @@
  * option highlights and applies it at once. Closing the menu forgets a
  * highlight that was not applied. A disabled row is greyed out and ignores input.
  *
- * A label in the corner of the screen shows any setting that is not 1x.
+ * Below the rows, a button, or M, asks to turn the enemy's minion spawning on
+ * or off. That setting is shared by everyone in the world, so the button shows
+ * the value the server last reported rather than the request.
+ *
+ * A label in the corner of the screen shows any setting that is not 1x, and
+ * when minion spawning is off.
  */
 class PauseMenu final {
 public:
@@ -69,6 +75,18 @@ public:
 
     /** Returns the game speed to 1x, as when another player joins. */
     void ResetSpeed();
+
+    /**
+     * Shows whether the enemy drops minions.
+     * @param spawning The setting the server last reported.
+     */
+    void ShowMinionSpawning(bool spawning);
+
+    /**
+     * Reports a request to change minion spawning once.
+     * @return The setting the player asked for since the last call, or empty if they did not ask.
+     */
+    std::optional<bool> TakeMinionSpawningRequest();
 
 private:
     /**
@@ -118,6 +136,8 @@ private:
 
     bool open = false;
     bool quit_requested = false;
+    bool minion_spawning = true;
+    std::optional<bool> minion_spawning_request;
     std::size_t focused_row = 0;
     GooseSpeed highlighted = GooseSpeed::Normal;
 
@@ -125,6 +145,7 @@ private:
     svanes::Entity backdrop{};
     svanes::Entity highlight{};
     std::array<Row, 2> rows{};
+    Button minion_button{};
     Button quit_button{};
     svanes::Entity title{};
     svanes::Entity note{};

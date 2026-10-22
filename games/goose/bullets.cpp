@@ -1,5 +1,7 @@
 #include "bullets.hpp"
 
+#include "minions.hpp"
+
 #include <svanes/collision_system.hpp>
 #include <svanes/kinematic_system.hpp>
 #include <svanes/registry.hpp>
@@ -56,6 +58,11 @@ std::vector<BulletHit> UpdateBullets(svanes::Registry &world) {
             const svanes::Kinematic2D &motion) {
             for (const svanes::Entity target : targets) {
                 if (target == bullet.owner) {
+                    continue;
+                }
+                if (world.HasComponent<Minion>(target) &&
+                    world.GetComponent<Minion>(target).spawner ==
+                        bullet.owner) {
                     continue;
                 }
 

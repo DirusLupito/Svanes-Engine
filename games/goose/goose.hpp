@@ -61,6 +61,19 @@ enum class GooseState : std::uint8_t {
 };
 
 /**
+ * Who a hit on a goose came from. Each has its own invincibility window, so
+ * being hit by one does not protect the goose from the other.
+ *
+ * MEMBERS:
+ * - Enemy: The enemy or anything it spawned.
+ * - Player: Another player's goose.
+ */
+enum class HitSource : std::uint8_t {
+    Enemy,
+    Player,
+};
+
+/**
  * The player character on the server. Owns one entity and moves it by writing
  * to the engine's Kinematic2D component, letting Gravity and the engine's
  * physics step do the integration.
@@ -96,21 +109,23 @@ public:
 
     /**
      * Throws the goose along a direction, takes damage, and starts the
-     * knockback and invincibility timers. Player control is suspended until the
-     * knockback timer expires, and further hits are ignored until the
-     * invincibility timer does. Ignored entirely while dead. If this takes the
-     * last of the goose's health, the goose dies.
+     * knockback timer and the source's invincibility timer. Player control is
+     * suspended until the knockback timer expires, and further hits from the
+     * same source are ignored until its invincibility timer does. Ignored
+     * entirely while dead. If this takes the last of the goose's health, the
+     * goose dies.
      *
      * @param world The registry holding the goose entity.
      * @param direction The direction to be thrown in. Need not be normalized.
      * @param speed The speed to be thrown at, in world units per second.
      * @param damage The health to lose. Health stops at zero.
+     * @param source Who the hit came from.
      *
      * @throws std::invalid_argument if the direction is not finite or is zero
      * length.
      */
     void Hit(svanes::Registry &world, svanes::Vector2D direction, float speed,
-             std::uint32_t damage);
+             std::uint32_t damage, HitSource source);
 
     /**
      * Kills the goose, even while it is invincible. Does nothing if it is
@@ -145,14 +160,6 @@ private:
      */
     void Respawn(svanes::Registry &world);
 
-    /**
-     * Pushes the goose out of every Solid it overlaps and recalculates whether
-     * it is standing on the ground.
-     *
-     * @param world The registry containing the goose and the arena.
-     */
-    void ResolveCollisions(svanes::Registry &world);
-
     svanes::Entity entity;
     svanes::Vector2D spawn;
     std::uint32_t health;
@@ -160,7 +167,7 @@ private:
     GooseState state = GooseState::Idle;
 
     // whether the goose is standing on solid geometry, recalculated every frame
-    // from the collision normals in ResolveCollisions
+    // from the collision normals in ResolveSolidCollisions
     bool grounded = false;
 
     svanes::TicCount fly_time_remaining = 0;
@@ -175,8 +182,10 @@ private:
     // player input so a hit cannot be immediately walked off
     svanes::TicCount knockback_timer = 0;
 
-    // counts down after a hit, during which further knockback is ignored
-    svanes::TicCount invincible_timer = 0;
+    // count down after a hit from each source, during which further hits from
+    // that source are ignored
+    svanes::TicCount enemy_invincible_timer = 0;
+    svanes::TicCount player_invincible_timer = 0;
 
     // counts down while dead, and the goose respawns when it reaches zero
     svanes::TicCount respawn_timer = 0;
