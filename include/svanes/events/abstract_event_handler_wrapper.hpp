@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "event.hpp"
+#include <svanes/events/event.hpp>
 
 #include <string>
 

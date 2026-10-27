@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "abstract_event_handler_wrapper.hpp"
+#include <svanes/events/abstract_event_handler_wrapper.hpp>
 
 #include <concepts>
 #include <functional>
