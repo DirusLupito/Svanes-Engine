@@ -11,7 +11,6 @@ namespace svanes {
  */
 class Event {
 public:
-
     /**
      * Default destructor for the Event class.
      */
@@ -27,9 +26,9 @@ public:
     virtual const std::string GetEventType() const = 0;
 
     /**
-     * Indicates whether the event has been handled by a given event handler.
+     * Indicates whether the event has been handled by any event handler.
      */
     bool Handled{false};
 };
 
-}
+} // namespace svanes
