@@ -1,3 +1,5 @@
+// Inspired by code from https://denyskryvytskyi.github.io/event-system
+
 #pragma once
 
 #include <string>
