@@ -158,9 +158,10 @@ private:
      * movement, including collisions, damage, and destruction.
      *
      * @param world The authoritative world after the engine's physics step.
+     * @param events The event manager to queue detected collisions.
      * @param driver The engine's parallel for driver for collision detection.
      */
-    void RespondToPhysics(svanes::Registry &world,
+    void RespondToPhysics(svanes::Registry &world, svanes::EventManager &events,
                           svanes::AsyncParallelForDriver &driver);
 
     /**

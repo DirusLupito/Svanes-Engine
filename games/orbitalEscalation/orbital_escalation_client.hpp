@@ -109,8 +109,9 @@ private:
      * physics step between server updates.
      *
      * @param world The client's world after its timelines have advanced.
+     * @param events The event manager to queue predicted collisions.
      */
-    void Predict(svanes::Registry &world);
+    void Predict(svanes::Registry &world, svanes::EventManager &events);
 
     // The server's address for admission and gameplay messages.
     std::string server_address;

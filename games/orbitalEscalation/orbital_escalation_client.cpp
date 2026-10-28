@@ -243,7 +243,7 @@ void OrbitalEscalationClient::Update(const svanes::ClientFrameContext &frame) {
             effects.Pause();
             svanes::AdvanceTimelines(frame.world,
                                      svanes::DefaultPhysicsStepTics);
-            Predict(frame.world);
+            Predict(frame.world, frame.events);
             svanes::AdvanceSpriteAnimations(frame.world);
             if (!effects_paused) {
                 effects.Unpause();
@@ -526,7 +526,8 @@ void OrbitalEscalationClient::SendInput(
     frame.network.Send(writer.Finish());
 }
 
-void OrbitalEscalationClient::Predict(svanes::Registry &world) {
+void OrbitalEscalationClient::Predict(svanes::Registry &world,
+                                      svanes::EventManager &events) {
     svanes::AdvancePhysics(
         world, {}, parallel_for, [&](std::span<const svanes::PhysicsTimeStep>) {
             ApplyPropulsion(world);
@@ -541,8 +542,8 @@ void OrbitalEscalationClient::Predict(svanes::Registry &world) {
                         colliders.push_back(entity);
                     }
                 });
-            auto contacts =
-                svanes::DetectEntityCollisions(world, colliders, parallel_for);
+            auto contacts = svanes::DetectEntityCollisions(
+                world, colliders, events, parallel_for);
 
             // Attached parts do not collide with each other, and freshly fired
             // missiles ignore their firing ship while arming.

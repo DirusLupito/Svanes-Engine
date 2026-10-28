@@ -162,7 +162,7 @@ void OrbitalEscalationServer::PhysicsUpdate(
 
     if (!world.GetComponent<svanes::Timeline>(gameplay_timeline->Get())
              .IsPaused()) {
-        RespondToPhysics(world, context.parallel_for);
+        RespondToPhysics(world, context.events, context.parallel_for);
         for (auto &[client, player] : players) {
             if (player.ship) {
                 SetWeaponControls(world, *player.ship, player.input.weapons);
@@ -397,7 +397,8 @@ void OrbitalEscalationServer::CreateJunk(svanes::Registry &world,
 }
 
 void OrbitalEscalationServer::RespondToPhysics(
-    svanes::Registry &world, svanes::AsyncParallelForDriver &driver) {
+    svanes::Registry &world, svanes::EventManager &events,
+    svanes::AsyncParallelForDriver &driver) {
 
     for (auto &[client, player] : players) {
         if (player.ship) {
@@ -418,7 +419,8 @@ void OrbitalEscalationServer::RespondToPhysics(
                 colliders.push_back(entity);
             }
         });
-    auto contacts = svanes::DetectEntityCollisions(world, colliders, driver);
+    auto contacts =
+        svanes::DetectEntityCollisions(world, colliders, events, driver);
 
     // Parts of the same object should not collide with each other. An arming
     // missile also ignores its firing ship and that ship's attached parts.

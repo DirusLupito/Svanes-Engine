@@ -8,6 +8,7 @@
 
 namespace svanes {
 
+class EventManager;
 class NetworkServer;
 
 /**
@@ -46,6 +47,8 @@ struct JoinResponse {
  * FIELDS:
  * - world: The engine owned registry containing the server's entities and
  * components.
+ * - events: The engine owned event manager used to register handlers and
+ * report events.
  * - network: The engine owned network server used to manage client connections
  * and send/receive messages.
  * - gravity: The engine owned gravity vector applied to entities with
@@ -55,6 +58,7 @@ struct JoinResponse {
  */
 struct ServerContext {
     Registry &world;
+    EventManager &events;
     NetworkServer &network;
     Vector2D &gravity;
     std::uint32_t concurrency = 1;
@@ -87,6 +91,8 @@ struct ServerUpdateContext {
  * FIELDS:
  * - world: The engine owned registry containing the server's entities and
  * components.
+ * - events: The engine owned event manager used to register handlers and
+ * report events.
  * - network: The engine owned network server used to manage client connections
  * and send/receive messages.
  * - entity_steps: A span of physics time steps for each entity.
@@ -95,6 +101,7 @@ struct ServerUpdateContext {
  */
 struct ServerPhysicsContext {
     Registry &world;
+    EventManager &events;
     NetworkServer &network;
     std::span<const PhysicsTimeStep> entity_steps;
     AsyncParallelForDriver &parallel_for;
