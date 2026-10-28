@@ -2,7 +2,14 @@
 
 #include <svanes/network/message_serialization.hpp>
 
+#include <algorithm>
+#include <array>
+#include <charconv>
+#include <cstring>
 #include <stdexcept>
+#include <string>
+#include <string_view>
+#include <system_error>
 
 namespace {
 
@@ -53,6 +60,60 @@ void RequireFullyRead(const svanes::MessageReader &reader) {
         throw std::invalid_argument("A goose message had unread bytes left.");
     }
 }
+
+/**
+ * Appends a number and a separating space to text.
+ *
+ * @param text The text to append to.
+ * @param value The number to write.
+ */
+template <typename Number> void AppendNumber(std::string &text, Number value) {
+    std::array<char, 32> buffer{};
+    const auto result =
+        std::to_chars(buffer.data(), buffer.data() + buffer.size(), value);
+    text.append(buffer.data(), result.ptr);
+    text.push_back(' ');
+}
+
+/**
+ * Reads space separated numbers from text, in order.
+ */
+class TextReader {
+public:
+    /**
+     * @param text The text to read.
+     */
+    explicit TextReader(std::string_view text) : rest(text) {}
+
+    /**
+     * @return The next number.
+     * @throws std::invalid_argument if the next token is not a number.
+     */
+    template <typename Number> Number Read() {
+        rest.remove_prefix(std::min(rest.find_first_not_of(' '), rest.size()));
+        Number value{};
+        const auto result =
+            std::from_chars(rest.data(), rest.data() + rest.size(), value);
+        if (result.ec != std::errc{}) {
+            throw std::invalid_argument("A goose text message is malformed.");
+        }
+        rest.remove_prefix(static_cast<std::size_t>(result.ptr - rest.data()));
+        return value;
+    }
+
+    /**
+     * @throws std::invalid_argument if anything but spaces is left unread.
+     */
+    void RequireFullyRead() const {
+        if (rest.find_first_not_of(' ') != std::string_view::npos) {
+            throw std::invalid_argument(
+                "A goose text message had unread text left.");
+        }
+    }
+
+private:
+    std::string_view rest;
+};
 
 } // namespace
 
@@ -170,5 +231,96 @@ Snapshot DecodeSnapshot(const svanes::NetworkMessage &message) {
     snapshot.minion_spawning = reader.ReadBool();
 
     RequireFullyRead(reader);
+    return snapshot;
+}
+
+svanes::NetworkMessage EncodeSnapshotText(const Snapshot &snapshot) {
+    std::string text;
+    AppendNumber(text, static_cast<std::uint32_t>(snapshot.clock.speed));
+    AppendNumber(text, static_cast<std::uint32_t>(snapshot.clock.paused));
+
+    AppendNumber(text, static_cast<std::uint32_t>(snapshot.geese.size()));
+    for (const SnapshotGoose &goose : snapshot.geese) {
+        AppendNumber(text, goose.client);
+        AppendNumber(text, goose.position.x);
+        AppendNumber(text, goose.position.y);
+        AppendNumber(text, static_cast<std::uint32_t>(goose.state));
+        AppendNumber(text, goose.health);
+    }
+
+    AppendNumber(text, static_cast<std::uint32_t>(snapshot.enemy.has_value()));
+    if (snapshot.enemy) {
+        AppendNumber(text, snapshot.enemy->position.x);
+        AppendNumber(text, snapshot.enemy->position.y);
+        AppendNumber(text, snapshot.enemy->health);
+    }
+
+    AppendNumber(text, static_cast<std::uint32_t>(snapshot.bullets.size()));
+    for (const SnapshotBullet &bullet : snapshot.bullets) {
+        AppendNumber(text, bullet.position.x);
+        AppendNumber(text, bullet.position.y);
+        AppendNumber(text, static_cast<std::uint32_t>(bullet.from_enemy));
+    }
+
+    AppendNumber(text, static_cast<std::uint32_t>(snapshot.minions.size()));
+    for (const SnapshotMinion &minion : snapshot.minions) {
+        AppendNumber(text, minion.position.x);
+        AppendNumber(text, minion.position.y);
+        AppendNumber(text, static_cast<std::uint32_t>(minion.kind));
+        AppendNumber(text, minion.health);
+    }
+    AppendNumber(text, static_cast<std::uint32_t>(snapshot.minion_spawning));
+
+    svanes::NetworkMessage message;
+    message.bytes.resize(text.size());
+    std::memcpy(message.bytes.data(), text.data(), text.size());
+    return message;
+}
+
+Snapshot DecodeSnapshotText(const svanes::NetworkMessage &message) {
+    TextReader reader(std::string_view{
+        reinterpret_cast<const char *>(message.bytes.data()),
+        message.bytes.size()});
+    Snapshot snapshot{};
+    snapshot.clock.speed =
+        static_cast<GooseSpeed>(reader.Read<std::uint32_t>());
+    snapshot.clock.paused = reader.Read<std::uint32_t>() != 0;
+
+    const auto goose_count = reader.Read<std::uint32_t>();
+    for (std::uint32_t index = 0; index < goose_count; ++index) {
+        const auto client = reader.Read<std::uint32_t>();
+        const auto x = reader.Read<float>();
+        const auto y = reader.Read<float>();
+        const auto state = static_cast<GooseState>(reader.Read<std::uint32_t>());
+        const auto health = reader.Read<std::uint32_t>();
+        snapshot.geese.push_back({client, {x, y}, state, health});
+    }
+
+    if (reader.Read<std::uint32_t>() != 0) {
+        const auto x = reader.Read<float>();
+        const auto y = reader.Read<float>();
+        const auto health = reader.Read<std::uint32_t>();
+        snapshot.enemy = SnapshotEnemy{{x, y}, health};
+    }
+
+    const auto bullet_count = reader.Read<std::uint32_t>();
+    for (std::uint32_t index = 0; index < bullet_count; ++index) {
+        const auto x = reader.Read<float>();
+        const auto y = reader.Read<float>();
+        const bool from_enemy = reader.Read<std::uint32_t>() != 0;
+        snapshot.bullets.push_back({{x, y}, from_enemy});
+    }
+
+    const auto minion_count = reader.Read<std::uint32_t>();
+    for (std::uint32_t index = 0; index < minion_count; ++index) {
+        const auto x = reader.Read<float>();
+        const auto y = reader.Read<float>();
+        const auto kind = static_cast<MinionKind>(reader.Read<std::uint32_t>());
+        const auto health = reader.Read<std::uint32_t>();
+        snapshot.minions.push_back({{x, y}, kind, health});
+    }
+    snapshot.minion_spawning = reader.Read<std::uint32_t>() != 0;
+
+    reader.RequireFullyRead();
     return snapshot;
 }

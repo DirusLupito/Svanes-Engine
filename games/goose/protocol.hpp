@@ -163,3 +163,21 @@ svanes::NetworkMessage EncodeSnapshot(const Snapshot &snapshot);
  * @throws std::invalid_argument if the message is too short or too long.
  */
 Snapshot DecodeSnapshot(const svanes::NetworkMessage &message);
+
+/**
+ * Writes a snapshot as space separated decimal text instead of binary, for
+ * comparing the two formats. Holds the same fields in the same order as
+ * EncodeSnapshot.
+ *
+ * @param snapshot The world after a step.
+ * @return The snapshot as a text message.
+ */
+svanes::NetworkMessage EncodeSnapshotText(const Snapshot &snapshot);
+
+/**
+ * @param message A message written by EncodeSnapshotText.
+ * @return The decoded snapshot.
+ * @throws std::invalid_argument if the text is malformed, too short, or too
+ * long.
+ */
+Snapshot DecodeSnapshotText(const svanes::NetworkMessage &message);
