@@ -2,7 +2,7 @@
 
 #include <svanes/camera2d.hpp>
 #include <svanes/geometry/primitive_geometry.hpp>
-#include <svanes/input.hpp>
+#include <svanes/input/input_manager.hpp>
 #include <svanes/kinematic_system.hpp>
 #include <svanes/timeline_system.hpp>
 

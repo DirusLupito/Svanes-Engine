@@ -174,7 +174,9 @@ target_sources(
         src/tilemaps/tilemap.cpp
         src/collision_pass.cpp
         src/geometry/geometry.cpp
-        src/input.cpp
+        src/input/input_events.cpp
+        src/input/input_manager.cpp
+        src/input/input_manager_internal.cpp
         src/kinematic_system.cpp
         src/MenuUtilities/font_manager.cpp
         src/MenuUtilities/font_manager_internal.hpp
@@ -191,7 +193,7 @@ target_sources(
         src/physics_system.cpp
         src/geometry/rectangle_geometry.cpp
         src/geometry/triangle_geometry.cpp
-        src/input_manager_internal.hpp
+        src/input/input_manager_internal.hpp
         src/render/render_queue.cpp
         src/render/render_queue_executor.cpp
         src/render/render_queue_executor.hpp
@@ -228,7 +230,9 @@ target_sources(
             include/svanes/events/event_manager.hpp
             include/svanes/game.hpp
             include/svanes/geometry/geometry.hpp
-            include/svanes/input.hpp
+            include/svanes/input/input_events.hpp
+            include/svanes/input/input_manager.hpp
+            include/svanes/input/input_types.hpp
             include/svanes/kinematic_system.hpp
             include/svanes/MenuUtilities/font_manager.hpp
             include/svanes/MenuUtilities/text_label.hpp
@@ -292,7 +296,9 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/events/event_manager.hpp
     include/svanes/game.hpp
     include/svanes/geometry/geometry.hpp
-    include/svanes/input.hpp
+    include/svanes/input/input_events.hpp
+    include/svanes/input/input_manager.hpp
+    include/svanes/input/input_types.hpp
     include/svanes/kinematic_system.hpp
     include/svanes/MenuUtilities/font_manager.hpp
     include/svanes/MenuUtilities/text_label.hpp
@@ -337,7 +343,9 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/tilemaps/tilemap.cpp
     src/collision_pass.cpp
     src/geometry/geometry.cpp
-    src/input.cpp
+    src/input/input_events.cpp
+    src/input/input_manager.cpp
+    src/input/input_manager_internal.cpp
     src/kinematic_system.cpp
     src/MenuUtilities/font_manager.cpp
     src/MenuUtilities/font_manager_internal.hpp
@@ -354,7 +362,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/physics_system.cpp
     src/geometry/rectangle_geometry.cpp
     src/geometry/triangle_geometry.cpp
-    src/input_manager_internal.hpp
+    src/input/input_manager_internal.hpp
     src/render/render_queue.cpp
     src/render/render_queue_executor.cpp
     src/render/render_queue_executor.hpp

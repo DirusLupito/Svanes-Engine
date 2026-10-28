@@ -14,7 +14,7 @@
 #include <svanes/MenuUtilities/text_label.hpp>
 #include <svanes/asset_path.hpp>
 #include <svanes/camera2d.hpp>
-#include <svanes/input.hpp>
+#include <svanes/input/input_manager.hpp>
 #include <svanes/network/clientserver/network_client.hpp>
 #include <svanes/physics_system.hpp>
 #include <svanes/registry.hpp>

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <svanes/input.hpp>
+#include <svanes/input/input_manager.hpp>
 
 #include <SDL3/SDL.h>
 

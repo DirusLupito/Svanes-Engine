@@ -2,7 +2,7 @@
 
 #include <svanes/audio/audio_manager.hpp>
 #include <svanes/camera2d.hpp>
-#include <svanes/input.hpp>
+#include <svanes/input/input_manager.hpp>
 #include <svanes/network/clientserver/IClient.hpp>
 #include <svanes/render/render_queue.hpp>
 #include <svanes/render/render_system.hpp>
@@ -11,7 +11,7 @@
 #include "../../MenuUtilities/font_manager_internal.hpp"
 #include "../../MenuUtilities/text_label_renderer.hpp"
 #include "../../audio/audio_manager_internal.hpp"
-#include "../../input_manager_internal.hpp"
+#include "../../input/input_manager_internal.hpp"
 #include "../../render/render_queue_executor.hpp"
 #include "../../render/texture_manager_internal.hpp"
 
