@@ -170,6 +170,7 @@ target_sources(
         src/geometry/convex_polygon_geometry.cpp
         src/collision_system.cpp
         src/deterministic_math.cpp
+        src/events/collision_event.cpp
         src/events/event_manager.cpp
         src/tilemaps/tilemap.cpp
         src/collision_pass.cpp
@@ -225,6 +226,7 @@ target_sources(
             include/svanes/collision_pass.hpp
             include/svanes/entity.hpp
             include/svanes/events/abstract_event_handler_wrapper.hpp
+            include/svanes/events/collision_event.hpp
             include/svanes/events/event.hpp
             include/svanes/events/event_handler_wrapper.hpp
             include/svanes/events/event_manager.hpp
@@ -291,6 +293,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/collision_pass.hpp
     include/svanes/entity.hpp
     include/svanes/events/abstract_event_handler_wrapper.hpp
+    include/svanes/events/collision_event.hpp
     include/svanes/events/event.hpp
     include/svanes/events/event_handler_wrapper.hpp
     include/svanes/events/event_manager.hpp
@@ -339,6 +342,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/geometry/convex_polygon_geometry.cpp
     src/collision_system.cpp
     src/deterministic_math.cpp
+    src/events/collision_event.cpp
     src/events/event_manager.cpp
     src/tilemaps/tilemap.cpp
     src/collision_pass.cpp
