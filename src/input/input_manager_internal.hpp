@@ -48,15 +48,19 @@ public:
     static void BeginFrame(InputManager &input);
 
     /**
-     * Reads the keyboard and mouse state from SDL and updates the manager's
-     * current input state. Keys and buttons are released while the window
-     * lacks keyboard focus. Call once per frame after BeginFrame, on the
-     * main thread.
+     * Reads the keyboard and mouse state from SDL and queues input events
+     * for changes since the last handled input. Losing keyboard focus queues
+     * releases for any keys and buttons that are still held down.
+     * Call once per frame after BeginFrame, on the main thread, then dispatch
+     * the queued events before the game reads input.
      *
-     * @param input The InputManager instance to update.
+     * @param input The input manager whose state is compared with the polled
+     * state. Polling does not change it.
+     * @param events The event manager that receives the input events.
      * @param window The window receiving input.
      */
-    static void Poll(InputManager &input, SDL_Window *window);
+    static void Poll(const InputManager &input, EventManager &events,
+                     SDL_Window *window);
 
 private:
     /**

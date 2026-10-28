@@ -6,6 +6,7 @@
 #include <svanes/async/async_parallel_for_driver.hpp>
 #include <svanes/audio/audio_manager.hpp>
 #include <svanes/camera2d.hpp>
+#include <svanes/events/event_manager.hpp>
 #include <svanes/game.hpp>
 #include <svanes/input/input_manager.hpp>
 #include <svanes/physics_system.hpp>
@@ -58,6 +59,8 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
     RenderQueueExecutor render_queue_executor{renderer, texture_manager};
     RenderQueue render_queue;
     InputManager input;
+    EventManager events;
+    InputManagerInternal::RegisterEventHandlers(input, events);
     Camera2D camera;
     Vector2D gravity{};
     std::int32_t output_width = 0;
@@ -111,7 +114,8 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
         //
 
         InputManagerInternal::BeginFrame(input);
-        InputManagerInternal::Poll(input, window);
+        InputManagerInternal::Poll(input, events, window);
+        events.DispatchEvents();
 
         //
         // DELTA TIME CALCULATION

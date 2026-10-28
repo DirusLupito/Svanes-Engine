@@ -2,6 +2,7 @@
 
 #include <svanes/audio/audio_manager.hpp>
 #include <svanes/camera2d.hpp>
+#include <svanes/events/event_manager.hpp>
 #include <svanes/input/input_manager.hpp>
 #include <svanes/network/clientserver/IClient.hpp>
 #include <svanes/render/render_queue.hpp>
@@ -364,6 +365,8 @@ void NetworkClient::RunClientLoop(IClient &client, SDL_Window *window,
                                                         texture_manager};
     RenderQueue render_queue;
     InputManager input;
+    EventManager events;
+    internal::InputManagerInternal::RegisterEventHandlers(input, events);
     Camera2D camera;
     std::int32_t output_width = 0;
     std::int32_t output_height = 0;
@@ -401,7 +404,8 @@ void NetworkClient::RunClientLoop(IClient &client, SDL_Window *window,
         //
 
         internal::InputManagerInternal::BeginFrame(input);
-        internal::InputManagerInternal::Poll(input, window);
+        internal::InputManagerInternal::Poll(input, events, window);
+        events.DispatchEvents();
 
         // Gather this frame's server messages before the client reads them.
         // Messages arriving during Update will have to wait for the next frame.

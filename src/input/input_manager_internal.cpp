@@ -43,15 +43,12 @@ void internal::InputManagerInternal::BeginFrame(InputManager &input) {
     input.mouse_delta_this_frame = {};
 }
 
-void internal::InputManagerInternal::Poll(InputManager &input,
+void internal::InputManagerInternal::Poll(const InputManager &input,
+                                          EventManager &events,
                                           SDL_Window *window) {
     SDL_PumpEvents();
 
-    // Start with all keys and buttons released. If the window is unfocused,
-    // they stay released. Otherwise, we update them with the polled state.
-
-    input.current.fill(false);
-    input.mouse_current.fill(false);
+    const bool has_keyboard_focus = SDL_GetKeyboardFocus() == window;
 
     float mouse_x = 0.0F;
     float mouse_y = 0.0F;
@@ -63,37 +60,44 @@ void internal::InputManagerInternal::Poll(InputManager &input,
     float delta_y = 0.0F;
     SDL_GetRelativeMouseState(&delta_x, &delta_y);
 
-    if (SDL_GetKeyboardFocus() != window) {
-        return;
-    }
-
     std::int32_t key_count = 0;
     const bool *keys = SDL_GetKeyboardState(&key_count);
 
-    // For every scancode, we translate it to our Key enum and update the
-    // current state.
+    // For every scancode, we translate it to our Key enum and queue an event
+    // if its state changed. Unfocused keys are treated as released.
     for (std::int32_t scancode = 0; scancode < key_count; ++scancode) {
         const auto key = TranslateKey(static_cast<SDL_Scancode>(scancode));
         if (key.has_value()) {
-            input.current.at(static_cast<std::size_t>(*key)) = keys[scancode];
+            const bool down = has_keyboard_focus && keys[scancode];
+            if (input.IsDown(*key) != down) {
+                events.QueueEvent(std::make_unique<KeyInputEvent>(*key, down));
+            }
         }
     }
 
     // For every mouse button, we translate it to our MouseButton enum and
-    // update the current state.
+    // queue an event if its state changed.
     for (std::uint8_t code = SDL_BUTTON_LEFT; code <= SDL_BUTTON_X2; ++code) {
         const auto button = TranslateMouseButton(code);
         if (button.has_value()) {
-            input.mouse_current.at(static_cast<std::size_t>(*button)) =
-                (mouse_buttons & SDL_BUTTON_MASK(code)) != 0;
+            const bool down = has_keyboard_focus &&
+                              (mouse_buttons & SDL_BUTTON_MASK(code)) != 0;
+            if (input.IsMouseButtonDown(*button) != down) {
+                events.QueueEvent(
+                    std::make_unique<MouseButtonInputEvent>(*button, down));
+            }
         }
     }
 
-    // If the window has focus, we update the mouse position and delta for this
-    // frame.
-    if (SDL_GetMouseFocus() == window) {
-        input.mouse_position = {mouse_x, mouse_y};
-        input.mouse_delta_this_frame = {delta_x, delta_y};
+    // If the window has focus, we queue any change in mouse position or
+    // accumulated movement for this frame.
+    if (has_keyboard_focus && SDL_GetMouseFocus() == window) {
+        const auto previous_position = input.MousePosition();
+        if (mouse_x != previous_position.x || mouse_y != previous_position.y ||
+            delta_x != 0.0F || delta_y != 0.0F) {
+            events.QueueEvent(std::make_unique<MouseMotionInputEvent>(
+                Vector2D{mouse_x, mouse_y}, Vector2D{delta_x, delta_y}));
+        }
     }
 }
 
