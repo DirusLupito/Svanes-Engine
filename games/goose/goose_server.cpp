@@ -12,6 +12,8 @@
 #include <svanes/timeline_system.hpp>
 
 #include <algorithm>
+#include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <exception>
 #include <iostream>
@@ -65,6 +67,21 @@ struct Player {
  */
 class GooseServer final : public svanes::IServer {
 public:
+    /**
+     * @param text_snapshots Whether to send snapshots as text rather than
+     * binary.
+     * @param benchmark_minions If given, runs a benchmark instead of the normal
+     * game: regular minion groups are off, this many minions drop as soon as
+     * the first player joins, and after a minute of timing every step the
+     * server prints the results and quits.
+     */
+    GooseServer(bool text_snapshots,
+                std::optional<std::uint32_t> benchmark_minions)
+        : minion_spawning(!benchmark_minions), text_snapshots(text_snapshots),
+          benchmark_minions(benchmark_minions) {}
+
+    bool ShouldQuit() const override { return benchmark_done; }
+
     void Initialize(svanes::ServerContext &context) override {
         // the world gravity vector, applied by the engine every frame to any entity
         // holding both Kinematic2D and Gravity. Positive y is down
@@ -113,6 +130,19 @@ public:
             }
         }
 
+        if (benchmark_minions && !benchmark_start && !players.empty()) {
+            for (std::uint32_t index = 0; index < *benchmark_minions; ++index) {
+                const float x = 2000.0F + 2000.0F * static_cast<float>(index) /
+                                              static_cast<float>(
+                                                  *benchmark_minions);
+                SpawnMinion(context.world, enemy->GetEntity(),
+                            index % 2 == 0 ? MinionKind::Melee
+                                           : MinionKind::Archer,
+                            {x, 700.0F});
+            }
+            benchmark_start = std::chrono::steady_clock::now();
+        }
+
         clock_setting = ClockSetting{};
         if (players.size() == 1) {
             clock_setting = players.begin()->second.clock;
@@ -129,6 +159,7 @@ public:
     }
 
     void PhysicsUpdate(const svanes::ServerPhysicsContext &context) override {
+        const auto step_start = std::chrono::steady_clock::now();
         svanes::Registry &world = context.world;
 
         for (auto &[client, player] : players) {
@@ -177,13 +208,45 @@ public:
         ApplyDeathZones(world);
 
         const svanes::NetworkMessage snapshot =
-            EncodeSnapshot(TakeSnapshot(world));
+            text_snapshots ? EncodeSnapshotText(TakeSnapshot(world))
+                           : EncodeSnapshot(TakeSnapshot(world));
         for (const auto &[client, player] : players) {
             context.network.Send(client, snapshot);
+        }
+
+        if (benchmark_start && !benchmark_done) {
+            const auto step_end = std::chrono::steady_clock::now();
+            const double micros =
+                std::chrono::duration<double, std::micro>(step_end - step_start)
+                    .count();
+            ++benchmark_steps;
+            benchmark_micros += micros;
+            benchmark_micros_squared += micros * micros;
+            benchmark_bytes += snapshot.bytes.size();
+            if (step_end - *benchmark_start >= std::chrono::seconds(60)) {
+                PrintBenchmark();
+                benchmark_done = true;
+            }
         }
     }
 
 private:
+    /** Prints the benchmark's step timings and snapshot sizes. */
+    void PrintBenchmark() const {
+        const double steps = static_cast<double>(benchmark_steps);
+        const double mean = benchmark_micros / steps;
+        const double variance = benchmark_micros_squared / steps - mean * mean;
+        std::cout << "BENCHMARK format=" << (text_snapshots ? "text" : "binary")
+                  << " minions=" << *benchmark_minions
+                  << " steps=" << benchmark_steps
+                  << " total_ms=" << benchmark_micros / 1000.0
+                  << " mean_step_us=" << mean
+                  << " variance_us2=" << variance
+                  << " stddev_us=" << std::sqrt(variance)
+                  << " mean_snapshot_bytes="
+                  << static_cast<double>(benchmark_bytes) / steps << '\n';
+    }
+
     /**
      * @param world The registry to spawn a goose in.
      * @param client The client an input arrived from.
@@ -372,24 +435,45 @@ private:
 
     svanes::Entity clock = 0;
     ClockSetting clock_setting;
-    bool minion_spawning = true;
+    bool minion_spawning;
     std::optional<Enemy> enemy;
     std::unordered_map<svanes::ClientId, Player> players;
+
+    bool text_snapshots;
+    std::optional<std::uint32_t> benchmark_minions;
+    std::optional<std::chrono::steady_clock::time_point> benchmark_start;
+    bool benchmark_done = false;
+    std::uint64_t benchmark_steps = 0;
+    double benchmark_micros = 0.0;
+    double benchmark_micros_squared = 0.0;
+    std::uint64_t benchmark_bytes = 0;
 };
 
 } // namespace
 
-int32_t main(int32_t argc, char **) {
-    if (argc > 1) {
-        std::cerr << "The goose server takes no arguments. It listens on UDP "
-                     "port "
-                  << kPort << ".\n";
+int32_t main(int32_t argc, char **argv) {
+    bool text_snapshots = false;
+    std::optional<std::uint32_t> benchmark_minions;
+    try {
+        for (int32_t index = 1; index < argc; ++index) {
+            const std::string argument = argv[index];
+            if (argument == "--text") {
+                text_snapshots = true;
+            } else {
+                benchmark_minions =
+                    static_cast<std::uint32_t>(std::stoul(argument));
+            }
+        }
+    } catch (const std::exception &) {
+        std::cerr << "Usage: svanes_game_goose_server [--text] [MINIONS]\n"
+                  << "Listens on UDP port " << kPort
+                  << ". MINIONS runs a one minute benchmark.\n";
         return 1;
     }
 
     try {
         svanes::NetworkServer network;
-        GooseServer server;
+        GooseServer server(text_snapshots, benchmark_minions);
         return network.run(server);
     } catch (const std::exception &error) {
         std::cerr << "Goose server: " << error.what() << '\n';
