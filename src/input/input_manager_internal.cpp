@@ -1,6 +1,41 @@
 #include "input_manager_internal.hpp"
 
+#include <svanes/events/event_handler_wrapper.hpp>
+#include <svanes/events/event_manager.hpp>
+#include <svanes/input/input_events.hpp>
+
+#include <memory>
+
 namespace svanes {
+
+void internal::InputManagerInternal::RegisterEventHandlers(
+    InputManager &input, EventManager &events) {
+
+    // all the handlers can be simple lambdas that call the appropriate
+    // InputManager methods.
+
+    // Set up the keyboard input event handler.
+    events.Subscribe(KeyInputEvent::GetStaticEventType(),
+                     std::make_unique<EventHandlerWrapper<KeyInputEvent>>(
+                         [&input](const KeyInputEvent &event) {
+                             input.HandleKeyInput(event);
+                         }));
+    // Set up the mouse button input event handler.
+    events.Subscribe(
+        MouseButtonInputEvent::GetStaticEventType(),
+        std::make_unique<EventHandlerWrapper<MouseButtonInputEvent>>(
+            [&input](const MouseButtonInputEvent &event) {
+                input.HandleMouseButtonInput(event);
+            }));
+
+    // Set up the mouse motion input event handler.
+    events.Subscribe(
+        MouseMotionInputEvent::GetStaticEventType(),
+        std::make_unique<EventHandlerWrapper<MouseMotionInputEvent>>(
+            [&input](const MouseMotionInputEvent &event) {
+                input.HandleMouseMotionInput(event);
+            }));
+}
 
 void internal::InputManagerInternal::BeginFrame(InputManager &input) {
     input.previous = input.current;

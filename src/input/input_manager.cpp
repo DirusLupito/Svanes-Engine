@@ -1,5 +1,7 @@
 #include <svanes/input/input_manager.hpp>
 
+#include <svanes/input/input_events.hpp>
+
 namespace svanes {
 
 // To test if something is down, we can just look at the current state.
@@ -46,6 +48,19 @@ Vector2D InputManager::MousePosition() const { return mouse_position; }
 
 Vector2D InputManager::MouseDeltaThisFrame() const {
     return mouse_delta_this_frame;
+}
+
+void InputManager::HandleKeyInput(const KeyInputEvent &event) {
+    current.at(static_cast<std::size_t>(event.key)) = event.down;
+}
+
+void InputManager::HandleMouseButtonInput(const MouseButtonInputEvent &event) {
+    mouse_current.at(static_cast<std::size_t>(event.button)) = event.down;
+}
+
+void InputManager::HandleMouseMotionInput(const MouseMotionInputEvent &event) {
+    mouse_position = event.position;
+    mouse_delta_this_frame += event.delta;
 }
 
 } // namespace svanes

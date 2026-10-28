@@ -6,6 +6,12 @@
 
 #include <optional>
 
+namespace svanes {
+
+class EventManager;
+
+}
+
 namespace svanes::internal {
 
 /**
@@ -16,6 +22,21 @@ namespace svanes::internal {
  */
 class InputManagerInternal final {
 public:
+    /**
+     * Registers callbacks that update the input manager when the event
+     * manager delivers key, mouse button, and mouse movement events.
+     * Call once for the input manager associated with this event manager.
+     *
+     * @param input The input manager to update. It must remain alive and at
+     * the same address until the registered handlers are removed.
+     * @param events The event manager that will own the callback wrappers.
+     *
+     * @throws std::invalid_argument if these callbacks are already registered.
+     * @throws std::logic_error if called during an event callback.
+     */
+    static void RegisterEventHandlers(InputManager &input,
+                                      EventManager &events);
+
     /**
      * Prepares the InputManager for a new frame.
      * Saves the current key and mouse button states as the previous states,

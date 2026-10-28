@@ -8,6 +8,10 @@
 
 namespace svanes {
 
+class KeyInputEvent;
+class MouseButtonInputEvent;
+class MouseMotionInputEvent;
+
 namespace internal {
 
 class InputManagerInternal;
@@ -80,6 +84,32 @@ public:
     Vector2D MouseDeltaThisFrame() const;
 
 private:
+    /**
+     * Updates the state of the key identified by an input event. Press and
+     * release queries compare this state with the previous frame's state.
+     *
+     * @param event The key and whether it is now held down.
+     * @throws std::out_of_range if event.key is not a valid key.
+     */
+    void HandleKeyInput(const KeyInputEvent &event);
+
+    /**
+     * Updates the state of the mouse button identified by an input event.
+     *
+     * @param event The mouse button and whether it is now held down.
+     * @throws std::out_of_range if event.button is not a valid mouse button.
+     */
+    void HandleMouseButtonInput(const MouseButtonInputEvent &event);
+
+    /**
+     * Updates the cursor position and adds the event's movement to this
+     * frame's mouse delta. Multiple movement events in a frame contribute
+     * to the same accumulated delta.
+     *
+     * @param event The cursor position and movement to apply.
+     */
+    void HandleMouseMotionInput(const MouseMotionInputEvent &event);
+
     // Constants for the number of keys and mouse buttons, used to size the
     // arrays.
 
