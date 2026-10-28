@@ -376,8 +376,9 @@ void NetworkClient::RunClientLoop(IClient &client, SDL_Window *window,
                                  std::string{SDL_GetError()});
     }
     camera.SetOutputSize(output_width, output_height);
-    ClientContext context{world,        *this,  texture_manager, audio_manager,
-                          font_manager, camera, output_width,    output_height};
+    ClientContext context{world,           events,        *this,
+                          texture_manager, audio_manager, font_manager,
+                          camera,          output_width,  output_height};
 
     // Custom initialization of the client. Implemented by the user of the
     // engine.
@@ -436,7 +437,7 @@ void NetworkClient::RunClientLoop(IClient &client, SDL_Window *window,
         camera.SetOutputSize(output_width, output_height);
 
         const ClientFrameContext frame_context{
-            world,        *this,         input,         real_delta_tics,
+            world,        events,        *this,         input, real_delta_tics,
             output_width, output_height, audio_manager, camera};
 
         // This will call the client's Update method, which should read input,

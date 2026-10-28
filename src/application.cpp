@@ -71,9 +71,9 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
                                  std::string{SDL_GetError()});
     }
     camera.SetOutputSize(output_width, output_height);
-    GameContext game_context{world,         texture_manager, audio_manager,
-                             font_manager,  camera,          output_width,
-                             output_height, gravity};
+    GameContext game_context{world,         events,        texture_manager,
+                             audio_manager, font_manager,  camera,
+                             output_width,  output_height, gravity};
 
     // Custom initialization of the game. Implemented by the user of the engine.
 
@@ -146,8 +146,8 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
         camera.SetOutputSize(output_width, output_height);
 
         const FrameContext frame_context{
-            world,         input,         real_delta_tics, output_width,
-            output_height, audio_manager, camera,          gravity};
+            world,         events,        input,  real_delta_tics, output_width,
+            output_height, audio_manager, camera, gravity};
 
         // Here we should advance the kinematics of all entities before each
         // game physics update. This allows us to first update the positions of
