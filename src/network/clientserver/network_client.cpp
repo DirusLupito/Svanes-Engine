@@ -401,18 +401,7 @@ void NetworkClient::RunClientLoop(IClient &client, SDL_Window *window,
         //
 
         internal::InputManagerInternal::BeginFrame(input);
-
-        SDL_Event event{};
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_EVENT_QUIT) {
-                running = false;
-            }
-            internal::InputManagerInternal::HandleEvent(input, event);
-        }
-
-        if (!running) {
-            break;
-        }
+        internal::InputManagerInternal::Poll(input, window);
 
         // Gather this frame's server messages before the client reads them.
         // Messages arriving during Update will have to wait for the next frame.
@@ -458,8 +447,6 @@ void NetworkClient::RunClientLoop(IClient &client, SDL_Window *window,
         // Once messages have been processed, we don't want to keep
         // applying them unless they're explicitly sent again.
         incoming.clear();
-
-        internal::InputManagerInternal::SynchronizeTextInput(input, window);
 
         if (client.ShouldQuit()) {
             running = false;

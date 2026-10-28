@@ -212,14 +212,6 @@ void OrbitalEscalationClient::Update(const svanes::ClientFrameContext &frame) {
     // scaling.
     pause_label.position.x = frame.camera.Viewport().width * 0.5F;
 
-    // 1.1^delta
-    // Rolling harder on the mouse wheel will zoom in and out
-    // faster compared to rolling the same distance slowly.
-    const float zoom = std::clamp(
-        frame.camera.zoom * std::pow(1.1F, frame.input.MouseWheelThisFrame().y),
-        0.01F, 100.0F);
-    frame.camera.zoom = zoom;
-
     // Forward the player's input to the server.
     SendInput(frame);
 

@@ -5,7 +5,6 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <string>
 
 namespace svanes {
 
@@ -304,7 +303,7 @@ enum class MouseButton : std::uint8_t {
 
 /**
  * Class that manages input state for keys and mouse buttons,
- * as well as mouse position, delta, and wheel movement.
+ * as well as mouse position and movement.
  * Mostly a wrapper around SDL's input handling.
  */
 class InputManager final {
@@ -367,37 +366,6 @@ public:
      */
     Vector2D MouseDeltaThisFrame() const;
 
-    /**
-     * Gets the mouse wheel movement for this frame.
-     * @return The mouse wheel movement for this frame as a Vector2D.
-     */
-    Vector2D MouseWheelThisFrame() const;
-
-    /**
-     * Requests to start text input mode.
-     * This will enable SDL's text input handling, allowing for text input
-     * events.
-     */
-    void StartTextInput();
-
-    /**
-     * Requests to stop text input mode.
-     * This will disable SDL's text input handling.
-     */
-    void StopTextInput();
-
-    /**
-     * Checks if text input mode is currently active.
-     * @return True if text input is active, false otherwise.
-     */
-    bool IsTextInputActive() const;
-
-    /**
-     * Gets the text input received during this frame.
-     * @return A string containing the text input for this frame.
-     */
-    const std::string &TextInputThisFrame() const;
-
 private:
     // Constants for the number of keys and mouse buttons, used to size the
     // arrays.
@@ -437,21 +405,6 @@ private:
     // Mouse movement delta (change in position) for this frame.
     // This should be reset to (0, 0) at the start of each frame.
     Vector2D mouse_delta_this_frame{};
-
-    // Mouse wheel movement for this frame.
-    // This should be reset to (0, 0) at the start of each frame.
-    Vector2D mouse_wheel_this_frame{};
-
-    // Tracks whether text input has been requested for this frame.
-    bool text_input_requested = false;
-
-    // Tracks whether text input is currently active.
-    bool text_input_active = false;
-
-    // Stores the text input received during this frame.
-    // This should be cleared at the start of each frame.
-    std::string text_input_this_frame;
-
 
     // Expose the private members to the internal InputManagerInternal class for
     // managing input state.

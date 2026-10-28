@@ -111,14 +111,7 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
         //
 
         InputManagerInternal::BeginFrame(input);
-
-        SDL_Event event{};
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_EVENT_QUIT) {
-                running = false;
-            }
-            InputManagerInternal::HandleEvent(input, event);
-        }
+        InputManagerInternal::Poll(input, window);
 
         //
         // DELTA TIME CALCULATION
@@ -196,8 +189,6 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
             pending_tics %= physics_step_tics;
         }
         game.Update(frame_context);
-
-        InputManagerInternal::SynchronizeTextInput(input, window);
 
         if (game.ShouldQuit()) {
             running = false;

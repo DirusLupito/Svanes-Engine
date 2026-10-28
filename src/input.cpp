@@ -2,9 +2,6 @@
 
 #include "input_manager_internal.hpp"
 
-#include <stdexcept>
-#include <string>
-
 namespace svanes {
 
 // To test if something is down, we can just look at the current state.
@@ -53,88 +50,64 @@ Vector2D InputManager::MouseDeltaThisFrame() const {
     return mouse_delta_this_frame;
 }
 
-Vector2D InputManager::MouseWheelThisFrame() const {
-    return mouse_wheel_this_frame;
-}
-
-void InputManager::StartTextInput() { text_input_requested = true; }
-
-void InputManager::StopTextInput() { text_input_requested = false; }
-
-bool InputManager::IsTextInputActive() const { return text_input_active; }
-
-const std::string &InputManager::TextInputThisFrame() const {
-    return text_input_this_frame;
-}
-
 void internal::InputManagerInternal::BeginFrame(InputManager &input) {
     input.previous = input.current;
     input.mouse_previous = input.mouse_current;
     input.mouse_delta_this_frame = {};
-    input.mouse_wheel_this_frame = {};
-    input.text_input_this_frame.clear();
 }
 
-void internal::InputManagerInternal::HandleEvent(InputManager &input,
-                                                 const SDL_Event &event) {
-    switch (event.type) {
-    case SDL_EVENT_KEY_DOWN:
-    case SDL_EVENT_KEY_UP: {
-        const std::optional<Key> key = TranslateKey(event.key.scancode);
-        if (key.has_value()) {
-            input.current.at(static_cast<std::size_t>(*key)) =
-                event.type == SDL_EVENT_KEY_DOWN;
-        }
-        break;
-    }
-    case SDL_EVENT_TEXT_INPUT:
-        input.text_input_this_frame += event.text.text;
-        break;
-    case SDL_EVENT_MOUSE_BUTTON_DOWN:
-    case SDL_EVENT_MOUSE_BUTTON_UP: {
-        const std::optional<MouseButton> button =
-            TranslateMouseButton(event.button.button);
-        if (button.has_value()) {
-            input.mouse_current.at(static_cast<std::size_t>(*button)) =
-                event.type == SDL_EVENT_MOUSE_BUTTON_DOWN;
-        }
-        break;
-    }
-    case SDL_EVENT_MOUSE_MOTION:
-        input.mouse_position = {event.motion.x, event.motion.y};
-        input.mouse_delta_this_frame += {event.motion.xrel, event.motion.yrel};
-        break;
-    // SDL_EVENT_MOUSE_WHEEL supports two axes of scrolling with a mouse wheel.
-    // But typically mice typically only produce vertical scrolling,
-    // since typical mice only have a single wheel that either scrolls up or
-    // down. This would correspond to the y-axis of scrolling.
-    case SDL_EVENT_MOUSE_WHEEL:
-        input.mouse_wheel_this_frame += {event.wheel.x, event.wheel.y};
-        break;
-    case SDL_EVENT_WINDOW_FOCUS_LOST:
-        input.current.fill(false);
-        input.mouse_current.fill(false);
-        break;
-    default:
-        break;
-    }
-}
+void internal::InputManagerInternal::Poll(InputManager &input,
+                                          SDL_Window *window) {
+    SDL_PumpEvents();
 
-void internal::InputManagerInternal::SynchronizeTextInput(InputManager &input,
-                                                          SDL_Window *window) {
-    if (input.text_input_requested == input.text_input_active) {
+    // Start with all keys and buttons released. If the window is unfocused,
+    // they stay released. Otherwise, we update them with the polled state.
+
+    input.current.fill(false);
+    input.mouse_current.fill(false);
+
+    float mouse_x = 0.0F;
+    float mouse_y = 0.0F;
+    const auto mouse_buttons = SDL_GetMouseState(&mouse_x, &mouse_y);
+
+    // We read the accumulated movement even while unfocused, so it cannot build
+    // up and appear as a jump when the window regains focus.
+    float delta_x = 0.0F;
+    float delta_y = 0.0F;
+    SDL_GetRelativeMouseState(&delta_x, &delta_y);
+
+    if (SDL_GetKeyboardFocus() != window) {
         return;
     }
 
-    const bool succeeded = input.text_input_requested
-                               ? SDL_StartTextInput(window)
-                               : SDL_StopTextInput(window);
-    if (!succeeded) {
-        throw std::runtime_error("Could not change text input state: " +
-                                 std::string{SDL_GetError()});
+    std::int32_t key_count = 0;
+    const bool *keys = SDL_GetKeyboardState(&key_count);
+
+    // For every scancode, we translate it to our Key enum and update the
+    // current state.
+    for (std::int32_t scancode = 0; scancode < key_count; ++scancode) {
+        const auto key = TranslateKey(static_cast<SDL_Scancode>(scancode));
+        if (key.has_value()) {
+            input.current.at(static_cast<std::size_t>(*key)) = keys[scancode];
+        }
     }
 
-    input.text_input_active = input.text_input_requested;
+    // For every mouse button, we translate it to our MouseButton enum and
+    // update the current state.
+    for (std::uint8_t code = SDL_BUTTON_LEFT; code <= SDL_BUTTON_X2; ++code) {
+        const auto button = TranslateMouseButton(code);
+        if (button.has_value()) {
+            input.mouse_current.at(static_cast<std::size_t>(*button)) =
+                (mouse_buttons & SDL_BUTTON_MASK(code)) != 0;
+        }
+    }
+
+    // If the window has focus, we update the mouse position and delta for this
+    // frame.
+    if (SDL_GetMouseFocus() == window) {
+        input.mouse_position = {mouse_x, mouse_y};
+        input.mouse_delta_this_frame = {delta_x, delta_y};
+    }
 }
 
 std::optional<Key>
