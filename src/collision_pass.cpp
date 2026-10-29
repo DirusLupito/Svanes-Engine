@@ -18,11 +18,11 @@ namespace svanes {
 // pass. Still, this is almost certainly faster than the naive O(n^2) submit
 // everything to DetectCollisions approach.
 
-std::vector<EntityCollision2D>
-DetectEntityCollisions(const Registry &world,
-                       const std::vector<Entity> &entities,
-                       EventManager &events, AsyncParallelForDriver &driver,
-                       std::size_t batch_size, CollisionOrder order) {
+void DetectEntityCollisions(const Registry &world,
+                            const std::vector<Entity> &entities,
+                            EventManager &events,
+                            AsyncParallelForDriver &driver,
+                            std::size_t batch_size, CollisionOrder order) {
 
     if (batch_size == 0) {
         throw std::invalid_argument("Collision batch size must be positive.");
@@ -45,8 +45,9 @@ DetectEntityCollisions(const Registry &world,
         }
 
         // Report all detected collisions to the event manager.
-        for (const auto &result : results) {
-            events.QueueEvent(std::make_unique<CollisionEvent>(result));
+        for (auto &result : results) {
+            events.QueueEvent(
+                std::make_unique<CollisionEvent>(std::move(result)));
         }
     };
     // First, we set up our HGrid2D.
@@ -146,11 +147,10 @@ DetectEntityCollisions(const Registry &world,
     }
 
     // If there is only one worker (i.e. we set up the driver with a concurrency
-    // of 1), there's no need to merge results, we simply move ownership and
-    // return.
+    // of 1), queue its collisions without merging.
     if (worker_results.size() == 1) {
         finish_results(worker_results.front());
-        return std::move(worker_results.front());
+        return;
     }
 
 
@@ -171,7 +171,6 @@ DetectEntityCollisions(const Registry &world,
         }
     }
     finish_results(results);
-    return results;
 }
 
 } // namespace svanes
