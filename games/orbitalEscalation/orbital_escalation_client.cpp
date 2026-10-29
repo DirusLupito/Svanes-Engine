@@ -28,7 +28,6 @@
 const svanes::TicCount kPauseFlashPeriod = svanes::SecondsToTics(1.0);
 constexpr std::uint8_t kPauseLabelMinimumAlpha = 64;
 constexpr svanes::TicCount kClientFrameTics = 5000; // 1/200 second
-constexpr float kPlanetImpactDamage = 25.0F;
 
 OrbitalEscalationClient::OrbitalEscalationClient(std::string server_address)
     : server_address(std::move(server_address)),
@@ -40,6 +39,7 @@ OrbitalEscalationClient::OrbitalEscalationClient(std::string server_address)
 
 void OrbitalEscalationClient::Initialize(svanes::ClientContext &context) {
     RegisterPhysicalCollisionHandler(context.world, context.events);
+    planet_collision_damage.Register(context.world, context.events);
     context.network.Connect(server_address);
     std::cout << "Joining " << server_address << '.' << std::endl;
 
@@ -518,6 +518,7 @@ void OrbitalEscalationClient::Predict(svanes::Registry &world,
                         colliders.push_back(entity);
                     }
                 });
+            planet_collision_damage.BeginStep(planet->GetEntity());
             auto contacts = svanes::DetectEntityCollisions(
                 world, colliders, events, parallel_for);
 
@@ -533,40 +534,6 @@ void OrbitalEscalationClient::Predict(svanes::Registry &world,
             // Clientside collision response
 
             events.DispatchEvents();
-
-            // The ships touching the planet in this step.
-            std::unordered_set<svanes::Entity> contacting;
-
-            // For every ship touching the planet, apply impact damage once per
-            // contact.
-            for (const auto &[id, object] : objects) {
-                const auto entity = object->GetEntity();
-
-                // Only ships can take impact damage, and only if they are
-                // alive.
-                if (object->GetType() != DynamicObjectType::Ship ||
-                    IsDead(world, entity)) {
-                    continue;
-                }
-
-                // Check if this ship is touching the planet. If so, add it to
-                // the set of ships touching the planet this step.
-                for (const auto &pair : contacts) {
-                    const auto surface = planet->GetEntity();
-                    if ((pair.a == entity && pair.b == surface) ||
-                        (pair.b == entity && pair.a == surface)) {
-                        contacting.insert(entity);
-                    }
-                }
-
-                // If this ship is touching the planet now but was not touching
-                // it in the previous step, apply impact damage once.
-                if (contacting.contains(entity) &&
-                    !touching_planet.contains(entity)) {
-                    ApplyDamage(world, entity, kPlanetImpactDamage);
-                }
-            }
-            touching_planet = std::move(contacting);
 
             // Create explosion flashes for missiles that detonated this step.
             for (const auto position :

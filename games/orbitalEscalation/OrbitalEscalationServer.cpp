@@ -23,7 +23,6 @@
 #include <utility>
 
 constexpr float kPlayerHealth = 100.0F;
-constexpr float kPlanetImpactDamage = 25.0F;
 constexpr float kSpawnSpeed = 300.0F;
 
 // The total number of junk ships.
@@ -41,6 +40,7 @@ OrbitalEscalationServer::OrbitalEscalationServer(
 
 void OrbitalEscalationServer::Initialize(svanes::ServerContext &context) {
     RegisterPhysicalCollisionHandler(context.world, context.events);
+    planet_collision_damage.Register(context.world, context.events);
     gameplay_timeline.emplace(context.world);
     context.world.AddComponent<svanes::Timeline>(gameplay_timeline->Get());
     planet.emplace(context.world, Planet::MakeDefinition());
@@ -388,6 +388,7 @@ void OrbitalEscalationServer::RespondToPhysics(
                 colliders.push_back(entity);
             }
         });
+    planet_collision_damage.BeginStep(planet->GetEntity());
     auto contacts =
         svanes::DetectEntityCollisions(world, colliders, events, driver);
 
@@ -401,25 +402,6 @@ void OrbitalEscalationServer::RespondToPhysics(
     });
 
     events.DispatchEvents();
-
-    // The ships contacting the planet in this physics step, including junk.
-    std::unordered_set<svanes::Entity> contacting;
-    const auto surface = planet->GetEntity();
-    for (const auto &pair : contacts) {
-        if (pair.a != surface && pair.b != surface) {
-            continue;
-        }
-        const auto entity = pair.a == surface ? pair.b : pair.a;
-        if (world.HasComponent<Propulsion>(entity) && !IsDead(world, entity)) {
-            // Composite ships can have several contacts with the surface.
-            // Deal damage once when contact begins, rather than each tick.
-            if (contacting.insert(entity).second &&
-                !touching_planet.contains(entity)) {
-                ApplyDamage(world, entity, kPlanetImpactDamage);
-            }
-        }
-    }
-    touching_planet = std::move(contacting);
 
     UpdateMissileExplosions(world, contacts);
 

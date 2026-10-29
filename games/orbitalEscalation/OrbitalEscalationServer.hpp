@@ -1,5 +1,6 @@
 #pragma once
 
+#include "collision_response.hpp"
 #include "combat/weapon_system.hpp"
 #include "game_objects/dynamic_object/ship.hpp"
 #include "game_objects/planet.hpp"
@@ -11,7 +12,6 @@
 
 #include <map>
 #include <optional>
-#include <unordered_set>
 #include <vector>
 
 inline constexpr std::uint16_t OrbitalServerPort = 45010;
@@ -210,8 +210,8 @@ private:
     // The simple static and drifting ships without player controls.
     std::vector<std::unique_ptr<Ship>> junk_ships;
 
-    // The ships touching the planet during the previous physics step.
-    std::unordered_set<svanes::Entity> touching_planet;
+    // Handler for applying planet impact damage once when a ship begins contact.
+    PlanetCollisionDamageHandler planet_collision_damage;
 
     // Simulation time accumulated toward sending the next world update.
     svanes::TicCount snapshot_tics = 0;

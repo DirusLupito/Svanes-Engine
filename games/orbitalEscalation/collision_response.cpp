@@ -1,7 +1,9 @@
 #include "collision_response.hpp"
 
 #include "attachment_system.hpp"
+#include "combat/damage_system.hpp"
 #include "combat/missile_system.hpp"
+#include "propulsion_system.hpp"
 
 #include <svanes/events/collision_event.hpp>
 #include <svanes/events/event_handler_wrapper.hpp>
@@ -12,6 +14,7 @@
 #include <memory>
 
 constexpr float kCollisionAcceleration = 400000.0F;
+constexpr float kPlanetImpactDamage = 25.0F;
 
 void RegisterPhysicalCollisionHandler(svanes::Registry &world,
                                       svanes::EventManager &events) {
@@ -51,4 +54,48 @@ void RegisterPhysicalCollisionHandler(svanes::Registry &world,
                     }
                 }
             }));
+}
+
+void PlanetCollisionDamageHandler::Register(svanes::Registry &world,
+                                            svanes::EventManager &events) {
+    events.Subscribe(
+        svanes::CollisionEvent::GetStaticEventType(),
+        std::make_unique<svanes::EventHandlerWrapper<svanes::CollisionEvent>>(
+            [this, &world](const svanes::CollisionEvent &event) {
+                HandleCollision(world, event);
+            }));
+}
+
+void PlanetCollisionDamageHandler::BeginStep(svanes::Entity planet) {
+    this->planet = planet;
+    previous_contacts.swap(current_contacts);
+    current_contacts.clear();
+}
+
+void PlanetCollisionDamageHandler::HandleCollision(
+    svanes::Registry &world, const svanes::CollisionEvent &event) {
+    const auto &pair = event.collision;
+    if (!planet || (pair.a != *planet && pair.b != *planet)) {
+        return;
+    }
+
+    const auto ship = pair.a == *planet ? pair.b : pair.a;
+    if (!world.HasComponent<Propulsion>(ship) || IsDead(world, ship)) {
+        return;
+    }
+
+    if (GetAttachmentRoot(world, pair.a) == GetAttachmentRoot(world, pair.b) ||
+        IgnoresFiringShip(world, pair.a, pair.b) ||
+        IgnoresFiringShip(world, pair.b, pair.a)) {
+        return;
+    }
+
+    
+    // Composite ships can have several contacts with the surface.
+    // Deal damage once when contact begins, rather than each tick.
+
+    if (current_contacts.insert(ship).second &&
+        !previous_contacts.contains(ship)) {
+        ApplyDamage(world, ship, kPlanetImpactDamage);
+    }
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "collision_response.hpp"
 #include "game_objects/planet.hpp"
 #include "serialization/asset_catalog.hpp"
 #include "serialization/world_update.hpp"
@@ -11,7 +12,6 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 /**
@@ -160,9 +160,8 @@ private:
     // List of collision flashes. Purely clientside.
     std::vector<OwnedEntity> collision_flashes;
 
-    // The local IDs of ships touching the planet during the previous prediction
-    // step, so sustained contact does not repeatedly deal impact damage.
-    std::unordered_set<svanes::Entity> touching_planet;
+    // Handler for applying planet impact damage once when a ship begins predicted contact.
+    PlanetCollisionDamageHandler planet_collision_damage;
 
     // The parfor driver used by local physics and collision detection.
     svanes::AsyncParallelForDriver parallel_for{1};
