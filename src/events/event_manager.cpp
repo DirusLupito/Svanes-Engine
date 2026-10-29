@@ -1,5 +1,7 @@
 #include <svanes/events/event_manager.hpp>
 
+#include <algorithm>
+#include <limits>
 #include <stdexcept>
 #include <utility>
 
@@ -93,15 +95,20 @@ void EventManager::TriggerEvent(const Event &event) {
     --active_triggers;
 }
 
-void EventManager::QueueEvent(std::unique_ptr<Event> &&event) {
+void EventManager::QueueEvent(std::unique_ptr<Event> &&event,
+                              EventPriority priority) {
     if (!event) {
         throw std::invalid_argument("Queued event cannot be null.");
     }
 
-    events_queue.push_back(std::move(event));
+    events_queue.emplace_back(priority, std::move(event));
 }
 
 void EventManager::DispatchEvents() {
+    DispatchEvents(std::numeric_limits<EventPriority>::max());
+}
+
+void EventManager::DispatchEvents(EventPriority maximum_priority) {
 
     // check if anyone is currently processing events, or if we are already dispatching
     if (active_triggers != 0 || dispatching) {
@@ -115,11 +122,19 @@ void EventManager::DispatchEvents() {
     std::size_t consumed = 0;
     dispatching = true;
     try {
-        while (consumed < count) {
+        // Events are processed in ascending priority order, with insertion order
+        // used to break ties.
+        std::stable_sort(events_queue.begin(), events_queue.begin() + count,
+                         [](const auto &left, const auto &right) {
+                             return left.first < right.first;
+                         });
+
+        while (consumed < count &&
+               events_queue[consumed].first <= maximum_priority) {
             // Move ownership into a local variable rather than keeping a
             // reference to a queue slot that callbacks could invalidate by
             // adding events.
-            auto event = std::move(events_queue[consumed++]);
+            auto event = std::move(events_queue[consumed++].second);
             if (!event->Handled) {
                 TriggerEvent(*event);
             }

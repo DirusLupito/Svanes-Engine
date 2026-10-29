@@ -5,12 +5,16 @@
 #include <svanes/events/abstract_event_handler_wrapper.hpp>
 
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace svanes {
+
+using EventPriority = std::uint64_t;
 
 /**
  * Represents a manager for the lifecycle of events and their associated
@@ -129,17 +133,20 @@ public:
      * The manager owns the event until it is dispatched or discarded.
      *
      * @param event The event to enqueue.
+     * @param priority The dispatch priority. Smaller values are processed
+     * first.
      *
      * @throws std::invalid_argument if event is null.
      */
-    void QueueEvent(std::unique_ptr<Event> &&event);
+    void QueueEvent(std::unique_ptr<Event> &&event, EventPriority priority = 0);
 
     /**
-     * Processes all events queued by QueueEvent. Each event is passed to
-     * every registered handler for its type, in registration order, unless the
-     * event's Handled flag is set to true. Events are removed from the queue
-     * after processing. Events queued by callbacks will not be processed until
-     * the next call to this method.
+     * Processes all events queued by QueueEvent in ascending priority order.
+     * Events with equal priorities use insertion order. Each event is passed
+     * to every registered handler for its type, in registration order, unless
+     * the event's Handled flag is set to true. Events are removed from the
+     * queue after processing. Events queued by callbacks will not be processed
+     * until the next call to this method.
      *
      * @throws std::logic_error if called during event delivery.
      * @throws ... Propagates any exception thrown by a registered handler.
@@ -149,10 +156,30 @@ public:
      */
     void DispatchEvents();
 
+    /**
+     * Processes events queued by QueueEvent with priorities at or below
+     * maximum_priority, in ascending priority order. Events with larger
+     * priorities remain queued.
+     * Events with equal priorities use insertion order. Each event is passed
+     * to every registered handler for its type, in registration order, unless
+     * the event's Handled flag is set to true. Events are removed from the
+     * queue after processing. Events queued by callbacks will not be processed
+     * until the next call to this method.
+     *
+     * @param maximum_priority The inclusive upper limit on priority values.
+     *
+     * @throws std::logic_error if called during event delivery.
+     * @throws ... Propagates any exception thrown by a registered handler.
+     * The event being processed is discarded, and undelivered events remain
+     * queued ahead of events added by callbacks. Effects of callbacks that
+     * already ran are not rolled back.
+     */
+    void DispatchEvents(EventPriority maximum_priority);
+
 private:
-    // Owns pending events in insertion order until they are consumed or
-    // discarded by Shutdown.
-    std::vector<std::unique_ptr<Event>> events_queue;
+    // Owns pending (priority, event) pairs until they are consumed or discarded
+    // by Shutdown.
+    std::vector<std::pair<EventPriority, std::unique_ptr<Event>>> events_queue;
 
     // Maps event type identifiers to owned handlers. Each vector preserves
     // registration order so delivery order is predictable.
