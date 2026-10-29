@@ -95,13 +95,12 @@ void EventManager::TriggerEvent(const Event &event) {
     --active_triggers;
 }
 
-void EventManager::QueueEvent(std::unique_ptr<Event> &&event,
-                              EventPriority priority) {
+void EventManager::QueueEvent(std::unique_ptr<Event> &&event) {
     if (!event) {
         throw std::invalid_argument("Queued event cannot be null.");
     }
 
-    events_queue.emplace_back(priority, std::move(event));
+    events_queue.push_back(std::move(event));
 }
 
 void EventManager::DispatchEvents() {
@@ -126,15 +125,15 @@ void EventManager::DispatchEvents(EventPriority maximum_priority) {
         // used to break ties.
         std::stable_sort(events_queue.begin(), events_queue.begin() + count,
                          [](const auto &left, const auto &right) {
-                             return left.first < right.first;
+                             return left->priority < right->priority;
                          });
 
         while (consumed < count &&
-               events_queue[consumed].first <= maximum_priority) {
+               events_queue[consumed]->priority <= maximum_priority) {
             // Move ownership into a local variable rather than keeping a
             // reference to a queue slot that callbacks could invalidate by
             // adding events.
-            auto event = std::move(events_queue[consumed++].second);
+            auto event = std::move(events_queue[consumed++]);
             if (!event->Handled) {
                 TriggerEvent(*event);
             }

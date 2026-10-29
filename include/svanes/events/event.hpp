@@ -2,9 +2,12 @@
 
 #pragma once
 
+#include <cstdint>
 #include <string>
 
 namespace svanes {
+
+using EventPriority = std::uint64_t;
 
 /**
  * Represents any event that can be handled by the application.
@@ -24,6 +27,11 @@ public:
      * @return A string representing the type of the event.
      */
     virtual const std::string GetEventType() const = 0;
+
+    /**
+     * The dispatch priority. Smaller values are processed first.
+     */
+    EventPriority priority = 0;
 
     /**
      * Indicates whether the event has been handled by any event handler.

@@ -5,16 +5,12 @@
 #include <svanes/events/abstract_event_handler_wrapper.hpp>
 
 #include <cstddef>
-#include <cstdint>
 #include <memory>
 #include <string>
 #include <unordered_map>
-#include <utility>
 #include <vector>
 
 namespace svanes {
-
-using EventPriority = std::uint64_t;
 
 /**
  * Represents a manager for the lifecycle of events and their associated
@@ -133,12 +129,10 @@ public:
      * The manager owns the event until it is dispatched or discarded.
      *
      * @param event The event to enqueue.
-     * @param priority The dispatch priority. Smaller values are processed
-     * first.
      *
      * @throws std::invalid_argument if event is null.
      */
-    void QueueEvent(std::unique_ptr<Event> &&event, EventPriority priority = 0);
+    void QueueEvent(std::unique_ptr<Event> &&event);
 
     /**
      * Processes all events queued by QueueEvent in ascending priority order.
@@ -177,9 +171,8 @@ public:
     void DispatchEvents(EventPriority maximum_priority);
 
 private:
-    // Owns pending (priority, event) pairs until they are consumed or discarded
-    // by Shutdown.
-    std::vector<std::pair<EventPriority, std::unique_ptr<Event>>> events_queue;
+    // Owns pending events until they are consumed or discarded by Shutdown.
+    std::vector<std::unique_ptr<Event>> events_queue;
 
     // Maps event type identifiers to owned handlers. Each vector preserves
     // registration order so delivery order is predictable.
