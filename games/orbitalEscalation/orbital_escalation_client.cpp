@@ -15,6 +15,7 @@
 #include <svanes/MenuUtilities/text_label.hpp>
 #include <svanes/asset_path.hpp>
 #include <svanes/camera2d.hpp>
+#include <svanes/collision_pass.hpp>
 #include <svanes/events/event_manager.hpp>
 #include <svanes/input/input_manager.hpp>
 #include <svanes/network/clientserver/network_client.hpp>
@@ -40,6 +41,7 @@ OrbitalEscalationClient::OrbitalEscalationClient(std::string server_address)
 void OrbitalEscalationClient::Initialize(svanes::ClientContext &context) {
     RegisterPhysicalCollisionHandler(context.world, context.events);
     planet_collision_damage.Register(context.world, context.events);
+    missile_collisions.Register(context.world, context.events);
     context.network.Connect(server_address);
     std::cout << "Joining " << server_address << '.' << std::endl;
 
@@ -519,17 +521,8 @@ void OrbitalEscalationClient::Predict(svanes::Registry &world,
                     }
                 });
             planet_collision_damage.BeginStep(planet->GetEntity());
-            auto contacts = svanes::DetectEntityCollisions(
-                world, colliders, events, parallel_for);
-
-            // Attached parts do not collide with each other, and freshly fired
-            // missiles ignore their firing ship while arming.
-            std::erase_if(contacts, [&](const auto &pair) {
-                return GetAttachmentRoot(world, pair.a) ==
-                           GetAttachmentRoot(world, pair.b) ||
-                       IgnoresFiringShip(world, pair.a, pair.b) ||
-                       IgnoresFiringShip(world, pair.b, pair.a);
-            });
+            svanes::DetectEntityCollisions(world, colliders, events,
+                                           parallel_for);
 
             // Clientside collision response
 
@@ -537,7 +530,7 @@ void OrbitalEscalationClient::Predict(svanes::Registry &world,
 
             // Create explosion flashes for missiles that detonated this step.
             for (const auto position :
-                 UpdateMissileExplosions(world, contacts)) {
+                 missile_collisions.UpdateExplosions(world)) {
                 CreateCollisionFlash(world, effects_timeline->Get(),
                                      collision_flashes, position);
             }

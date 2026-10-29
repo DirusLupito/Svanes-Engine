@@ -1,6 +1,7 @@
 #pragma once
 
 #include "collision_response.hpp"
+#include "combat/missile_system.hpp"
 #include "combat/weapon_system.hpp"
 #include "game_objects/dynamic_object/ship.hpp"
 #include "game_objects/planet.hpp"
@@ -212,6 +213,9 @@ private:
 
     // Handler for applying planet impact damage once when a ship begins contact.
     PlanetCollisionDamageHandler planet_collision_damage;
+
+    // Handles missile impacts and the explosions they trigger.
+    MissileCollisionHandler missile_collisions;
 
     // Simulation time accumulated toward sending the next world update.
     svanes::TicCount snapshot_tics = 0;

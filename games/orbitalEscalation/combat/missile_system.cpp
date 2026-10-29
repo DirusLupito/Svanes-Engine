@@ -2,8 +2,12 @@
 
 #include "../attachment_system.hpp"
 #include "damage_system.hpp"
+#include <svanes/events/collision_event.hpp>
+#include <svanes/events/event_handler_wrapper.hpp>
+#include <svanes/events/event_manager.hpp>
 #include <svanes/registry.hpp>
 
+#include <memory>
 #include <unordered_set>
 
 bool IgnoresFiringShip(const svanes::Registry &world, svanes::Entity missile,
@@ -26,9 +30,39 @@ bool IgnoresFiringShip(const svanes::Registry &world, svanes::Entity missile,
     return now - explosion.launched_at < explosion.arming_tics;
 }
 
+void MissileCollisionHandler::Register(svanes::Registry &world,
+                                       svanes::EventManager &events) {
+    events.Subscribe(
+        svanes::CollisionEvent::GetStaticEventType(),
+        std::make_unique<svanes::EventHandlerWrapper<svanes::CollisionEvent>>(
+            [this, &world](const svanes::CollisionEvent &event) {
+                HandleCollision(world, event);
+            }));
+}
+
+void MissileCollisionHandler::HandleCollision(
+    svanes::Registry &world, const svanes::CollisionEvent &event) {
+    const auto &pair = event.collision;
+
+    // Parts of the same object should not collide with each other. An arming
+    // missile also ignores its firing ship and that ship's attached parts.
+
+    if (GetAttachmentRoot(world, pair.a) == GetAttachmentRoot(world, pair.b) ||
+        IgnoresFiringShip(world, pair.a, pair.b) ||
+        IgnoresFiringShip(world, pair.b, pair.a)) {
+        return;
+    }
+
+    for (const auto entity : {pair.a, pair.b}) {
+        if (world.HasComponent<MissileExplosion>(entity) &&
+            !world.GetComponent<MissileExplosion>(entity).detonated) {
+            contacted_missiles.push_back(entity);
+        }
+    }
+}
+
 std::vector<svanes::Vector2D>
-UpdateMissileExplosions(svanes::Registry &world,
-                        std::span<const svanes::EntityCollision2D> contacts) {
+MissileCollisionHandler::UpdateExplosions(svanes::Registry &world) {
     // The positions of explosions produced by this update.
     std::vector<svanes::Vector2D> explosions;
     std::unordered_set<svanes::Entity> pending;
@@ -47,18 +81,12 @@ UpdateMissileExplosions(svanes::Registry &world,
     };
     collect_dead();
 
-    // Add contacted, undetonated missiles to the same queue as missiles found
-    // dead by collect_dead.
-    const auto contact = [&](svanes::Entity missile) {
-        if (world.HasComponent<MissileExplosion>(missile) &&
-            !world.GetComponent<MissileExplosion>(missile).detonated) {
-            pending.insert(missile);
-        }
-    };
-    for (const auto &pair : contacts) {
-        contact(pair.a);
-        contact(pair.b);
+    // Add contacted missiles to the same queue as missiles found dead by
+    // collect_dead.
+    for (const auto missile : contacted_missiles) {
+        pending.insert(missile);
     }
+    contacted_missiles.clear();
 
     // Process the queue until all contact-triggered and chain-reaction
     // explosions have been handled.

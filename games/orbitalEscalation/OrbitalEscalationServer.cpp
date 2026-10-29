@@ -8,6 +8,7 @@
 #include "game_objects/world_obstacles.hpp"
 #include "serialization/world_update.hpp"
 
+#include <svanes/collision_pass.hpp>
 #include <svanes/events/event_manager.hpp>
 #include <svanes/kinematic_system.hpp>
 #include <svanes/network/message_serialization.hpp>
@@ -41,6 +42,7 @@ OrbitalEscalationServer::OrbitalEscalationServer(
 void OrbitalEscalationServer::Initialize(svanes::ServerContext &context) {
     RegisterPhysicalCollisionHandler(context.world, context.events);
     planet_collision_damage.Register(context.world, context.events);
+    missile_collisions.Register(context.world, context.events);
     gameplay_timeline.emplace(context.world);
     context.world.AddComponent<svanes::Timeline>(gameplay_timeline->Get());
     planet.emplace(context.world, Planet::MakeDefinition());
@@ -389,21 +391,11 @@ void OrbitalEscalationServer::RespondToPhysics(
             }
         });
     planet_collision_damage.BeginStep(planet->GetEntity());
-    auto contacts =
-        svanes::DetectEntityCollisions(world, colliders, events, driver);
-
-    // Parts of the same object should not collide with each other. An arming
-    // missile also ignores its firing ship and that ship's attached parts.
-    std::erase_if(contacts, [&](const svanes::EntityCollision2D &pair) {
-        return GetAttachmentRoot(world, pair.a) ==
-                   GetAttachmentRoot(world, pair.b) ||
-               IgnoresFiringShip(world, pair.a, pair.b) ||
-               IgnoresFiringShip(world, pair.b, pair.a);
-    });
+    svanes::DetectEntityCollisions(world, colliders, events, driver);
 
     events.DispatchEvents();
 
-    UpdateMissileExplosions(world, contacts);
+    missile_collisions.UpdateExplosions(world);
 
     // Objects touching the deletion boxes are removed with other dead objects.
     ApplyDeletionBoxes(world, deletion_boxes);
