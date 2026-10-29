@@ -43,6 +43,7 @@ void OrbitalEscalationServer::Initialize(svanes::ServerContext &context) {
     RegisterPhysicalCollisionHandler(context.world, context.events);
     planet_collision_damage.Register(context.world, context.events);
     missile_collisions.Register(context.world, context.events);
+    deletion_box_collisions.Register(context.world, context.events);
     gameplay_timeline.emplace(context.world);
     context.world.AddComponent<svanes::Timeline>(gameplay_timeline->Get());
     planet.emplace(context.world, Planet::MakeDefinition());
@@ -396,9 +397,6 @@ void OrbitalEscalationServer::RespondToPhysics(
     events.DispatchEvents();
 
     missile_collisions.UpdateExplosions(world);
-
-    // Objects touching the deletion boxes are removed with other dead objects.
-    ApplyDeletionBoxes(world, deletion_boxes);
 
     // Explosions have finished using the entities' geometry. Now their owners
     // can remove dead objects, including dead missiles still inside launchers.

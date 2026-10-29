@@ -3,6 +3,7 @@
 #include "attachment_system.hpp"
 #include "combat/damage_system.hpp"
 #include "combat/missile_system.hpp"
+#include "game_objects/deletion_boxes.hpp"
 #include "propulsion_system.hpp"
 
 #include <svanes/events/collision_event.hpp>
@@ -23,6 +24,15 @@ void RegisterPhysicalCollisionHandler(svanes::Registry &world,
         std::make_unique<svanes::EventHandlerWrapper<svanes::CollisionEvent>>(
             [&world](const svanes::CollisionEvent &event) {
                 const auto &pair = event.collision;
+
+                // Ignore collisions with deletion boxes and between parts of the same
+                // object. 
+
+                if (world.HasComponent<DeletionBox>(pair.a) ||
+                    world.HasComponent<DeletionBox>(pair.b)) {
+                    return;
+                }
+
                 if (GetAttachmentRoot(world, pair.a) ==
                         GetAttachmentRoot(world, pair.b) ||
                     IgnoresFiringShip(world, pair.a, pair.b) ||

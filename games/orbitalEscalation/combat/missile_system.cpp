@@ -1,6 +1,7 @@
 #include "missile_system.hpp"
 
 #include "../attachment_system.hpp"
+#include "../game_objects/deletion_boxes.hpp"
 #include "damage_system.hpp"
 #include <svanes/events/collision_event.hpp>
 #include <svanes/events/event_handler_wrapper.hpp>
@@ -43,6 +44,10 @@ void MissileCollisionHandler::Register(svanes::Registry &world,
 void MissileCollisionHandler::HandleCollision(
     svanes::Registry &world, const svanes::CollisionEvent &event) {
     const auto &pair = event.collision;
+    if (world.HasComponent<DeletionBox>(pair.a) ||
+        world.HasComponent<DeletionBox>(pair.b)) {
+        return;
+    }
 
     // Parts of the same object should not collide with each other. An arming
     // missile also ignores its firing ship and that ship's attached parts.

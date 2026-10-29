@@ -2,6 +2,7 @@
 
 #include "collision_response.hpp"
 #include "combat/missile_system.hpp"
+#include "game_objects/deletion_boxes.hpp"
 #include "game_objects/planet.hpp"
 #include "serialization/asset_catalog.hpp"
 #include "serialization/world_update.hpp"
@@ -166,6 +167,9 @@ private:
 
     // Handles predicted missile impacts and their explosions.
     MissileCollisionHandler missile_collisions;
+
+    // Handles predicted boundary contacts and their explosion flashes.
+    DeletionBoxCollisionHandler deletion_box_collisions;
 
     // The parfor driver used by local physics and collision detection.
     svanes::AsyncParallelForDriver parallel_for{1};

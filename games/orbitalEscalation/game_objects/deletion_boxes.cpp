@@ -3,9 +3,14 @@
 #include "../combat/damage_system.hpp"
 
 #include <svanes/collision_system.hpp>
+#include <svanes/events/collision_event.hpp>
+#include <svanes/events/event_handler_wrapper.hpp>
+#include <svanes/events/event_manager.hpp>
 #include <svanes/registry.hpp>
 
 #include <array>
+#include <memory>
+#include <utility>
 
 // The positions and sizes of the four deletion boxes surrounding the planet.
 static constexpr std::array<svanes::Rectangle2D, 4> boxes = {
@@ -20,36 +25,45 @@ std::vector<OwnedEntity> CreateDeletionBoxes(svanes::Registry &world) {
     for (const auto &box : boxes) {
         auto &entity = zones.emplace_back(world);
 
+        world.AddComponent<svanes::Transform>(entity.Get());
+        world.AddComponent<DeletionBox>(entity.Get());
         world.AddComponent<svanes::Collider2D>(entity.Get(),
                                                svanes::Collider2D{box});
     }
     return zones;
 }
 
-std::vector<svanes::Vector2D>
-ApplyDeletionBoxes(svanes::Registry &world,
-                   std::span<const OwnedEntity> boxes) {
-    // List of the positions of objects that were deleted by the deletion boxes.
-    std::vector<svanes::Vector2D> impacts;
+void DeletionBoxCollisionHandler::Register(
+    svanes::Registry &world, svanes::EventManager &events,
+    std::function<void(svanes::Vector2D)> on_delete) {
+    events.Subscribe(
+        svanes::CollisionEvent::GetStaticEventType(),
+        std::make_unique<svanes::EventHandlerWrapper<svanes::CollisionEvent>>(
+            [this, &world, on_delete = std::move(on_delete)](
+                const svanes::CollisionEvent &event) {
+                HandleCollision(world, event, on_delete);
+            }));
+}
 
-    world.ForEach<svanes::Transform, svanes::Collider2D>(
-        [&](svanes::Entity entity, const svanes::Transform &pose,
-            const svanes::Collider2D &collider) {
-            if (IsDead(world, entity)) {
-                return;
-            }
+void DeletionBoxCollisionHandler::HandleCollision(
+    svanes::Registry &world, const svanes::CollisionEvent &event,
+    const std::function<void(svanes::Vector2D)> &on_delete) {
+    const auto &pair = event.collision;
+    const bool a_is_box = world.HasComponent<DeletionBox>(pair.a);
+    const bool b_is_box = world.HasComponent<DeletionBox>(pair.b);
 
-            for (const auto &box : boxes) {
-                const auto &zone =
-                    world.GetComponent<svanes::Collider2D>(box.Get());
-                if (!svanes::DetectCollisions(collider.geometry, pose,
-                                              zone.geometry, {})
-                         .empty()) {
-                    world.AddComponent<Health>(entity, Health{0.0F});
-                    impacts.push_back({pose.x, pose.y});
-                    break;
-                }
-            }
-        });
-    return impacts;
+    if (a_is_box == b_is_box) {
+        return;
+    }
+
+    const auto entity = a_is_box ? pair.b : pair.a;
+    if (IsDead(world, entity)) {
+        return;
+    }
+    const auto &pose = world.GetComponent<svanes::Transform>(entity);
+    const svanes::Vector2D position{pose.x, pose.y};
+    world.AddComponent<Health>(entity, Health{0.0F});
+    if (on_delete) {
+        on_delete(position);
+    }
 }

@@ -42,6 +42,12 @@ void OrbitalEscalationClient::Initialize(svanes::ClientContext &context) {
     RegisterPhysicalCollisionHandler(context.world, context.events);
     planet_collision_damage.Register(context.world, context.events);
     missile_collisions.Register(context.world, context.events);
+    deletion_box_collisions.Register(
+        context.world, context.events,
+        [this, &world = context.world](svanes::Vector2D position) {
+            CreateCollisionFlash(world, effects_timeline->Get(),
+                                 collision_flashes, position);
+        });
     context.network.Connect(server_address);
     std::cout << "Joining " << server_address << '.' << std::endl;
 
@@ -531,13 +537,6 @@ void OrbitalEscalationClient::Predict(svanes::Registry &world,
             // Create explosion flashes for missiles that detonated this step.
             for (const auto position :
                  missile_collisions.UpdateExplosions(world)) {
-                CreateCollisionFlash(world, effects_timeline->Get(),
-                                     collision_flashes, position);
-            }
-
-            // Predict the results of collisions with the deletion boxes.
-            for (const auto position :
-                 ApplyDeletionBoxes(world, deletion_boxes)) {
                 CreateCollisionFlash(world, effects_timeline->Get(),
                                      collision_flashes, position);
             }
