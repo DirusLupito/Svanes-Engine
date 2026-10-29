@@ -1,12 +1,14 @@
 #include "OrbitalEscalationServer.hpp"
 
 #include "attachment_system.hpp"
+#include "collision_response.hpp"
 #include "combat/damage_system.hpp"
 #include "combat/missile_system.hpp"
 #include "game_objects/deletion_boxes.hpp"
 #include "game_objects/world_obstacles.hpp"
 #include "serialization/world_update.hpp"
 
+#include <svanes/events/event_manager.hpp>
 #include <svanes/kinematic_system.hpp>
 #include <svanes/network/message_serialization.hpp>
 #include <svanes/sprite_animation_system.hpp>
@@ -22,7 +24,6 @@
 
 constexpr float kPlayerHealth = 100.0F;
 constexpr float kPlanetImpactDamage = 25.0F;
-constexpr float kCollisionAcceleration = 400000.0F;
 constexpr float kSpawnSpeed = 300.0F;
 
 // The total number of junk ships.
@@ -34,44 +35,12 @@ constexpr std::uint32_t kStaticJunkShipCount = 1000;
 // The health of a junk ship.
 constexpr float kJunkHealth = 10.0F;
 
-/**
- * Applies an acceleration to two entities based on their collision, if they
- * have collided to slam them apart. The acceleration is applied in the
- * direction of the collision normal.
- *
- * @param world The registry containing the entities.
- * @param pair The entities and collision details from the shared detection
- * pass.
- */
-static void ApplyCollisionAcceleration(svanes::Registry &world,
-                                       const svanes::EntityCollision2D &pair) {
-    const auto a = pair.a;
-    const auto b = pair.b;
-
-    for (const svanes::Collision2D &collision : pair.collisions) {
-        const svanes::Vector2D acceleration =
-            collision.normal *
-            svanes::PerSecondSquaredToPerTicSquared(kCollisionAcceleration);
-
-        if (world.HasComponent<svanes::Kinematic2D>(a)) {
-            auto &motion = world.GetComponent<svanes::Kinematic2D>(a);
-            motion.acceleration_x += acceleration.x;
-            motion.acceleration_y += acceleration.y;
-        }
-
-        if (world.HasComponent<svanes::Kinematic2D>(b)) {
-            auto &motion = world.GetComponent<svanes::Kinematic2D>(b);
-            motion.acceleration_x -= acceleration.x;
-            motion.acceleration_y -= acceleration.y;
-        }
-    }
-}
-
 OrbitalEscalationServer::OrbitalEscalationServer(
     const std::filesystem::path &asset_root, std::uint16_t joining_port)
     : assets(asset_root), port(joining_port) {}
 
 void OrbitalEscalationServer::Initialize(svanes::ServerContext &context) {
+    RegisterPhysicalCollisionHandler(context.world, context.events);
     gameplay_timeline.emplace(context.world);
     context.world.AddComponent<svanes::Timeline>(gameplay_timeline->Get());
     planet.emplace(context.world, Planet::MakeDefinition());
@@ -431,9 +400,7 @@ void OrbitalEscalationServer::RespondToPhysics(
                IgnoresFiringShip(world, pair.b, pair.a);
     });
 
-    for (const auto &pair : contacts) {
-        ApplyCollisionAcceleration(world, pair);
-    }
+    events.DispatchEvents();
 
     // The ships contacting the planet in this physics step, including junk.
     std::unordered_set<svanes::Entity> contacting;

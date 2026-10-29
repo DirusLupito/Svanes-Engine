@@ -2,6 +2,8 @@ add_library(
     svanes_orbital_common STATIC
     attachment_system.cpp
     attachment_system.hpp
+    collision_response.cpp
+    collision_response.hpp
     propulsion_system.cpp
     propulsion_system.hpp
     combat/damage_system.cpp

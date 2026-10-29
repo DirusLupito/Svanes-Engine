@@ -1,4 +1,5 @@
 #include "orbital_escalation_client.hpp"
+#include "collision_response.hpp"
 #include "combat/damage_system.hpp"
 #include "combat/missile_system.hpp"
 #include "combat/weapon_system.hpp"
@@ -14,6 +15,7 @@
 #include <svanes/MenuUtilities/text_label.hpp>
 #include <svanes/asset_path.hpp>
 #include <svanes/camera2d.hpp>
+#include <svanes/events/event_manager.hpp>
 #include <svanes/input/input_manager.hpp>
 #include <svanes/network/clientserver/network_client.hpp>
 #include <svanes/physics_system.hpp>
@@ -27,33 +29,6 @@ const svanes::TicCount kPauseFlashPeriod = svanes::SecondsToTics(1.0);
 constexpr std::uint8_t kPauseLabelMinimumAlpha = 64;
 constexpr svanes::TicCount kClientFrameTics = 5000; // 1/200 second
 constexpr float kPlanetImpactDamage = 25.0F;
-constexpr float kCollisionAcceleration = 400000.0F;
-
-/**
- * Pushes colliding objects apart using the contact normals.
- *
- * @param world The registry containing the colliding objects.
- * @param pair The objects and their collision contacts.
- */
-static void ApplyCollisionAcceleration(svanes::Registry &world,
-                                       const svanes::EntityCollision2D &pair) {
-    for (const auto &collision : pair.collisions) {
-        const auto acceleration =
-            collision.normal *
-            svanes::PerSecondSquaredToPerTicSquared(kCollisionAcceleration);
-        if (world.HasComponent<svanes::Kinematic2D>(pair.a)) {
-            auto &motion = world.GetComponent<svanes::Kinematic2D>(pair.a);
-            motion.acceleration_x += acceleration.x;
-            motion.acceleration_y += acceleration.y;
-        }
-
-        if (world.HasComponent<svanes::Kinematic2D>(pair.b)) {
-            auto &motion = world.GetComponent<svanes::Kinematic2D>(pair.b);
-            motion.acceleration_x -= acceleration.x;
-            motion.acceleration_y -= acceleration.y;
-        }
-    }
-}
 
 OrbitalEscalationClient::OrbitalEscalationClient(std::string server_address)
     : server_address(std::move(server_address)),
@@ -64,6 +39,7 @@ OrbitalEscalationClient::OrbitalEscalationClient(std::string server_address)
 }
 
 void OrbitalEscalationClient::Initialize(svanes::ClientContext &context) {
+    RegisterPhysicalCollisionHandler(context.world, context.events);
     context.network.Connect(server_address);
     std::cout << "Joining " << server_address << '.' << std::endl;
 
@@ -556,9 +532,7 @@ void OrbitalEscalationClient::Predict(svanes::Registry &world,
 
             // Clientside collision response
 
-            for (const auto &pair : contacts) {
-                ApplyCollisionAcceleration(world, pair);
-            }
+            events.DispatchEvents();
 
             // The ships touching the planet in this step.
             std::unordered_set<svanes::Entity> contacting;
