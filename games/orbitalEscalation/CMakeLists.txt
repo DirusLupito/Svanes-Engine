@@ -1,5 +1,9 @@
 add_library(
     svanes_orbital_common STATIC
+    player_events.cpp
+    player_events.hpp
+    world_snapshot_event.cpp
+    world_snapshot_event.hpp
     attachment_system.cpp
     attachment_system.hpp
     collision_response.cpp
