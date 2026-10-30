@@ -7,6 +7,8 @@
 #include "effects/collision_flashes.hpp"
 #include "game_objects/deletion_boxes.hpp"
 #include "game_objects/world_obstacles.hpp"
+#include "player_events.hpp"
+#include "world_snapshot_event.hpp"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -16,6 +18,7 @@
 #include <svanes/asset_path.hpp>
 #include <svanes/camera2d.hpp>
 #include <svanes/collision_pass.hpp>
+#include <svanes/events/event_handler_wrapper.hpp>
 #include <svanes/events/event_manager.hpp>
 #include <svanes/input/input_manager.hpp>
 #include <svanes/network/clientserver/network_client.hpp>
@@ -23,7 +26,6 @@
 #include <svanes/registry.hpp>
 #include <svanes/render/render_system.hpp>
 #include <svanes/sprite_animation_system.hpp>
-#include <unordered_set>
 #include <utility>
 
 const svanes::TicCount kPauseFlashPeriod = svanes::SecondsToTics(1.0);
@@ -91,6 +93,44 @@ void OrbitalEscalationClient::Initialize(svanes::ClientContext &context) {
             svanes::Rectangle2D{0.0F, 0.0F, view.width, view.height}});
     context.world.AddComponent<svanes::ZOrder>(background_entity,
                                                svanes::ZOrder{-100});
+
+    snapshot_event_handlers.emplace(ClientEventContext{
+        .world = context.world,
+        .events = context.events,
+        .camera = context.camera,
+        .assets = assets,
+        .client_id = client_id,
+        .gameplay_timeline = gameplay_timeline->Get(),
+        .effects_timeline = effects_timeline->Get(),
+        .rotating_square = rotating_square->Get(),
+        .pause_label = pause_label_entity,
+        .planet = planet,
+        .player_ship = player_ship,
+        .objects = objects,
+        .root_objects = root_objects,
+        .collision_flashes = collision_flashes,
+    });
+
+    context.events.Subscribe(
+        PlayerSpawnEvent::GetStaticEventType(),
+        std::make_unique<svanes::EventHandlerWrapper<PlayerSpawnEvent>>(
+            [this](const PlayerSpawnEvent &event) {
+                snapshot_event_handlers->HandlePlayerSpawn(event);
+            }));
+
+    context.events.Subscribe(
+        PlayerDeathEvent::GetStaticEventType(),
+        std::make_unique<svanes::EventHandlerWrapper<PlayerDeathEvent>>(
+            [this](const PlayerDeathEvent &event) {
+                snapshot_event_handlers->HandlePlayerDeath(event);
+            }));
+
+    context.events.Subscribe(
+        WorldSnapshotEvent::GetStaticEventType(),
+        std::make_unique<svanes::EventHandlerWrapper<WorldSnapshotEvent>>(
+            [this](const WorldSnapshotEvent &event) {
+                snapshot_event_handlers->HandleWorldSnapshot(event);
+            }));
 }
 
 svanes::NetworkMessage OrbitalEscalationClient::CreateJoinRequest() {
@@ -139,7 +179,9 @@ void OrbitalEscalationClient::Update(const svanes::ClientFrameContext &frame) {
     // Each update describes the complete world state, so only apply the last
     // one before the engine renders this frame.
     if (!messages.empty()) {
-        ApplyWorldUpdate(frame, WorldUpdate::Read(messages.back()));
+        frame.events.QueueEvent(std::make_unique<WorldSnapshotEvent>(
+            WorldUpdate::Read(messages.back())));
+        frame.events.DispatchEvents();
     }
 
     if (frame.input.WasPressed(svanes::Key::Escape)) {
@@ -262,207 +304,6 @@ void OrbitalEscalationClient::Update(const svanes::ClientFrameContext &frame) {
     background_rectangle.height = view.height;
 }
 
-void OrbitalEscalationClient::ApplyWorldUpdate(
-    const svanes::ClientFrameContext &frame, const WorldUpdate &update) {
-    // The registry containing the client's displayed objects and local UI.
-    auto &world = frame.world;
-
-    // The master clock shared by the displayed gameplay objects.
-    auto &timeline =
-        world.GetComponent<svanes::Timeline>(gameplay_timeline->Get());
-
-    // Replace predicted gameplay time with the server's clock state.
-    timeline.SetProgress(update.total_tics, 0, svanes::RationalNumber{0});
-    timeline.SetTicSize(update.tic_size);
-    if (update.paused) {
-        timeline.Pause();
-        world.GetComponent<svanes::Timeline>(effects_timeline->Get()).Pause();
-    } else {
-        timeline.Unpause();
-        world.GetComponent<svanes::Timeline>(effects_timeline->Get()).Unpause();
-    }
-
-    world.GetComponent<svanes::TextLabel>(pause_label_entity).visible =
-        update.paused;
-
-    // We create the planet once, then update its displayed position and
-    // rotation given subsequent world updates.
-    if (!planet) {
-        planet.emplace(world, Planet::MakeDefinition());
-    }
-
-    planet->GetTransform(world) = update.planet_transform;
-    planet->UpdateVisuals(world);
-
-    world.GetComponent<svanes::Transform>(rotating_square->Get()).rotation =
-        update.square_rotation;
-
-    // Collect the existing attachment trees into one list so their objects can
-    // be kept even if they change parents or become independent in this update.
-    for (std::size_t index = 0; index < root_objects.size(); ++index) {
-        auto attachments = root_objects[index]->ReleaseAttachments();
-        for (auto &attachment : attachments) {
-            root_objects.push_back(std::move(attachment));
-        }
-    }
-
-    // The owners of existing and newly created objects, keyed by their local
-    // entity IDs until ownership is transferred to the new attachment trees.
-    // Predicted-only objects have no entry in objects, so they stay here and
-    // are destroyed when the authoritative update finishes.
-    std::unordered_map<svanes::Entity, std::unique_ptr<DynamicObject>> owned;
-    for (auto &object : root_objects) {
-        const auto entity = object->GetEntity();
-        world.RemoveComponent<Attachment>(entity);
-        owned.emplace(entity, std::move(object));
-    }
-    root_objects.clear();
-
-    // The server IDs of objects present in this complete world update.
-    std::unordered_set<svanes::Entity> present;
-
-    // For every object in the server's world, create it if necessary and update
-    // its displayed state. The server's world update is authoritative, so we
-    // copy the server's state to the client.
-    for (const auto &state : update.objects) {
-        present.insert(state.entity);
-
-        // Create the object if it does not already exist in the client's world.
-        if (!objects.contains(state.entity)) {
-            auto object = assets.CreateUnattached(
-                world, gameplay_timeline->Get(), state.type, state.definition);
-            objects.emplace(state.entity, object.get());
-            owned.emplace(object->GetEntity(), std::move(object));
-        }
-
-        // And now at this point we know the object exists in the client's
-        // world, so we can update its displayed state to match the server's
-        // world update.
-
-        // The local object corresponding to this server entity.
-        auto &object = *objects.at(state.entity);
-        const auto entity = object.GetEntity();
-
-        world.GetComponent<svanes::Timeline>(entity).SetProgress(
-            state.local_tics, 0, svanes::RationalNumber{0});
-
-        // Copy independent movement if present. Static and attached objects
-        // have no kinematic component.
-        if (state.velocity) {
-            auto &motion = world.AddComponent<svanes::Kinematic2D>(entity);
-            motion.velocity_x = state.velocity->linear.x;
-            motion.velocity_y = state.velocity->linear.y;
-            motion.angular_velocity = state.velocity->angular;
-        } else {
-            world.RemoveComponent<svanes::Kinematic2D>(entity);
-        }
-
-        // Keep damageable objects' health in step with the server.
-        if (state.health) {
-            world.AddComponent<Health>(entity, Health{*state.health});
-        } else {
-            world.RemoveComponent<Health>(entity);
-        }
-
-        // Apply any per-object color instead of the catalog's default color.
-        if (state.color) {
-            world.AddComponent<svanes::Color>(entity, *state.color);
-        } else {
-            world.RemoveComponent<svanes::Color>(entity);
-        }
-
-        // Launch history is estimated locally rather than sent by the server.
-        if (world.HasComponent<MissileExplosion>(entity)) {
-            auto &explosion = world.GetComponent<MissileExplosion>(entity);
-            explosion.firing_ship.reset();
-            explosion.launched_at = state.local_tics;
-            explosion.detonated = false;
-        }
-    }
-
-    // For every server object, if it is a missile that is no longer present,
-    // it must have blown up. so we need to create a flash for it.
-    // Assumes that missiles can only be destroyed by detonating.
-    for (const auto &[id, object] : objects) {
-        if (!present.contains(id) &&
-            object->GetType() == DynamicObjectType::Missile) {
-            const auto &pose = object->GetTransform(world);
-            CreateCollisionFlash(world, effects_timeline->Get(),
-                                 collision_flashes, {pose.x, pose.y});
-        }
-    }
-
-    // Remove lookup entries for objects which are no longer in the server's
-    // world. Their owners remain in owned and destroy them when it goes out of
-    // scope.
-    std::erase_if(objects, [&](const auto &entry) {
-        return !present.contains(entry.first);
-    });
-
-    // Rebuild the owning attachment vectors and registry relationships using
-    // the server's parent IDs. Objects without parents remain independently
-    // owned by the client.
-    for (const auto &state : update.objects) {
-        auto &object = *objects.at(state.entity);
-        const auto entity = object.GetEntity();
-        if (state.attachment) {
-            objects.at(state.attachment->parent)
-                ->AddAttachment(world, std::move(owned.at(entity)),
-                                state.attachment->transform);
-        } else {
-            root_objects.push_back(std::move(owned.at(entity)));
-        }
-    }
-
-    // Attaching objects recalculates their positions. Restore the server's
-    // exact world poses now that the complete attachment trees exist.
-    for (const auto &state : update.objects) {
-        objects.at(state.entity)->GetTransform(world) = state.transform;
-    }
-
-    // Estimate launcher readiness from the ammunition actually attached in
-    // this snapshot. An empty slot starts a fresh local reload countdown.
-    for (const auto &state : update.objects) {
-        const auto &object = *objects.at(state.entity);
-        const auto entity = object.GetEntity();
-        if (world.HasComponent<MissileLauncherState>(entity)) {
-            auto &launcher = world.GetComponent<MissileLauncherState>(entity);
-            launcher.loaded_missile.reset();
-            launcher.emptied_at = state.local_tics;
-            launcher.ammunition_lost = false;
-            for (const auto &child : object.GetAttachments()) {
-                if (child->GetType() == DynamicObjectType::Missile) {
-                    launcher.loaded_missile = child->GetEntity();
-                    launcher.emptied_at.reset();
-                    break;
-                }
-            }
-            world.GetComponent<WeaponControl>(entity).fire = false;
-        }
-    }
-
-    // Update the complete trees' visuals from their roots.
-    for (const auto &object : root_objects) {
-        object->UpdateVisuals(world);
-    }
-
-    // Follow this player's living ship. If it has been destroyed, keep the
-    // camera at its last position.
-    player_ship.reset();
-    for (const auto &player : update.players) {
-        if (player.client == client_id) {
-            player_ship = player.ship;
-
-            if (player_ship) {
-                const auto &pose =
-                    objects.at(*player_ship)->GetTransform(world);
-                frame.camera.x = pose.x;
-                frame.camera.y = pose.y;
-            }
-        }
-    }
-}
-
 void OrbitalEscalationClient::SendInput(
     const svanes::ClientFrameContext &frame) {
     if (!frame.network.IsConnected()) {
@@ -541,15 +382,14 @@ void OrbitalEscalationClient::Predict(svanes::Registry &world,
                                      collision_flashes, position);
             }
 
-            // Remove dead objects from the world, including their attachments.
-            // If a parent is dead, its children are also dead, so we can remove
-            // the entire attachment tree at once. If a child is dead, we remove
-            // it from its parent's attachment vector, but the parent remains
-            // alive.
+            // Player ships remain until a server snapshot removes them. Other
+            // dead objects take their attachments with them, so remove lookup
+            // entries for the complete tree before destroying its owner.
             std::erase_if(objects, [&](const auto &entry) {
                 auto entity = entry.second->GetEntity();
                 while (true) {
-                    if (IsDead(world, entity)) {
+                    if (IsDead(world, entity) &&
+                        !snapshot_event_handlers->IsPlayerShip(entity)) {
                         return true;
                     }
 
@@ -561,12 +401,9 @@ void OrbitalEscalationClient::Predict(svanes::Registry &world,
                 }
             });
 
-            if (player_ship && !objects.contains(*player_ship)) {
-                player_ship.reset();
-            }
-
             std::erase_if(root_objects, [&](const auto &object) {
-                if (IsDead(world, object->GetEntity())) {
+                if (IsDead(world, object->GetEntity()) &&
+                    !snapshot_event_handlers->IsPlayerShip(object->GetEntity())) {
                     return true;
                 }
 

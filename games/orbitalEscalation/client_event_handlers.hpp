@@ -103,6 +103,16 @@ public:
      */
     void HandlePlayerDeath(const PlayerDeathEvent &event);
 
+    /**
+     * Checks whether an entity is a player ship in the server's latest
+     * snapshot.
+     *
+     * @param entity The entity in the client's registry.
+     * @return true if the entity is a living player's ship in the latest
+     * snapshot, false otherwise.
+     */
+    bool IsPlayerShip(svanes::Entity entity) const;
+
 private:
     /**
      * Replaces an existing object's time, movement, health, and appearance

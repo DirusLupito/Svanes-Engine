@@ -223,6 +223,13 @@ void ClientEventHandlers::HandlePlayerDeath(const PlayerDeathEvent &event) {
     }
 }
 
+bool ClientEventHandlers::IsPlayerShip(svanes::Entity entity) const {
+    return std::any_of(
+        player_ships.begin(), player_ships.end(), [&](const auto &player) {
+            return context.objects.at(player.second)->GetEntity() == entity;
+        });
+}
+
 void ClientEventHandlers::ApplyObjectState(const WorldUpdate::Object &state) {
     auto &world = context.world;
     const auto entity = context.objects.at(state.entity)->GetEntity();

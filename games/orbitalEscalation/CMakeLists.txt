@@ -70,6 +70,8 @@ target_link_libraries(svanes_orbital_common PUBLIC
 )
 add_executable(svanes_game_orbital_escalation
     client_main.cpp
+    client_event_handlers.cpp
+    client_event_handlers.hpp
     orbital_escalation_client.cpp
     orbital_escalation_client.hpp
 )

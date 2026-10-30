@@ -1,11 +1,11 @@
 #pragma once
 
+#include "client_event_handlers.hpp"
 #include "collision_response.hpp"
 #include "combat/missile_system.hpp"
 #include "game_objects/deletion_boxes.hpp"
 #include "game_objects/planet.hpp"
 #include "serialization/asset_catalog.hpp"
-#include "serialization/world_update.hpp"
 
 #include <svanes/async/async_parallel_for_driver.hpp>
 #include <svanes/entity.hpp>
@@ -81,23 +81,6 @@ public:
 
 private:
     /**
-     * Applies the server's complete world state to the client's
-     * view of the game. This should be called once per frame if
-     * the server has sent any world update messages.
-     * Discards predicted-only gameplay objects and preserves local effects.
-     *
-     * TODO: Consider optimizing this to only update objects that have changed
-     * since the last update, or perhaps only objects that the client can see or
-     * interact with.
-     *
-     * @param frame The client's world, camera, and other services for this
-     * frame.
-     * @param update The world state received from the server.
-     */
-    void ApplyWorldUpdate(const svanes::ClientFrameContext &frame,
-                          const WorldUpdate &update);
-
-    /**
      * Reads this player's controls for local prediction and queues them for
      * the server to apply.
      *
@@ -161,6 +144,9 @@ private:
 
     // List of collision flashes. Purely clientside.
     std::vector<OwnedEntity> collision_flashes;
+
+    // The handlers that apply server snapshots and player lifetime changes.
+    std::optional<ClientEventHandlers> snapshot_event_handlers;
 
     // Handler for applying planet impact damage once when a ship begins predicted contact.
     PlanetCollisionDamageHandler planet_collision_damage;
