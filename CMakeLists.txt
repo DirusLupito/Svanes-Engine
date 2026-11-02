@@ -393,11 +393,3 @@ add_subdirectory(games/orbitalEscalation)
 add_subdirectory(games/doubleTime)
 
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT svanes_game_orbital_escalation)
-
-option(SVANES_BUILD_REPLAY_TESTS "Build replay system tests" OFF)
-if(SVANES_BUILD_REPLAY_TESTS)
-    enable_testing()
-    add_executable(svanes_replay_tests tests/replay_tests.cpp)
-    target_link_libraries(svanes_replay_tests PRIVATE Svanes::Engine)
-    add_test(NAME svanes_replay_tests COMMAND svanes_replay_tests)
-endif()

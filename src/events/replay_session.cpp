@@ -66,11 +66,15 @@ const std::string StopReplayEvent::GetEventType() const {
 ReplaySession::ReplaySession(EventManager &manager, TicCount step_tics,
                              Callbacks callbacks)
     : manager(&manager), step_tics(step_tics), callbacks(std::move(callbacks)) {
+    // Checks to ensure valid  param inputs from the game
+    // All three callbacks are necessary for recording and playback
     if (step_tics == 0 || !this->callbacks.save || !this->callbacks.restore ||
         !this->callbacks.step) {
         throw std::invalid_argument("Replay requires a positive step duration "
                                     "and save/restore/step callbacks.");
     }
+    // Prevents ReplaySession creation while the chosen EventManager is busy.
+    // Also prevents multiple ReplaySessions from being associated with one manager.
     if (manager.IsDeliveringEvents() || manager.replay) {
         throw std::logic_error("A replay session requires an idle event "
                                "manager without another session.");
@@ -90,6 +94,9 @@ bool ReplaySession::IsReplaying() const {
     return state == State::Playing || state == State::Paused;
 }
 
+// Check to ensure that replay operations are not being carried out at dangerous times
+// Ensures that the manager exists and is not busy, and that the ReplaySession is not
+// in the middle of progressing a step or running the simulation callback.
 void ReplaySession::CheckBoundary() const {
     if (!manager || manager->IsDeliveringEvents() || step_open || updating) {
         throw std::logic_error("Replay operation requires a simulation "
@@ -97,6 +104,8 @@ void ReplaySession::CheckBoundary() const {
     }
 }
 
+// Registers encoding and decoding logic for use in reading and writing replay files
+// Registration must occur while the session is idle, and duplicates cannot be registered.
 void ReplaySession::RegisterCodec(std::string type, Codec codec) {
     CheckBoundary();
     if (state != State::Idle) {
@@ -111,6 +120,12 @@ void ReplaySession::RegisterCodec(std::string type, Codec codec) {
     }
 }
 
+// Registers all keyboard and mouse events for recording during playback.
+// We assume that just about all games will have some sort of input needing
+// to be logged, so we just have a function for handling it so that developers
+// don't need to register each individual input they use themselves.
+// The engine provides encoding and decoding for any potential input.
+// (For standard computer inputs only, no controller support or anything like that)
 void ReplaySession::RegisterInputEvents() {
     RegisterEvent<KeyInputEvent>(
         [](MessageWriter &writer, const KeyInputEvent &event) {
@@ -160,7 +175,11 @@ void ReplaySession::RegisterInputEvents() {
         });
 }
 
+// Watches out for events and decides what to do based on what type of event it is.
+// If it's a replay event, queue up the relevant replay action for the session to deal with.
+// Otherwise, see if its one of our registered events and, if so, add it to the log.
 bool ReplaySession::Observe(const Event &event) {
+    // Handling for replay events
     if (const auto *control =
             dynamic_cast<const StartRecordingEvent *>(&event)) {
         controls.push_back({Action::Record, control->path});
@@ -175,18 +194,19 @@ bool ReplaySession::Observe(const Event &event) {
         controls.push_back({Action::Resume, {}});
     } else if (dynamic_cast<const StopReplayEvent *>(&event)) {
         controls.push_back({Action::Stop, {}});
-    } else {
+    } else { // Handling for non replay events
         const auto codec = codecs.find(event.GetEventType());
         if (codec != codecs.end()) {
-            if (IsReplaying() && !injecting) {
+            if (IsReplaying() && !injecting) { // This event is not registered, skip
                 return false;
             }
-            if (state == State::Recording) {
-                if (!step_open) {
+            if (state == State::Recording) { // If we are recording right now, try to add it to the log
+                if (!step_open) { // The recording window is not open right now, can't record
                     throw std::logic_error("Deliver replay driving events "
                                            "between BeginStep and EndStep.");
                 }
                 MessageWriter writer;
+                // Encode this event and write it ot our log
                 codec->second.encode(writer, event);
                 pending_events.push_back(
                     {codec->first, event.priority, writer.Finish(), nullptr});
@@ -196,6 +216,7 @@ bool ReplaySession::Observe(const Event &event) {
     return true;
 }
 
+// Completely resets the ReplaySession to an idle state, and clears out pending events/tasks
 void ReplaySession::Reset() {
     CheckBoundary();
     state = State::Idle;
@@ -208,6 +229,8 @@ void ReplaySession::Reset() {
     accumulated_tics = 0;
 }
 
+// Go through pending replay control actions and execute them
+// ProcessControls is regularly called by other functions to ensure that replay actions are not missed
 void ReplaySession::ProcessControls() {
     CheckBoundary();
     auto pending = std::move(controls);
@@ -216,7 +239,7 @@ void ReplaySession::ProcessControls() {
     try {
         for (const auto &control : pending) {
             switch (control.action) {
-            case Action::Record:
+            case Action::Record: // Start recording. Requires a replay file path. Captures the initial state and clears out pending events
                 if (state != State::Idle || control.path.empty()) {
                     throw std::logic_error(
                         "Recording requires an idle session and a file path.");
@@ -227,14 +250,14 @@ void ReplaySession::ProcessControls() {
                 recording_path = control.path;
                 state = State::Recording;
                 break;
-            case Action::Save:
+            case Action::Save: // Doen't execute unless the ReplaySession is currently recording. Otherwise saves the replay file and begins idling
                 if (state != State::Recording) {
                     throw std::logic_error("No replay recording is active.");
                 }
                 Save();
                 state = State::Idle;
                 break;
-            case Action::Play:
+            case Action::Play: // Looks for a replay file at the path and begins playback
                 if (state != State::Idle || control.path.empty()) {
                     throw std::logic_error(
                         "Playback requires an idle session and a file path.");
@@ -246,20 +269,20 @@ void ReplaySession::ProcessControls() {
                 accumulated_tics = 0;
                 state = steps.empty() ? State::Idle : State::Playing;
                 break;
-            case Action::Pause:
+            case Action::Pause: // Only executes while playing. Pauses playback. Duh.
                 if (state != State::Playing) {
                     throw std::logic_error("Cannot pause an inactive replay.");
                 }
                 state = State::Paused;
                 break;
-            case Action::Resume:
+            case Action::Resume: // Only executes while paused. Pauses playback. Double duh.
                 if (state != State::Paused) {
                     throw std::logic_error(
                         "Cannot resume a replay that is not paused.");
                 }
                 state = State::Playing;
                 break;
-            case Action::Stop:
+            case Action::Stop: // Ends the playback
                 if (!IsReplaying()) {
                     throw std::logic_error("No replay playback is active.");
                 }
@@ -276,6 +299,8 @@ void ReplaySession::ProcessControls() {
     updating = false;
 }
 
+// These two are respectively called to open up and close recording steps, with each step holding
+// some number of events.
 void ReplaySession::BeginStep() {
     ProcessControls();
     if (IsReplaying()) {
@@ -298,8 +323,10 @@ void ReplaySession::EndStep() {
     ProcessControls();
 }
 
+// What actually drives the playback simulation
 void ReplaySession::Update(TicCount elapsed_tics) {
     ProcessControls();
+    // Check that we're in the right state
     if (state != State::Playing) {
         return;
     }
@@ -311,22 +338,27 @@ void ReplaySession::Update(TicCount elapsed_tics) {
     try {
         while (state == State::Playing && accumulated_tics >= step_tics) {
             updating = true;
+            // Get all the events that occurred during this playback step and attempt to execute them.
+            // We update injecting to let the observer know that these events are a part of the playback
+            // that needs to be let through to the event handlers.
             for (auto &event : steps[playback_step]) {
                 injecting = true;
                 manager->TriggerEvent(*event.decoded);
                 injecting = false;
             }
+            // Advance the playback and prepare for the next step
             callbacks.step(step_tics);
             ++playback_step;
             accumulated_tics -= step_tics;
             updating = false;
             ProcessControls();
+            // If we're on the last step, then playback is complete and we move back to idling.
             if (IsReplaying() && playback_step == steps.size()) {
                 state = State::Idle;
                 accumulated_tics = 0;
             }
         }
-    } catch (...) {
+    } catch (...) { // If there's some issue, abort playback
         updating = false;
         injecting = false;
         state = State::Idle;
@@ -337,13 +369,16 @@ void ReplaySession::Update(TicCount elapsed_tics) {
 
 void ReplaySession::Save() const {
     MessageWriter writer;
+    // Write replay file metadata, as well as the initial state
     writer.WriteUint32(0x53565250);
     writer.WriteUint64(step_tics);
     writer.WriteUint64(initial_state.bytes.size());
     writer.WriteBytes(initial_state.bytes);
     writer.WriteUint64(steps.size());
+    // Loop through every step taken in the recording
     for (const auto &step : steps) {
         writer.WriteUint64(step.size());
+        // Then loops through each encoded event and write it, along with its metadata
         for (const auto &event : step) {
             writer.WriteText(event.type);
             writer.WriteUint64(event.priority);
@@ -351,6 +386,8 @@ void ReplaySession::Save() const {
             writer.WriteBytes(event.payload.bytes);
         }
     }
+    // Attempt to save the replay file. If it is too large, or if there is an issue
+    // saving it, throw an error
     const auto data = writer.Finish();
     if (data.bytes.size() > static_cast<std::uint64_t>(
                                 std::numeric_limits<std::streamsize>::max())) {
@@ -367,6 +404,7 @@ void ReplaySession::Save() const {
 }
 
 void ReplaySession::Load(const std::filesystem::path &path) {
+    // Try to load the replay file, throw an error if there's an issue doing so
     std::ifstream file(path, std::ios::binary | std::ios::ate);
     if (!file) {
         throw std::runtime_error("Could not open replay: " + path.string());
@@ -389,9 +427,13 @@ void ReplaySession::Load(const std::filesystem::path &path) {
         throw std::runtime_error("Could not read replay: " + path.string());
     }
     MessageReader reader(data);
+    // Check the signature to make sure that this is one of our engine's replay files
     if (reader.ReadUint32() != 0x53565250) {
         throw std::invalid_argument("Invalid replay file signature.");
     }
+    // If the step sizes do not match, this replay file is either for a different
+    // game or is from an older version. In either case, it will cause the replay
+    // to not play correctly
     const auto duration = reader.ReadUint64();
     if (duration != step_tics) {
         throw std::invalid_argument(
@@ -405,12 +447,14 @@ void ReplaySession::Load(const std::filesystem::path &path) {
         return reader.ReadBytes(static_cast<std::size_t>(count));
     };
     const auto saved = read_bytes();
+    // Get the starting state from the replay file
     NetworkMessage loaded_state{
         std::vector<std::byte>(saved.begin(), saved.end())};
     const auto count = reader.ReadUint64();
     if (count > reader.Remaining() / 8) {
         throw std::invalid_argument("Invalid replay step count.");
     }
+    // Read in all of the steps
     std::vector<Step> loaded_steps;
     loaded_steps.reserve(static_cast<std::size_t>(count));
     for (std::uint64_t index = 0; index < count; ++index) {
@@ -420,29 +464,40 @@ void ReplaySession::Load(const std::filesystem::path &path) {
         }
         auto &step = loaded_steps.emplace_back();
         step.reserve(static_cast<std::size_t>(event_count));
+        // Loop through all the steps that were just read in.
         for (std::uint64_t entry = 0; entry < event_count; ++entry) {
             auto type = reader.ReadText();
             const auto codec = codecs.find(type);
+            // First we have to check that this event type is registered. If this throws an error,
+            // that means that either the replay file is from a different game/version, or that it
+            // is being loaded in some different context, where the event was not correctly registered.
             if (codec == codecs.end()) {
                 throw std::invalid_argument("Unregistered replay event: " +
                                             type);
             }
             const auto priority = reader.ReadUint64();
             MessageReader payload(read_bytes());
+            // If we get here, that means that this event type was registered and we can now decode it.
             auto event = codec->second.decode(payload);
+            // If this throws it means someone somewhere goofed. The event was either not encoded properly
+            // or not decoded properly.
             if (!event || event->GetEventType() != type ||
                 payload.Remaining() != 0) {
                 throw std::invalid_argument("Invalid replay event payload: " +
                                             type);
             }
+            // If we've gotten through all of that, it means we can finish piecing this event back together
+            // and store it as a part of this playback step.
             event->priority = priority;
             event->Handled = false;
             step.push_back({std::move(type), priority, {}, std::move(event)});
         }
     }
+    // Leftover data at the end of your replay file? No bueno! That means something was written or read incorrectly!
     if (reader.Remaining() != 0) {
         throw std::invalid_argument("Unexpected trailing replay data.");
     }
+    // Once we've read through the whole replay file, we can store the reconstructed data for later playback.
     initial_state = std::move(loaded_state);
     steps = std::move(loaded_steps);
 }

@@ -28,7 +28,19 @@ public:
     EventManager() = default;
     ~EventManager();
 
+    /** 
+     * Returns true if the manager is currently delivering an event or dispatching
+     * queued events.
+     * Used to prevent replay state changes from occurring while the manager
+     * is still working through queued events. This is important to ensure
+     * that replay events do not interfere with gameplay/user input events.
+    */
     bool IsDeliveringEvents() const;
+    /** 
+     * Clears out pending events queued in the manager. Used to ensure that replays
+     * and live gameplay states start from a clean event queue to prevent incorrect
+     * behavior (such as user inputs changing the event playback or vice versa).
+    */
     void ClearQueuedEvents();
 
     /**
