@@ -1,8 +1,12 @@
 #include "double_time_game.hpp"
+#include "replay_protocol.hpp"
 #include "tilemap_parser.hpp"
 
+#include <svanes/asset_path.hpp>
 #include <svanes/camera2d.hpp>
-#include <svanes/input.hpp>
+#include <svanes/events/event_handler_wrapper.hpp>
+#include <svanes/events/event_manager.hpp>
+#include <svanes/input/input_manager.hpp>
 #include <svanes/registry.hpp>
 #include <svanes/render/render_system.hpp>
 #include <svanes/render/texture_manager.hpp>
@@ -11,10 +15,10 @@
 #include <SDL3/SDL.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <memory>
-#include <array>
 #include <stdexcept>
 #include <utility>
 
@@ -50,8 +54,7 @@ DoubleTimeGame::DoubleTimeGame(std::string server_host,
     SDL_Log("Networking: joining Double Time server.");
 }
 
-void DoubleTimeGame::EnterState(DoubleTimeState next,
-                                svanes::Registry &world) {
+void DoubleTimeGame::EnterState(DoubleTimeState next, svanes::Registry &world) {
     state = next;
     if (next == DoubleTimeState::MainMenu) {
         if (audio_manager != nullptr) {
@@ -71,12 +74,12 @@ void DoubleTimeGame::LoadAreaAssets(std::size_t area_index) {
         const auto &definition = DoubleTimeAssetCatalog()[area_index];
         auto &assets = area_assets[area_index];
         assets.music = audio_manager->LoadMusic(
-            std::string{DOUBLE_TIME_GAME_ASSETS_DIR} + "/" +
-            std::string{definition.music_filename});
+            svanes::AssetPath(std::string{DOUBLE_TIME_GAME_ASSETS_DIR} + "/" +
+                              std::string{definition.music_filename}));
         for (const std::string_view filename : definition.tilemap_filenames) {
             assets.levels.push_back(LoadDoubleTimeLevelData(
-                std::string{DOUBLE_TIME_GAME_ASSETS_DIR} + "/" +
-                    std::string{filename},
+                svanes::AssetPath(std::string{DOUBLE_TIME_GAME_ASSETS_DIR} +
+                                  "/" + std::string{filename}),
                 assets.tile_set));
         }
     }
@@ -85,7 +88,7 @@ void DoubleTimeGame::LoadAreaAssets(std::size_t area_index) {
 void DoubleTimeGame::EnterArea(std::size_t area_index,
                                svanes::Registry &world) {
     const bool area_changed = active_area_index != area_index ||
-                               area_assets[area_index].levels.empty();
+                              area_assets[area_index].levels.empty();
     LoadAreaAssets(area_index);
     active_area_index = area_index;
     if (audio_manager != nullptr) {
@@ -140,60 +143,35 @@ void DoubleTimeGame::ActivateTilemap(svanes::Registry &world,
     }
 
     active_tilemap_entity = world.CreateEntity();
-    const svanes::TileMap &tilemap = area_assets[active_area_index]
-                                          .levels[index]
-                                          .tile_map;
+    const svanes::TileMap &tilemap =
+        area_assets[active_area_index].levels[index].tile_map;
     world.AddComponent<svanes::Transform>(
         active_tilemap_entity,
         GetCenteredTileMapTransform(tilemap, kDoubleTimeWorldWidth * 0.5F,
                                     kDoubleTimeWorldHeight * 0.5F));
     world.AddComponent<svanes::TileMap>(active_tilemap_entity, tilemap);
-    world.AddComponent<svanes::ZOrder>(
-        active_tilemap_entity, svanes::ZOrder{kGroundZOrder});
+    world.AddComponent<svanes::ZOrder>(active_tilemap_entity,
+                                       svanes::ZOrder{kGroundZOrder});
     active_tilemap_index = index;
     has_active_tilemap = true;
 }
 
-void DoubleTimeGame::CheckGoal(svanes::Registry &world) {
-    if (!has_character || !has_active_tilemap ||
-        active_area_index >= DoubleTimeAssetCatalog().size()) {
-        return;
-    }
-    const auto &levels = area_assets[active_area_index].levels;
-    if (active_tilemap_index >= levels.size() || !levels[active_tilemap_index].goal) {
-        return;
-    }
-    const auto &goal = *levels[active_tilemap_index].goal;
-    const auto &tilemap_transform =
-        world.GetComponent<svanes::Transform>(active_tilemap_entity);
-    const auto &character_transform =
-        world.GetComponent<svanes::Transform>(character_entity);
-    const float left = tilemap_transform.x + goal.x * kDoubleTimeTileSize;
-    const float right = left + goal.width * kDoubleTimeTileSize;
-    const float top = tilemap_transform.y + goal.y * kDoubleTimeTileSize;
-    const float bottom = top + goal.height * kDoubleTimeTileSize;
-    const float character_left =
-        character_transform.x - kDoubleTimeCharacterWidth * 0.5F;
-    const float character_right =
-        character_transform.x + kDoubleTimeCharacterWidth * 0.5F;
-    const float character_top =
-        character_transform.y - kDoubleTimeCharacterHeight * 0.5F;
-    const float character_bottom =
-        character_transform.y + kDoubleTimeCharacterHeight * 0.5F;
-    if (character_right > left && character_left < right &&
-        character_bottom > top && character_top < bottom) {
-        if (active_tilemap_index + 1 < levels.size()) {
-            ClearLevelEntities(world);
-            ActivateTilemap(world, active_tilemap_index + 1);
-        } else if (const auto next_area =
-                       DoubleTimeAssetCatalog()[active_area_index].next_area;
-                   next_area.has_value()) {
-            EnterArea(*next_area, world);
-        }
-    }
-}
 
 void DoubleTimeGame::Initialize(svanes::ClientContext &context) {
+    context.events.Subscribe(
+        DoubleTimeWorldSnapshotEvent::GetStaticEventType(),
+        std::make_unique<
+            svanes::EventHandlerWrapper<DoubleTimeWorldSnapshotEvent>>(
+            [this, &world = context.world](
+                const DoubleTimeWorldSnapshotEvent &event) {
+                ApplyServerState(world, event);
+            }));
+    context.events.Subscribe(
+        DoubleTimeCommandEvent::GetStaticEventType(),
+        std::make_unique<svanes::EventHandlerWrapper<DoubleTimeCommandEvent>>(
+            [&network = context.network](const DoubleTimeCommandEvent &event) {
+                network.Send(svanes::NetworkMessage::From(event.input));
+            }));
     context.network.Connect(server_host + ":" +
                             std::to_string(kDoubleTimeServerJoinPort));
     asset_manager = &context.assets;
@@ -204,18 +182,21 @@ void DoubleTimeGame::Initialize(svanes::ClientContext &context) {
 
     const svanes::Entity background_entity = context.world.CreateEntity();
     context.world.AddComponent<svanes::Transform>(
-        background_entity, svanes::Transform{kDoubleTimeWorldWidth * 0.5F,
-                                             kDoubleTimeWorldHeight * 0.5F, 0.0F});
+        background_entity,
+        svanes::Transform{kDoubleTimeWorldWidth * 0.5F,
+                          kDoubleTimeWorldHeight * 0.5F, 0.0F});
     context.world.AddComponent<svanes::SolidShape>(
         background_entity,
         svanes::SolidShape{kBackgroundColor,
-                           svanes::Rectangle2D{0.0F, 0.0F, kDoubleTimeWorldWidth,
+                           svanes::Rectangle2D{0.0F, 0.0F,
+                                               kDoubleTimeWorldWidth,
                                                kDoubleTimeWorldHeight}});
 
     area_assets.resize(DoubleTimeAssetCatalog().size());
     for (auto &area : area_assets) {
         area.tile_set = context.assets.LoadTexture(
-        std::string{DOUBLE_TIME_GAME_ASSETS_DIR} + "/" + kTestTileSetFilename);
+            svanes::AssetPath(std::string{DOUBLE_TIME_GAME_ASSETS_DIR} + "/" +
+                              kTestTileSetFilename));
     }
     EnterState(DoubleTimeState::LevelOne, context.world);
 }
@@ -227,11 +208,18 @@ svanes::NetworkMessage DoubleTimeGame::CreateJoinRequest() {
 void DoubleTimeGame::HandleJoinResult(const svanes::JoinResult &result) {
     if (result.status == svanes::JoinStatus::Accepted) {
         client_id = result.client_id;
+    } else {
+        should_quit = true;
     }
 }
 
+void DoubleTimeGame::HandleDisconnect() { should_quit = true; }
+
+bool DoubleTimeGame::ShouldQuit() const { return should_quit; }
+
 void DoubleTimeGame::SendInput(const svanes::ClientFrameContext &frame) {
-    if (!frame.network.IsConnected()) return;
+    if (!frame.network.IsConnected())
+        return;
     const auto assigned_id = client_id;
     input_send_timer += static_cast<float>(client_timeline.GetDeltaTics()) /
                         static_cast<float>(svanes::TicsPerSecond);
@@ -241,10 +229,14 @@ void DoubleTimeGame::SendInput(const svanes::ClientFrameContext &frame) {
         float horizontal_input = 0.0F;
         bool jump_requested = action_requested_since_last_send;
         bool jump_on_beat = jump_on_beat_since_last_send;
-        bool platform_left = frame.input.IsDown(svanes::Key::Left);
-        bool platform_right = frame.input.IsDown(svanes::Key::Right);
-        bool platform_up = frame.input.IsDown(svanes::Key::Up);
-        bool platform_down = frame.input.IsDown(svanes::Key::Down);
+        bool platform_left = frame.input.IsDown(svanes::Key::Left) ||
+                             platform_left_requested_since_last_send;
+        bool platform_right = frame.input.IsDown(svanes::Key::Right) ||
+                              platform_right_requested_since_last_send;
+        bool platform_up = frame.input.IsDown(svanes::Key::Up) ||
+                           platform_up_requested_since_last_send;
+        bool platform_down = frame.input.IsDown(svanes::Key::Down) ||
+                             platform_down_requested_since_last_send;
         bool platform_action = platform_action_requested_since_last_send;
         if (input_bridge_pipe != nullptr) {
             if (has_bridge_input) {
@@ -261,7 +253,8 @@ void DoubleTimeGame::SendInput(const svanes::ClientFrameContext &frame) {
                 platform_right = platform_right || bridge_input.platform_right;
                 platform_up = platform_up || bridge_input.platform_up;
                 platform_down = platform_down || bridge_input.platform_down;
-                platform_action = platform_action || bridge_input.platform_action;
+                platform_action =
+                    platform_action || bridge_input.platform_action;
             }
         }
         if (frame.input.IsDown(svanes::Key::A)) {
@@ -271,26 +264,35 @@ void DoubleTimeGame::SendInput(const svanes::ClientFrameContext &frame) {
             horizontal_input += 1.0F;
         }
 
-        const PlayerInputMessage input{assigned_id, horizontal_input,
-                                       jump_requested, jump_on_beat,
-                                       input_bridge_controls_platforms,
-                                       platform_left,
-                                       platform_right, platform_up, platform_down,
-                                       platform_action,
-                                       platform_left_on_beat,
-                                       platform_right_on_beat,
-                                       platform_up_on_beat,
-                                       platform_down_on_beat,
-                                       platform_action_on_beat,
-                                       platform_left_beat_index,
-                                       platform_right_beat_index,
-                                       platform_up_beat_index,
-                                       platform_down_beat_index,
-                                       platform_action_beat_index};
-        frame.network.Send(svanes::NetworkMessage::From(input));
+        const PlayerInputMessage input{
+            assigned_id,
+            std::clamp(horizontal_input, -1.0F, 1.0F),
+            jump_requested,
+            jump_on_beat,
+            input_bridge_controls_platforms,
+            platform_left,
+            platform_right,
+            platform_up,
+            platform_down,
+            platform_action,
+            platform_left_on_beat,
+            platform_right_on_beat,
+            platform_up_on_beat,
+            platform_down_on_beat,
+            platform_action_on_beat,
+            platform_left_beat_index,
+            platform_right_beat_index,
+            platform_up_beat_index,
+            platform_down_beat_index,
+            platform_action_beat_index};
+        frame.events.TriggerEvent(DoubleTimeCommandEvent{input});
         action_requested_since_last_send = false;
         jump_on_beat_since_last_send = false;
         platform_action_requested_since_last_send = false;
+        platform_left_requested_since_last_send = false;
+        platform_right_requested_since_last_send = false;
+        platform_up_requested_since_last_send = false;
+        platform_down_requested_since_last_send = false;
     }
 }
 
@@ -303,12 +305,26 @@ void DoubleTimeGame::PollInputBridge() {
     while (input_bridge_pipe->Receive(source, message)) {
         const DoubleTimeBridgeInput previous = bridge_input;
         bridge_input = message.As<DoubleTimeBridgeInput>();
+        platform_left_requested_since_last_send |=
+            bridge_input.platform_left && !previous.platform_left;
+        platform_right_requested_since_last_send |=
+            bridge_input.platform_right && !previous.platform_right;
+        platform_up_requested_since_last_send |=
+            bridge_input.platform_up && !previous.platform_up;
+        platform_down_requested_since_last_send |=
+            bridge_input.platform_down && !previous.platform_down;
+        action_requested_since_last_send =
+            action_requested_since_last_send || bridge_input.character_jump;
+        platform_action_requested_since_last_send =
+            platform_action_requested_since_last_send ||
+            bridge_input.platform_action;
         if (bridge_input.character_jump) {
             jump_on_beat_since_last_send =
                 jump_on_beat_since_last_send ||
                 double_time::IsOnBeat(
                     client_timeline.GetTotalTics(),
-                    DoubleTimeAssetCatalog()[active_area_index].beats_per_minute,
+                    DoubleTimeAssetCatalog()[active_area_index]
+                        .beats_per_minute,
                     kRhythmTolerance);
         }
         const auto capture = [&](bool down, bool was_down, bool &on_beat,
@@ -316,10 +332,12 @@ void DoubleTimeGame::PollInputBridge() {
             if (down && !was_down) {
                 beat_index = double_time::BeatIndex(
                     client_timeline.GetTotalTics(),
-                    DoubleTimeAssetCatalog()[active_area_index].beats_per_minute);
+                    DoubleTimeAssetCatalog()[active_area_index]
+                        .beats_per_minute);
                 on_beat = double_time::IsOnBeat(
                     client_timeline.GetTotalTics(),
-                    DoubleTimeAssetCatalog()[active_area_index].beats_per_minute,
+                    DoubleTimeAssetCatalog()[active_area_index]
+                        .beats_per_minute,
                     kRhythmTolerance);
             }
         };
@@ -333,15 +351,15 @@ void DoubleTimeGame::PollInputBridge() {
                 platform_down_on_beat, platform_down_beat_index);
         capture(bridge_input.platform_action, previous.platform_action,
                 platform_action_on_beat, platform_action_beat_index);
+        bridge_input.character_jump = false;
+        bridge_input.platform_action = false;
         has_bridge_input = true;
     }
 }
 
 void DoubleTimeGame::ApplyServerState(
-    svanes::Registry &world,
-    std::span<const svanes::NetworkMessage> messages) {
-    for (const svanes::NetworkMessage &message : messages) {
-        const DoubleTimeEntityState state = message.As<DoubleTimeEntityState>();
+    svanes::Registry &world, const DoubleTimeWorldSnapshotEvent &event) {
+    for (const DoubleTimeEntityState &state : event.objects) {
         if (state.kind != DoubleTimeEntityKind::AudioTimeline) {
             continue;
         }
@@ -352,20 +370,22 @@ void DoubleTimeGame::ApplyServerState(
         has_audio_sync = true;
         const std::size_t server_area = state.area_index;
         const std::size_t server_tilemap = state.tilemap_index;
-        if (server_area < DoubleTimeAssetCatalog().size()) {
-            LoadAreaAssets(server_area);
-            if (active_area_index != server_area) {
-                EnterArea(server_area, world);
-            } else if (!has_active_tilemap ||
-                       active_tilemap_index != server_tilemap) {
-                ClearLevelEntities(world);
-                ActivateTilemap(world, server_tilemap);
-            }
+        if (server_area >= DoubleTimeAssetCatalog().size() ||
+            server_tilemap >= DoubleTimeAssetCatalog()[server_area]
+                                  .tilemap_filenames.size()) {
+            throw std::invalid_argument("Invalid Double Time snapshot level.");
+        }
+        LoadAreaAssets(server_area);
+        if (active_area_index != server_area) {
+            EnterArea(server_area, world);
+        } else if (!has_active_tilemap ||
+                   active_tilemap_index != server_tilemap) {
+            ClearLevelEntities(world);
+            ActivateTilemap(world, server_tilemap);
         }
     }
 
-    for (const svanes::NetworkMessage &message : messages) {
-        const DoubleTimeEntityState state = message.As<DoubleTimeEntityState>();
+    for (const DoubleTimeEntityState &state : event.objects) {
 
         if (state.kind == DoubleTimeEntityKind::AudioTimeline) {
             synced_audio_tics = state.timeline_tics;
@@ -380,11 +400,10 @@ void DoubleTimeGame::ApplyServerState(
                 const svanes::Entity entity = world.CreateEntity();
                 world.AddComponent<svanes::Transform>(entity, state.transform);
                 world.AddComponent<svanes::SolidShape>(
-                    entity,
-                    svanes::SolidShape{
-                        svanes::Color{110, 116, 134, 255},
-                        svanes::Rectangle2D{0.0F, 0.0F, state.width,
-                                            state.height}});
+                    entity, svanes::SolidShape{
+                                svanes::Color{110, 116, 134, 255},
+                                svanes::Rectangle2D{0.0F, 0.0F, state.width,
+                                                    state.height}});
                 world.AddComponent<svanes::ZOrder>(
                     entity, svanes::ZOrder{kPlatformZOrder});
                 platform_entities.emplace(state.entity_id, entity);
@@ -408,11 +427,10 @@ void DoubleTimeGame::ApplyServerState(
                 const svanes::Entity entity = world.CreateEntity();
                 world.AddComponent<svanes::Transform>(entity, state.transform);
                 world.AddComponent<svanes::SolidShape>(
-                    entity,
-                    svanes::SolidShape{
-                        svanes::Color{196, 120, 30, 255},
-                        svanes::Rectangle2D{0.0F, 0.0F, state.width,
-                                            state.height}});
+                    entity, svanes::SolidShape{
+                                svanes::Color{196, 120, 30, 255},
+                                svanes::Rectangle2D{0.0F, 0.0F, state.width,
+                                                    state.height}});
                 world.AddComponent<svanes::ZOrder>(
                     entity, svanes::ZOrder{kPlatformZOrder});
                 door_entities.emplace(state.entity_id, entity);
@@ -424,7 +442,8 @@ void DoubleTimeGame::ApplyServerState(
         }
 
         auto &special_entities = state.kind == DoubleTimeEntityKind::Spikes
-            ? spike_entities : collectible_entities;
+                                     ? spike_entities
+                                     : collectible_entities;
         if (state.kind == DoubleTimeEntityKind::Spikes ||
             state.kind == DoubleTimeEntityKind::Collectible) {
             auto found = special_entities.find(state.entity_id);
@@ -440,11 +459,11 @@ void DoubleTimeGame::ApplyServerState(
                 world.AddComponent<svanes::Transform>(entity, state.transform);
                 world.AddComponent<svanes::SolidShape>(
                     entity, svanes::SolidShape{
-                        state.kind == DoubleTimeEntityKind::Spikes
-                            ? svanes::Color{220, 80, 20, 255}
-                            : svanes::Color{255, 220, 0, 255},
-                        svanes::Rectangle2D{0.0F, 0.0F, state.width,
-                                            state.height}});
+                                state.kind == DoubleTimeEntityKind::Spikes
+                                    ? svanes::Color{220, 80, 20, 255}
+                                    : svanes::Color{255, 220, 0, 255},
+                                svanes::Rectangle2D{0.0F, 0.0F, state.width,
+                                                    state.height}});
                 world.AddComponent<svanes::ZOrder>(
                     entity, svanes::ZOrder{kPlatformZOrder});
                 special_entities.emplace(state.entity_id, entity);
@@ -452,16 +471,23 @@ void DoubleTimeGame::ApplyServerState(
             continue;
         }
 
+        if (!state.enabled) {
+            if (has_character) {
+                world.DestroyEntity(character_entity);
+                has_character = false;
+            }
+            continue;
+        }
         if (!has_character) {
             character_entity = world.CreateEntity();
             world.AddComponent<svanes::Transform>(character_entity,
                                                   state.transform);
             world.AddComponent<svanes::SolidShape>(
                 character_entity,
-                svanes::SolidShape{svanes::Color{76, 175, 80, 255},
-                                   svanes::Rectangle2D{
-                                       0.0F, 0.0F, kDoubleTimeCharacterWidth,
-                                       kDoubleTimeCharacterHeight}});
+                svanes::SolidShape{
+                    svanes::Color{76, 175, 80, 255},
+                    svanes::Rectangle2D{0.0F, 0.0F, kDoubleTimeCharacterWidth,
+                                        kDoubleTimeCharacterHeight}});
             world.AddComponent<svanes::Timeline>(character_entity);
             world.AddComponent<svanes::ZOrder>(
                 character_entity, svanes::ZOrder{kCharacterZOrder});
@@ -491,8 +517,8 @@ void DoubleTimeGame::SynchronizeAudio(float elapsed_seconds) {
     const double duration = static_cast<double>(duration_milliseconds);
     const double desired_position =
         std::fmod(server_position_milliseconds, duration);
-    const double current_position = static_cast<double>(
-        audio_manager->MusicPositionMilliseconds());
+    const double current_position =
+        static_cast<double>(audio_manager->MusicPositionMilliseconds());
     double error = desired_position - current_position;
     if (error > duration * 0.5) {
         error -= duration;
@@ -500,7 +526,9 @@ void DoubleTimeGame::SynchronizeAudio(float elapsed_seconds) {
         error += duration;
     }
 
-    if (std::abs(error) >= kAudioHardSyncThresholdMilliseconds) {
+    if (force_audio_seek ||
+        std::abs(error) >= kAudioHardSyncThresholdMilliseconds) {
+        force_audio_seek = false;
         audio_manager->SeekMusic(static_cast<std::int64_t>(desired_position));
         if (applied_audio_rate != 1.0F) {
             audio_manager->SetMusicPlaybackRate(1.0F);
@@ -513,8 +541,7 @@ void DoubleTimeGame::SynchronizeAudio(float elapsed_seconds) {
     if (std::abs(error) >= kAudioSoftSyncThresholdMilliseconds) {
         target_rate = std::clamp(
             1.0F + static_cast<float>(error) * kAudioRateCorrectionGain,
-            1.0F - kAudioMaxRateCorrection,
-            1.0F + kAudioMaxRateCorrection);
+            1.0F - kAudioMaxRateCorrection, 1.0F + kAudioMaxRateCorrection);
     }
     if (std::abs(target_rate - applied_audio_rate) > 0.001F) {
         audio_manager->SetMusicPlaybackRate(target_rate);
@@ -522,9 +549,126 @@ void DoubleTimeGame::SynchronizeAudio(float elapsed_seconds) {
     }
 }
 
+void DoubleTimeGame::ResetPendingInput() {
+    input_send_timer = 0.0F;
+    action_requested_since_last_send = false;
+    jump_on_beat_since_last_send = false;
+    platform_action_requested_since_last_send = false;
+    platform_left_requested_since_last_send = false;
+    platform_right_requested_since_last_send = false;
+    platform_up_requested_since_last_send = false;
+    platform_down_requested_since_last_send = false;
+    bridge_input.character_jump = false;
+    bridge_input.platform_action = false;
+}
+
+void DoubleTimeGame::ReceiveMessages(const svanes::ClientFrameContext &frame) {
+    const auto apply = [&](const svanes::NetworkMessage &message) {
+        frame.events.QueueEvent(DoubleTimeWorldSnapshotEvent::Read(message));
+        frame.events.DispatchEvents();
+    };
+    for (const auto &message : frame.network.PollMessages()) {
+        const auto kind = DoubleTimeReplayKind(message);
+        if (!kind) {
+            latest_live_snapshot = message;
+            if (!viewing_replay) {
+                apply(message);
+            }
+            continue;
+        }
+        svanes::MessageReader reader(message);
+        reader.ReadUint32();
+        reader.ReadUint8();
+        if (*kind == DoubleTimeReplayMessage::Status) {
+            replay_recording = reader.ReadBool();
+            const bool playing = reader.ReadBool();
+            const auto text = reader.ReadText();
+            if (reader.Remaining() != 0) {
+                throw std::invalid_argument("Invalid replay status payload.");
+            }
+            SDL_Log("%s", text.c_str());
+            if (playing != viewing_replay) {
+                force_audio_seek = true;
+                ClearLevelEntities(frame.world);
+                ResetPendingInput();
+                viewing_replay = playing;
+                if (!playing && !latest_live_snapshot.bytes.empty()) {
+                    apply(latest_live_snapshot);
+                }
+            }
+            std::int32_t window_count = 0;
+            SDL_Window **windows = SDL_GetWindows(&window_count);
+            for (std::int32_t index = 0; index < window_count; ++index) {
+                SDL_SetWindowTitle(
+                    windows[index],
+                    viewing_replay
+                        ? "Double Time - Replay (\\ or Escape to exit)"
+                    : replay_recording ? "Double Time - Recording"
+                                       : "Double Time");
+            }
+            SDL_free(windows);
+        } else if (*kind == DoubleTimeReplayMessage::Snapshot) {
+            if (!viewing_replay) {
+                force_audio_seek = true;
+                viewing_replay = true;
+                ClearLevelEntities(frame.world);
+                ResetPendingInput();
+            }
+            const auto bytes = reader.ReadBytes(reader.Remaining());
+            apply(svanes::NetworkMessage{
+                std::vector<std::byte>(bytes.begin(), bytes.end())});
+        } else {
+            throw std::invalid_argument("Unexpected replay server message.");
+        }
+    }
+}
+
 void DoubleTimeGame::Update(const svanes::ClientFrameContext &frame) {
+    ReceiveMessages(frame);
+    const auto request = [&](DoubleTimeReplayMessage kind) {
+        if (frame.network.IsConnected()) {
+            frame.network.Send(DoubleTimeReplayWriter(kind).Finish());
+        }
+    };
+    const bool escape = frame.input.WasPressed(svanes::Key::Escape);
+    if (frame.input.WasPressed(svanes::Key::Backslash) ||
+        (escape && viewing_replay)) {
+        request(viewing_replay ? DoubleTimeReplayMessage::Exit
+                               : DoubleTimeReplayMessage::Play);
+    } else if (frame.input.WasPressed(svanes::Key::LeftBracket)) {
+        request(DoubleTimeReplayMessage::Record);
+    } else if (frame.input.WasPressed(svanes::Key::RightBracket)) {
+        request(DoubleTimeReplayMessage::Save);
+    }
+    SDL_Event close_event;
+    if ((escape && !viewing_replay) ||
+        SDL_PeepEvents(&close_event, 1, SDL_GETEVENT, SDL_EVENT_QUIT,
+                       SDL_EVENT_QUIT) > 0 ||
+        SDL_PeepEvents(&close_event, 1, SDL_GETEVENT,
+                       SDL_EVENT_WINDOW_CLOSE_REQUESTED,
+                       SDL_EVENT_WINDOW_CLOSE_REQUESTED) > 0) {
+        frame.network.Disconnect();
+        should_quit = true;
+    }
+    if (should_quit) {
+        return;
+    }
     client_timeline.Advance(frame.real_delta_tics);
     PollInputBridge();
+    if (viewing_replay) {
+        ResetPendingInput();
+        SynchronizeAudio(static_cast<float>(frame.real_delta_tics) /
+                         static_cast<float>(svanes::TicsPerSecond));
+        return;
+    }
+    platform_left_requested_since_last_send |=
+        frame.input.WasPressed(svanes::Key::Left);
+    platform_right_requested_since_last_send |=
+        frame.input.WasPressed(svanes::Key::Right);
+    platform_up_requested_since_last_send |=
+        frame.input.WasPressed(svanes::Key::Up);
+    platform_down_requested_since_last_send |=
+        frame.input.WasPressed(svanes::Key::Down);
     const auto capture = [&](bool down, bool &was_down, bool &on_beat,
                              std::uint64_t &beat_index) {
         if (down && !was_down) {
@@ -566,8 +710,6 @@ void DoubleTimeGame::Update(const svanes::ClientFrameContext &frame) {
     }
 
     SendInput(frame);
-    ApplyServerState(frame.world, frame.network.PollMessages());
-    CheckGoal(frame.world);
     SynchronizeAudio(static_cast<float>(frame.real_delta_tics) /
                      static_cast<float>(svanes::TicsPerSecond));
 

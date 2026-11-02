@@ -172,6 +172,7 @@ target_sources(
         src/deterministic_math.cpp
         src/events/collision_event.cpp
         src/events/event_manager.cpp
+        src/events/replay_session.cpp
         src/tilemaps/tilemap.cpp
         src/collision_pass.cpp
         src/geometry/geometry.cpp
@@ -230,6 +231,7 @@ target_sources(
             include/svanes/events/event.hpp
             include/svanes/events/event_handler_wrapper.hpp
             include/svanes/events/event_manager.hpp
+            include/svanes/events/replay_session.hpp
             include/svanes/game.hpp
             include/svanes/geometry/geometry.hpp
             include/svanes/input/input_events.hpp
@@ -297,6 +299,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/events/event.hpp
     include/svanes/events/event_handler_wrapper.hpp
     include/svanes/events/event_manager.hpp
+    include/svanes/events/replay_session.hpp
     include/svanes/game.hpp
     include/svanes/geometry/geometry.hpp
     include/svanes/input/input_events.hpp
@@ -344,6 +347,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/deterministic_math.cpp
     src/events/collision_event.cpp
     src/events/event_manager.cpp
+    src/events/replay_session.cpp
     src/tilemaps/tilemap.cpp
     src/collision_pass.cpp
     src/geometry/geometry.cpp
@@ -387,6 +391,13 @@ include(cmake/game_packages.cmake)
 add_subdirectory(games/goose)
 add_subdirectory(games/orbitalEscalation)
 add_subdirectory(games/doubleTime)
-add_subdirectory(games/doubleTime/grading)
 
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT svanes_game_orbital_escalation)
+
+option(SVANES_BUILD_REPLAY_TESTS "Build replay system tests" OFF)
+if(SVANES_BUILD_REPLAY_TESTS)
+    enable_testing()
+    add_executable(svanes_replay_tests tests/replay_tests.cpp)
+    target_link_libraries(svanes_replay_tests PRIVATE Svanes::Engine)
+    add_test(NAME svanes_replay_tests COMMAND svanes_replay_tests)
+endif()

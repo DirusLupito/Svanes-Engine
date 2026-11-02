@@ -1,4 +1,5 @@
 #include <svanes/events/event_manager.hpp>
+#include <svanes/events/replay_session.hpp>
 
 #include <algorithm>
 #include <limits>
@@ -7,11 +8,31 @@
 
 namespace svanes {
 
+EventManager::~EventManager() {
+    if (replay) {
+        replay->manager = nullptr;
+    }
+}
+
+bool EventManager::IsDeliveringEvents() const {
+    return active_triggers != 0 || dispatching;
+}
+
+void EventManager::ClearQueuedEvents() {
+    if (IsDeliveringEvents()) {
+        throw std::logic_error("Cannot clear queued events during delivery.");
+    }
+    events_queue.clear();
+}
+
 void EventManager::Shutdown() {
     if (active_triggers != 0 || dispatching) {
         throw std::logic_error("Cannot shut down during event delivery.");
     }
 
+    if (replay) {
+        replay->Reset();
+    }
     events_queue.clear();
     subscribers.clear();
 }
@@ -74,16 +95,17 @@ void EventManager::Unsubscribe(const std::string &event_id,
 }
 
 void EventManager::TriggerEvent(const Event &event) {
-
-    // find the handlers subscribed to the event's type
-    const auto found = subscribers.find(event.GetEventType());
-    if (found == subscribers.end()) {
-        // noone can handle this event, nothing to do.
-        return;
-    }
-
     ++active_triggers;
     try {
+        if (replay && !replay->Observe(event)) {
+            --active_triggers;
+            return;
+        }
+        const auto found = subscribers.find(event.GetEventType());
+        if (found == subscribers.end()) {
+            --active_triggers;
+            return;
+        }
         // Call each handler in registration order, passing the event to it.
         for (const auto &handler : found->second) {
             handler->Exec(event);

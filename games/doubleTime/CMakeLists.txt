@@ -1,6 +1,7 @@
 add_executable(svanes_game_double_time
     main.cpp
     double_time_game.cpp
+    game_events.cpp
 )
 target_link_libraries(svanes_game_double_time PRIVATE Svanes::Engine)
 target_link_libraries(svanes_game_double_time PRIVATE SDL3_image::SDL3_image)
@@ -8,7 +9,13 @@ target_compile_definitions(svanes_game_double_time PRIVATE
     DOUBLE_TIME_GAME_ASSETS_DIR="assets/doubleTime"
 )
 
-add_executable(svanes_game_double_time_server server_main.cpp)
+add_executable(svanes_game_double_time_server
+    server_main.cpp
+    double_time_server.cpp
+    collision_response.cpp
+    game_events.cpp
+    replay_server.cpp
+)
 target_link_libraries(svanes_game_double_time_server PRIVATE Svanes::Engine)
 target_link_libraries(svanes_game_double_time_server PRIVATE SDL3_image::SDL3_image)
 target_compile_definitions(svanes_game_double_time_server PRIVATE

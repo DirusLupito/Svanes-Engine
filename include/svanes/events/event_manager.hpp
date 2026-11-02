@@ -12,6 +12,8 @@
 
 namespace svanes {
 
+class ReplaySession;
+
 /**
  * Represents a manager for the lifecycle of events and their associated
  * handlers. This class provides functionality to subscribe, unsubscribe,
@@ -24,6 +26,10 @@ public:
      * Creates an empty manager with no queued events or subscriptions.
      */
     EventManager() = default;
+    ~EventManager();
+
+    bool IsDeliveringEvents() const;
+    void ClearQueuedEvents();
 
     /**
      * Override of the copy constructor to prevent copying of EventManager
@@ -171,6 +177,9 @@ public:
     void DispatchEvents(EventPriority maximum_priority);
 
 private:
+    friend class ReplaySession;
+    ReplaySession *replay = nullptr;
+
     // Owns pending events until they are consumed or discarded by Shutdown.
     std::vector<std::unique_ptr<Event>> events_queue;
 
