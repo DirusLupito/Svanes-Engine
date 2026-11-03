@@ -1,5 +1,4 @@
 #include <svanes/events/event_manager.hpp>
-#include <svanes/events/replay_session.hpp>
 
 #include <algorithm>
 #include <limits>
@@ -8,10 +7,26 @@
 
 namespace svanes {
 
-EventManager::~EventManager() {
-    if (replay) {
-        replay->manager = nullptr;
+ReplaySession &
+EventManager::CreateReplaySession(TicCount step_tics,
+                                  ReplaySession::Callbacks callbacks) {
+    if (IsDeliveringEvents() || replay) {
+        throw std::logic_error("A replay session requires an idle event "
+                               "manager without another session.");
     }
+
+    replay =
+        std::make_unique<ReplaySession>(*this, step_tics, std::move(callbacks));
+
+    return *replay;
+}
+
+ReplaySession &EventManager::GetReplaySession() {
+    if (!replay) {
+        throw std::logic_error("No replay session has been created.");
+    }
+
+    return *replay;
 }
 
 bool EventManager::IsDeliveringEvents() const {

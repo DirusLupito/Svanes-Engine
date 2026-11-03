@@ -65,22 +65,11 @@ const std::string StopReplayEvent::GetEventType() const {
 
 ReplaySession::ReplaySession(EventManager &manager, TicCount step_tics,
                              Callbacks callbacks)
-    : manager(&manager), step_tics(step_tics), callbacks(std::move(callbacks)) {
+    : manager(manager), step_tics(step_tics), callbacks(std::move(callbacks)) {
     if (step_tics == 0 || !this->callbacks.save || !this->callbacks.restore ||
         !this->callbacks.step) {
         throw std::invalid_argument("Replay requires a positive step duration "
                                     "and save/restore/step callbacks.");
-    }
-    if (manager.IsDeliveringEvents() || manager.replay) {
-        throw std::logic_error("A replay session requires an idle event "
-                               "manager without another session.");
-    }
-    manager.replay = this;
-}
-
-ReplaySession::~ReplaySession() {
-    if (manager) {
-        manager->replay = nullptr;
     }
 }
 
@@ -91,7 +80,7 @@ bool ReplaySession::IsReplaying() const {
 }
 
 void ReplaySession::CheckBoundary() const {
-    if (!manager || manager->IsDeliveringEvents() || step_open || updating) {
+    if (manager.IsDeliveringEvents() || step_open || updating) {
         throw std::logic_error("Replay operation requires a simulation "
                                "boundary outside event delivery.");
     }
@@ -246,7 +235,7 @@ void ReplaySession::ProcessControls() {
                         "Playback requires an idle session and a file path.");
                 }
                 Load(control.path);
-                manager->ClearQueuedEvents();
+                manager.ClearQueuedEvents();
                 callbacks.restore(initial_state.bytes);
                 playback_step = 0;
                 accumulated_tics = 0;
@@ -269,7 +258,7 @@ void ReplaySession::ProcessControls() {
                 if (!IsReplaying()) {
                     throw std::logic_error("No replay playback is active.");
                 }
-                manager->ClearQueuedEvents();
+                manager.ClearQueuedEvents();
                 state = State::Idle;
                 accumulated_tics = 0;
                 break;
@@ -292,7 +281,7 @@ void ReplaySession::BeginStep() {
 }
 
 void ReplaySession::EndStep() {
-    if (!manager || manager->IsDeliveringEvents() || !step_open) {
+    if (manager.IsDeliveringEvents() || !step_open) {
         throw std::logic_error(
             "EndStep requires a completed live simulation step.");
     }
@@ -323,7 +312,7 @@ void ReplaySession::Update(TicCount elapsed_tics) {
             // event handlers.
             for (auto &event : steps[playback_step]) {
                 injecting = true;
-                manager->TriggerEvent(*event.decoded);
+                manager.TriggerEvent(*event.decoded);
                 injecting = false;
             }
             // Advance the playback and prepare for the next step

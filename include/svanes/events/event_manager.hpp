@@ -3,16 +3,14 @@
 #pragma once
 
 #include <svanes/events/abstract_event_handler_wrapper.hpp>
+#include <svanes/events/replay_session.hpp>
 
-#include <cstddef>
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 namespace svanes {
-
-class ReplaySession;
 
 /**
  * Represents a manager for the lifecycle of events and their associated
@@ -28,10 +26,27 @@ public:
     EventManager() = default;
 
     /**
-     * Detaches any associated replay session so it cannot use the manager
-     * after the manager is destroyed.
+     * Creates a new replay session with the specified step tics and callbacks.
+     *
+     * @param step_tics The number of tics to advance each step.
+     * @param callbacks The callbacks to use for the replay session.
+     *
+     * @return A reference to the newly created replay session.
+     *
+     * @throws std::logic_error if called while delivering events or if a
+     * replay session already exists.
      */
-    ~EventManager();
+    ReplaySession &CreateReplaySession(TicCount step_tics,
+                                       ReplaySession::Callbacks callbacks);
+
+    /**
+     * Gets the current replay session associated with this manager.
+     *
+     * @return A reference to the current replay session.
+     *
+     * @throws std::logic_error if no replay session has been created.
+     */
+    ReplaySession &GetReplaySession();
 
     /**
      * Returns true if the manager is currently delivering an event or
@@ -199,13 +214,9 @@ public:
     void DispatchEvents(EventPriority maximum_priority);
 
 private:
-    // The replay session needs to be able to access the manager's internals
-    // to observe events and queue replay actions.
-    friend class ReplaySession;
-
     // The replay session observing this manager's events, or null if none is
-    // attached. Not an owning pointer.
-    ReplaySession *replay = nullptr;
+    // attached.
+    std::unique_ptr<ReplaySession> replay;
 
     // Owns pending events until they are consumed or discarded by Shutdown.
     std::vector<std::unique_ptr<Event>> events_queue;

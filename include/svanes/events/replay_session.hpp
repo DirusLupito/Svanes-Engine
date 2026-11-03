@@ -242,15 +242,9 @@ public:
      *
      * @throws std::invalid_argument if step_tics is zero or a callback is
      * empty.
-     * @throws std::logic_error if the manager is delivering events or already
-     * has an associated replay session.
      */
     ReplaySession(EventManager &manager, TicCount step_tics,
                   Callbacks callbacks);
-    /**
-     * Detaches the replay session from its event manager.
-     */
-    ~ReplaySession();
 
     /**
      * Override of the copy constructor to prevent copying of ReplaySession
@@ -312,9 +306,8 @@ public:
      *
      * @throws std::invalid_argument if the event type identifier is empty,
      * reserved for replay controls, or already registered.
-     * @throws std::logic_error if the manager has been destroyed, the session
-     * is not idle, or registration occurs while processing events, a step,
-     * or a control action.
+     * @throws std::logic_error if the session is not idle, or registration
+     * occurs while processing events, a step, or a control action.
      */
     template <std::derived_from<Event> T, typename Encode, typename Decode>
     void RegisterEvent(Encode encode, Decode decode) {
@@ -334,9 +327,8 @@ public:
      *
      * @throws std::invalid_argument if an input event type is already
      * registered.
-     * @throws std::logic_error if the manager has been destroyed, the session
-     * is not idle, or registration occurs while processing events, a step,
-     * or a control action.
+     * @throws std::logic_error if the session is not idle, or registration
+     * occurs while processing events, a step, or a control action.
      */
     void RegisterInputEvents();
 
@@ -345,9 +337,8 @@ public:
      * current playback state, including handling cases of invalid state update
      * requests.
      *
-     * @throws std::logic_error if the manager has been destroyed, an action
-     * requests an invalid state change, or called while processing events,
-     * a step, or another control action.
+     * @throws std::logic_error if an action requests an invalid state change,
+     * or called while processing events, a step, or another control action.
      * @throws ... Propagates file and game callback errors from pending
      * actions.
      */
@@ -357,8 +348,8 @@ public:
      * Opens the recording window at the beginning of a live simulation step.
      * Processes pending replay controls first.
      *
-     * @throws std::logic_error if the manager has been destroyed, playback is
-     * active, or called while processing events, a step, or a control action.
+     * @throws std::logic_error if playback is active, or called while
+     * processing events, a step, or a control action.
      * @throws ... Propagates errors from pending replay controls.
      */
     void BeginStep();
@@ -368,8 +359,8 @@ public:
      * Stores the completed step when recording, even if it contains no events,
      * then processes pending replay controls.
      *
-     * @throws std::logic_error if the manager has been destroyed, no live step
-     * is open, or events are being delivered.
+     * @throws std::logic_error if no live step is open, or events are being
+     * delivered.
      * @throws ... Propagates errors from pending replay controls.
      */
     void EndStep();
@@ -381,8 +372,8 @@ public:
      * @param elapsed_tics The number of unscaled source tics elapsed since
      * the last call.
      *
-     * @throws std::logic_error if the manager has been destroyed or called
-     * while processing events, a step, or another control action.
+     * @throws std::logic_error if called while processing events, a step,
+     * or another control action.
      * @throws std::overflow_error if elapsed_tics would overflow accumulated
      * time.
      * @throws ... Propagates errors from replay controls, event handlers, or
@@ -478,9 +469,8 @@ private:
      *
      * @throws std::invalid_argument if type is empty, reserved for replay
      * controls, or already registered.
-     * @throws std::logic_error if the manager has been destroyed, the session
-     * is not idle, or registration occurs while processing events, a step,
-     * or a control action.
+     * @throws std::logic_error if the session is not idle, or registration
+     * occurs while processing events, a step, or a control action.
      */
     void RegisterCodec(std::string type, Codec codec);
 
@@ -504,8 +494,8 @@ private:
      * Completely resets the ReplaySession to an idle state and clears out
      * pending events and tasks. Discards recorded and loaded replay data.
      *
-     * @throws std::logic_error if the manager has been destroyed or called
-     * while processing events, a step, or a control action.
+     * @throws std::logic_error if called while processing events, a step,
+     * or a control action.
      */
     void Reset();
 
@@ -537,15 +527,13 @@ private:
      * Checks that replay operations occur at a simulation boundary, so they
      * cannot change the session partway through event delivery or a step.
      *
-     * @throws std::logic_error if the manager has been destroyed, events are
-     * being delivered, a live step is open, or replay controls or playback
-     * steps are being processed.
+     * @throws std::logic_error if events are being delivered, a live step
+     * is open, or replay controls or playback steps are being processed.
      */
     void CheckBoundary() const;
 
-    // The associated event manager, or null after its destruction. Not owned
-    // by this session.
-    EventManager *manager;
+    // The associated event manager. Not owned by this session.
+    EventManager &manager;
 
     // The duration of one simulation step, in unscaled source tics.
     TicCount step_tics;
