@@ -172,6 +172,7 @@ target_sources(
         src/deterministic_math.cpp
         src/events/collision_event.cpp
         src/events/event_manager.cpp
+        src/events/replay_events.cpp
         src/events/replay_session.cpp
         src/tilemaps/tilemap.cpp
         src/collision_pass.cpp
@@ -231,6 +232,7 @@ target_sources(
             include/svanes/events/event.hpp
             include/svanes/events/event_handler_wrapper.hpp
             include/svanes/events/event_manager.hpp
+            include/svanes/events/replay_events.hpp
             include/svanes/events/replay_session.hpp
             include/svanes/game.hpp
             include/svanes/geometry/geometry.hpp
@@ -299,6 +301,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/events/event.hpp
     include/svanes/events/event_handler_wrapper.hpp
     include/svanes/events/event_manager.hpp
+    include/svanes/events/replay_events.hpp
     include/svanes/events/replay_session.hpp
     include/svanes/game.hpp
     include/svanes/geometry/geometry.hpp
@@ -347,6 +350,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/deterministic_math.cpp
     src/events/collision_event.cpp
     src/events/event_manager.cpp
+    src/events/replay_events.cpp
     src/events/replay_session.cpp
     src/tilemaps/tilemap.cpp
     src/collision_pass.cpp
