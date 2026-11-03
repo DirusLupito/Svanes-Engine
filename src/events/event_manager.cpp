@@ -19,10 +19,6 @@ bool EventManager::IsDeliveringEvents() const {
 }
 
 void EventManager::ClearQueuedEvents() {
-    // Prevents queue clearing while the manager is delivering events.
-    // Not doing so could result in changes in playback state causing
-    // the queue to empty while the manager is still working through it,
-    // potentially leading to undefined behavior or runtime errors.
     if (IsDeliveringEvents()) {
         throw std::logic_error("Cannot clear queued events during delivery.");
     }

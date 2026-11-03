@@ -26,21 +26,31 @@ public:
      * Creates an empty manager with no queued events or subscriptions.
      */
     EventManager() = default;
+
+    /**
+     * Detaches any associated replay session so it cannot use the manager
+     * after the manager is destroyed.
+     */
     ~EventManager();
 
-    /** 
-     * Returns true if the manager is currently delivering an event or dispatching
-     * queued events.
-     * Used to prevent replay state changes from occurring while the manager
-     * is still working through queued events. This is important to ensure
-     * that replay events do not interfere with gameplay/user input events.
-    */
+    /**
+     * Returns true if the manager is currently delivering an event or
+     * dispatching queued events. Used to prevent replay state changes from
+     * occurring while the manager is still working through queued events.
+     *
+     * @return true during event delivery or queued dispatch, false otherwise.
+     */
     bool IsDeliveringEvents() const;
-    /** 
-     * Clears out pending events queued in the manager. Used to ensure that replays
-     * and live gameplay states start from a clean event queue to prevent incorrect
-     * behavior (such as user inputs changing the event playback or vice versa).
-    */
+
+    /**
+     * Clears out pending events queued in the manager. Used to ensure that
+     * replays and live gameplay states start from a clean event queue to
+     * prevent incorrect behavior (such as user inputs changing the event
+     * playback or vice versa).
+     *
+     * @throws std::logic_error if called during event delivery or queued
+     * dispatch.
+     */
     void ClearQueuedEvents();
 
     /**
@@ -189,7 +199,12 @@ public:
     void DispatchEvents(EventPriority maximum_priority);
 
 private:
+    // The replay session needs to be able to access the manager's internals
+    // to observe events and queue replay actions.
     friend class ReplaySession;
+
+    // The replay session observing this manager's events, or null if none is
+    // attached. Not an owning pointer.
     ReplaySession *replay = nullptr;
 
     // Owns pending events until they are consumed or discarded by Shutdown.
