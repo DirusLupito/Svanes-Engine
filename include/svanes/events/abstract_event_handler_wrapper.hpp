@@ -35,6 +35,15 @@ public:
      */
     virtual std::string GetType() const = 0;
 
+    /**
+     * Returns the ID of the event type this handler accepts. The event manager
+     * registers the handler under this ID, so it only ever receives events of
+     * that type.
+     *
+     * @return The ID of the event type this handler accepts.
+     */
+    virtual EventTypeId GetEventTypeId() const = 0;
+
 private:
     /**
      * Callback method to be implemented by derived classes to handle the event.

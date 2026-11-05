@@ -20,168 +20,6 @@ namespace svanes {
 class EventManager;
 
 /**
- * Specific event type telling the engine to begin logging registered
- * events in order to create a playback log. Games should raise this
- * type of event according to their specific conditions related to their
- * replay systems.
- */
-class StartRecordingEvent final : public Event {
-public:
-    /**
-     * Constructor for StartRecordingEvent. This event needs a path
-     * so that the engine knows where it should eventually write the completed
-     * replay file to.
-     *
-     * @param path The path to which the engine will save the replay file.
-     */
-    explicit StartRecordingEvent(std::filesystem::path path);
-
-    /**
-     * Returns event type, callable before event object instantiation.
-     *
-     * @return The event type identifier for starting a recording.
-     */
-    static std::string GetStaticEventType();
-
-    /**
-     * Identifies this event as a request to start recording.
-     *
-     * @return The event type identifier for starting a recording.
-     */
-    const std::string GetEventType() const override;
-
-    /**
-     * The path that the engine is to write the completed replay file to.
-     */
-    std::filesystem::path path;
-};
-
-/**
- * Specific event type telling the engine to stop logging registered
- * events and finish creating the playback log. Games should raise this
- * type of event according to their specific conditions related to their
- * replay systems.
- */
-class StopRecordingEvent final : public Event {
-public:
-    /**
-     * Returns event type, callable before event object instantiation.
-     *
-     * @return The event type identifier for stopping a recording.
-     */
-    static std::string GetStaticEventType();
-
-    /**
-     * Identifies this event as a request to stop recording.
-     *
-     * @return The event type identifier for stopping a recording.
-     */
-    const std::string GetEventType() const override;
-};
-
-/**
- * Specific event type telling the engine to begin playback for a
- * replay session. Games should raise this type of event according
- * to their specific conditions related to their replay systems.
- */
-class PlayReplayEvent final : public Event {
-public:
-    /**
-     * Constructor for PlayReplayEvent. This event needs a path
-     * so that the engine knows where it should look for the replay
-     * file to play.
-     *
-     * @param path The path to the replay file to be played.
-     */
-    explicit PlayReplayEvent(std::filesystem::path path);
-
-    /**
-     * Returns event type, callable before event object instantiation.
-     *
-     * @return The event type identifier for starting playback.
-     */
-    static std::string GetStaticEventType();
-
-    /**
-     * Identifies this event as a request to start playback.
-     *
-     * @return The event type identifier for starting playback.
-     */
-    const std::string GetEventType() const override;
-
-    /**
-     * The path to the replay file that is to be played.
-     */
-    std::filesystem::path path;
-};
-
-/**
- * Specific event type telling the engine to pause playback for a
- * replay session. Games should raise this type of event according
- * to their specific conditions related to their replay systems.
- */
-class PauseReplayEvent final : public Event {
-public:
-    /**
-     * Returns event type, callable before event object instantiation.
-     *
-     * @return The event type identifier for pausing playback.
-     */
-    static std::string GetStaticEventType();
-
-    /**
-     * Identifies this event as a request to pause playback.
-     *
-     * @return The event type identifier for pausing playback.
-     */
-    const std::string GetEventType() const override;
-};
-
-/**
- * Specific event type telling the engine to resume playback for a
- * replay session. Games should raise this type of event according
- * to their specific conditions related to their replay systems.
- */
-class ResumeReplayEvent final : public Event {
-public:
-    /**
-     * Returns event type, callable before event object instantiation.
-     *
-     * @return The event type identifier for resuming playback.
-     */
-    static std::string GetStaticEventType();
-
-    /**
-     * Identifies this event as a request to resume playback.
-     *
-     * @return The event type identifier for resuming playback.
-     */
-    const std::string GetEventType() const override;
-};
-
-/**
- * Specific event type telling the engine to stop playback for a
- * replay session. Games should raise this type of event according
- * to their specific conditions related to their replay systems.
- */
-class StopReplayEvent final : public Event {
-public:
-    /**
-     * Returns event type, callable before event object instantiation.
-     *
-     * @return The event type identifier for stopping playback.
-     */
-    static std::string GetStaticEventType();
-
-    /**
-     * Identifies this event as a request to stop playback.
-     *
-     * @return The event type identifier for stopping playback.
-     */
-    const std::string GetEventType() const override;
-};
-
-/**
  * Representation of a replay recording and playback session. Requires some
  * game-side setup for callback functions and event registration. Provides basic
  * functionality for navigating replay playback.
@@ -242,15 +80,9 @@ public:
      *
      * @throws std::invalid_argument if step_tics is zero or a callback is
      * empty.
-     * @throws std::logic_error if the manager is delivering events or already
-     * has an associated replay session.
      */
     ReplaySession(EventManager &manager, TicCount step_tics,
                   Callbacks callbacks);
-    /**
-     * Detaches the replay session from its event manager.
-     */
-    ~ReplaySession();
 
     /**
      * Override of the copy constructor to prevent copying of ReplaySession
@@ -300,7 +132,8 @@ public:
      * Event types must be registered in order to be logged, and thus
      * played back.
      *
-     * @tparam T The event type to record and play back.
+     * @tparam T The event type to record and play back. Its encoder receives
+     * the event through a static_cast, so T's EventName must be unique.
      * @tparam Encode The type of the encoding callable.
      * @tparam Decode The type of the decoding callable.
      * @param encode Algorithm to encode an event for writing to the log.
@@ -312,17 +145,16 @@ public:
      *
      * @throws std::invalid_argument if the event type identifier is empty,
      * reserved for replay controls, or already registered.
-     * @throws std::logic_error if the manager has been destroyed, the session
-     * is not idle, or registration occurs while processing events, a step,
-     * or a control action.
+     * @throws std::logic_error if the session is not idle, or registration
+     * occurs while processing events, a step, or a control action.
      */
     template <std::derived_from<Event> T, typename Encode, typename Decode>
     void RegisterEvent(Encode encode, Decode decode) {
         RegisterCodec(
-            T::GetStaticEventType(),
+            T::EventName,
             Codec{[encode = std::move(encode)](MessageWriter &writer,
                                                const Event &event) {
-                      encode(writer, dynamic_cast<const T &>(event));
+                      encode(writer, static_cast<const T &>(event));
                   },
                   [decode = std::move(decode)](MessageReader &reader)
                       -> std::unique_ptr<Event> { return decode(reader); }});
@@ -334,9 +166,8 @@ public:
      *
      * @throws std::invalid_argument if an input event type is already
      * registered.
-     * @throws std::logic_error if the manager has been destroyed, the session
-     * is not idle, or registration occurs while processing events, a step,
-     * or a control action.
+     * @throws std::logic_error if the session is not idle, or registration
+     * occurs while processing events, a step, or a control action.
      */
     void RegisterInputEvents();
 
@@ -345,9 +176,8 @@ public:
      * current playback state, including handling cases of invalid state update
      * requests.
      *
-     * @throws std::logic_error if the manager has been destroyed, an action
-     * requests an invalid state change, or called while processing events,
-     * a step, or another control action.
+     * @throws std::logic_error if an action requests an invalid state change,
+     * or called while processing events, a step, or another control action.
      * @throws ... Propagates file and game callback errors from pending
      * actions.
      */
@@ -357,8 +187,8 @@ public:
      * Opens the recording window at the beginning of a live simulation step.
      * Processes pending replay controls first.
      *
-     * @throws std::logic_error if the manager has been destroyed, playback is
-     * active, or called while processing events, a step, or a control action.
+     * @throws std::logic_error if playback is active, or called while
+     * processing events, a step, or a control action.
      * @throws ... Propagates errors from pending replay controls.
      */
     void BeginStep();
@@ -368,8 +198,8 @@ public:
      * Stores the completed step when recording, even if it contains no events,
      * then processes pending replay controls.
      *
-     * @throws std::logic_error if the manager has been destroyed, no live step
-     * is open, or events are being delivered.
+     * @throws std::logic_error if no live step is open, or events are being
+     * delivered.
      * @throws ... Propagates errors from pending replay controls.
      */
     void EndStep();
@@ -381,8 +211,8 @@ public:
      * @param elapsed_tics The number of unscaled source tics elapsed since
      * the last call.
      *
-     * @throws std::logic_error if the manager has been destroyed or called
-     * while processing events, a step, or another control action.
+     * @throws std::logic_error if called while processing events, a step,
+     * or another control action.
      * @throws std::overflow_error if elapsed_tics would overflow accumulated
      * time.
      * @throws ... Propagates errors from replay controls, event handlers, or
@@ -452,7 +282,8 @@ private:
      * An event saved during recording or reconstructed for playback.
      *
      * FIELDS:
-     * - type: The event type identifier used to select its codec.
+     * - type: The event type's name, which the replay file stores and Load
+     * hashes to select its codec.
      * - priority: The event's original dispatch priority.
      * - payload: The encoded event payload, populated while recording.
      * - decoded: The reconstructed event used during playback, empty while
@@ -473,16 +304,16 @@ private:
      * replay files. Registration must occur while the session is idle, and
      * duplicates cannot be registered.
      *
-     * @param type The event type identifier associated with the codec.
+     * @param type The name of the event type associated with the codec. The
+     * codec is stored under the hash of this name.
      * @param codec The functions used to encode and decode event payloads.
      *
      * @throws std::invalid_argument if type is empty, reserved for replay
      * controls, or already registered.
-     * @throws std::logic_error if the manager has been destroyed, the session
-     * is not idle, or registration occurs while processing events, a step,
-     * or a control action.
+     * @throws std::logic_error if the session is not idle, or registration
+     * occurs while processing events, a step, or a control action.
      */
-    void RegisterCodec(std::string type, Codec codec);
+    void RegisterCodec(std::string_view type, Codec codec);
 
     /**
      * Watches for events and decides what to do based on their type. If it's
@@ -504,8 +335,8 @@ private:
      * Completely resets the ReplaySession to an idle state and clears out
      * pending events and tasks. Discards recorded and loaded replay data.
      *
-     * @throws std::logic_error if the manager has been destroyed or called
-     * while processing events, a step, or a control action.
+     * @throws std::logic_error if called while processing events, a step,
+     * or a control action.
      */
     void Reset();
 
@@ -537,15 +368,13 @@ private:
      * Checks that replay operations occur at a simulation boundary, so they
      * cannot change the session partway through event delivery or a step.
      *
-     * @throws std::logic_error if the manager has been destroyed, events are
-     * being delivered, a live step is open, or replay controls or playback
-     * steps are being processed.
+     * @throws std::logic_error if events are being delivered, a live step
+     * is open, or replay controls or playback steps are being processed.
      */
     void CheckBoundary() const;
 
-    // The associated event manager, or null after its destruction. Not owned
-    // by this session.
-    EventManager *manager;
+    // The associated event manager. Not owned by this session.
+    EventManager &manager;
 
     // The duration of one simulation step, in unscaled source tics.
     TicCount step_tics;
@@ -556,8 +385,8 @@ private:
     // The session's current recording or playback state.
     State state = State::Idle;
 
-    // The encoding and decoding functions keyed by event type identifier.
-    std::unordered_map<std::string, Codec> codecs;
+    // The encoding and decoding functions keyed by event type ID.
+    std::unordered_map<EventTypeId, Codec> codecs;
 
     // The replay control actions waiting for the next simulation boundary.
     std::vector<Control> controls;

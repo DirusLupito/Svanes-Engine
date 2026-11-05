@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <string_view>
 
 namespace svanes {
 
@@ -26,5 +27,16 @@ std::size_t Hash(std::span<const std::uint32_t> values) noexcept;
  * @return The hash.
  */
 std::uint64_t HashBytes(std::span<const std::byte> bytes);
+
+// 64-bit FNV-1a:
+// https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
+constexpr std::uint64_t HashText(std::string_view text) {
+    std::uint64_t hash = 14695981039346656037ULL;
+    for (const char character : text) {
+        hash ^= static_cast<std::uint8_t>(character);
+        hash *= 1099511628211ULL;
+    }
+    return hash;
+}
 
 } // namespace svanes

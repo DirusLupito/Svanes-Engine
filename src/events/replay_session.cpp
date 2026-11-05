@@ -1,6 +1,7 @@
 #include <svanes/events/replay_session.hpp>
 
 #include <svanes/events/event_manager.hpp>
+#include <svanes/events/replay_events.hpp>
 #include <svanes/input/input_events.hpp>
 
 #include <cmath>
@@ -9,78 +10,13 @@
 
 namespace svanes {
 
-StartRecordingEvent::StartRecordingEvent(std::filesystem::path path)
-    : path(std::move(path)) {}
-
-std::string StartRecordingEvent::GetStaticEventType() {
-    return "svanes.replay.record.start";
-}
-
-const std::string StartRecordingEvent::GetEventType() const {
-    return GetStaticEventType();
-}
-
-std::string StopRecordingEvent::GetStaticEventType() {
-    return "svanes.replay.record.stop";
-}
-
-const std::string StopRecordingEvent::GetEventType() const {
-    return GetStaticEventType();
-}
-
-PlayReplayEvent::PlayReplayEvent(std::filesystem::path path)
-    : path(std::move(path)) {}
-
-std::string PlayReplayEvent::GetStaticEventType() {
-    return "svanes.replay.play";
-}
-
-const std::string PlayReplayEvent::GetEventType() const {
-    return GetStaticEventType();
-}
-
-std::string PauseReplayEvent::GetStaticEventType() {
-    return "svanes.replay.pause";
-}
-
-const std::string PauseReplayEvent::GetEventType() const {
-    return GetStaticEventType();
-}
-
-std::string ResumeReplayEvent::GetStaticEventType() {
-    return "svanes.replay.resume";
-}
-
-const std::string ResumeReplayEvent::GetEventType() const {
-    return GetStaticEventType();
-}
-
-std::string StopReplayEvent::GetStaticEventType() {
-    return "svanes.replay.stop";
-}
-
-const std::string StopReplayEvent::GetEventType() const {
-    return GetStaticEventType();
-}
-
 ReplaySession::ReplaySession(EventManager &manager, TicCount step_tics,
                              Callbacks callbacks)
-    : manager(&manager), step_tics(step_tics), callbacks(std::move(callbacks)) {
+    : manager(manager), step_tics(step_tics), callbacks(std::move(callbacks)) {
     if (step_tics == 0 || !this->callbacks.save || !this->callbacks.restore ||
         !this->callbacks.step) {
         throw std::invalid_argument("Replay requires a positive step duration "
                                     "and save/restore/step callbacks.");
-    }
-    if (manager.IsDeliveringEvents() || manager.replay) {
-        throw std::logic_error("A replay session requires an idle event "
-                               "manager without another session.");
-    }
-    manager.replay = this;
-}
-
-ReplaySession::~ReplaySession() {
-    if (manager) {
-        manager->replay = nullptr;
     }
 }
 
@@ -91,13 +27,13 @@ bool ReplaySession::IsReplaying() const {
 }
 
 void ReplaySession::CheckBoundary() const {
-    if (!manager || manager->IsDeliveringEvents() || step_open || updating) {
+    if (manager.IsDeliveringEvents() || step_open || updating) {
         throw std::logic_error("Replay operation requires a simulation "
                                "boundary outside event delivery.");
     }
 }
 
-void ReplaySession::RegisterCodec(std::string type, Codec codec) {
+void ReplaySession::RegisterCodec(std::string_view type, Codec codec) {
     CheckBoundary();
     if (state != State::Idle) {
         throw std::logic_error(
@@ -106,7 +42,7 @@ void ReplaySession::RegisterCodec(std::string type, Codec codec) {
     if (type.empty() || type.starts_with("svanes.replay.")) {
         throw std::invalid_argument("Invalid replay driving event type.");
     }
-    if (!codecs.emplace(std::move(type), std::move(codec)).second) {
+    if (!codecs.emplace(HashText(type), std::move(codec)).second) {
         throw std::invalid_argument("Replay event type is already registered.");
     }
 }
@@ -162,37 +98,47 @@ void ReplaySession::RegisterInputEvents() {
 
 bool ReplaySession::Observe(const Event &event) {
     // Handling for replay events
-    if (const auto *control =
-            dynamic_cast<const StartRecordingEvent *>(&event)) {
-        controls.push_back({Action::Record, control->path});
-    } else if (dynamic_cast<const StopRecordingEvent *>(&event)) {
+    switch (event.GetTypeId()) {
+    case EventTypeIdOf<StartRecordingEvent>():
+        controls.push_back(
+            {Action::Record,
+             static_cast<const StartRecordingEvent &>(event).path});
+        return true;
+    case EventTypeIdOf<StopRecordingEvent>():
         controls.push_back({Action::Save, {}});
-    } else if (const auto *control =
-                   dynamic_cast<const PlayReplayEvent *>(&event)) {
-        controls.push_back({Action::Play, control->path});
-    } else if (dynamic_cast<const PauseReplayEvent *>(&event)) {
+        return true;
+    case EventTypeIdOf<PlayReplayEvent>():
+        controls.push_back(
+            {Action::Play, static_cast<const PlayReplayEvent &>(event).path});
+        return true;
+    case EventTypeIdOf<PauseReplayEvent>():
         controls.push_back({Action::Pause, {}});
-    } else if (dynamic_cast<const ResumeReplayEvent *>(&event)) {
+        return true;
+    case EventTypeIdOf<ResumeReplayEvent>():
         controls.push_back({Action::Resume, {}});
-    } else if (dynamic_cast<const StopReplayEvent *>(&event)) {
+        return true;
+    case EventTypeIdOf<StopReplayEvent>():
         controls.push_back({Action::Stop, {}});
-    } else { // Handling for non replay events
-        const auto codec = codecs.find(event.GetEventType());
-        if (codec != codecs.end()) {
-            if (IsReplaying() && !injecting) { // This event is not registered, skip
-                return false;
+        return true;
+    }
+
+    // Handling for non replay events
+    const auto codec = codecs.find(event.GetTypeId());
+    if (codec != codecs.end()) {
+        if (IsReplaying() && !injecting) { // Live event during playback, drop
+            return false;
+        }
+        if (state == State::Recording) { // If we are recording right now, try to add it to the log
+            if (!step_open) { // The recording window is not open right now, can't record
+                throw std::logic_error("Deliver replay driving events "
+                                       "between BeginStep and EndStep.");
             }
-            if (state == State::Recording) { // If we are recording right now, try to add it to the log
-                if (!step_open) { // The recording window is not open right now, can't record
-                    throw std::logic_error("Deliver replay driving events "
-                                           "between BeginStep and EndStep.");
-                }
-                MessageWriter writer;
-                // Encode this event and write it ot our log
-                codec->second.encode(writer, event);
-                pending_events.push_back(
-                    {codec->first, event.priority, writer.Finish(), nullptr});
-            }
+            MessageWriter writer;
+            // Encode this event and write it to our log
+            codec->second.encode(writer, event);
+            pending_events.push_back({std::string{event.GetEventType()},
+                                      event.priority, writer.Finish(),
+                                      nullptr});
         }
     }
     return true;
@@ -246,7 +192,7 @@ void ReplaySession::ProcessControls() {
                         "Playback requires an idle session and a file path.");
                 }
                 Load(control.path);
-                manager->ClearQueuedEvents();
+                manager.ClearQueuedEvents();
                 callbacks.restore(initial_state.bytes);
                 playback_step = 0;
                 accumulated_tics = 0;
@@ -269,7 +215,7 @@ void ReplaySession::ProcessControls() {
                 if (!IsReplaying()) {
                     throw std::logic_error("No replay playback is active.");
                 }
-                manager->ClearQueuedEvents();
+                manager.ClearQueuedEvents();
                 state = State::Idle;
                 accumulated_tics = 0;
                 break;
@@ -292,7 +238,7 @@ void ReplaySession::BeginStep() {
 }
 
 void ReplaySession::EndStep() {
-    if (!manager || manager->IsDeliveringEvents() || !step_open) {
+    if (manager.IsDeliveringEvents() || !step_open) {
         throw std::logic_error(
             "EndStep requires a completed live simulation step.");
     }
@@ -323,7 +269,7 @@ void ReplaySession::Update(TicCount elapsed_tics) {
             // event handlers.
             for (auto &event : steps[playback_step]) {
                 injecting = true;
-                manager->TriggerEvent(*event.decoded);
+                manager.TriggerEvent(*event.decoded);
                 injecting = false;
             }
             // Advance the playback and prepare for the next step
@@ -447,7 +393,8 @@ void ReplaySession::Load(const std::filesystem::path &path) {
         // Loop through all the steps that were just read in.
         for (std::uint64_t entry = 0; entry < event_count; ++entry) {
             auto type = reader.ReadText();
-            const auto codec = codecs.find(type);
+            const auto type_id = HashText(type);
+            const auto codec = codecs.find(type_id);
             // First we have to check that this event type is registered. If this throws an error,
             // that means that either the replay file is from a different game/version, or that it
             // is being loaded in some different context, where the event was not correctly registered.
@@ -461,7 +408,7 @@ void ReplaySession::Load(const std::filesystem::path &path) {
             auto event = codec->second.decode(payload);
             // If this throws it means someone somewhere goofed. The event was either not encoded properly
             // or not decoded properly.
-            if (!event || event->GetEventType() != type ||
+            if (!event || event->GetTypeId() != type_id ||
                 payload.Remaining() != 0) {
                 throw std::invalid_argument("Invalid replay event payload: " +
                                             type);

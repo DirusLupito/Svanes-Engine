@@ -22,9 +22,8 @@ using EventHandler = std::function<void(const EventType &)>;
  * and provides a concrete implementation for handling events of a specific
  * type.
  *
- * @tparam EventType The type of event that this handler can handle. It must be
- * a subclass of Event and provide a static GetStaticEventType() method that
- * returns the same identifier as GetEventType().
+ * @tparam EventType The type of event that this handler can handle. It must
+ * derive from EventOf<EventType>, which requires it to declare an EventName.
  */
 template <std::derived_from<Event> EventType>
 class EventHandlerWrapper : public AbstractEventHandlerWrapper {
@@ -45,18 +44,27 @@ public:
      */
     std::string GetType() const override { return handler_type; }
 
+    /**
+     * Returns the ID of EventType, which the event manager registers this
+     * handler under.
+     *
+     * @return The ID of EventType.
+     */
+    EventTypeId GetEventTypeId() const override {
+        return EventTypeIdOf<EventType>();
+    }
+
 private:
     /**
-     * Executes the wrapped event handler if the event type matches the expected
-     * EventType. This method is called by the Exec method of the base class.
+     * Executes the wrapped event handler. This method is called by the Exec
+     * method of the base class.
      *
-     * @param event The event to be handled. It is checked against the expected
-     * EventType, and if it matches, the handler is invoked.
+     * @param event The event to be handled. It must be an EventType, which the
+     * event manager guarantees by looking up handlers using the event's ID.
+     * This is not checked here.
      */
     void Call(const Event &event) override {
-        if (event.GetEventType() == EventType::GetStaticEventType()) {
-            handler(static_cast<const EventType &>(event));
-        }
+        handler(static_cast<const EventType &>(event));
     }
 
     // The actual event handler function that will be called when an event of

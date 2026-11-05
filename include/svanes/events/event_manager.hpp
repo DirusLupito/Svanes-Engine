@@ -3,16 +3,14 @@
 #pragma once
 
 #include <svanes/events/abstract_event_handler_wrapper.hpp>
+#include <svanes/events/replay_session.hpp>
 
-#include <cstddef>
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 namespace svanes {
-
-class ReplaySession;
 
 /**
  * Represents a manager for the lifecycle of events and their associated
@@ -28,10 +26,27 @@ public:
     EventManager() = default;
 
     /**
-     * Detaches any associated replay session so it cannot use the manager
-     * after the manager is destroyed.
+     * Creates a new replay session with the specified step tics and callbacks.
+     *
+     * @param step_tics The number of tics to advance each step.
+     * @param callbacks The callbacks to use for the replay session.
+     *
+     * @return A reference to the newly created replay session.
+     *
+     * @throws std::logic_error if called while delivering events or if a
+     * replay session already exists.
      */
-    ~EventManager();
+    ReplaySession &CreateReplaySession(TicCount step_tics,
+                                       ReplaySession::Callbacks callbacks);
+
+    /**
+     * Gets the current replay session associated with this manager.
+     *
+     * @return A reference to the current replay session.
+     *
+     * @throws std::logic_error if no replay session has been created.
+     */
+    ReplaySession &GetReplaySession();
 
     /**
      * Returns true if the manager is currently delivering an event or
@@ -106,36 +121,32 @@ public:
     void Shutdown();
 
     /**
-     * Takes ownership of a handler for event_id and maps it to the given event
-     * type identifier. The handler will be called when TriggerEvent is called
-     * with an event whose event type matches the one given here.
+     * Takes ownership of a handler and registers it for the event type its
+     * wrapper reports through GetEventTypeId(). The handler will be called when
+     * TriggerEvent is called with an event of that type.
      *
-     * @param event_id The event type identifier to associate with the handler.
-     * It must match the identifier returned by the events it handles.
      * @param handler The wrapper to register. Ownership transfers to the
      * manager when registration succeeds.
      *
-     * @throws std::invalid_argument if event_id is empty, handler is null, or
-     * a handler with the same GetType() is already registered for event_id.
+     * @throws std::invalid_argument if handler is null, or a handler with the
+     * same GetType() is already registered for the same event type.
      * @throws std::logic_error if called during a callback.
      */
-    void Subscribe(const std::string &event_id,
-                   std::unique_ptr<AbstractEventHandlerWrapper> &&handler);
+    void Subscribe(std::unique_ptr<AbstractEventHandlerWrapper> &&handler);
 
     /**
      * Unregisters one callback so it will no longer receive events of the
      * specified type.
      *
-     * @param event_id The event type identifier used when registering the
-     * handler.
+     * @param event_id The ID of the event type the handler was registered for,
+     * obtained from EventTypeIdOf.
      * @param handler_name The callback type name returned by the registered
      * wrapper's GetType().
      *
      * @throws std::invalid_argument if the registration does not exist.
      * @throws std::logic_error if called during a callback.
      */
-    void Unsubscribe(const std::string &event_id,
-                     const std::string handler_name);
+    void Unsubscribe(EventTypeId event_id, const std::string handler_name);
 
     /**
      * Finds the handlers subscribed to the given event's type and passes the
@@ -199,21 +210,17 @@ public:
     void DispatchEvents(EventPriority maximum_priority);
 
 private:
-    // The replay session needs to be able to access the manager's internals
-    // to observe events and queue replay actions.
-    friend class ReplaySession;
-
     // The replay session observing this manager's events, or null if none is
-    // attached. Not an owning pointer.
-    ReplaySession *replay = nullptr;
+    // attached.
+    std::unique_ptr<ReplaySession> replay;
 
     // Owns pending events until they are consumed or discarded by Shutdown.
     std::vector<std::unique_ptr<Event>> events_queue;
 
-    // Maps event type identifiers to owned handlers. Each vector preserves
+    // Maps event type IDs to owned handlers. Each vector preserves
     // registration order so delivery order is predictable.
     std::unordered_map<
-        std::string, std::vector<std::unique_ptr<AbstractEventHandlerWrapper>>>
+        EventTypeId, std::vector<std::unique_ptr<AbstractEventHandlerWrapper>>>
         subscribers;
 
     // The number of nested TriggerEvent calls executing handlers. Registration

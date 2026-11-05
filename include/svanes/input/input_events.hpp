@@ -4,7 +4,7 @@
 #include <svanes/input/input_types.hpp>
 #include <svanes/vector2d.hpp>
 
-#include <string>
+#include <string_view>
 
 namespace svanes {
 
@@ -12,8 +12,11 @@ namespace svanes {
  * Represents a key press or release. It identifies the key and whether it is
  * now held down.
  */
-class KeyInputEvent final : public Event {
+class KeyInputEvent final : public EventOf<KeyInputEvent> {
 public:
+    // The unique name of this event type, hashed to produce its EventTypeId.
+    static constexpr std::string_view EventName = "svanes.input.key";
+
     /**
      * Constructs an event describing a change in a key's state.
      *
@@ -21,20 +24,6 @@ public:
      * @param down True if the key was pressed, false if it was released.
      */
     KeyInputEvent(Key key, bool down);
-
-    /**
-     * Returns the identifier used to subscribe to key input events.
-     *
-     * @return The event type identifier shared by all KeyInputEvent instances.
-     */
-    static std::string GetStaticEventType();
-
-    /**
-     * Identifies this event so the event manager can find its handlers.
-     *
-     * @return The same identifier returned by GetStaticEventType().
-     */
-    const std::string GetEventType() const override;
 
     // The key whose state changed.
     Key key;
@@ -47,8 +36,11 @@ public:
  * Represents a mouse button press or release. It identifies the button and
  * whether it is now held down.
  */
-class MouseButtonInputEvent final : public Event {
+class MouseButtonInputEvent final : public EventOf<MouseButtonInputEvent> {
 public:
+    // The unique name of this event type, hashed to produce its EventTypeId.
+    static constexpr std::string_view EventName = "svanes.input.mouse_button";
+
     /**
      * Constructs an event describing a change in a mouse button's state.
      *
@@ -56,21 +48,6 @@ public:
      * @param down True if the button was pressed, false if it was released.
      */
     MouseButtonInputEvent(MouseButton button, bool down);
-
-    /**
-     * Returns the identifier used to subscribe to mouse button input events.
-     *
-     * @return The event type identifier shared by all MouseButtonInputEvent
-     * instances.
-     */
-    static std::string GetStaticEventType();
-
-    /**
-     * Identifies this event so the event manager can find its handlers.
-     *
-     * @return The same identifier returned by GetStaticEventType().
-     */
-    const std::string GetEventType() const override;
 
     // The mouse button whose state changed.
     MouseButton button;
@@ -83,8 +60,11 @@ public:
  * Represents mouse movement, including the cursor's position in the window
  * and the movement accumulated since the previous input sample.
  */
-class MouseMotionInputEvent final : public Event {
+class MouseMotionInputEvent final : public EventOf<MouseMotionInputEvent> {
 public:
+    // The unique name of this event type, hashed to produce its EventTypeId.
+    static constexpr std::string_view EventName = "svanes.input.mouse_motion";
+
     /**
      * Constructs an event describing the mouse's position and movement.
      *
@@ -93,21 +73,6 @@ public:
      * @param delta The mouse movement since the previous input sample.
      */
     MouseMotionInputEvent(Vector2D position, Vector2D delta);
-
-    /**
-     * Returns the identifier used to subscribe to mouse movement events.
-     *
-     * @return The event type identifier shared by all MouseMotionInputEvent
-     * instances.
-     */
-    static std::string GetStaticEventType();
-
-    /**
-     * Identifies this event so the event manager can find its handlers.
-     *
-     * @return The same identifier returned by GetStaticEventType().
-     */
-    const std::string GetEventType() const override;
 
     // Cursor position relative to the window's top-left corner.
     Vector2D position;

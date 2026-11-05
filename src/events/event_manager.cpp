@@ -1,5 +1,4 @@
 #include <svanes/events/event_manager.hpp>
-#include <svanes/events/replay_session.hpp>
 
 #include <algorithm>
 #include <limits>
@@ -8,10 +7,26 @@
 
 namespace svanes {
 
-EventManager::~EventManager() {
-    if (replay) {
-        replay->manager = nullptr;
+ReplaySession &
+EventManager::CreateReplaySession(TicCount step_tics,
+                                  ReplaySession::Callbacks callbacks) {
+    if (IsDeliveringEvents() || replay) {
+        throw std::logic_error("A replay session requires an idle event "
+                               "manager without another session.");
     }
+
+    replay =
+        std::make_unique<ReplaySession>(*this, step_tics, std::move(callbacks));
+
+    return *replay;
+}
+
+ReplaySession &EventManager::GetReplaySession() {
+    if (!replay) {
+        throw std::logic_error("No replay session has been created.");
+    }
+
+    return *replay;
 }
 
 bool EventManager::IsDeliveringEvents() const {
@@ -38,21 +53,16 @@ void EventManager::Shutdown() {
 }
 
 void EventManager::Subscribe(
-    const std::string &event_id,
     std::unique_ptr<AbstractEventHandlerWrapper> &&handler) {
     if (active_triggers != 0) {
         throw std::logic_error("Cannot subscribe during an event callback.");
-    }
-
-    if (event_id.empty()) {
-        throw std::invalid_argument("Event identifier cannot be empty.");
     }
 
     if (!handler) {
         throw std::invalid_argument("Event handler cannot be null.");
     }
 
-    auto &handlers = subscribers[event_id];
+    auto &handlers = subscribers[handler->GetEventTypeId()];
 
     // iterate through existing handlers for this event type to check for duplicates
     for (const auto &existing : handlers) {
@@ -64,7 +74,7 @@ void EventManager::Subscribe(
     handlers.push_back(std::move(handler));
 }
 
-void EventManager::Unsubscribe(const std::string &event_id,
+void EventManager::Unsubscribe(EventTypeId event_id,
                                const std::string handler_name) {
     if (active_triggers != 0) {
         throw std::logic_error("Cannot unsubscribe during an event callback.");
@@ -101,7 +111,7 @@ void EventManager::TriggerEvent(const Event &event) {
             --active_triggers;
             return;
         }
-        const auto found = subscribers.find(event.GetEventType());
+        const auto found = subscribers.find(event.GetTypeId());
         if (found == subscribers.end()) {
             --active_triggers;
             return;
