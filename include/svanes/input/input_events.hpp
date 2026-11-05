@@ -14,7 +14,7 @@ namespace svanes {
  */
 class KeyInputEvent final : public EventOf<KeyInputEvent> {
 public:
-    // The unique name of this event type, hashed to produce its EventTypeId.
+    // The unique name identifying key press and release events.
     static constexpr std::string_view EventName = "svanes.input.key";
 
     /**
@@ -38,7 +38,7 @@ public:
  */
 class MouseButtonInputEvent final : public EventOf<MouseButtonInputEvent> {
 public:
-    // The unique name of this event type, hashed to produce its EventTypeId.
+    // The unique name identifying mouse button press and release events.
     static constexpr std::string_view EventName = "svanes.input.mouse_button";
 
     /**
@@ -62,7 +62,7 @@ public:
  */
 class MouseMotionInputEvent final : public EventOf<MouseMotionInputEvent> {
 public:
-    // The unique name of this event type, hashed to produce its EventTypeId.
+    // The unique name identifying mouse movement events.
     static constexpr std::string_view EventName = "svanes.input.mouse_motion";
 
     /**

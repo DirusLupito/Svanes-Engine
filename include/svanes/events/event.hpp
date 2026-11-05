@@ -11,13 +11,11 @@ namespace svanes {
 
 using EventPriority = std::uint64_t;
 
-// Identifies an event type at runtime. It is the hash of the type's EventName,
-// so it stays the same across runs and platforms.
+// Identifies an event type at runtime.
 using EventTypeId = std::uint64_t;
 
 /**
- * Returns the ID of an event type. Always evaluated at compile time, so the
- * result can be used as a case label.
+ * Returns the ID of an event type.
  *
  * @tparam T The event type. It must declare a static constexpr EventName.
  *
@@ -38,16 +36,14 @@ public:
     virtual ~Event() = default;
 
     /**
-     * Returns the readable name of the event's type. Event types get this from
-     * EventOf rather than implementing it themselves.
+     * Returns the readable name of the event's type.
      *
      * @return The EventName of the event's type.
      */
     virtual std::string_view GetEventType() const = 0;
 
     /**
-     * Returns the ID of the event's type. Event types get this from EventOf
-     * rather than implementing it themselves.
+     * Returns the ID of the event's type.
      *
      * @return The ID used to find the handlers and replay codec for this event.
      */
@@ -78,7 +74,7 @@ public:
     /**
      * Returns the readable name of the event's type.
      *
-     * @return T::EventName.
+     * @return The EventName of T.
      */
     std::string_view GetEventType() const final { return T::EventName; }
 

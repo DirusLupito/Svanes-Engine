@@ -128,11 +128,13 @@ bool ReplaySession::Observe(const Event &event) {
         if (IsReplaying() && !injecting) { // Live event during playback, drop
             return false;
         }
+
         if (state == State::Recording) { // If we are recording right now, try to add it to the log
             if (!step_open) { // The recording window is not open right now, can't record
                 throw std::logic_error("Deliver replay driving events "
                                        "between BeginStep and EndStep.");
             }
+
             MessageWriter writer;
             // Encode this event and write it to our log
             codec->second.encode(writer, event);
@@ -141,6 +143,7 @@ bool ReplaySession::Observe(const Event &event) {
                                       nullptr});
         }
     }
+
     return true;
 }
 

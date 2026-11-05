@@ -16,7 +16,7 @@ namespace svanes {
 class StartRecordingEvent final : public EventOf<StartRecordingEvent> {
 public:
     /**
-     * The unique name of this event type, hashed to produce its EventTypeId.
+     * The unique name identifying requests to start recording.
      */
     static constexpr std::string_view EventName = "svanes.replay.record.start";
 
@@ -44,7 +44,7 @@ public:
 class StopRecordingEvent final : public EventOf<StopRecordingEvent> {
 public:
     /**
-     * The unique name of this event type, hashed to produce its EventTypeId.
+     * The unique name identifying requests to stop recording.
      */
     static constexpr std::string_view EventName = "svanes.replay.record.stop";
 };
@@ -57,7 +57,7 @@ public:
 class PlayReplayEvent final : public EventOf<PlayReplayEvent> {
 public:
     /**
-     * The unique name of this event type, hashed to produce its EventTypeId.
+     * The unique name identifying requests to start replay playback.
      */
     static constexpr std::string_view EventName = "svanes.replay.play";
 
@@ -84,7 +84,7 @@ public:
 class PauseReplayEvent final : public EventOf<PauseReplayEvent> {
 public:
     /**
-     * The unique name of this event type, hashed to produce its EventTypeId.
+     * The unique name identifying requests to pause replay playback.
      */
     static constexpr std::string_view EventName = "svanes.replay.pause";
 };
@@ -97,7 +97,7 @@ public:
 class ResumeReplayEvent final : public EventOf<ResumeReplayEvent> {
 public:
     /**
-     * The unique name of this event type, hashed to produce its EventTypeId.
+     * The unique name identifying requests to resume replay playback.
      */
     static constexpr std::string_view EventName = "svanes.replay.resume";
 };
@@ -110,7 +110,7 @@ public:
 class StopReplayEvent final : public EventOf<StopReplayEvent> {
 public:
     /**
-     * The unique name of this event type, hashed to produce its EventTypeId.
+     * The unique name identifying requests to stop replay playback.
      */
     static constexpr std::string_view EventName = "svanes.replay.stop";
 };

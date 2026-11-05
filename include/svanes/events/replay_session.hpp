@@ -132,8 +132,8 @@ public:
      * Event types must be registered in order to be logged, and thus
      * played back.
      *
-     * @tparam T The event type to record and play back. Its encoder receives
-     * the event through a static_cast, so T's EventName must be unique.
+     * @tparam T The event type to record and play back. T's EventName must be
+     * unique.
      * @tparam Encode The type of the encoding callable.
      * @tparam Decode The type of the decoding callable.
      * @param encode Algorithm to encode an event for writing to the log.
@@ -304,8 +304,7 @@ private:
      * replay files. Registration must occur while the session is idle, and
      * duplicates cannot be registered.
      *
-     * @param type The name of the event type associated with the codec. The
-     * codec is stored under the hash of this name.
+     * @param type The name of the event type associated with the codec.
      * @param codec The functions used to encode and decode event payloads.
      *
      * @throws std::invalid_argument if type is empty, reserved for replay
