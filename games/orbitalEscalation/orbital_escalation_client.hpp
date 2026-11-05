@@ -81,6 +81,15 @@ public:
 
 private:
     /**
+     * Zooms the camera while Shift+= or Shift+- is held. The rate increases
+     * exponentially during a continuous hold and resets when the direction
+     * changes or the controls are released.
+     *
+     * @param frame The input, camera, and unscaled elapsed time for this frame.
+     */
+    void UpdateZoom(const svanes::ClientFrameContext &frame);
+
+    /**
      * Reads this player's controls for local prediction and queues them for
      * the server to apply.
      *
@@ -162,6 +171,12 @@ private:
 
     // The timeline controlling the client's frame rate.
     svanes::Timeline client_loop_timeline;
+
+    // The duration of the current continuous zoom hold, in real seconds.
+    double zoom_hold_seconds = 0.0;
+
+    // The current zoom direction, 1 for in, -1 for out, or 0 for neither.
+    std::int8_t zoom_direction = 0;
 
     // The timeline used to animate the pause label.
     svanes::Timeline pause_timeline;

@@ -31,6 +31,10 @@
 const svanes::TicCount kPauseFlashPeriod = svanes::SecondsToTics(1.0);
 constexpr std::uint8_t kPauseLabelMinimumAlpha = 64;
 constexpr svanes::TicCount kClientFrameTics = 5000; // 1/200 second
+constexpr double kMinimumZoom = 0.01;
+constexpr double kMaximumZoom = 100.0;
+constexpr double kInitialZoomRate = 0.5;
+constexpr double kZoomRateGrowth = 1.0;
 
 OrbitalEscalationClient::OrbitalEscalationClient(std::string server_address)
     : server_address(std::move(server_address)),
@@ -190,11 +194,18 @@ void OrbitalEscalationClient::Update(const svanes::ClientFrameContext &frame) {
         return;
     }
 
-    // +/- will speed up or slow down the client loop.
-    const bool faster = frame.input.WasPressed(svanes::Key::Equals) ||
-                        frame.input.WasPressed(svanes::Key::KeypadPlus);
-    const bool slower = frame.input.WasPressed(svanes::Key::Minus) ||
-                        frame.input.WasPressed(svanes::Key::KeypadMinus);
+    // Unshifted +/- will speed up or slow down the client loop.
+    const bool shift = frame.input.IsDown(svanes::Key::LeftShift) ||
+                       frame.input.IsDown(svanes::Key::RightShift);
+
+    const bool faster =
+        (!shift && frame.input.WasPressed(svanes::Key::Equals)) ||
+        frame.input.WasPressed(svanes::Key::KeypadPlus);
+
+    const bool slower =
+        (!shift && frame.input.WasPressed(svanes::Key::Minus)) ||
+        frame.input.WasPressed(svanes::Key::KeypadMinus);
+
     if (faster != slower) {
         client_loop_timeline.SetTicSize(client_loop_timeline.GetTicSize() /
                                         (faster
@@ -237,6 +248,8 @@ void OrbitalEscalationClient::Update(const svanes::ClientFrameContext &frame) {
     // Adjust for any changes in the camera, especially regarding proportional
     // scaling.
     pause_label.position.x = frame.camera.Viewport().width * 0.5F;
+
+    UpdateZoom(frame);
 
     // Forward the player's input to the server.
     SendInput(frame);
@@ -302,6 +315,45 @@ void OrbitalEscalationClient::Update(const svanes::ClientFrameContext &frame) {
             .geometry);
     background_rectangle.width = view.width;
     background_rectangle.height = view.height;
+}
+
+void OrbitalEscalationClient::UpdateZoom(
+    const svanes::ClientFrameContext &frame) {
+    const bool shift = frame.input.IsDown(svanes::Key::LeftShift) ||
+                       frame.input.IsDown(svanes::Key::RightShift);
+
+    const bool zoom_in = shift && frame.input.IsDown(svanes::Key::Equals);
+    const bool zoom_out = shift && frame.input.IsDown(svanes::Key::Minus);
+
+    const auto direction = static_cast<std::int8_t>(zoom_in - zoom_out);
+    if (direction != zoom_direction) {
+        zoom_hold_seconds = 0.0;
+        zoom_direction = direction;
+    }
+
+    if (direction == 0 ||
+        (direction > 0 && frame.camera.zoom >= kMaximumZoom) ||
+        (direction < 0 && frame.camera.zoom <= kMinimumZoom)) {
+        return;
+    }
+
+    const double seconds =
+        static_cast<double>(frame.real_delta_tics) / svanes::TicsPerSecond;
+
+    // calculate the zoom change for this frame, which grows exponentially with
+    // the duration of a continuous hold in the same direction.
+    // sort of like how scrolling really hard on the mouse used to
+    // zoom further than moving the mouse wheel the same distance slowly.
+
+    const double change =
+        kInitialZoomRate * std::exp(kZoomRateGrowth * zoom_hold_seconds) *
+        std::expm1(kZoomRateGrowth * seconds) / kZoomRateGrowth;
+
+    zoom_hold_seconds += seconds;
+    const double log_zoom = std::log(frame.camera.zoom) + direction * change;
+
+    frame.camera.zoom = static_cast<float>(std::exp(
+        std::clamp(log_zoom, std::log(kMinimumZoom), std::log(kMaximumZoom))));
 }
 
 void OrbitalEscalationClient::SendInput(
