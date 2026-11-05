@@ -33,7 +33,7 @@ void ReplaySession::CheckBoundary() const {
     }
 }
 
-void ReplaySession::RegisterCodec(std::string type, Codec codec) {
+void ReplaySession::RegisterCodec(std::string_view type, Codec codec) {
     CheckBoundary();
     if (state != State::Idle) {
         throw std::logic_error(
@@ -42,7 +42,7 @@ void ReplaySession::RegisterCodec(std::string type, Codec codec) {
     if (type.empty() || type.starts_with("svanes.replay.")) {
         throw std::invalid_argument("Invalid replay driving event type.");
     }
-    if (!codecs.emplace(std::move(type), std::move(codec)).second) {
+    if (!codecs.emplace(HashText(type), std::move(codec)).second) {
         throw std::invalid_argument("Replay event type is already registered.");
     }
 }
@@ -98,37 +98,47 @@ void ReplaySession::RegisterInputEvents() {
 
 bool ReplaySession::Observe(const Event &event) {
     // Handling for replay events
-    if (const auto *control =
-            dynamic_cast<const StartRecordingEvent *>(&event)) {
-        controls.push_back({Action::Record, control->path});
-    } else if (dynamic_cast<const StopRecordingEvent *>(&event)) {
+    switch (event.GetTypeId()) {
+    case EventTypeIdOf<StartRecordingEvent>():
+        controls.push_back(
+            {Action::Record,
+             static_cast<const StartRecordingEvent &>(event).path});
+        return true;
+    case EventTypeIdOf<StopRecordingEvent>():
         controls.push_back({Action::Save, {}});
-    } else if (const auto *control =
-                   dynamic_cast<const PlayReplayEvent *>(&event)) {
-        controls.push_back({Action::Play, control->path});
-    } else if (dynamic_cast<const PauseReplayEvent *>(&event)) {
+        return true;
+    case EventTypeIdOf<PlayReplayEvent>():
+        controls.push_back(
+            {Action::Play, static_cast<const PlayReplayEvent &>(event).path});
+        return true;
+    case EventTypeIdOf<PauseReplayEvent>():
         controls.push_back({Action::Pause, {}});
-    } else if (dynamic_cast<const ResumeReplayEvent *>(&event)) {
+        return true;
+    case EventTypeIdOf<ResumeReplayEvent>():
         controls.push_back({Action::Resume, {}});
-    } else if (dynamic_cast<const StopReplayEvent *>(&event)) {
+        return true;
+    case EventTypeIdOf<StopReplayEvent>():
         controls.push_back({Action::Stop, {}});
-    } else { // Handling for non replay events
-        const auto codec = codecs.find(event.GetEventType());
-        if (codec != codecs.end()) {
-            if (IsReplaying() && !injecting) { // This event is not registered, skip
-                return false;
+        return true;
+    }
+
+    // Handling for non replay events
+    const auto codec = codecs.find(event.GetTypeId());
+    if (codec != codecs.end()) {
+        if (IsReplaying() && !injecting) { // Live event during playback, drop
+            return false;
+        }
+        if (state == State::Recording) { // If we are recording right now, try to add it to the log
+            if (!step_open) { // The recording window is not open right now, can't record
+                throw std::logic_error("Deliver replay driving events "
+                                       "between BeginStep and EndStep.");
             }
-            if (state == State::Recording) { // If we are recording right now, try to add it to the log
-                if (!step_open) { // The recording window is not open right now, can't record
-                    throw std::logic_error("Deliver replay driving events "
-                                           "between BeginStep and EndStep.");
-                }
-                MessageWriter writer;
-                // Encode this event and write it ot our log
-                codec->second.encode(writer, event);
-                pending_events.push_back(
-                    {codec->first, event.priority, writer.Finish(), nullptr});
-            }
+            MessageWriter writer;
+            // Encode this event and write it to our log
+            codec->second.encode(writer, event);
+            pending_events.push_back({std::string{event.GetEventType()},
+                                      event.priority, writer.Finish(),
+                                      nullptr});
         }
     }
     return true;
@@ -383,7 +393,8 @@ void ReplaySession::Load(const std::filesystem::path &path) {
         // Loop through all the steps that were just read in.
         for (std::uint64_t entry = 0; entry < event_count; ++entry) {
             auto type = reader.ReadText();
-            const auto codec = codecs.find(type);
+            const auto type_id = HashText(type);
+            const auto codec = codecs.find(type_id);
             // First we have to check that this event type is registered. If this throws an error,
             // that means that either the replay file is from a different game/version, or that it
             // is being loaded in some different context, where the event was not correctly registered.
@@ -397,7 +408,7 @@ void ReplaySession::Load(const std::filesystem::path &path) {
             auto event = codec->second.decode(payload);
             // If this throws it means someone somewhere goofed. The event was either not encoded properly
             // or not decoded properly.
-            if (!event || event->GetEventType() != type ||
+            if (!event || event->GetTypeId() != type_id ||
                 payload.Remaining() != 0) {
                 throw std::invalid_argument("Invalid replay event payload: " +
                                             type);

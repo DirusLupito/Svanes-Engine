@@ -3,7 +3,7 @@
 #include <svanes/events/event.hpp>
 
 #include <filesystem>
-#include <string>
+#include <string_view>
 
 namespace svanes {
 
@@ -13,8 +13,13 @@ namespace svanes {
  * type of event according to their specific conditions related to their
  * replay systems.
  */
-class StartRecordingEvent final : public Event {
+class StartRecordingEvent final : public EventOf<StartRecordingEvent> {
 public:
+    /**
+     * The unique name of this event type, hashed to produce its EventTypeId.
+     */
+    static constexpr std::string_view EventName = "svanes.replay.record.start";
+
     /**
      * Constructor for StartRecordingEvent. This event needs a path
      * so that the engine knows where it should eventually write the completed
@@ -23,20 +28,6 @@ public:
      * @param path The path to which the engine will save the replay file.
      */
     explicit StartRecordingEvent(std::filesystem::path path);
-
-    /**
-     * Returns event type, callable before event object instantiation.
-     *
-     * @return The event type identifier for starting a recording.
-     */
-    static std::string GetStaticEventType();
-
-    /**
-     * Identifies this event as a request to start recording.
-     *
-     * @return The event type identifier for starting a recording.
-     */
-    const std::string GetEventType() const override;
 
     /**
      * The path that the engine is to write the completed replay file to.
@@ -50,21 +41,12 @@ public:
  * type of event according to their specific conditions related to their
  * replay systems.
  */
-class StopRecordingEvent final : public Event {
+class StopRecordingEvent final : public EventOf<StopRecordingEvent> {
 public:
     /**
-     * Returns event type, callable before event object instantiation.
-     *
-     * @return The event type identifier for stopping a recording.
+     * The unique name of this event type, hashed to produce its EventTypeId.
      */
-    static std::string GetStaticEventType();
-
-    /**
-     * Identifies this event as a request to stop recording.
-     *
-     * @return The event type identifier for stopping a recording.
-     */
-    const std::string GetEventType() const override;
+    static constexpr std::string_view EventName = "svanes.replay.record.stop";
 };
 
 /**
@@ -72,8 +54,13 @@ public:
  * replay session. Games should raise this type of event according
  * to their specific conditions related to their replay systems.
  */
-class PlayReplayEvent final : public Event {
+class PlayReplayEvent final : public EventOf<PlayReplayEvent> {
 public:
+    /**
+     * The unique name of this event type, hashed to produce its EventTypeId.
+     */
+    static constexpr std::string_view EventName = "svanes.replay.play";
+
     /**
      * Constructor for PlayReplayEvent. This event needs a path
      * so that the engine knows where it should look for the replay
@@ -82,20 +69,6 @@ public:
      * @param path The path to the replay file to be played.
      */
     explicit PlayReplayEvent(std::filesystem::path path);
-
-    /**
-     * Returns event type, callable before event object instantiation.
-     *
-     * @return The event type identifier for starting playback.
-     */
-    static std::string GetStaticEventType();
-
-    /**
-     * Identifies this event as a request to start playback.
-     *
-     * @return The event type identifier for starting playback.
-     */
-    const std::string GetEventType() const override;
 
     /**
      * The path to the replay file that is to be played.
@@ -108,21 +81,12 @@ public:
  * replay session. Games should raise this type of event according
  * to their specific conditions related to their replay systems.
  */
-class PauseReplayEvent final : public Event {
+class PauseReplayEvent final : public EventOf<PauseReplayEvent> {
 public:
     /**
-     * Returns event type, callable before event object instantiation.
-     *
-     * @return The event type identifier for pausing playback.
+     * The unique name of this event type, hashed to produce its EventTypeId.
      */
-    static std::string GetStaticEventType();
-
-    /**
-     * Identifies this event as a request to pause playback.
-     *
-     * @return The event type identifier for pausing playback.
-     */
-    const std::string GetEventType() const override;
+    static constexpr std::string_view EventName = "svanes.replay.pause";
 };
 
 /**
@@ -130,21 +94,12 @@ public:
  * replay session. Games should raise this type of event according
  * to their specific conditions related to their replay systems.
  */
-class ResumeReplayEvent final : public Event {
+class ResumeReplayEvent final : public EventOf<ResumeReplayEvent> {
 public:
     /**
-     * Returns event type, callable before event object instantiation.
-     *
-     * @return The event type identifier for resuming playback.
+     * The unique name of this event type, hashed to produce its EventTypeId.
      */
-    static std::string GetStaticEventType();
-
-    /**
-     * Identifies this event as a request to resume playback.
-     *
-     * @return The event type identifier for resuming playback.
-     */
-    const std::string GetEventType() const override;
+    static constexpr std::string_view EventName = "svanes.replay.resume";
 };
 
 /**
@@ -152,21 +107,12 @@ public:
  * replay session. Games should raise this type of event according
  * to their specific conditions related to their replay systems.
  */
-class StopReplayEvent final : public Event {
+class StopReplayEvent final : public EventOf<StopReplayEvent> {
 public:
     /**
-     * Returns event type, callable before event object instantiation.
-     *
-     * @return The event type identifier for stopping playback.
+     * The unique name of this event type, hashed to produce its EventTypeId.
      */
-    static std::string GetStaticEventType();
-
-    /**
-     * Identifies this event as a request to stop playback.
-     *
-     * @return The event type identifier for stopping playback.
-     */
-    const std::string GetEventType() const override;
+    static constexpr std::string_view EventName = "svanes.replay.stop";
 };
 
 } // namespace svanes

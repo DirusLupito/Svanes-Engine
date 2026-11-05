@@ -132,7 +132,8 @@ public:
      * Event types must be registered in order to be logged, and thus
      * played back.
      *
-     * @tparam T The event type to record and play back.
+     * @tparam T The event type to record and play back. Its encoder receives
+     * the event through a static_cast, so T's EventName must be unique.
      * @tparam Encode The type of the encoding callable.
      * @tparam Decode The type of the decoding callable.
      * @param encode Algorithm to encode an event for writing to the log.
@@ -150,10 +151,10 @@ public:
     template <std::derived_from<Event> T, typename Encode, typename Decode>
     void RegisterEvent(Encode encode, Decode decode) {
         RegisterCodec(
-            T::GetStaticEventType(),
+            T::EventName,
             Codec{[encode = std::move(encode)](MessageWriter &writer,
                                                const Event &event) {
-                      encode(writer, dynamic_cast<const T &>(event));
+                      encode(writer, static_cast<const T &>(event));
                   },
                   [decode = std::move(decode)](MessageReader &reader)
                       -> std::unique_ptr<Event> { return decode(reader); }});
@@ -281,7 +282,8 @@ private:
      * An event saved during recording or reconstructed for playback.
      *
      * FIELDS:
-     * - type: The event type identifier used to select its codec.
+     * - type: The event type's name, which the replay file stores and Load
+     * hashes to select its codec.
      * - priority: The event's original dispatch priority.
      * - payload: The encoded event payload, populated while recording.
      * - decoded: The reconstructed event used during playback, empty while
@@ -302,7 +304,8 @@ private:
      * replay files. Registration must occur while the session is idle, and
      * duplicates cannot be registered.
      *
-     * @param type The event type identifier associated with the codec.
+     * @param type The name of the event type associated with the codec. The
+     * codec is stored under the hash of this name.
      * @param codec The functions used to encode and decode event payloads.
      *
      * @throws std::invalid_argument if type is empty, reserved for replay
@@ -310,7 +313,7 @@ private:
      * @throws std::logic_error if the session is not idle, or registration
      * occurs while processing events, a step, or a control action.
      */
-    void RegisterCodec(std::string type, Codec codec);
+    void RegisterCodec(std::string_view type, Codec codec);
 
     /**
      * Watches for events and decides what to do based on their type. If it's
@@ -382,8 +385,8 @@ private:
     // The session's current recording or playback state.
     State state = State::Idle;
 
-    // The encoding and decoding functions keyed by event type identifier.
-    std::unordered_map<std::string, Codec> codecs;
+    // The encoding and decoding functions keyed by event type ID.
+    std::unordered_map<EventTypeId, Codec> codecs;
 
     // The replay control actions waiting for the next simulation boundary.
     std::vector<Control> controls;

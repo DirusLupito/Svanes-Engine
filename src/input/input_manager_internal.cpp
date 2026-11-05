@@ -15,14 +15,10 @@ void internal::InputManagerInternal::RegisterEventHandlers(
     // InputManager methods.
 
     // Set up the keyboard input event handler.
-    events.Subscribe(KeyInputEvent::GetStaticEventType(),
-                     std::make_unique<EventHandlerWrapper<KeyInputEvent>>(
-                         [&input](const KeyInputEvent &event) {
-                             input.HandleKeyInput(event);
-                         }));
+    events.Subscribe(std::make_unique<EventHandlerWrapper<KeyInputEvent>>(
+        [&input](const KeyInputEvent &event) { input.HandleKeyInput(event); }));
     // Set up the mouse button input event handler.
     events.Subscribe(
-        MouseButtonInputEvent::GetStaticEventType(),
         std::make_unique<EventHandlerWrapper<MouseButtonInputEvent>>(
             [&input](const MouseButtonInputEvent &event) {
                 input.HandleMouseButtonInput(event);
@@ -30,7 +26,6 @@ void internal::InputManagerInternal::RegisterEventHandlers(
 
     // Set up the mouse motion input event handler.
     events.Subscribe(
-        MouseMotionInputEvent::GetStaticEventType(),
         std::make_unique<EventHandlerWrapper<MouseMotionInputEvent>>(
             [&input](const MouseMotionInputEvent &event) {
                 input.HandleMouseMotionInput(event);

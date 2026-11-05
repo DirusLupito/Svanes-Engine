@@ -121,36 +121,32 @@ public:
     void Shutdown();
 
     /**
-     * Takes ownership of a handler for event_id and maps it to the given event
-     * type identifier. The handler will be called when TriggerEvent is called
-     * with an event whose event type matches the one given here.
+     * Takes ownership of a handler and registers it for the event type its
+     * wrapper reports through GetEventTypeId(). The handler will be called when
+     * TriggerEvent is called with an event of that type.
      *
-     * @param event_id The event type identifier to associate with the handler.
-     * It must match the identifier returned by the events it handles.
      * @param handler The wrapper to register. Ownership transfers to the
      * manager when registration succeeds.
      *
-     * @throws std::invalid_argument if event_id is empty, handler is null, or
-     * a handler with the same GetType() is already registered for event_id.
+     * @throws std::invalid_argument if handler is null, or a handler with the
+     * same GetType() is already registered for the same event type.
      * @throws std::logic_error if called during a callback.
      */
-    void Subscribe(const std::string &event_id,
-                   std::unique_ptr<AbstractEventHandlerWrapper> &&handler);
+    void Subscribe(std::unique_ptr<AbstractEventHandlerWrapper> &&handler);
 
     /**
      * Unregisters one callback so it will no longer receive events of the
      * specified type.
      *
-     * @param event_id The event type identifier used when registering the
-     * handler.
+     * @param event_id The ID of the event type the handler was registered for,
+     * obtained from EventTypeIdOf.
      * @param handler_name The callback type name returned by the registered
      * wrapper's GetType().
      *
      * @throws std::invalid_argument if the registration does not exist.
      * @throws std::logic_error if called during a callback.
      */
-    void Unsubscribe(const std::string &event_id,
-                     const std::string handler_name);
+    void Unsubscribe(EventTypeId event_id, const std::string handler_name);
 
     /**
      * Finds the handlers subscribed to the given event's type and passes the
@@ -221,10 +217,10 @@ private:
     // Owns pending events until they are consumed or discarded by Shutdown.
     std::vector<std::unique_ptr<Event>> events_queue;
 
-    // Maps event type identifiers to owned handlers. Each vector preserves
+    // Maps event type IDs to owned handlers. Each vector preserves
     // registration order so delivery order is predictable.
     std::unordered_map<
-        std::string, std::vector<std::unique_ptr<AbstractEventHandlerWrapper>>>
+        EventTypeId, std::vector<std::unique_ptr<AbstractEventHandlerWrapper>>>
         subscribers;
 
     // The number of nested TriggerEvent calls executing handlers. Registration
