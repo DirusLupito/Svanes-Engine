@@ -116,21 +116,18 @@ void OrbitalEscalationClient::Initialize(svanes::ClientContext &context) {
     });
 
     context.events.Subscribe(
-        PlayerSpawnEvent::GetStaticEventType(),
         std::make_unique<svanes::EventHandlerWrapper<PlayerSpawnEvent>>(
             [this](const PlayerSpawnEvent &event) {
                 snapshot_event_handlers->HandlePlayerSpawn(event);
             }));
 
     context.events.Subscribe(
-        PlayerDeathEvent::GetStaticEventType(),
         std::make_unique<svanes::EventHandlerWrapper<PlayerDeathEvent>>(
             [this](const PlayerDeathEvent &event) {
                 snapshot_event_handlers->HandlePlayerDeath(event);
             }));
 
     context.events.Subscribe(
-        WorldSnapshotEvent::GetStaticEventType(),
         std::make_unique<svanes::EventHandlerWrapper<WorldSnapshotEvent>>(
             [this](const WorldSnapshotEvent &event) {
                 snapshot_event_handlers->HandleWorldSnapshot(event);

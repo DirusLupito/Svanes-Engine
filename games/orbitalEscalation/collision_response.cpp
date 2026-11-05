@@ -20,7 +20,6 @@ constexpr float kPlanetImpactDamage = 25.0F;
 void RegisterPhysicalCollisionHandler(svanes::Registry &world,
                                       svanes::EventManager &events) {
     events.Subscribe(
-        svanes::CollisionEvent::GetStaticEventType(),
         std::make_unique<svanes::EventHandlerWrapper<svanes::CollisionEvent>>(
             [&world](const svanes::CollisionEvent &event) {
                 const auto &pair = event.collision;
@@ -69,7 +68,6 @@ void RegisterPhysicalCollisionHandler(svanes::Registry &world,
 void PlanetCollisionDamageHandler::Register(svanes::Registry &world,
                                             svanes::EventManager &events) {
     events.Subscribe(
-        svanes::CollisionEvent::GetStaticEventType(),
         std::make_unique<svanes::EventHandlerWrapper<svanes::CollisionEvent>>(
             [this, &world](const svanes::CollisionEvent &event) {
                 HandleCollision(world, event);

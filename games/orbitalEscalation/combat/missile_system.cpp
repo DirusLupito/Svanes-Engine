@@ -34,7 +34,6 @@ bool IgnoresFiringShip(const svanes::Registry &world, svanes::Entity missile,
 void MissileCollisionHandler::Register(svanes::Registry &world,
                                        svanes::EventManager &events) {
     events.Subscribe(
-        svanes::CollisionEvent::GetStaticEventType(),
         std::make_unique<svanes::EventHandlerWrapper<svanes::CollisionEvent>>(
             [this, &world](const svanes::CollisionEvent &event) {
                 HandleCollision(world, event);

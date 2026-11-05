@@ -37,7 +37,6 @@ void DeletionBoxCollisionHandler::Register(
     svanes::Registry &world, svanes::EventManager &events,
     std::function<void(svanes::Vector2D)> on_delete) {
     events.Subscribe(
-        svanes::CollisionEvent::GetStaticEventType(),
         std::make_unique<svanes::EventHandlerWrapper<svanes::CollisionEvent>>(
             [this, &world, on_delete = std::move(on_delete)](
                 const svanes::CollisionEvent &event) {
