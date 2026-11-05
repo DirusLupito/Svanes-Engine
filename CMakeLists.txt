@@ -173,6 +173,7 @@ target_sources(
         src/events/collision_event.cpp
         src/events/event_manager.cpp
         src/events/replay_events.cpp
+        src/events/replay_recording.cpp
         src/events/replay_session.cpp
         src/tilemaps/tilemap.cpp
         src/collision_pass.cpp
@@ -180,6 +181,7 @@ target_sources(
         src/input/input_events.cpp
         src/input/input_manager.cpp
         src/input/input_manager_internal.cpp
+        src/input/input_replay.cpp
         src/kinematic_system.cpp
         src/MenuUtilities/font_manager.cpp
         src/MenuUtilities/font_manager_internal.hpp
@@ -209,6 +211,7 @@ target_sources(
         src/stable_id.cpp
         src/timeline_system.cpp
         src/utility/hash.cpp
+        src/utility/file_io.cpp
         src/utility/rational_number.cpp
     PUBLIC
         FILE_SET HEADERS
@@ -233,6 +236,7 @@ target_sources(
             include/svanes/events/event_handler_wrapper.hpp
             include/svanes/events/event_manager.hpp
             include/svanes/events/replay_events.hpp
+            include/svanes/events/replay_recording.hpp
             include/svanes/events/replay_session.hpp
             include/svanes/game.hpp
             include/svanes/geometry/geometry.hpp
@@ -264,6 +268,7 @@ target_sources(
             include/svanes/stable_id.hpp
             include/svanes/timeline_system.hpp
             include/svanes/utility/hash.hpp
+            include/svanes/utility/file_io.hpp
             include/svanes/utility/rational_number.hpp
             include/svanes/vector2d.hpp
 )
@@ -302,6 +307,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/events/event_handler_wrapper.hpp
     include/svanes/events/event_manager.hpp
     include/svanes/events/replay_events.hpp
+    include/svanes/events/replay_recording.hpp
     include/svanes/events/replay_session.hpp
     include/svanes/game.hpp
     include/svanes/geometry/geometry.hpp
@@ -333,6 +339,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/stable_id.hpp
     include/svanes/timeline_system.hpp
     include/svanes/utility/hash.hpp
+    include/svanes/utility/file_io.hpp
     include/svanes/utility/rational_number.hpp
     include/svanes/vector2d.hpp
 )
@@ -351,6 +358,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/events/collision_event.cpp
     src/events/event_manager.cpp
     src/events/replay_events.cpp
+    src/events/replay_recording.cpp
     src/events/replay_session.cpp
     src/tilemaps/tilemap.cpp
     src/collision_pass.cpp
@@ -358,6 +366,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/input/input_events.cpp
     src/input/input_manager.cpp
     src/input/input_manager_internal.cpp
+    src/input/input_replay.cpp
     src/kinematic_system.cpp
     src/MenuUtilities/font_manager.cpp
     src/MenuUtilities/font_manager_internal.hpp
@@ -387,6 +396,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/stable_id.cpp
     src/timeline_system.cpp
     src/utility/hash.cpp
+    src/utility/file_io.cpp
     src/utility/rational_number.cpp
 )
 

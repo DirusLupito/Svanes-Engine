@@ -1,6 +1,7 @@
 #pragma once
 
 #include <svanes/events/event.hpp>
+#include <svanes/events/replay_recording.hpp>
 #include <svanes/network/message_serialization.hpp>
 #include <svanes/timeline_system.hpp>
 
@@ -10,7 +11,7 @@
 #include <memory>
 #include <span>
 #include <stdexcept>
-#include <string>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -278,26 +279,8 @@ private:
         std::function<std::unique_ptr<Event>(MessageReader &)> decode;
     };
 
-    /**
-     * An event saved during recording or reconstructed for playback.
-     *
-     * FIELDS:
-     * - type: The event type's name, which the replay file stores and Load
-     * hashes to select its codec.
-     * - priority: The event's original dispatch priority.
-     * - payload: The encoded event payload, populated while recording.
-     * - decoded: The reconstructed event used during playback, empty while
-     * recording.
-     */
-    struct RecordedEvent {
-        std::string type;
-        EventPriority priority;
-        NetworkMessage payload;
-        std::unique_ptr<Event> decoded;
-    };
-
-    // The replayable events from one simulation step, in delivery order.
-    using Step = std::vector<RecordedEvent>;
+    // The reconstructed events from one playback step, in delivery order.
+    using PlaybackStep = std::vector<std::unique_ptr<Event>>;
 
     /**
      * Registers encoding and decoding logic for use in reading and writing
@@ -393,15 +376,14 @@ private:
     // The destination path selected when recording starts.
     std::filesystem::path recording_path;
 
-    // The serialized starting state captured for recording or loaded from a
-    // file.
-    NetworkMessage initial_state;
+    // The replay's serialized starting state and recorded event payloads.
+    ReplayRecording recording;
 
-    // The completed recorded steps, or the steps loaded for playback.
-    std::vector<Step> steps;
+    // The reconstructed events for each step of a loaded replay.
+    std::vector<PlaybackStep> playback_steps;
 
     // The events collected for the live step currently being recorded.
-    Step pending_events;
+    ReplayRecording::Step pending_events;
 
     // The index of the next recorded step to run during playback.
     std::size_t playback_step = 0;
