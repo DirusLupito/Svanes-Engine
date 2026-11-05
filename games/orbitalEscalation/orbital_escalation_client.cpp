@@ -326,6 +326,9 @@ void OrbitalEscalationClient::Update(const svanes::ClientFrameContext &frame) {
                     frame.world, {}, parallel_for,
                     [&](std::span<const svanes::PhysicsTimeStep>) {
                         UpdateAttachments(frame.world);
+                        for (const auto &object : root_objects) {
+                            object->UpdateVisuals(frame.world);
+                        }
                     });
             } else {
                 Predict(frame.world, frame.events);
