@@ -41,6 +41,12 @@ svanes::NetworkMessage WorldUpdate::Write() const {
     writer.WriteUint64(tic_size.GetDenominator());
     writer.WriteBool(paused);
 
+    // Replay updates identify the player everyone should follow.
+    writer.WriteBool(death_cam_player.has_value());
+    if (death_cam_player) {
+        writer.WriteUint32(*death_cam_player);
+    }
+
     // Then we write the planet's identity and pose. Clients create it from the
     // shared definition.
     writer.WriteUint32(planet);
@@ -126,6 +132,12 @@ WorldUpdate WorldUpdate::Read(const svanes::NetworkMessage &message) {
 
     update.tic_size = {numerator, denominator};
     update.paused = reader.ReadBool();
+
+    // If the death_cam_player presence flag is set, read the player ID to
+    // follow during replay.
+    if (reader.ReadBool()) {
+        update.death_cam_player = reader.ReadUint32();
+    }
 
     // Then read the planet's identity and pose. Its remaining properties
     // come from the shared definition.

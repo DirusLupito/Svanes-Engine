@@ -55,6 +55,7 @@ void OrbitalEscalationServer::Initialize(svanes::ServerContext &context) {
     deletion_boxes = CreateDeletionBoxes(context.world);
     spawn_zones.emplace(context.world);
     CreateJunk(context.world, kJunkShipCount, kStaticJunkShipCount);
+    death_cam.Initialize(context.network);
     context.network.Listen("*:" + std::to_string(port));
 
     std::cout << "Orbital Escalation server: UDP port " << port << '.'
@@ -64,6 +65,11 @@ void OrbitalEscalationServer::Initialize(svanes::ServerContext &context) {
 svanes::JoinResponse OrbitalEscalationServer::HandleJoinRequest(
     const svanes::ServerJoinContext &context) {
     AddPlayer(context.world, context.client);
+    if (!death_cam.IsPlaying()) {
+        // Capture the current world state for the new player.
+        death_cam.Capture(CreateWorldUpdate(context.world));
+    }
+
     std::cout << "Player " << context.client << " joined." << std::endl;
     return {true, {}};
 }
@@ -103,6 +109,10 @@ OrbitalEscalationServer::DecodeInput(const svanes::NetworkMessage &message) {
 
 void OrbitalEscalationServer::Update(
     const svanes::ServerUpdateContext &context) {
+    if (death_cam.IsPlaying()) {
+        return;
+    }
+
     for (const auto &message : context.network.PollInputs()) {
         const auto input = DecodeInput(message.message);
         auto &held = players.at(message.client).input;
@@ -131,10 +141,39 @@ void OrbitalEscalationServer::Update(
 void OrbitalEscalationServer::PhysicsUpdate(
     const svanes::ServerPhysicsContext &context) {
     auto &world = context.world;
+    auto &timeline =
+        world.GetComponent<svanes::Timeline>(gameplay_timeline->Get());
 
-    if (!world.GetComponent<svanes::Timeline>(gameplay_timeline->Get())
-             .IsPaused()) {
-        RespondToPhysics(world, context.events, context.parallel_for);
+    // If the death cam is playing, we freeze the world and only advance the
+    // replay. The authoritative world is not updated until the replay ends.
+    if (death_cam.IsPlaying()) {
+        death_cam.Update(svanes::DefaultPhysicsStepTics);
+
+        // If, after advancing the replay, the death cam is no longer playing,
+        // we can unpause the world and respawn any players whose ships were
+        // destroyed during the replay. We also capture a new snapshot to send
+        // to all clients.
+        if (!death_cam.IsPlaying()) {
+            for (auto &[client, player] : players) {
+                if (!player.ship) {
+                    SpawnPlayer(world, player);
+                }
+            }
+
+            timeline.Unpause();
+            const auto snapshot = CreateWorldUpdate(world);
+            death_cam.Capture(snapshot);
+            context.network.Broadcast(snapshot.Write());
+            snapshot_tics = 0;
+        }
+
+        return;
+    }
+
+    std::optional<svanes::ClientId> dead_player;
+    if (!timeline.IsPaused()) {
+        dead_player =
+            RespondToPhysics(world, context.events, context.parallel_for);
         for (auto &[client, player] : players) {
             if (player.ship) {
                 SetWeaponControls(world, *player.ship, player.input.weapons);
@@ -157,18 +196,37 @@ void OrbitalEscalationServer::PhysicsUpdate(
 
     svanes::AdvanceSpriteAnimations(world);
 
+    if (dead_player) {
+        // Capture the destruction before freezing the world or respawning
+        // ships.
+        death_cam.Capture(CreateWorldUpdate(world));
+        timeline.Pause();
+        for (auto &[client, player] : players) {
+            player.input = {};
+        }
+
+        death_cam.Play(*dead_player);
+        snapshot_tics = 0;
+        return;
+    }
+
     if (!players.empty()) {
         // We need only advance towards sending the next snapshot if there is at
         // least one player to send it to.
         snapshot_tics += svanes::DefaultPhysicsStepTics;
         if (snapshot_tics >= OrbitalSnapshotTics) {
             snapshot_tics %= OrbitalSnapshotTics;
-            context.network.Broadcast(CreateWorldUpdate(world));
+            const auto snapshot = CreateWorldUpdate(world);
+            if (!timeline.IsPaused()) {
+                death_cam.Capture(snapshot);
+            }
+
+            context.network.Broadcast(snapshot.Write());
         }
     }
 }
 
-svanes::NetworkMessage OrbitalEscalationServer::CreateWorldUpdate(
+WorldUpdate OrbitalEscalationServer::CreateWorldUpdate(
     const svanes::Registry &world) const {
 
     // The encoding of the world update. A self contained message that
@@ -271,7 +329,7 @@ svanes::NetworkMessage OrbitalEscalationServer::CreateWorldUpdate(
         }
     }
 
-    return update.Write();
+    return update;
 }
 
 void OrbitalEscalationServer::AddPlayer(svanes::Registry &world,
@@ -368,7 +426,7 @@ void OrbitalEscalationServer::CreateJunk(svanes::Registry &world,
     }
 }
 
-void OrbitalEscalationServer::RespondToPhysics(
+std::optional<svanes::ClientId> OrbitalEscalationServer::RespondToPhysics(
     svanes::Registry &world, svanes::EventManager &events,
     svanes::AsyncParallelForDriver &driver) {
 
@@ -401,9 +459,11 @@ void OrbitalEscalationServer::RespondToPhysics(
     // Explosions have finished using the entities' geometry. Now their owners
     // can remove dead objects, including dead missiles still inside launchers.
     // A player's roster entry remains so their ship can be respawned.
+    std::optional<svanes::ClientId> dead_player;
     for (auto &[client, player] : players) {
         if (player.ship) {
             if (IsDead(world, player.ship->GetEntity())) {
+                dead_player = client;
                 player.ship.reset();
             } else {
                 player.ship->RemoveDeadAttachments(world);
@@ -423,10 +483,5 @@ void OrbitalEscalationServer::RespondToPhysics(
         return IsDead(world, ship->GetEntity());
     });
 
-    // Respawn any players whose ships were destroyed.
-    for (auto &[client, player] : players) {
-        if (!player.ship) {
-            SpawnPlayer(world, player);
-        }
-    }
+    return dead_player;
 }

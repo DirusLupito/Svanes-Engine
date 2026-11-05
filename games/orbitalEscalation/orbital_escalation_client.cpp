@@ -82,6 +82,20 @@ void OrbitalEscalationClient::Initialize(svanes::ClientContext &context) {
             .visible = false,
         });
 
+    death_cam_label_entity = context.world.CreateEntity();
+    context.world.AddComponent<svanes::TextLabel>(
+        death_cam_label_entity,
+        svanes::TextLabel{
+            .text = "DEATH CAM",
+            .position = {context.camera.Viewport().width * 0.5F, 16.0F},
+            .color = {252, 186, 3, 255},
+            .font = context.fonts.LoadFont(
+                svanes::AssetPath("assets/orbitalEscalation/fonts/consola.ttf"),
+                48.0F),
+            .alignment = svanes::TextAlignment::TopCenter,
+            .visible = false,
+        });
+
     context.camera.zoom = 0.02F;
 
     const svanes::Rectangle2D view =
@@ -180,8 +194,24 @@ void OrbitalEscalationClient::Update(const svanes::ClientFrameContext &frame) {
     // Each update describes the complete world state, so only apply the last
     // one before the engine renders this frame.
     if (!messages.empty()) {
-        frame.events.QueueEvent(std::make_unique<WorldSnapshotEvent>(
-            WorldUpdate::Read(messages.back())));
+        auto snapshot = WorldUpdate::Read(messages.back());
+        death_cam_player = snapshot.death_cam_player;
+        death_cam_ship.reset();
+        if (death_cam_player) {
+            const auto player =
+                std::find_if(snapshot.players.begin(), snapshot.players.end(),
+                             [this](const auto &entry) {
+                                 return entry.client == *death_cam_player;
+                             });
+
+            if (player != snapshot.players.end()) {
+                death_cam_ship = player->ship;
+            }
+        }
+
+        frame.events.QueueEvent(
+            std::make_unique<WorldSnapshotEvent>(std::move(snapshot)));
+
         frame.events.DispatchEvents();
     }
 
@@ -225,6 +255,16 @@ void OrbitalEscalationClient::Update(const svanes::ClientFrameContext &frame) {
 
     auto &pause_label =
         frame.world.GetComponent<svanes::TextLabel>(pause_label_entity);
+
+    auto &death_cam_label =
+        frame.world.GetComponent<svanes::TextLabel>(death_cam_label_entity);
+
+    death_cam_label.visible = death_cam_player.has_value();
+    death_cam_label.position.x = frame.camera.Viewport().width * 0.5F;
+
+    if (death_cam_player) {
+        pause_label.visible = false;
+    }
 
     // I use a cosine wave to make the pause label flash while the game is
     // paused.
@@ -279,7 +319,17 @@ void OrbitalEscalationClient::Update(const svanes::ClientFrameContext &frame) {
             effects.Pause();
             svanes::AdvanceTimelines(frame.world,
                                      svanes::DefaultPhysicsStepTics);
-            Predict(frame.world, frame.events);
+            if (death_cam_player) {
+                // Recorded snapshots decide damage and destruction. Between
+                // them, only advance movement.
+                svanes::AdvancePhysics(
+                    frame.world, {}, parallel_for,
+                    [&](std::span<const svanes::PhysicsTimeStep>) {
+                        UpdateAttachments(frame.world);
+                    });
+            } else {
+                Predict(frame.world, frame.events);
+            }
             svanes::AdvanceSpriteAnimations(frame.world);
             if (!effects_paused) {
                 effects.Unpause();
@@ -294,9 +344,12 @@ void OrbitalEscalationClient::Update(const svanes::ClientFrameContext &frame) {
 
     UpdateCollisionFlashes(frame.world, collision_flashes);
 
-    // Follow the ship after either prediction or an authoritative update.
-    if (player_ship) {
-        const auto &pose = objects.at(*player_ship)->GetTransform(frame.world);
+    // Follow the player ship or the death cam ship, if any, with the camera.
+    const auto followed_ship = death_cam_player ? death_cam_ship : player_ship;
+
+    if (followed_ship) {
+        const auto &pose =
+            objects.at(*followed_ship)->GetTransform(frame.world);
         frame.camera.x = pose.x;
         frame.camera.y = pose.y;
     }
@@ -355,7 +408,7 @@ void OrbitalEscalationClient::UpdateZoom(
 
 void OrbitalEscalationClient::SendInput(
     const svanes::ClientFrameContext &frame) {
-    if (!frame.network.IsConnected()) {
+    if (!frame.network.IsConnected() || death_cam_player) {
         return;
     }
 

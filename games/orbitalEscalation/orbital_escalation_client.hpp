@@ -120,6 +120,13 @@ private:
     // world update or after its destruction.
     std::optional<svanes::Entity> player_ship;
 
+    // The player being followed during a server controlled death cam.
+    std::optional<std::uint32_t> death_cam_player;
+
+    // The followed ship's server entity ID, or empty once its recorded death
+    // occurs.
+    std::optional<svanes::Entity> death_cam_ship;
+
     // The master clock shared by gameplay objects. Server updates replace its
     // state, and prediction advances it between those updates.
     std::optional<OwnedEntity> gameplay_timeline;
@@ -183,6 +190,9 @@ private:
 
     // The text label displayed while gameplay is paused.
     svanes::Entity pause_label_entity = 0;
+
+    // The heading displayed while everyone watches a player's death cam.
+    svanes::Entity death_cam_label_entity = 0;
 
     // The background rectangle that follows the camera's view.
     svanes::Entity background_entity = 0;

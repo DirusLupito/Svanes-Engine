@@ -162,7 +162,7 @@ void ClientEventHandlers::HandleWorldSnapshot(const WorldSnapshotEvent &event) {
         object->UpdateVisuals(world);
     }
 
-    if (context.player_ship) {
+    if (context.player_ship && !snapshot.death_cam_player) {
         const auto &pose =
             objects.at(*context.player_ship)->GetTransform(world);
         context.camera.x = pose.x;

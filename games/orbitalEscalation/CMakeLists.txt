@@ -80,6 +80,8 @@ add_executable(svanes_game_orbital_escalation_server
     server_main.cpp
     OrbitalEscalationServer.hpp
     OrbitalEscalationServer.cpp
+    death_cam.hpp
+    death_cam.cpp
 )
 target_link_libraries(svanes_game_orbital_escalation_server PRIVATE svanes_orbital_common)
 
