@@ -24,6 +24,23 @@ bool ReplaySession::IsReplaying() const {
     return state == State::Playing || state == State::Paused;
 }
 
+void ReplaySession::Play(ReplayRecording recording) {
+    CheckBoundary();
+    if (state != State::Idle) {
+        throw std::logic_error("Playback requires an idle session.");
+    }
+
+    updating = true;
+    try {
+        Load(std::move(recording));
+        StartPlayback();
+    } catch (...) {
+        updating = false;
+        throw;
+    }
+    updating = false;
+}
+
 void ReplaySession::CheckBoundary() const {
     if (manager.IsDeliveringEvents() || step_open || updating) {
         throw std::logic_error("Replay operation requires a simulation "
@@ -145,11 +162,7 @@ void ReplaySession::ProcessControls() {
                         "Playback requires an idle session and a file path.");
                 }
                 Load(control.path);
-                manager.ClearQueuedEvents();
-                callbacks.restore(recording.initial_state.bytes);
-                playback_step = 0;
-                accumulated_tics = 0;
-                state = playback_steps.empty() ? State::Idle : State::Playing;
+                StartPlayback();
                 break;
             case Action::Pause: // Only executes while playing. Pauses playback. Duh.
                 if (state != State::Playing) {
@@ -255,7 +268,10 @@ void ReplaySession::Save() const {
 
 void ReplaySession::Load(const std::filesystem::path &path) {
     // Try to load the replay file, throw an error if there's an issue doing so
-    auto loaded = ReplayRecording::Read(ReadFile(path));
+    Load(ReplayRecording::Read(ReadFile(path)));
+}
+
+void ReplaySession::Load(ReplayRecording loaded) {
     // Playback needs the same step duration used during recording.
     if (loaded.step_tics != step_tics) {
         throw std::invalid_argument(
@@ -301,6 +317,14 @@ void ReplaySession::Load(const std::filesystem::path &path) {
     recording.step_tics = loaded.step_tics;
     recording.steps.clear();
     playback_steps = std::move(loaded_steps);
+}
+
+void ReplaySession::StartPlayback() {
+    manager.ClearQueuedEvents();
+    callbacks.restore(recording.initial_state.bytes);
+    playback_step = 0;
+    accumulated_tics = 0;
+    state = playback_steps.empty() ? State::Idle : State::Playing;
 }
 
 } // namespace svanes

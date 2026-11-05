@@ -173,6 +173,20 @@ public:
     void RegisterInputEvents();
 
     /**
+     * Restores and begins playing a recording held in memory.
+     *
+     * @param recording The starting state and event payloads to play.
+     * Ownership transfers to the session.
+     *
+     * @throws std::logic_error if the session is not idle, or called while
+     * processing events, a step, or a control action.
+     * @throws std::invalid_argument if the step duration, event types, or
+     * payloads are invalid.
+     * @throws ... Propagates errors from event decoders or state restoration.
+     */
+    void Play(ReplayRecording recording);
+
+    /**
      * Takes pending actions and decides what to do with them based on the
      * current playback state, including handling cases of invalid state update
      * requests.
@@ -345,6 +359,23 @@ private:
      * @throws ... Propagates errors from event decoders.
      */
     void Load(const std::filesystem::path &path);
+
+    /**
+     * Reconstructs a recording's events for playback.
+     *
+     * @param loaded The starting state and encoded events to retain.
+     * @throws std::invalid_argument if the step duration, event types, or
+     * payloads are invalid.
+     * @throws ... Propagates errors from event decoders.
+     */
+    void Load(ReplayRecording loaded);
+
+    /**
+     * Restores the loaded starting state and starts playback at its first step.
+     *
+     * @throws ... Propagates errors from state restoration.
+     */
+    void StartPlayback();
 
     /**
      * Checks that replay operations occur at a simulation boundary, so they
