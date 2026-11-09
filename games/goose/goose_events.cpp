@@ -15,6 +15,9 @@ DeathEvent::DeathEvent(svanes::Entity entity, DeathReport report)
 SpawnEvent::SpawnEvent(svanes::Entity entity, SpawnReport report)
     : entity(entity), report(report) {}
 
+SnapshotEvent::SnapshotEvent(Snapshot snapshot)
+    : snapshot(std::move(snapshot)) {}
+
 ReportedDeathEvent::ReportedDeathEvent(DeathReport report) : report(report) {}
 
 ReportedSpawnEvent::ReportedSpawnEvent(SpawnReport report) : report(report) {}

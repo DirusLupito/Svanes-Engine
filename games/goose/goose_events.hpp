@@ -84,6 +84,26 @@ public:
 };
 
 /**
+ * A snapshot the server sent, raised on the client to draw it. Live snapshots
+ * are raised as they arrive, and the death replay raises recorded ones, during
+ * which live ones are dropped.
+ *
+ * FIELDS:
+ * - snapshot: The world as the server saw it.
+ */
+class SnapshotEvent final : public svanes::EventOf<SnapshotEvent> {
+public:
+    static constexpr std::string_view EventName = "goose.snapshot";
+
+    /**
+     * @param snapshot The world as the server saw it.
+     */
+    explicit SnapshotEvent(Snapshot snapshot);
+
+    Snapshot snapshot;
+};
+
+/**
  * A death the server reported, raised on the client once per report however
  * many snapshots carry it.
  *

@@ -11,10 +11,16 @@
 #include <svanes/camera2d.hpp>
 #include <svanes/events/event_handler_wrapper.hpp>
 #include <svanes/events/event_manager.hpp>
+#include <svanes/events/replay_events.hpp>
+#include <svanes/events/replay_recording.hpp>
+#include <svanes/events/replay_session.hpp>
+#include <svanes/MenuUtilities/font_manager.hpp>
+#include <svanes/MenuUtilities/text_label.hpp>
 #include <svanes/input/input_manager.hpp>
 #include <svanes/input/input_types.hpp>
 #include <svanes/network/clientserver/IClient.hpp>
 #include <svanes/network/clientserver/network_client.hpp>
+#include <svanes/physics_system.hpp>
 #include <svanes/registry.hpp>
 #include <svanes/render/render_system.hpp>
 #include <svanes/render/texture_manager.hpp>
@@ -22,11 +28,14 @@
 #include <svanes/timeline_system.hpp>
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <exception>
 #include <iostream>
 #include <memory>
 #include <optional>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -74,6 +83,13 @@ constexpr svanes::Color kMissingHealthColor{.red = 200, .green = 40, .blue = 40}
 constexpr svanes::Color kEnemyBulletColor{255, 90, 90, 255};
 
 const svanes::TicCount kDoubleTapTics = svanes::SecondsToTics(0.25);
+
+const std::size_t kReplaySteps =
+    svanes::SecondsToTics(5.0) / svanes::DefaultPhysicsStepTics;
+constexpr float kReplayLabelPoints = 24.0F;
+constexpr float kReplayLabelGap = 16.0F;
+constexpr svanes::Color kReplayLabelColor{
+    .red = 255, .green = 255, .blue = 255, .alpha = 255};
 
 /**
  * Subtracts elapsed time from a countdown without unsigned underflow.
@@ -171,6 +187,13 @@ void PlaceHealthBar(svanes::Registry &world, svanes::Entity filled_part,
  * Deaths and spawns the server reports are raised as events, and those
  * events show and hide the death screen. If a report is lost, the goose's
  * health in the next snapshot corrects the death screen instead.
+ *
+ * Every snapshot is drawn through a SnapshotEvent, and the last five seconds
+ * of snapshots since the player's goose last spawned are kept. When the
+ * player's goose dies, those snapshots are handed to the engine's replay
+ * session as a recording, so the death plays back at normal speed while live
+ * snapshots are dropped. The goose is not respawned until the replay ends or
+ * the player skips it with Space.
  */
 class GooseClient final : public svanes::IClient {
 public:
@@ -228,12 +251,38 @@ public:
 
         menu.emplace(context);
 
+        const std::string font_path = assets + "/fonts/consola.ttf";
+        const svanes::FontHandle font =
+            context.fonts.LoadFont(font_path, kReplayLabelPoints);
+        if (font.id == 0) {
+            throw std::runtime_error("GooseClient could not load its font from " +
+                                     font_path + ".");
+        }
+        replay_label = world.CreateEntity();
+        world.AddComponent<svanes::TextLabel>(
+            replay_label,
+            svanes::TextLabel{.text = "REPLAY - SPACE TO SKIP",
+                              .color = kReplayLabelColor,
+                              .font = font,
+                              .alignment = svanes::TextAlignment::TopCenter,
+                              .visible = false});
+        world.AddComponent<svanes::ZOrder>(replay_label,
+                                           svanes::ZOrder{kBossBarZ});
+
+        CreateDeathReplay(world, context.events);
+        context.events.Subscribe(
+            std::make_unique<svanes::EventHandlerWrapper<SnapshotEvent>>(
+                [this, &world](const SnapshotEvent &event) {
+                    ApplySnapshot(world, event.snapshot);
+                }));
+
         context.events.Subscribe(
             std::make_unique<svanes::EventHandlerWrapper<ReportedDeathEvent>>(
                 [this, &world](const ReportedDeathEvent &event) {
                     if (IsOwnGoose(event.report.subject,
                                    event.report.client)) {
                         ShowDeathScreen(world, true);
+                        replay_requested = true;
                     }
                 }));
         context.events.Subscribe(
@@ -242,6 +291,7 @@ public:
                     if (IsOwnGoose(event.report.subject,
                                    event.report.client)) {
                         ShowDeathScreen(world, false);
+                        history.clear();
                     }
                 }));
 
@@ -274,21 +324,37 @@ public:
     }
 
     void Update(const svanes::ClientFrameContext &frame) override {
-        const auto messages = frame.network.PollMessages();
+        svanes::ReplaySession &replay = frame.events.GetReplaySession();
         std::optional<Snapshot> latest;
-        for (const svanes::NetworkMessage &message : messages) {
+        for (const svanes::NetworkMessage &message :
+             frame.network.PollMessages()) {
             latest = DecodeSnapshot(message);
+            history.push_back(message);
+            if (history.size() > kReplaySteps) {
+                history.pop_front();
+            }
             QueueNewReports(frame.events, *latest);
         }
         frame.events.DispatchEvents();
-        if (latest) {
-            ApplySnapshot(frame.world, *latest);
+        if (replay_requested) {
+            replay_requested = false;
+            PlayDeathReplay(replay);
         }
+        if (latest) {
+            frame.events.TriggerEvent(SnapshotEvent{*latest});
+            FollowLiveSnapshot(frame.world, *latest);
+        }
+
+        if (replay.IsReplaying() &&
+            frame.input.WasPressed(svanes::Key::Space)) {
+            frame.events.TriggerEvent(svanes::StopReplayEvent{});
+        }
+        replay.Update(frame.real_delta_tics);
 
         svanes::AdvanceTimelines(frame.world, frame.real_delta_tics);
         svanes::AdvanceSpriteAnimations(frame.world);
 
-        const bool alone = geese.size() == 1;
+        const bool alone = live_geese == 1;
         if (!alone) {
             menu->ResetSpeed();
         }
@@ -313,13 +379,14 @@ public:
         const PlayerInput input{
             ReadIntent(frame),
             ClockSetting{.speed = menu->Speed(), .paused = menu->IsOpen()},
-            pending_minion_spawning, own_goose_dead};
+            pending_minion_spawning, own_goose_dead && !replay.IsReplaying()};
         if (frame.network.IsConnected()) {
             frame.network.Send(EncodePlayerInput(input));
         }
 
         UpdateCamera(frame);
         PlaceBossBar(frame);
+        PlaceReplayLabel(frame, replay.IsReplaying());
         menu->Draw(frame, alone);
     }
 
@@ -454,7 +521,8 @@ private:
 
     /**
      * Shows or hides the tint drawn over the world while this player's goose
-     * is dead, and starts or stops asking the server to respawn it.
+     * is dead, and starts or stops asking the server to respawn it once no
+     * replay is playing.
      *
      * @param world The registry holding the tint.
      * @param dead Whether this player's goose is dead.
@@ -466,20 +534,110 @@ private:
     }
 
     /**
-     * Makes the drawn world and the menu match a snapshot, and stops sending a
-     * minion spawning request once the server has carried it out. Shows or
-     * hides the death screen if the snapshot disagrees with it, which only
-     * happens when a death or spawn report was lost.
+     * Creates the engine's replay session for the death replay, which plays
+     * recordings built by PlayDeathReplay from received snapshots.
      *
-     * @param world The registry holding everything drawn.
-     * @param snapshot The latest snapshot from the server.
+     * @param world The registry the replayed snapshots are drawn in.
+     * @param events The event manager to create the session on.
      */
-    void ApplySnapshot(svanes::Registry &world, const Snapshot &snapshot) {
+    void CreateDeathReplay(svanes::Registry &world,
+                           svanes::EventManager &events) {
+        svanes::ReplaySession &replay = events.CreateReplaySession(
+            svanes::DefaultPhysicsStepTics,
+            {[]() -> svanes::NetworkMessage {
+                 throw std::logic_error(
+                     "The goose client never records through the engine; it "
+                     "builds its replays from received snapshots.");
+             },
+             [this, &world](std::span<const std::byte> state) {
+                 ApplySnapshot(world, DecodeSnapshot(svanes::NetworkMessage{
+                                          std::vector<std::byte>(
+                                              state.begin(), state.end())}));
+             },
+             [](svanes::TicCount) {}});
+        replay.RegisterEvent<SnapshotEvent>(
+            [](svanes::MessageWriter &writer, const SnapshotEvent &event) {
+                writer.WriteBytes(EncodeSnapshot(event.snapshot).bytes);
+            },
+            [](svanes::MessageReader &reader) {
+                const std::span<const std::byte> bytes =
+                    reader.ReadBytes(reader.Remaining());
+                return std::make_unique<SnapshotEvent>(
+                    DecodeSnapshot(svanes::NetworkMessage{
+                        std::vector<std::byte>(bytes.begin(), bytes.end())}));
+            });
+    }
+
+    /**
+     * Plays the snapshots kept since the player's goose last spawned, the
+     * oldest as the starting state and each later one as its own step.
+     *
+     * @param replay The session to play them on.
+     * @throws std::logic_error if no snapshots have been kept.
+     */
+    void PlayDeathReplay(svanes::ReplaySession &replay) {
+        if (history.empty()) {
+            throw std::logic_error("The death replay has no snapshots to play.");
+        }
+
+        svanes::ReplayRecording recording;
+        recording.step_tics = svanes::DefaultPhysicsStepTics;
+        recording.initial_state = history.front();
+        for (std::size_t index = 1; index < history.size(); ++index) {
+            recording.steps.push_back(
+                {{std::string{SnapshotEvent::EventName}, 0, history[index]}});
+        }
+        replay.Play(std::move(recording));
+    }
+
+    /**
+     * Keeps the menu and the death screen in line with the latest live
+     * snapshot, which a replayed one must not change. Stops sending a minion
+     * spawning request once the server has carried it out, and corrects the
+     * death screen if the snapshot disagrees with it, which only happens when
+     * a death or spawn report was lost.
+     *
+     * @param world The registry holding the death screen.
+     * @param snapshot The latest live snapshot.
+     */
+    void FollowLiveSnapshot(svanes::Registry &world, const Snapshot &snapshot) {
         menu->ShowMinionSpawning(snapshot.minion_spawning);
         if (pending_minion_spawning == snapshot.minion_spawning) {
             pending_minion_spawning.reset();
         }
 
+        live_geese = snapshot.geese.size();
+        for (const SnapshotGoose &goose : snapshot.geese) {
+            const bool dead = goose.health == 0;
+            if (goose.client == player && dead != own_goose_dead) {
+                ShowDeathScreen(world, dead);
+            }
+        }
+    }
+
+    /**
+     * Shows the replay label below the boss's health bar while a replay is
+     * playing.
+     *
+     * @param frame The frame's world and camera.
+     * @param replaying Whether a replay is playing.
+     */
+    void PlaceReplayLabel(const svanes::ClientFrameContext &frame,
+                          bool replaying) {
+        svanes::TextLabel &label =
+            frame.world.GetComponent<svanes::TextLabel>(replay_label);
+        label.visible = replaying;
+        label.position = {frame.camera.Viewport().width * 0.5F,
+                          kBossBarTop + kBossBarHeight + kReplayLabelGap};
+    }
+
+    /**
+     * Makes the drawn world match a snapshot, live or replayed.
+     *
+     * @param world The registry holding everything drawn.
+     * @param snapshot The snapshot to draw.
+     */
+    void ApplySnapshot(svanes::Registry &world, const Snapshot &snapshot) {
         svanes::Timeline &timeline = world.GetComponent<svanes::Timeline>(clock);
         timeline.SetTicSize(TicSize(snapshot.clock.speed));
         if (snapshot.clock.paused) {
@@ -516,10 +674,6 @@ private:
                 GooseWidth, kHealthBarHeight};
             PlaceHealthBar(world, drawn.health_bar, drawn.missing_health_bar,
                            above_goose, goose.health, GooseMaxHealth);
-            const bool dead = goose.health == 0;
-            if (goose.client == player && dead != own_goose_dead) {
-                ShowDeathScreen(world, dead);
-            }
             geese.emplace(goose.client, drawn);
         }
         for (const auto &[client, departed] : remaining) {
@@ -729,6 +883,10 @@ private:
     std::optional<bool> pending_minion_spawning;
     bool own_goose_dead = false;
     std::uint32_t last_report = 0;
+    std::size_t live_geese = 0;
+    std::deque<svanes::NetworkMessage> history;
+    bool replay_requested = false;
+    svanes::Entity replay_label = 0;
 
     svanes::TicCount left_tap_window = 0;
     svanes::TicCount right_tap_window = 0;
