@@ -57,11 +57,80 @@ struct ClockSetting {
  * - minion_spawning: Whether the player wants the enemy to drop minions, or
  *   empty if they have not asked for a change. Any player may change it for
  *   everyone.
+ * - respawn: Whether the player wants their dead goose spawned again. Sent
+ *   every frame until it takes effect, so a lost message only delays it.
+ *   Ignored while the goose is alive.
  */
 struct PlayerInput {
     GooseIntent intent;
     ClockSetting clock;
     std::optional<bool> minion_spawning;
+    bool respawn = false;
+};
+
+/**
+ * What a death or spawn report is about.
+ *
+ * MEMBERS:
+ * - Goose: A player's goose.
+ * - Enemy: The enemy.
+ * - Minion: One of the enemy's minions.
+ */
+enum class Subject : std::uint8_t {
+    Goose,
+    Enemy,
+    Minion,
+};
+
+/**
+ * What took the last of something's health.
+ *
+ * MEMBERS:
+ * - EnemyFire: A bullet from the enemy or one of its archers.
+ * - PlayerFire: A bullet from a goose.
+ * - Minion: A melee minion's touch.
+ * - DeathZone: Falling into a death zone.
+ */
+enum class DeathCause : std::uint8_t {
+    EnemyFire,
+    PlayerFire,
+    Minion,
+    DeathZone,
+};
+
+/**
+ * Something that died on the server.
+ *
+ * FIELDS:
+ * - subject: What died.
+ * - client: The client whose goose died, or 0 if subject is not Goose.
+ * - position: Where it died.
+ * - cause: What killed it.
+ * - killer: The client whose goose fired the killing bullet, or 0 if cause is
+ *   not PlayerFire or that client has left.
+ */
+struct DeathReport {
+    Subject subject;
+    svanes::ClientId client;
+    svanes::Vector2D position;
+    DeathCause cause;
+    svanes::ClientId killer;
+};
+
+/**
+ * Something that spawned on the server.
+ *
+ * FIELDS:
+ * - subject: What spawned. Never Enemy, which exists from the start.
+ * - client: The client whose goose spawned, or 0 if subject is not Goose.
+ * - minion_kind: How the minion fights. Only meaningful if subject is Minion.
+ * - position: Where it spawned.
+ */
+struct SpawnReport {
+    Subject subject;
+    svanes::ClientId client;
+    MinionKind minion_kind;
+    svanes::Vector2D position;
 };
 
 /**

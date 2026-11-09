@@ -80,6 +80,7 @@ svanes::NetworkMessage EncodePlayerInput(const PlayerInput &input) {
     if (input.minion_spawning) {
         writer.WriteBool(*input.minion_spawning);
     }
+    writer.WriteBool(input.respawn);
     return writer.Finish();
 }
 
@@ -95,6 +96,7 @@ PlayerInput DecodePlayerInput(const svanes::NetworkMessage &message) {
     if (reader.ReadBool()) {
         input.minion_spawning = reader.ReadBool();
     }
+    input.respawn = reader.ReadBool();
     RequireFullyRead(reader);
     return input;
 }

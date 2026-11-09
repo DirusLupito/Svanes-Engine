@@ -201,11 +201,12 @@ void AdvanceMinions(svanes::Registry &world,
     }
 }
 
-void DamageMinion(svanes::Registry &world, svanes::Entity entity,
+bool DamageMinion(svanes::Registry &world, svanes::Entity entity,
                   std::uint32_t damage) {
     Minion &minion = world.GetComponent<Minion>(entity);
-    minion.health -= std::min(minion.health, damage);
     if (minion.health == 0) {
-        world.DestroyEntity(entity);
+        return false;
     }
+    minion.health -= std::min(minion.health, damage);
+    return minion.health == 0;
 }

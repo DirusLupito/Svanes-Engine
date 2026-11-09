@@ -31,7 +31,6 @@ const svanes::TicCount kFireInterval = svanes::SecondsToTics(0.15);
 const svanes::TicCount kKnockbackLockTics = svanes::SecondsToTics(0.25);
 const svanes::TicCount kEnemyInvincibleTics = svanes::SecondsToTics(1.0);
 const svanes::TicCount kPlayerInvincibleTics = svanes::SecondsToTics(0.6);
-const svanes::TicCount kRespawnTics = svanes::SecondsToTics(3.0);
 
 /**
  * Subtracts elapsed time from a countdown without unsigned underflow.
@@ -88,10 +87,6 @@ void Goose::Advance(svanes::Registry &world, const GooseIntent &intent) {
     if (IsDead()) {
         motion.velocity_x = 0.0F;
         state = GooseState::Idle;
-        AdvanceCountdown(respawn_timer, delta_tics);
-        if (respawn_timer == 0) {
-            Respawn(world);
-        }
         return;
     }
 
@@ -147,13 +142,13 @@ void Goose::Advance(svanes::Registry &world, const GooseIntent &intent) {
     }
 }
 
-void Goose::Hit(svanes::Registry &world, svanes::Vector2D direction,
+bool Goose::Hit(svanes::Registry &world, svanes::Vector2D direction,
                 float speed, std::uint32_t damage, HitSource source) {
     const bool from_enemy = source == HitSource::Enemy;
     svanes::TicCount &invincible_timer =
         from_enemy ? enemy_invincible_timer : player_invincible_timer;
     if (IsDead() || invincible_timer > 0) {
-        return;
+        return false;
     }
 
     const float length = std::hypot(direction.x, direction.y);
@@ -176,27 +171,29 @@ void Goose::Hit(svanes::Registry &world, svanes::Vector2D direction,
     dash_timer = 0;
     grounded = false;
     health -= std::min(health, damage);
-    if (health == 0) {
-        Die();
-    }
+    return health == 0;
 }
 
-void Goose::Kill() {
-    if (!IsDead()) {
-        Die();
+bool Goose::Kill() {
+    if (IsDead()) {
+        return false;
     }
-}
-
-void Goose::Die() {
     health = 0;
-    respawn_timer = kRespawnTics;
+    return true;
+}
+
+void Goose::Die(svanes::Registry &world) {
+    world.GetComponent<svanes::Kinematic2D>(entity).velocity_x = 0.0F;
+    state = GooseState::Idle;
+    dash_timer = 0;
+    knockback_timer = 0;
 }
 
 bool Goose::IsDead() const { return health == 0; }
 
 std::uint32_t Goose::GetHealth() const { return health; }
 
-void Goose::Respawn(svanes::Registry &world) {
+void Goose::Spawn(svanes::Registry &world) {
     svanes::Transform &transform = world.GetComponent<svanes::Transform>(entity);
     transform.x = spawn.x;
     transform.y = spawn.y;
@@ -212,9 +209,10 @@ void Goose::Respawn(svanes::Registry &world) {
     knockback_timer = 0;
     enemy_invincible_timer = 0;
     player_invincible_timer = 0;
-    respawn_timer = 0;
 }
 
 svanes::Entity Goose::GetEntity() const { return entity; }
 
 GooseState Goose::GetState() const { return state; }
+
+svanes::Vector2D Goose::GetSpawnPoint() const { return spawn; }

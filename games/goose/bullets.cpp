@@ -38,50 +38,11 @@ void SpawnBullet(svanes::Registry &world, svanes::Entity owner,
     world.AddComponent<Bullet>(bullet, Bullet{owner});
 }
 
-std::vector<BulletHit> UpdateBullets(svanes::Registry &world) {
-    std::vector<svanes::Entity> targets;
-    world.ForEach<svanes::Transform, svanes::Collider2D>(
-        [&](svanes::Entity entity, const svanes::Transform &,
-            const svanes::Collider2D &) {
-            if (!world.HasComponent<Bullet>(entity)) {
-                targets.push_back(entity);
-            }
-        });
-
-    std::vector<BulletHit> hits;
-    std::vector<svanes::Entity> struck;
-    world.ForEach<Bullet, svanes::Transform, svanes::Collider2D,
-                  svanes::Kinematic2D>(
-        [&](svanes::Entity entity, const Bullet &bullet,
-            const svanes::Transform &transform,
-            const svanes::Collider2D &collider,
-            const svanes::Kinematic2D &motion) {
-            for (const svanes::Entity target : targets) {
-                if (target == bullet.owner) {
-                    continue;
-                }
-                if (world.HasComponent<Minion>(target) &&
-                    world.GetComponent<Minion>(target).spawner ==
-                        bullet.owner) {
-                    continue;
-                }
-
-                const auto collisions = svanes::DetectCollisions(
-                    collider.geometry, transform,
-                    world.GetComponent<svanes::Collider2D>(target).geometry,
-                    world.GetComponent<svanes::Transform>(target));
-                if (!collisions.empty()) {
-                    hits.push_back({target,
-                                    bullet.owner,
-                                    {motion.velocity_x, motion.velocity_y}});
-                    struck.push_back(entity);
-                    return;
-                }
-            }
-        });
-
-    for (const svanes::Entity entity : struck) {
-        world.DestroyEntity(entity);
+bool PassesThrough(const svanes::Registry &world, const Bullet &bullet,
+                   svanes::Entity other) {
+    if (other == bullet.owner || world.HasComponent<Bullet>(other)) {
+        return true;
     }
-    return hits;
+    return world.HasComponent<Minion>(other) &&
+           world.GetComponent<Minion>(other).spawner == bullet.owner;
 }

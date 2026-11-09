@@ -283,7 +283,7 @@ public:
         const PlayerInput input{
             ReadIntent(frame),
             ClockSetting{.speed = menu->Speed(), .paused = menu->IsOpen()},
-            pending_minion_spawning};
+            pending_minion_spawning, own_goose_dead};
         if (frame.network.IsConnected()) {
             frame.network.Send(EncodePlayerInput(input));
         }
@@ -434,8 +434,9 @@ private:
             PlaceHealthBar(world, drawn.health_bar, drawn.missing_health_bar,
                            above_goose, goose.health, GooseMaxHealth);
             if (goose.client == player) {
+                own_goose_dead = goose.health == 0;
                 world.GetComponent<svanes::SolidShape>(death_tint).color.alpha =
-                    goose.health == 0 ? kDeathTintColor.alpha : 0;
+                    own_goose_dead ? kDeathTintColor.alpha : 0;
             }
             geese.emplace(goose.client, drawn);
         }
@@ -644,6 +645,7 @@ private:
     std::optional<PauseMenu> menu;
     bool should_quit = false;
     std::optional<bool> pending_minion_spawning;
+    bool own_goose_dead = false;
 
     svanes::TicCount left_tap_window = 0;
     svanes::TicCount right_tap_window = 0;
