@@ -169,7 +169,8 @@ void PlaceHealthBar(svanes::Registry &world, svanes::Entity filled_part,
  * frame and draws the latest snapshot the server sent back. It simulates
  * nothing; only animations run locally, on a clock that copies the server's.
  * Deaths and spawns the server reports are raised as events, and those
- * events, not the snapshot's health, show and hide the death screen.
+ * events show and hide the death screen. If a report is lost, the goose's
+ * health in the next snapshot corrects the death screen instead.
  */
 class GooseClient final : public svanes::IClient {
 public:
@@ -279,10 +280,10 @@ public:
             latest = DecodeSnapshot(message);
             QueueNewReports(frame.events, *latest);
         }
+        frame.events.DispatchEvents();
         if (latest) {
             ApplySnapshot(frame.world, *latest);
         }
-        frame.events.DispatchEvents();
 
         svanes::AdvanceTimelines(frame.world, frame.real_delta_tics);
         svanes::AdvanceSpriteAnimations(frame.world);
@@ -466,7 +467,9 @@ private:
 
     /**
      * Makes the drawn world and the menu match a snapshot, and stops sending a
-     * minion spawning request once the server has carried it out.
+     * minion spawning request once the server has carried it out. Shows or
+     * hides the death screen if the snapshot disagrees with it, which only
+     * happens when a death or spawn report was lost.
      *
      * @param world The registry holding everything drawn.
      * @param snapshot The latest snapshot from the server.
@@ -513,6 +516,10 @@ private:
                 GooseWidth, kHealthBarHeight};
             PlaceHealthBar(world, drawn.health_bar, drawn.missing_health_bar,
                            above_goose, goose.health, GooseMaxHealth);
+            const bool dead = goose.health == 0;
+            if (goose.client == player && dead != own_goose_dead) {
+                ShowDeathScreen(world, dead);
+            }
             geese.emplace(goose.client, drawn);
         }
         for (const auto &[client, departed] : remaining) {
