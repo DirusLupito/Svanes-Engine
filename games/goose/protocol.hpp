@@ -5,11 +5,13 @@
 
 #include <svanes/network/clientserver/network_server.hpp>
 #include <svanes/network/network_message.hpp>
+#include <svanes/timeline_system.hpp>
 #include <svanes/utility/rational_number.hpp>
 #include <svanes/vector2d.hpp>
 
 #include <cstdint>
 #include <optional>
+#include <variant>
 #include <vector>
 
 /**
@@ -134,6 +136,28 @@ struct SpawnReport {
 };
 
 /**
+ * How many steps the server keeps sending each death and spawn report for, so
+ * a client that loses some snapshots still hears about it.
+ */
+inline constexpr std::uint64_t ReportSteps = 50;
+
+/**
+ * A death or spawn as the server sends it, in every snapshot for ReportSteps
+ * steps after it happened.
+ *
+ * FIELDS:
+ * - sequence: Counts every report the server makes, starting at 1, so a client
+ *   can skip the ones it has already seen.
+ * - time: The world clock's time when it happened, in tics.
+ * - report: What happened.
+ */
+struct SequencedReport {
+    std::uint32_t sequence;
+    svanes::TicCount time;
+    std::variant<DeathReport, SpawnReport> report;
+};
+
+/**
  * One goose as the server last saw it.
  *
  * FIELDS:
@@ -197,6 +221,8 @@ struct SnapshotMinion {
  * - bullets: Every live bullet.
  * - minions: Every live minion.
  * - minion_spawning: Whether the enemy is allowed to drop minions.
+ * - reports: Every death and spawn from the last ReportSteps steps, oldest
+ *   first.
  */
 struct Snapshot {
     ClockSetting clock;
@@ -205,6 +231,7 @@ struct Snapshot {
     std::vector<SnapshotBullet> bullets;
     std::vector<SnapshotMinion> minions;
     bool minion_spawning = true;
+    std::vector<SequencedReport> reports;
 };
 
 /**

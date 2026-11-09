@@ -84,6 +84,44 @@ public:
 };
 
 /**
+ * A death the server reported, raised on the client once per report however
+ * many snapshots carry it.
+ *
+ * FIELDS:
+ * - report: What died, where, and to what.
+ */
+class ReportedDeathEvent final : public svanes::EventOf<ReportedDeathEvent> {
+public:
+    static constexpr std::string_view EventName = "goose.reported_death";
+
+    /**
+     * @param report What died, where, and to what.
+     */
+    explicit ReportedDeathEvent(DeathReport report);
+
+    DeathReport report;
+};
+
+/**
+ * A spawn the server reported, raised on the client once per report however
+ * many snapshots carry it.
+ *
+ * FIELDS:
+ * - report: What spawned, and where.
+ */
+class ReportedSpawnEvent final : public svanes::EventOf<ReportedSpawnEvent> {
+public:
+    static constexpr std::string_view EventName = "goose.reported_spawn";
+
+    /**
+     * @param report What spawned, and where.
+     */
+    explicit ReportedSpawnEvent(SpawnReport report);
+
+    SpawnReport report;
+};
+
+/**
  * Queues an event with the world clock's current time as its priority, which
  * is how every goose event is stamped.
  *

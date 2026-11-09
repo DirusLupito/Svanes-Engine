@@ -15,6 +15,10 @@ DeathEvent::DeathEvent(svanes::Entity entity, DeathReport report)
 SpawnEvent::SpawnEvent(svanes::Entity entity, SpawnReport report)
     : entity(entity), report(report) {}
 
+ReportedDeathEvent::ReportedDeathEvent(DeathReport report) : report(report) {}
+
+ReportedSpawnEvent::ReportedSpawnEvent(SpawnReport report) : report(report) {}
+
 void QueueGooseEvent(svanes::EventManager &events, const svanes::Registry &world,
                      svanes::Entity clock, std::unique_ptr<svanes::Event> event) {
     event->priority =

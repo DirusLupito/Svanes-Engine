@@ -2,12 +2,15 @@
 #include "bullets.hpp"
 #include "enemy.hpp"
 #include "goose.hpp"
+#include "goose_events.hpp"
 #include "minions.hpp"
 #include "pause_menu.hpp"
 #include "protocol.hpp"
 
 #include <svanes/asset_path.hpp>
 #include <svanes/camera2d.hpp>
+#include <svanes/events/event_handler_wrapper.hpp>
+#include <svanes/events/event_manager.hpp>
 #include <svanes/input/input_manager.hpp>
 #include <svanes/input/input_types.hpp>
 #include <svanes/network/clientserver/IClient.hpp>
@@ -22,6 +25,7 @@
 #include <cstdint>
 #include <exception>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -164,6 +168,8 @@ void PlaceHealthBar(svanes::Registry &world, svanes::Entity filled_part,
  * The goose game's window. It sends the server what the player wants each
  * frame and draws the latest snapshot the server sent back. It simulates
  * nothing; only animations run locally, on a clock that copies the server's.
+ * Deaths and spawns the server reports are raised as events, and those
+ * events, not the snapshot's health, show and hide the death screen.
  */
 class GooseClient final : public svanes::IClient {
 public:
@@ -221,6 +227,23 @@ public:
 
         menu.emplace(context);
 
+        context.events.Subscribe(
+            std::make_unique<svanes::EventHandlerWrapper<ReportedDeathEvent>>(
+                [this, &world](const ReportedDeathEvent &event) {
+                    if (IsOwnGoose(event.report.subject,
+                                   event.report.client)) {
+                        ShowDeathScreen(world, true);
+                    }
+                }));
+        context.events.Subscribe(
+            std::make_unique<svanes::EventHandlerWrapper<ReportedSpawnEvent>>(
+                [this, &world](const ReportedSpawnEvent &event) {
+                    if (IsOwnGoose(event.report.subject,
+                                   event.report.client)) {
+                        ShowDeathScreen(world, false);
+                    }
+                }));
+
         context.network.Connect(server_address);
         std::cout << "Joining the goose server at " << server_address << ".\n";
     }
@@ -250,10 +273,16 @@ public:
     }
 
     void Update(const svanes::ClientFrameContext &frame) override {
-        const auto snapshots = frame.network.PollMessages();
-        if (!snapshots.empty()) {
-            ApplySnapshot(frame.world, DecodeSnapshot(snapshots.back()));
+        const auto messages = frame.network.PollMessages();
+        std::optional<Snapshot> latest;
+        for (const svanes::NetworkMessage &message : messages) {
+            latest = DecodeSnapshot(message);
+            QueueNewReports(frame.events, *latest);
         }
+        if (latest) {
+            ApplySnapshot(frame.world, *latest);
+        }
+        frame.events.DispatchEvents();
 
         svanes::AdvanceTimelines(frame.world, frame.real_delta_tics);
         svanes::AdvanceSpriteAnimations(frame.world);
@@ -385,6 +414,57 @@ private:
     }
 
     /**
+     * Raises a ReportedDeathEvent or ReportedSpawnEvent for each report in a
+     * snapshot that no earlier snapshot carried, with the server's time as
+     * its priority.
+     *
+     * @param events The event manager to queue the events on.
+     * @param snapshot A snapshot from the server.
+     */
+    void QueueNewReports(svanes::EventManager &events,
+                         const Snapshot &snapshot) {
+        for (const SequencedReport &sequenced : snapshot.reports) {
+            if (sequenced.sequence <= last_report) {
+                continue;
+            }
+            last_report = sequenced.sequence;
+
+            std::unique_ptr<svanes::Event> event;
+            if (const auto *death =
+                    std::get_if<DeathReport>(&sequenced.report)) {
+                event = std::make_unique<ReportedDeathEvent>(*death);
+            } else {
+                event = std::make_unique<ReportedSpawnEvent>(
+                    std::get<SpawnReport>(sequenced.report));
+            }
+            event->priority = sequenced.time;
+            events.QueueEvent(std::move(event));
+        }
+    }
+
+    /**
+     * @param subject What a report is about.
+     * @param client The client the report names.
+     * @return Whether the report is about this player's goose.
+     */
+    bool IsOwnGoose(Subject subject, svanes::ClientId client) const {
+        return subject == Subject::Goose && client == player;
+    }
+
+    /**
+     * Shows or hides the tint drawn over the world while this player's goose
+     * is dead, and starts or stops asking the server to respawn it.
+     *
+     * @param world The registry holding the tint.
+     * @param dead Whether this player's goose is dead.
+     */
+    void ShowDeathScreen(svanes::Registry &world, bool dead) {
+        own_goose_dead = dead;
+        world.GetComponent<svanes::SolidShape>(death_tint).color.alpha =
+            dead ? kDeathTintColor.alpha : 0;
+    }
+
+    /**
      * Makes the drawn world and the menu match a snapshot, and stops sending a
      * minion spawning request once the server has carried it out.
      *
@@ -433,11 +513,6 @@ private:
                 GooseWidth, kHealthBarHeight};
             PlaceHealthBar(world, drawn.health_bar, drawn.missing_health_bar,
                            above_goose, goose.health, GooseMaxHealth);
-            if (goose.client == player) {
-                own_goose_dead = goose.health == 0;
-                world.GetComponent<svanes::SolidShape>(death_tint).color.alpha =
-                    own_goose_dead ? kDeathTintColor.alpha : 0;
-            }
             geese.emplace(goose.client, drawn);
         }
         for (const auto &[client, departed] : remaining) {
@@ -646,6 +721,7 @@ private:
     bool should_quit = false;
     std::optional<bool> pending_minion_spawning;
     bool own_goose_dead = false;
+    std::uint32_t last_report = 0;
 
     svanes::TicCount left_tap_window = 0;
     svanes::TicCount right_tap_window = 0;

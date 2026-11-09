@@ -3,6 +3,7 @@
 #include <svanes/network/message_serialization.hpp>
 
 #include <stdexcept>
+#include <variant>
 
 namespace {
 
@@ -42,6 +43,53 @@ ClockSetting ReadClock(svanes::MessageReader &reader) {
     const auto speed = static_cast<GooseSpeed>(reader.ReadUint8());
     const bool paused = reader.ReadBool();
     return {speed, paused};
+}
+
+/**
+ * @param writer The message to append to.
+ * @param sequenced The report to write.
+ */
+void WriteReport(svanes::MessageWriter &writer,
+                 const SequencedReport &sequenced) {
+    writer.WriteUint32(sequenced.sequence);
+    writer.WriteUint64(sequenced.time);
+    writer.WriteBool(std::holds_alternative<DeathReport>(sequenced.report));
+    if (const auto *death = std::get_if<DeathReport>(&sequenced.report)) {
+        writer.WriteUint8(static_cast<std::uint8_t>(death->subject));
+        writer.WriteUint32(death->client);
+        WritePosition(writer, death->position);
+        writer.WriteUint8(static_cast<std::uint8_t>(death->cause));
+        writer.WriteUint32(death->killer);
+        return;
+    }
+    const SpawnReport &spawn = std::get<SpawnReport>(sequenced.report);
+    writer.WriteUint8(static_cast<std::uint8_t>(spawn.subject));
+    writer.WriteUint32(spawn.client);
+    writer.WriteUint8(static_cast<std::uint8_t>(spawn.minion_kind));
+    WritePosition(writer, spawn.position);
+}
+
+/**
+ * @param reader The message positioned at a report written by WriteReport.
+ * @return The report.
+ */
+SequencedReport ReadReport(svanes::MessageReader &reader) {
+    const std::uint32_t sequence = reader.ReadUint32();
+    const svanes::TicCount time = reader.ReadUint64();
+    if (reader.ReadBool()) {
+        const auto subject = static_cast<Subject>(reader.ReadUint8());
+        const svanes::ClientId client = reader.ReadUint32();
+        const svanes::Vector2D position = ReadPosition(reader);
+        const auto cause = static_cast<DeathCause>(reader.ReadUint8());
+        const svanes::ClientId killer = reader.ReadUint32();
+        return {sequence, time,
+                DeathReport{subject, client, position, cause, killer}};
+    }
+    const auto subject = static_cast<Subject>(reader.ReadUint8());
+    const svanes::ClientId client = reader.ReadUint32();
+    const auto kind = static_cast<MinionKind>(reader.ReadUint8());
+    const svanes::Vector2D position = ReadPosition(reader);
+    return {sequence, time, SpawnReport{subject, client, kind, position}};
 }
 
 /**
@@ -132,6 +180,11 @@ svanes::NetworkMessage EncodeSnapshot(const Snapshot &snapshot) {
         writer.WriteUint32(minion.health);
     }
     writer.WriteBool(snapshot.minion_spawning);
+
+    writer.WriteUint32(static_cast<std::uint32_t>(snapshot.reports.size()));
+    for (const SequencedReport &report : snapshot.reports) {
+        WriteReport(writer, report);
+    }
     return writer.Finish();
 }
 
@@ -170,6 +223,11 @@ Snapshot DecodeSnapshot(const svanes::NetworkMessage &message) {
         snapshot.minions.push_back({position, kind, health});
     }
     snapshot.minion_spawning = reader.ReadBool();
+
+    const std::uint32_t report_count = reader.ReadUint32();
+    for (std::uint32_t index = 0; index < report_count; ++index) {
+        snapshot.reports.push_back(ReadReport(reader));
+    }
 
     RequireFullyRead(reader);
     return snapshot;

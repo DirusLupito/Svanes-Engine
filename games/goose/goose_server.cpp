@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <deque>
 #include <exception>
 #include <iostream>
 #include <memory>
@@ -28,6 +29,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
+#include <variant>
 #include <vector>
 
 namespace {
@@ -60,6 +62,18 @@ struct Player {
     GooseIntent intent;
     ClockSetting clock;
     bool spawning = false;
+};
+
+/**
+ * A report the server is still sending to clients.
+ *
+ * FIELDS:
+ * - report: The report as it is sent.
+ * - step: The step it was made in.
+ */
+struct HeldReport {
+    SequencedReport report;
+    std::uint64_t step;
 };
 
 /**
@@ -120,7 +134,8 @@ svanes::Vector2D PushOut(const svanes::EntityCollision2D &collision,
  * handled by goose's contact rules, and those rules raise a DeathEvent when
  * they take the last of something's health. Joining, respawning, and the
  * enemy dropping minions raise SpawnEvents. Each of these is handled by
- * whatever owns the thing it is about.
+ * whatever owns the thing it is about. Every death and spawn is also numbered
+ * and sent to the clients in the snapshots that follow it.
  *
  * Everything that moves follows one world clock. While exactly one player is
  * in the world, that player's pause and speed settings drive the clock;
@@ -248,6 +263,12 @@ public:
         }
         spent_bullets.clear();
 
+        while (!reports.empty() &&
+               reports.front().step + ReportSteps <= step) {
+            reports.pop_front();
+        }
+        ++step;
+
         const svanes::NetworkMessage snapshot =
             EncodeSnapshot(TakeSnapshot(world));
         for (const auto &[client, player] : players) {
@@ -285,6 +306,29 @@ private:
                 [this, &world](const SpawnEvent &event) {
                     HandleSpawn(world, event);
                 }));
+        events.Subscribe(
+            std::make_unique<svanes::EventHandlerWrapper<DeathEvent>>(
+                [this](const DeathEvent &event) {
+                    Report(event.priority, event.report);
+                }));
+        events.Subscribe(
+            std::make_unique<svanes::EventHandlerWrapper<SpawnEvent>>(
+                [this](const SpawnEvent &event) {
+                    Report(event.priority, event.report);
+                }));
+    }
+
+    /**
+     * Numbers a death or spawn and holds it to be sent in the next
+     * ReportSteps snapshots.
+     *
+     * @param time The world clock's time when it happened.
+     * @param report What happened.
+     */
+    void Report(svanes::TicCount time,
+                std::variant<DeathReport, SpawnReport> report) {
+        ++last_report;
+        reports.push_back({{last_report, time, report}, step});
     }
 
     /**
@@ -649,6 +693,10 @@ private:
                 snapshot.minions.push_back(
                     {{transform.x, transform.y}, minion.kind, minion.health});
             });
+
+        for (const HeldReport &held : reports) {
+            snapshot.reports.push_back(held.report);
+        }
         return snapshot;
     }
 
@@ -659,6 +707,9 @@ private:
     std::unordered_map<svanes::ClientId, Player> players;
     std::vector<std::unique_ptr<GooseInputEvent>> inputs;
     std::unordered_set<svanes::Entity> spent_bullets;
+    std::uint64_t step = 0;
+    std::uint32_t last_report = 0;
+    std::deque<HeldReport> reports;
 };
 
 } // namespace
