@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <functional>
 #include <map>
+#include <memory>
 #include <set>
 
 class DoubleTimeReplayServer final {
@@ -25,10 +26,6 @@ public:
     bool IsViewing(svanes::ClientId client) const;
 
 private:
-    struct Viewer {
-        svanes::EventManager events;
-        std::unique_ptr<svanes::ReplaySession> session;
-    };
     void Status(svanes::ClientId client, const std::string &message);
     void StatusAll(const std::string &message);
     void SendSnapshot(svanes::ClientId client,
@@ -39,7 +36,7 @@ private:
     Sender send;
     svanes::NetworkMessage latest;
     svanes::EventManager events;
-    svanes::ReplaySession recording;
+    svanes::ReplaySession &recording;
     std::set<svanes::ClientId> clients;
-    std::map<svanes::ClientId, std::unique_ptr<Viewer>> viewers;
+    std::map<svanes::ClientId, std::unique_ptr<svanes::EventManager>> viewers;
 };

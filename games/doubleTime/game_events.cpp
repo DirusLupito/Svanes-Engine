@@ -26,6 +26,10 @@ svanes::NetworkMessage DoubleTimeWorldSnapshotEvent::Write() const {
         writer.WriteUint32(state.area_index);
         writer.WriteUint32(state.tilemap_index);
     }
+    if (stats) {
+        writer.WriteUint32(stats->deaths);
+        writer.WriteUint32(stats->coins);
+    }
     return writer.Finish();
 }
 
@@ -70,9 +74,16 @@ DoubleTimeWorldSnapshotEvent::Read(const svanes::NetworkMessage &message) {
         clocks += state.kind == DoubleTimeEntityKind::AudioTimeline ? 1 : 0;
         states.push_back(state);
     }
-    if (clocks != 1 || reader.Remaining() != 0) {
+    if (clocks != 1) {
         throw std::invalid_argument(
             "Double Time snapshot requires one authoritative clock.");
     }
-    return std::make_unique<DoubleTimeWorldSnapshotEvent>(std::move(states));
+    std::optional<DoubleTimeRunStats> stats;
+    if (reader.Remaining() == 2 * sizeof(std::uint32_t)) {
+        stats = DoubleTimeRunStats{reader.ReadUint32(), reader.ReadUint32()};
+    } else if (reader.Remaining() != 0) {
+        throw std::invalid_argument("Invalid Double Time snapshot counters.");
+    }
+    return std::make_unique<DoubleTimeWorldSnapshotEvent>(std::move(states),
+                                                          stats);
 }

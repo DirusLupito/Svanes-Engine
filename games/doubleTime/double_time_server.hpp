@@ -68,6 +68,7 @@ private:
     void RegisterHandlers();
     void HandleCommand(const DoubleTimeCommandEvent &event);
     void HandleSpawn(const DoubleTimePlayerSpawnEvent &event);
+    void HandleDeath(const DoubleTimePlayerDeathEvent &event);
     void HandleRespawn();
     void HandleCollection(svanes::Entity entity);
     void AdvanceLevel();
@@ -96,6 +97,7 @@ private:
     std::vector<ServerAreaObject> death_zones;
     std::vector<ServerAreaObject> spikes;
     std::vector<ServerAreaObject> collectibles;
+    DoubleTimeRunStats run_stats;
     std::optional<ServerCharacter> character;
     std::optional<svanes::ClientId> platform_client_id;
     bool platform_left_held = false;

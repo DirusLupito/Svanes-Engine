@@ -26,38 +26,30 @@ public:
         context.automatic_simulation = false;
         pipe.Listen("*:" + std::to_string(kDoubleTimeInputBridgePort));
         context.events.Subscribe(
-            svanes::KeyInputEvent::GetStaticEventType(),
             std::make_unique<
                 svanes::EventHandlerWrapper<svanes::KeyInputEvent>>(
                 [this](const svanes::KeyInputEvent &event) {
+                    if (!event.down) {
+                        return;
+                    }
                     switch (event.key) {
-                    case svanes::Key::A:
-                        left = event.down;
-                        break;
-                    case svanes::Key::D:
-                        right = event.down;
-                        break;
                     case svanes::Key::Left:
-                        pending.platform_left |= event.down;
-                        input.platform_left = event.down;
+                        pending.platform_left = true;
                         break;
                     case svanes::Key::Right:
-                        pending.platform_right |= event.down;
-                        input.platform_right = event.down;
+                        pending.platform_right = true;
                         break;
                     case svanes::Key::Up:
-                        pending.platform_up |= event.down;
-                        input.platform_up = event.down;
+                        pending.platform_up = true;
                         break;
                     case svanes::Key::Down:
-                        pending.platform_down |= event.down;
-                        input.platform_down = event.down;
+                        pending.platform_down = true;
                         break;
                     case svanes::Key::W:
-                        input.character_jump |= event.down;
+                        pending.character_jump = true;
                         break;
                     case svanes::Key::Space:
-                        input.platform_action |= event.down;
+                        pending.platform_action = true;
                         break;
                     default:
                         break;
@@ -96,19 +88,18 @@ public:
             return;
         }
         send_tics %= 16000;
-        input.character_horizontal =
-            static_cast<float>(right) - static_cast<float>(left);
-        auto sent = input;
-        sent.platform_left |= pending.platform_left;
-        sent.platform_right |= pending.platform_right;
-        sent.platform_up |= pending.platform_up;
-        sent.platform_down |= pending.platform_down;
-        pending = {};
+        auto sent = pending;
+        sent.character_horizontal =
+            static_cast<float>(frame.input.IsDown(svanes::Key::D)) -
+            static_cast<float>(frame.input.IsDown(svanes::Key::A));
+        sent.platform_left |= frame.input.IsDown(svanes::Key::Left);
+        sent.platform_right |= frame.input.IsDown(svanes::Key::Right);
+        sent.platform_up |= frame.input.IsDown(svanes::Key::Up);
+        sent.platform_down |= frame.input.IsDown(svanes::Key::Down);
         const auto message = svanes::NetworkMessage::From(sent);
         pipe.Send(character_destination, message);
         pipe.Send(platform_destination, message);
-        input.character_jump = false;
-        input.platform_action = false;
+        pending = {};
     }
 
     bool ShouldQuit() const override { return should_quit; }
@@ -118,10 +109,7 @@ private:
     svanes::UdpMsgPipe pipe;
     std::string character_destination;
     std::string platform_destination;
-    DoubleTimeBridgeInput input;
     DoubleTimeBridgeInput pending;
-    bool left = false;
-    bool right = false;
     bool should_quit = false;
     svanes::TicCount send_tics = 0;
 };

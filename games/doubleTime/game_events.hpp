@@ -4,89 +4,93 @@
 
 #include <svanes/events/event.hpp>
 
+#include <cstdint>
 #include <memory>
+#include <optional>
+#include <string_view>
 #include <utility>
 #include <vector>
 
-class DoubleTimeCommandEvent final : public svanes::Event {
+class DoubleTimeCommandEvent final
+    : public svanes::EventOf<DoubleTimeCommandEvent> {
 public:
     explicit DoubleTimeCommandEvent(PlayerInputMessage input) : input(input) {}
-    static std::string GetStaticEventType() { return "double_time.command"; }
-    const std::string GetEventType() const override {
-        return GetStaticEventType();
-    }
+    static constexpr std::string_view EventName = "double_time.command";
     PlayerInputMessage input;
 };
 
-class DoubleTimePlayerSpawnEvent final : public svanes::Event {
+class DoubleTimePlayerSpawnEvent final
+    : public svanes::EventOf<DoubleTimePlayerSpawnEvent> {
 public:
     explicit DoubleTimePlayerSpawnEvent(svanes::ClientId client)
         : client(client) {}
-    static std::string GetStaticEventType() {
-        return "double_time.player.spawn";
-    }
-    const std::string GetEventType() const override {
-        return GetStaticEventType();
-    }
+    static constexpr std::string_view EventName = "double_time.player.spawn";
     svanes::ClientId client;
 };
 
-class DoubleTimePlayerDisconnectedEvent final : public svanes::Event {
+class DoubleTimePlayerDisconnectedEvent final
+    : public svanes::EventOf<DoubleTimePlayerDisconnectedEvent> {
 public:
     explicit DoubleTimePlayerDisconnectedEvent(svanes::ClientId client)
         : client(client) {}
-    static std::string GetStaticEventType() {
-        return "double_time.player.disconnect";
-    }
-    const std::string GetEventType() const override {
-        return GetStaticEventType();
-    }
+    static constexpr std::string_view EventName =
+        "double_time.player.disconnect";
     svanes::ClientId client;
 };
 
-class DoubleTimeRespawnEvent final : public svanes::Event {
+class DoubleTimePlayerDeathEvent final
+    : public svanes::EventOf<DoubleTimePlayerDeathEvent> {
 public:
-    static std::string GetStaticEventType() {
-        return "double_time.character.respawn";
-    }
-    const std::string GetEventType() const override {
-        return GetStaticEventType();
-    }
-};
-
-class DoubleTimeCollectEvent final : public svanes::Event {
-public:
-    explicit DoubleTimeCollectEvent(svanes::Entity entity) : entity(entity) {}
-    static std::string GetStaticEventType() { return "double_time.collect"; }
-    const std::string GetEventType() const override {
-        return GetStaticEventType();
-    }
+    explicit DoubleTimePlayerDeathEvent(svanes::Entity entity)
+        : entity(entity) {}
+    static constexpr std::string_view EventName = "double_time.player.death";
     svanes::Entity entity;
 };
 
-class DoubleTimeAdvanceLevelEvent final : public svanes::Event {
+class DoubleTimeRespawnEvent final
+    : public svanes::EventOf<DoubleTimeRespawnEvent> {
 public:
-    static std::string GetStaticEventType() {
-        return "double_time.level.advance";
-    }
-    const std::string GetEventType() const override {
-        return GetStaticEventType();
-    }
+    static constexpr std::string_view EventName =
+        "double_time.character.respawn";
 };
 
-class DoubleTimeWorldSnapshotEvent final : public svanes::Event {
+class DoubleTimeCollectEvent final
+    : public svanes::EventOf<DoubleTimeCollectEvent> {
+public:
+    explicit DoubleTimeCollectEvent(svanes::Entity entity) : entity(entity) {}
+    static constexpr std::string_view EventName = "double_time.collect";
+    svanes::Entity entity;
+};
+
+class DoubleTimeAdvanceLevelEvent final
+    : public svanes::EventOf<DoubleTimeAdvanceLevelEvent> {
+public:
+    static constexpr std::string_view EventName = "double_time.level.advance";
+};
+
+class OnBeatEvent final : public svanes::EventOf<OnBeatEvent> {
+public:
+    explicit OnBeatEvent(std::uint64_t beat_index) : beat_index(beat_index) {}
+    static constexpr std::string_view EventName = "double_time.rhythm.beat";
+    std::uint64_t beat_index;
+};
+
+struct DoubleTimeRunStats {
+    std::uint32_t deaths = 0;
+    std::uint32_t coins = 0;
+};
+
+class DoubleTimeWorldSnapshotEvent final
+    : public svanes::EventOf<DoubleTimeWorldSnapshotEvent> {
 public:
     explicit DoubleTimeWorldSnapshotEvent(
-        std::vector<DoubleTimeEntityState> objects)
-        : objects(std::move(objects)) {}
-    static std::string GetStaticEventType() {
-        return "double_time.world.snapshot";
-    }
-    const std::string GetEventType() const override {
-        return GetStaticEventType();
-    }
+        std::vector<DoubleTimeEntityState> objects,
+        std::optional<DoubleTimeRunStats> stats)
+        : objects(std::move(objects)), stats(stats) {}
+    static constexpr std::string_view EventName = "double_time.world.snapshot";
     svanes::NetworkMessage Write() const;
     static std::unique_ptr<DoubleTimeWorldSnapshotEvent>
     Read(const svanes::NetworkMessage &message);
     std::vector<DoubleTimeEntityState> objects;
+    std::optional<DoubleTimeRunStats> stats;
 };

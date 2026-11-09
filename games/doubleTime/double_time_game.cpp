@@ -1,7 +1,10 @@
 #include "double_time_game.hpp"
 #include "replay_protocol.hpp"
+#include "rhythm_helpers.hpp"
 #include "tilemap_parser.hpp"
 
+#include <svanes/MenuUtilities/font_manager.hpp>
+#include <svanes/MenuUtilities/text_label.hpp>
 #include <svanes/asset_path.hpp>
 #include <svanes/camera2d.hpp>
 #include <svanes/events/event_handler_wrapper.hpp>
@@ -35,10 +38,18 @@ constexpr double kRhythmTolerance = 0.175;
 constexpr std::int32_t kGroundZOrder = 1;
 constexpr std::int32_t kCharacterZOrder = 2;
 constexpr std::int32_t kPlatformZOrder = 2;
+constexpr svanes::Rectangle2D kSignalFrame{28.0F, 28.0F, 56.0F, 56.0F};
+constexpr svanes::Rectangle2D kSignalGeometry{0.0F, 0.0F, 14.0F, 14.0F};
 
 constexpr svanes::Color kBackgroundColor{17, 24, 39, 255};
 
 constexpr const char *kTestTileSetFilename = "TestTileSet.png";
+
+svanes::Rectangle2D SignalFrame(std::uint64_t beat_index) {
+    auto source = kSignalFrame;
+    source.x += static_cast<float>(beat_index % 2) * source.width;
+    return source;
+}
 
 } // namespace
 
@@ -91,6 +102,9 @@ void DoubleTimeGame::EnterArea(std::size_t area_index,
                               area_assets[area_index].levels.empty();
     LoadAreaAssets(area_index);
     active_area_index = area_index;
+    if (area_changed) {
+        last_beat_index.reset();
+    }
     if (audio_manager != nullptr) {
         audio_manager->SetMusicVolume(kDoubleTimeMusicVolume);
         audio_manager->SetMusicPlaybackRate(1.0F);
@@ -105,6 +119,7 @@ void DoubleTimeGame::EnterArea(std::size_t area_index,
 void DoubleTimeGame::ClearLevelEntities(svanes::Registry &world) {
     if (has_active_tilemap) {
         world.DestroyEntity(active_tilemap_entity);
+        world.DestroyEntity(signal_entity);
         has_active_tilemap = false;
     }
     for (const auto &[id, entity] : platform_entities) {
@@ -138,10 +153,6 @@ void DoubleTimeGame::ActivateTilemap(svanes::Registry &world,
     if (index >= area_assets[active_area_index].levels.size()) {
         throw std::out_of_range("Double Time tilemap index is out of range.");
     }
-    if (has_active_tilemap) {
-        world.DestroyEntity(active_tilemap_entity);
-    }
-
     active_tilemap_entity = world.CreateEntity();
     const svanes::TileMap &tilemap =
         area_assets[active_area_index].levels[index].tile_map;
@@ -152,6 +163,20 @@ void DoubleTimeGame::ActivateTilemap(svanes::Registry &world,
     world.AddComponent<svanes::TileMap>(active_tilemap_entity, tilemap);
     world.AddComponent<svanes::ZOrder>(active_tilemap_entity,
                                        svanes::ZOrder{kGroundZOrder});
+
+    signal_entity = world.CreateEntity();
+    world.AddComponent<svanes::Transform>(
+        signal_entity,
+        svanes::Transform{kDoubleTimeWorldWidth - 3.0F * kDoubleTimeTileSize,
+                          2.0F * kDoubleTimeTileSize});
+    world.AddComponent<svanes::Sprite>(
+        signal_entity,
+        svanes::Sprite{.texture = signal_texture,
+                       .source = SignalFrame(last_beat_index.value_or(0)),
+                       .geometry = kSignalGeometry});
+    world.AddComponent<svanes::ZOrder>(signal_entity,
+                                       svanes::ZOrder{kGroundZOrder + 1});
+
     active_tilemap_index = index;
     has_active_tilemap = true;
 }
@@ -159,7 +184,6 @@ void DoubleTimeGame::ActivateTilemap(svanes::Registry &world,
 
 void DoubleTimeGame::Initialize(svanes::ClientContext &context) {
     context.events.Subscribe(
-        DoubleTimeWorldSnapshotEvent::GetStaticEventType(),
         std::make_unique<
             svanes::EventHandlerWrapper<DoubleTimeWorldSnapshotEvent>>(
             [this, &world = context.world](
@@ -167,15 +191,36 @@ void DoubleTimeGame::Initialize(svanes::ClientContext &context) {
                 ApplyServerState(world, event);
             }));
     context.events.Subscribe(
-        DoubleTimeCommandEvent::GetStaticEventType(),
         std::make_unique<svanes::EventHandlerWrapper<DoubleTimeCommandEvent>>(
             [&network = context.network](const DoubleTimeCommandEvent &event) {
                 network.Send(svanes::NetworkMessage::From(event.input));
+            }));
+    context.events.Subscribe(
+        std::make_unique<svanes::EventHandlerWrapper<OnBeatEvent>>(
+            [this, &world = context.world](const OnBeatEvent &event) {
+                if (has_active_tilemap) {
+                    world.GetComponent<svanes::Sprite>(signal_entity).source =
+                        SignalFrame(event.beat_index);
+                }
             }));
     context.network.Connect(server_host + ":" +
                             std::to_string(kDoubleTimeServerJoinPort));
     asset_manager = &context.assets;
     audio_manager = &context.audio;
+    signal_texture = context.assets.LoadTexture(
+        svanes::AssetPath(DOUBLE_TIME_GAME_ASSETS_DIR "/sprites/signal.png"));
+    const auto counter_font = context.fonts.LoadFont(
+        svanes::AssetPath(DOUBLE_TIME_GAME_ASSETS_DIR "/fonts/consola.ttf"),
+        26.0F);
+    if (counter_font.id == 0) {
+        throw std::runtime_error("Could not load Double Time's counter font.");
+    }
+    counter_label_entity = context.world.CreateEntity();
+    context.world.AddComponent<svanes::TextLabel>(
+        counter_label_entity, svanes::TextLabel{.text = "Deaths: 0\nCoins: 0",
+                                                .position = {16.0F, 16.0F},
+                                                .color = {255, 255, 255, 255},
+                                                .font = counter_font});
     context.camera.scale_mode = svanes::ScaleMode::Proportional;
     context.camera.zoom = context.camera.Viewport().height /
                           context.camera.Scale() / kDoubleTimeWorldHeight;
@@ -359,6 +404,12 @@ void DoubleTimeGame::PollInputBridge() {
 
 void DoubleTimeGame::ApplyServerState(
     svanes::Registry &world, const DoubleTimeWorldSnapshotEvent &event) {
+    auto &label = world.GetComponent<svanes::TextLabel>(counter_label_entity);
+    label.visible = event.stats.has_value();
+    if (event.stats) {
+        label.text = "Deaths: " + std::to_string(event.stats->deaths) +
+                     "\nCoins: " + std::to_string(event.stats->coins);
+    }
     for (const DoubleTimeEntityState &state : event.objects) {
         if (state.kind != DoubleTimeEntityKind::AudioTimeline) {
             continue;
@@ -382,6 +433,13 @@ void DoubleTimeGame::ApplyServerState(
                    active_tilemap_index != server_tilemap) {
             ClearLevelEntities(world);
             ActivateTilemap(world, server_tilemap);
+        }
+        if (!last_beat_index) {
+            last_beat_index = double_time::BeatIndex(
+                state.timeline_tics,
+                DoubleTimeAssetCatalog()[server_area].beats_per_minute);
+            world.GetComponent<svanes::Sprite>(signal_entity).source =
+                SignalFrame(*last_beat_index);
         }
     }
 
@@ -589,6 +647,7 @@ void DoubleTimeGame::ReceiveMessages(const svanes::ClientFrameContext &frame) {
             SDL_Log("%s", text.c_str());
             if (playing != viewing_replay) {
                 force_audio_seek = true;
+                last_beat_index.reset();
                 ClearLevelEntities(frame.world);
                 ResetPendingInput();
                 viewing_replay = playing;
@@ -611,6 +670,7 @@ void DoubleTimeGame::ReceiveMessages(const svanes::ClientFrameContext &frame) {
             if (!viewing_replay) {
                 force_audio_seek = true;
                 viewing_replay = true;
+                last_beat_index.reset();
                 ClearLevelEntities(frame.world);
                 ResetPendingInput();
             }
@@ -620,6 +680,19 @@ void DoubleTimeGame::ReceiveMessages(const svanes::ClientFrameContext &frame) {
         } else {
             throw std::invalid_argument("Unexpected replay server message.");
         }
+    }
+}
+
+void DoubleTimeGame::EmitBeatEvents(const svanes::ClientFrameContext &frame) {
+    if (!last_beat_index) {
+        return;
+    }
+    const auto beat_index = double_time::BeatIndex(
+        client_timeline.GetTotalTics(),
+        DoubleTimeAssetCatalog()[active_area_index].beats_per_minute);
+    while (*last_beat_index < beat_index) {
+        ++*last_beat_index;
+        frame.events.TriggerEvent(OnBeatEvent{*last_beat_index});
     }
 }
 
@@ -654,6 +727,7 @@ void DoubleTimeGame::Update(const svanes::ClientFrameContext &frame) {
         return;
     }
     client_timeline.Advance(frame.real_delta_tics);
+    EmitBeatEvents(frame);
     PollInputBridge();
     if (viewing_replay) {
         ResetPendingInput();
@@ -661,17 +735,10 @@ void DoubleTimeGame::Update(const svanes::ClientFrameContext &frame) {
                          static_cast<float>(svanes::TicsPerSecond));
         return;
     }
-    platform_left_requested_since_last_send |=
-        frame.input.WasPressed(svanes::Key::Left);
-    platform_right_requested_since_last_send |=
-        frame.input.WasPressed(svanes::Key::Right);
-    platform_up_requested_since_last_send |=
-        frame.input.WasPressed(svanes::Key::Up);
-    platform_down_requested_since_last_send |=
-        frame.input.WasPressed(svanes::Key::Down);
-    const auto capture = [&](bool down, bool &was_down, bool &on_beat,
+    const auto capture = [&](svanes::Key key, bool &pending, bool &on_beat,
                              std::uint64_t &beat_index) {
-        if (down && !was_down) {
+        if (frame.input.WasPressed(key)) {
+            pending = true;
             beat_index = double_time::BeatIndex(
                 client_timeline.GetTotalTics(),
                 DoubleTimeAssetCatalog()[active_area_index].beats_per_minute);
@@ -680,15 +747,14 @@ void DoubleTimeGame::Update(const svanes::ClientFrameContext &frame) {
                 DoubleTimeAssetCatalog()[active_area_index].beats_per_minute,
                 kRhythmTolerance);
         }
-        was_down = down;
     };
-    capture(frame.input.IsDown(svanes::Key::Left), platform_left_was_down,
+    capture(svanes::Key::Left, platform_left_requested_since_last_send,
             platform_left_on_beat, platform_left_beat_index);
-    capture(frame.input.IsDown(svanes::Key::Right), platform_right_was_down,
+    capture(svanes::Key::Right, platform_right_requested_since_last_send,
             platform_right_on_beat, platform_right_beat_index);
-    capture(frame.input.IsDown(svanes::Key::Up), platform_up_was_down,
+    capture(svanes::Key::Up, platform_up_requested_since_last_send,
             platform_up_on_beat, platform_up_beat_index);
-    capture(frame.input.IsDown(svanes::Key::Down), platform_down_was_down,
+    capture(svanes::Key::Down, platform_down_requested_since_last_send,
             platform_down_on_beat, platform_down_beat_index);
     if (frame.input.WasPressed(svanes::Key::Up) ||
         frame.input.WasPressed(svanes::Key::W)) {

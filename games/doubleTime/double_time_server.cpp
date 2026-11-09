@@ -63,37 +63,36 @@ void DoubleTimeServer::Initialize(svanes::ServerContext &context) {
 
 void DoubleTimeServer::RegisterHandlers() {
     events->Subscribe(
-        DoubleTimeCommandEvent::GetStaticEventType(),
         std::make_unique<svanes::EventHandlerWrapper<DoubleTimeCommandEvent>>(
             [this](const DoubleTimeCommandEvent &event) {
                 HandleCommand(event);
             }));
     events->Subscribe(
-        DoubleTimePlayerSpawnEvent::GetStaticEventType(),
         std::make_unique<
             svanes::EventHandlerWrapper<DoubleTimePlayerSpawnEvent>>(
             [this](const DoubleTimePlayerSpawnEvent &event) {
                 HandleSpawn(event);
             }));
     events->Subscribe(
-        DoubleTimePlayerDisconnectedEvent::GetStaticEventType(),
         std::make_unique<
             svanes::EventHandlerWrapper<DoubleTimePlayerDisconnectedEvent>>(
             [this](const DoubleTimePlayerDisconnectedEvent &event) {
                 ReleasePlayer(event.client);
             }));
+    events->Subscribe(std::make_unique<
+                      svanes::EventHandlerWrapper<DoubleTimePlayerDeathEvent>>(
+        [this](const DoubleTimePlayerDeathEvent &event) {
+            HandleDeath(event);
+        }));
     events->Subscribe(
-        DoubleTimeRespawnEvent::GetStaticEventType(),
         std::make_unique<svanes::EventHandlerWrapper<DoubleTimeRespawnEvent>>(
             [this](const DoubleTimeRespawnEvent &) { HandleRespawn(); }));
     events->Subscribe(
-        DoubleTimeCollectEvent::GetStaticEventType(),
         std::make_unique<svanes::EventHandlerWrapper<DoubleTimeCollectEvent>>(
             [this](const DoubleTimeCollectEvent &event) {
                 HandleCollection(event.entity);
             }));
     events->Subscribe(
-        DoubleTimeAdvanceLevelEvent::GetStaticEventType(),
         std::make_unique<
             svanes::EventHandlerWrapper<DoubleTimeAdvanceLevelEvent>>(
             [this](const DoubleTimeAdvanceLevelEvent &) { AdvanceLevel(); }));
@@ -229,6 +228,15 @@ void DoubleTimeServer::ReleasePlayer(svanes::ClientId client) {
     }
 }
 
+void DoubleTimeServer::HandleDeath(const DoubleTimePlayerDeathEvent &event) {
+    if (!character || character->entity != event.entity) {
+        throw std::logic_error(
+            "Double Time death event has no active character.");
+    }
+    ++run_stats.deaths;
+    events->TriggerEvent(DoubleTimeRespawnEvent{});
+}
+
 void DoubleTimeServer::HandleRespawn() {
     if (!character) {
         return;
@@ -249,8 +257,12 @@ void DoubleTimeServer::HandleCollection(svanes::Entity entity) {
     if (found == collectibles.end()) {
         throw std::invalid_argument("Unknown Double Time collectible.");
     }
+    if (!found->enabled) {
+        return;
+    }
     found->enabled = false;
     active_world->RemoveComponent<svanes::Collider2D>(entity);
+    ++run_stats.coins;
 }
 
 void DoubleTimeServer::ClearLevel() {
@@ -637,7 +649,8 @@ void DoubleTimeServer::PhysicsUpdate(
                (current_tilemap_index + 1 < area.tilemap_filenames.size() ||
                 area.next_area.has_value());
         if (hazard) {
-            events->QueueEvent(std::make_unique<DoubleTimeRespawnEvent>());
+            events->QueueEvent(std::make_unique<DoubleTimePlayerDeathEvent>(
+                character->entity));
         } else if (goal) {
             events->QueueEvent(std::make_unique<DoubleTimeAdvanceLevelEvent>());
         }
@@ -760,5 +773,5 @@ DoubleTimeWorldSnapshotEvent DoubleTimeServer::CaptureSnapshot() const {
         absent.enabled = false;
         broadcast(absent);
     }
-    return DoubleTimeWorldSnapshotEvent{std::move(objects)};
+    return DoubleTimeWorldSnapshotEvent{std::move(objects), run_stats};
 }

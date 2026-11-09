@@ -1,6 +1,7 @@
 #include "replay_server.hpp"
 
 #include <svanes/events/event_handler_wrapper.hpp>
+#include <svanes/events/replay_events.hpp>
 #include <svanes/physics_system.hpp>
 
 namespace {
@@ -22,9 +23,10 @@ DoubleTimeReplayServer::DoubleTimeReplayServer(std::filesystem::path path,
                                                Sender send,
                                                svanes::NetworkMessage initial)
     : path(std::move(path)), send(std::move(send)), latest(std::move(initial)),
-      recording(events, svanes::DefaultPhysicsStepTics,
-                {[this] { return latest; }, [](std::span<const std::byte>) {},
-                 [](svanes::TicCount) {}}) {
+      recording(events.CreateReplaySession(svanes::DefaultPhysicsStepTics,
+                                           {[this] { return latest; },
+                                            [](std::span<const std::byte>) {},
+                                            [](svanes::TicCount) {}})) {
     RegisterSnapshots(recording);
 }
 
@@ -98,29 +100,26 @@ void DoubleTimeReplayServer::Request(svanes::ClientId client,
                 return;
             }
             StopRecording();
-            auto viewer = std::make_unique<Viewer>();
-            viewer->events.Subscribe(
-                DoubleTimeWorldSnapshotEvent::GetStaticEventType(),
+            auto viewer = std::make_unique<svanes::EventManager>();
+            viewer->Subscribe(
                 std::make_unique<
                     svanes::EventHandlerWrapper<DoubleTimeWorldSnapshotEvent>>(
                     [this, client](const DoubleTimeWorldSnapshotEvent &event) {
                         SendSnapshot(client, event.Write().bytes);
                     }));
-            viewer->session = std::make_unique<svanes::ReplaySession>(
-                viewer->events, svanes::DefaultPhysicsStepTics,
-                svanes::ReplaySession::Callbacks{
-                    [this] { return latest; },
-                    [this, client](std::span<const std::byte> bytes) {
-                        DoubleTimeWorldSnapshotEvent::Read(
-                            svanes::NetworkMessage{std::vector<std::byte>(
-                                bytes.begin(), bytes.end())});
-                        SendSnapshot(client, bytes);
-                    },
-                    [](svanes::TicCount) {}});
-            RegisterSnapshots(*viewer->session);
-            viewer->events.TriggerEvent(svanes::PlayReplayEvent{path});
-            viewer->session->ProcessControls();
-            if (viewer->session->IsReplaying()) {
+            auto &session = viewer->CreateReplaySession(
+                svanes::DefaultPhysicsStepTics,
+                {[this] { return latest; },
+                 [this, client](std::span<const std::byte> bytes) {
+                     DoubleTimeWorldSnapshotEvent::Read(svanes::NetworkMessage{
+                         std::vector<std::byte>(bytes.begin(), bytes.end())});
+                     SendSnapshot(client, bytes);
+                 },
+                 [](svanes::TicCount) {}});
+            RegisterSnapshots(session);
+            viewer->TriggerEvent(svanes::PlayReplayEvent{path});
+            session.ProcessControls();
+            if (session.IsReplaying()) {
                 viewers.emplace(client, std::move(viewer));
                 Status(client, "Replay playing. Press \\ or Escape to return "
                                "to live play.");
@@ -132,8 +131,8 @@ void DoubleTimeReplayServer::Request(svanes::ClientId client,
         case DoubleTimeReplayMessage::Exit:
             if (const auto found = viewers.find(client);
                 found != viewers.end()) {
-                found->second->events.TriggerEvent(svanes::StopReplayEvent{});
-                found->second->session->ProcessControls();
+                found->second->TriggerEvent(svanes::StopReplayEvent{});
+                found->second->GetReplaySession().ProcessControls();
                 viewers.erase(found);
             }
             Status(client, "Returned to live play.");
@@ -155,8 +154,9 @@ void DoubleTimeReplayServer::Tick(const DoubleTimeWorldSnapshotEvent &snapshot,
         recording.EndStep();
     }
     for (auto it = viewers.begin(); it != viewers.end();) {
-        it->second->session->Update(elapsed);
-        if (!it->second->session->IsReplaying()) {
+        auto &session = it->second->GetReplaySession();
+        session.Update(elapsed);
+        if (!session.IsReplaying()) {
             const auto client = it->first;
             it = viewers.erase(it);
             Status(client, "Replay finished; returned to live play.");

@@ -3,7 +3,6 @@
 #include "asset_catalog.hpp"
 #include "game_events.hpp"
 #include "network_protocol.hpp"
-#include "rhythm_helpers.hpp"
 #include "tilemap_parser.hpp"
 
 #include <svanes/audio/audio_manager.hpp>
@@ -18,6 +17,7 @@
 
 #include <map>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -57,6 +57,7 @@ private:
     void LoadAreaAssets(std::size_t area_index);
     void ClearLevelEntities(svanes::Registry &world);
     void ActivateTilemap(svanes::Registry &world, std::size_t index);
+    void EmitBeatEvents(const svanes::ClientFrameContext &frame);
     void SendInput(const svanes::ClientFrameContext &frame);
     void PollInputBridge();
     void ApplyServerState(svanes::Registry &world,
@@ -78,12 +79,16 @@ private:
     svanes::Entity character_entity = 0;
     bool has_character = false;
     svanes::Timeline client_timeline;
+    std::optional<std::uint64_t> last_beat_index;
 
     svanes::AudioManager *audio_manager = nullptr;
     DoubleTimeState state = DoubleTimeState::MainMenu;
     std::vector<DoubleTimeLevelAssets> area_assets;
     std::size_t active_area_index = 0;
     svanes::Entity active_tilemap_entity = 0;
+    svanes::Entity signal_entity = 0;
+    svanes::Entity counter_label_entity = 0;
+    svanes::TextureHandle signal_texture{};
     bool has_active_tilemap = false;
     std::size_t active_tilemap_index = 0;
     svanes::TextureManager *asset_manager = nullptr;
@@ -96,10 +101,6 @@ private:
     bool platform_right_requested_since_last_send = false;
     bool platform_up_requested_since_last_send = false;
     bool platform_down_requested_since_last_send = false;
-    bool platform_left_was_down = false;
-    bool platform_right_was_down = false;
-    bool platform_up_was_down = false;
-    bool platform_down_was_down = false;
     bool platform_left_on_beat = false;
     bool platform_right_on_beat = false;
     bool platform_up_on_beat = false;
