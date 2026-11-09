@@ -2,7 +2,8 @@
 
 #include <svanes/asset_path.hpp>
 #include <svanes/camera2d.hpp>
-#include <svanes/input.hpp>
+#include <svanes/input/input_manager.hpp>
+#include <svanes/input/input_types.hpp>
 #include <svanes/MenuUtilities/font_manager.hpp>
 #include <svanes/MenuUtilities/text_label.hpp>
 #include <svanes/registry.hpp>

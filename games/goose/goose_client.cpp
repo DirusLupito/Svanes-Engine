@@ -8,7 +8,8 @@
 
 #include <svanes/asset_path.hpp>
 #include <svanes/camera2d.hpp>
-#include <svanes/input.hpp>
+#include <svanes/input/input_manager.hpp>
+#include <svanes/input/input_types.hpp>
 #include <svanes/network/clientserver/IClient.hpp>
 #include <svanes/network/clientserver/network_client.hpp>
 #include <svanes/registry.hpp>
@@ -168,12 +169,9 @@ class GooseClient final : public svanes::IClient {
 public:
     /**
      * @param server_address The server's address, in IPv4:PORT form.
-     * @param text_snapshots Whether the server sends snapshots as text rather
-     * than binary.
      */
-    GooseClient(std::string server_address, bool text_snapshots)
-        : server_address(std::move(server_address)),
-          text_snapshots(text_snapshots) {}
+    explicit GooseClient(std::string server_address)
+        : server_address(std::move(server_address)) {}
 
     void Initialize(svanes::ClientContext &context) override {
         svanes::Registry &world = context.world;
@@ -254,9 +252,7 @@ public:
     void Update(const svanes::ClientFrameContext &frame) override {
         const auto snapshots = frame.network.PollMessages();
         if (!snapshots.empty()) {
-            ApplySnapshot(frame.world,
-                          text_snapshots ? DecodeSnapshotText(snapshots.back())
-                                         : DecodeSnapshot(snapshots.back()));
+            ApplySnapshot(frame.world, DecodeSnapshot(snapshots.back()));
         }
 
         svanes::AdvanceTimelines(frame.world, frame.real_delta_tics);
@@ -644,7 +640,6 @@ private:
     }
 
     std::string server_address;
-    bool text_snapshots;
     svanes::ClientId player = 0;
     std::optional<PauseMenu> menu;
     bool should_quit = false;
@@ -677,14 +672,10 @@ private:
 } // namespace
 
 int32_t main(int32_t argc, char **argv) {
-    const bool text_snapshots =
-        argc == 3 && std::string_view{argv[2]} == "--text";
-    if (argc < 2 || argc > 3 || (argc == 3 && !text_snapshots) ||
-        std::string_view{argv[1]} == "--help") {
-        std::cerr << "Usage: svanes_game_goose IPv4:PORT [--text]\n"
+    if (argc != 2 || std::string_view{argv[1]} == "--help") {
+        std::cerr << "Usage: svanes_game_goose IPv4:PORT\n"
                   << "Joins the goose server at that address. The server "
-                     "listens on port 46000. Pass --text if the server "
-                     "was started with --text.\n";
+                     "listens on port 46000.\n";
         return argc == 2 ? 0 : 1;
     }
 
@@ -694,7 +685,7 @@ int32_t main(int32_t argc, char **argv) {
             .width = 640,
             .height = 900,
         });
-        GooseClient client(argv[1], text_snapshots);
+        GooseClient client(argv[1]);
         return network.run(client);
     } catch (const std::exception &error) {
         std::cerr << "Titled Goose Game: " << error.what() << '\n';
