@@ -6,8 +6,9 @@
 #include <svanes/async/async_parallel_for_driver.hpp>
 #include <svanes/audio/audio_manager.hpp>
 #include <svanes/camera2d.hpp>
+#include <svanes/events/event_manager.hpp>
 #include <svanes/game.hpp>
-#include <svanes/input.hpp>
+#include <svanes/input/input_manager.hpp>
 #include <svanes/physics_system.hpp>
 #include <svanes/render/render_queue.hpp>
 #include <svanes/render/render_system.hpp>
@@ -19,7 +20,7 @@
 #include "MenuUtilities/font_manager_internal.hpp"
 #include "MenuUtilities/text_label_renderer.hpp"
 #include "audio/audio_manager_internal.hpp"
-#include "input_manager_internal.hpp"
+#include "input/input_manager_internal.hpp"
 #include "render/render_queue_executor.hpp"
 #include "render/texture_manager_internal.hpp"
 
@@ -58,6 +59,8 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
     RenderQueueExecutor render_queue_executor{renderer, texture_manager};
     RenderQueue render_queue;
     InputManager input;
+    EventManager events;
+    InputManagerInternal::RegisterEventHandlers(input, events);
     Camera2D camera;
     Vector2D gravity{};
     std::int32_t output_width = 0;
@@ -68,9 +71,9 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
                                  std::string{SDL_GetError()});
     }
     camera.SetOutputSize(output_width, output_height);
-    GameContext game_context{world,         texture_manager, audio_manager,
-                             font_manager,  camera,          output_width,
-                             output_height, gravity};
+    GameContext game_context{world,         events,        texture_manager,
+                             audio_manager, font_manager,  camera,
+                             output_width,  output_height, gravity};
 
     // Custom initialization of the game. Implemented by the user of the engine.
 
@@ -111,14 +114,8 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
         //
 
         InputManagerInternal::BeginFrame(input);
-
-        SDL_Event event{};
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_EVENT_QUIT) {
-                running = false;
-            }
-            InputManagerInternal::HandleEvent(input, event);
-        }
+        InputManagerInternal::Poll(input, events, window);
+        events.DispatchEvents();
 
         //
         // DELTA TIME CALCULATION
@@ -149,8 +146,8 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
         camera.SetOutputSize(output_width, output_height);
 
         const FrameContext frame_context{
-            world,         input,         real_delta_tics, output_width,
-            output_height, audio_manager, camera,          gravity};
+            world,         events,        input,  real_delta_tics, output_width,
+            output_height, audio_manager, camera, gravity};
 
         // Here we should advance the kinematics of all entities before each
         // game physics update. This allows us to first update the positions of
@@ -196,8 +193,6 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
             pending_tics %= physics_step_tics;
         }
         game.Update(frame_context);
-
-        InputManagerInternal::SynchronizeTextInput(input, window);
 
         if (game.ShouldQuit()) {
             running = false;

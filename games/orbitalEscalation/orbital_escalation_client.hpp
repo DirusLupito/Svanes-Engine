@@ -1,8 +1,11 @@
 #pragma once
 
+#include "client_event_handlers.hpp"
+#include "collision_response.hpp"
+#include "combat/missile_system.hpp"
+#include "game_objects/deletion_boxes.hpp"
 #include "game_objects/planet.hpp"
 #include "serialization/asset_catalog.hpp"
-#include "serialization/world_update.hpp"
 
 #include <svanes/async/async_parallel_for_driver.hpp>
 #include <svanes/entity.hpp>
@@ -11,7 +14,6 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 /**
@@ -79,21 +81,13 @@ public:
 
 private:
     /**
-     * Applies the server's complete world state to the client's
-     * view of the game. This should be called once per frame if
-     * the server has sent any world update messages.
-     * Discards predicted-only gameplay objects and preserves local effects.
+     * Zooms the camera while Shift+= or Shift+- is held. The rate increases
+     * exponentially during a continuous hold and resets when the direction
+     * changes or the controls are released.
      *
-     * TODO: Consider optimizing this to only update objects that have changed
-     * since the last update, or perhaps only objects that the client can see or
-     * interact with.
-     *
-     * @param frame The client's world, camera, and other services for this
-     * frame.
-     * @param update The world state received from the server.
+     * @param frame The input, camera, and unscaled elapsed time for this frame.
      */
-    void ApplyWorldUpdate(const svanes::ClientFrameContext &frame,
-                          const WorldUpdate &update);
+    void UpdateZoom(const svanes::ClientFrameContext &frame);
 
     /**
      * Reads this player's controls for local prediction and queues them for
@@ -109,8 +103,9 @@ private:
      * physics step between server updates.
      *
      * @param world The client's world after its timelines have advanced.
+     * @param events The event manager to queue predicted collisions.
      */
-    void Predict(svanes::Registry &world);
+    void Predict(svanes::Registry &world, svanes::EventManager &events);
 
     // The server's address for admission and gameplay messages.
     std::string server_address;
@@ -124,6 +119,13 @@ private:
     // The server entity ID of this player's ship, or empty before its first
     // world update or after its destruction.
     std::optional<svanes::Entity> player_ship;
+
+    // The player being followed during a server controlled death cam.
+    std::optional<std::uint32_t> death_cam_player;
+
+    // The followed ship's server entity ID, or empty once its recorded death
+    // occurs.
+    std::optional<svanes::Entity> death_cam_ship;
 
     // The master clock shared by gameplay objects. Server updates replace its
     // state, and prediction advances it between those updates.
@@ -159,9 +161,17 @@ private:
     // List of collision flashes. Purely clientside.
     std::vector<OwnedEntity> collision_flashes;
 
-    // The local IDs of ships touching the planet during the previous prediction
-    // step, so sustained contact does not repeatedly deal impact damage.
-    std::unordered_set<svanes::Entity> touching_planet;
+    // The handlers that apply server snapshots and player lifetime changes.
+    std::optional<ClientEventHandlers> snapshot_event_handlers;
+
+    // Handler for applying planet impact damage once when a ship begins predicted contact.
+    PlanetCollisionDamageHandler planet_collision_damage;
+
+    // Handles predicted missile impacts and their explosions.
+    MissileCollisionHandler missile_collisions;
+
+    // Handles predicted boundary contacts and their explosion flashes.
+    DeletionBoxCollisionHandler deletion_box_collisions;
 
     // The parfor driver used by local physics and collision detection.
     svanes::AsyncParallelForDriver parallel_for{1};
@@ -169,11 +179,20 @@ private:
     // The timeline controlling the client's frame rate.
     svanes::Timeline client_loop_timeline;
 
+    // The duration of the current continuous zoom hold, in real seconds.
+    double zoom_hold_seconds = 0.0;
+
+    // The current zoom direction, 1 for in, -1 for out, or 0 for neither.
+    std::int8_t zoom_direction = 0;
+
     // The timeline used to animate the pause label.
     svanes::Timeline pause_timeline;
 
     // The text label displayed while gameplay is paused.
     svanes::Entity pause_label_entity = 0;
+
+    // The heading displayed while everyone watches a player's death cam.
+    svanes::Entity death_cam_label_entity = 0;
 
     // The background rectangle that follows the camera's view.
     svanes::Entity background_entity = 0;

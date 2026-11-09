@@ -1,10 +1,13 @@
 #include <svanes/collision_pass.hpp>
 
 #include <svanes/async/async_parallel_for_driver.hpp>
+#include <svanes/events/collision_event.hpp>
+#include <svanes/events/event_manager.hpp>
 #include <svanes/registry.hpp>
 #include <svanes/spatial/hgrid2d.hpp>
 
 #include <algorithm>
+#include <memory>
 #include <stdexcept>
 #include <unordered_map>
 #include <utility>
@@ -15,11 +18,11 @@ namespace svanes {
 // pass. Still, this is almost certainly faster than the naive O(n^2) submit
 // everything to DetectCollisions approach.
 
-std::vector<EntityCollision2D>
-DetectEntityCollisions(const Registry &world,
-                       const std::vector<Entity> &entities,
-                       AsyncParallelForDriver &driver, std::size_t batch_size,
-                       CollisionOrder order) {
+void DetectEntityCollisions(const Registry &world,
+                            const std::vector<Entity> &entities,
+                            EventManager &events,
+                            AsyncParallelForDriver &driver,
+                            std::size_t batch_size, CollisionOrder order) {
 
     if (batch_size == 0) {
         throw std::invalid_argument("Collision batch size must be positive.");
@@ -29,7 +32,7 @@ DetectEntityCollisions(const Registry &world,
     // reject duplicates and recover the order supplied by the caller.
     std::unordered_map<Entity, std::size_t> input_order;
     input_order.reserve(entities.size());
-    const auto sort_results = [&](std::vector<EntityCollision2D> &results) {
+    const auto finish_results = [&](std::vector<EntityCollision2D> &results) {
         // Workers may finish in any order. Restore the caller's order after
         // collecting their results when InputOrder was requested.
         if (order == CollisionOrder::InputOrder) {
@@ -39,6 +42,12 @@ DetectEntityCollisions(const Registry &world,
                     return std::pair{input_order.at(a.a), input_order.at(a.b)} <
                            std::pair{input_order.at(b.a), input_order.at(b.b)};
                 });
+        }
+
+        // Report all detected collisions to the event manager.
+        for (auto &result : results) {
+            events.QueueEvent(
+                std::make_unique<CollisionEvent>(std::move(result)));
         }
     };
     // First, we set up our HGrid2D.
@@ -138,11 +147,10 @@ DetectEntityCollisions(const Registry &world,
     }
 
     // If there is only one worker (i.e. we set up the driver with a concurrency
-    // of 1), there's no need to merge results, we simply move ownership and
-    // return.
+    // of 1), queue its collisions without merging.
     if (worker_results.size() == 1) {
-        sort_results(worker_results.front());
-        return std::move(worker_results.front());
+        finish_results(worker_results.front());
+        return;
     }
 
 
@@ -162,8 +170,7 @@ DetectEntityCollisions(const Registry &world,
             results.push_back(std::move(result));
         }
     }
-    sort_results(results);
-    return results;
+    finish_results(results);
 }
 
 } // namespace svanes

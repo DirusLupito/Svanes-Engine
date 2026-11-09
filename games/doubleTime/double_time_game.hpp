@@ -1,25 +1,26 @@
 #pragma once
 
-#include "network_protocol.hpp"
 #include "asset_catalog.hpp"
-#include "rhythm_helpers.hpp"
+#include "game_events.hpp"
+#include "network_protocol.hpp"
 #include "tilemap_parser.hpp"
 
-#include <svanes/entity.hpp>
 #include <svanes/audio/audio_manager.hpp>
+#include <svanes/entity.hpp>
+#include <svanes/geometry/geometry.hpp>
 #include <svanes/network/clientserver/IClient.hpp>
 #include <svanes/network/clientserver/network_client.hpp>
-#include <svanes/geometry/geometry.hpp>
 #include <svanes/network/udp_msg_pipe.hpp>
 #include <svanes/render/basic_render_types.hpp>
-#include <svanes/timeline_system.hpp>
 #include <svanes/tilemaps/tilemap.hpp>
+#include <svanes/timeline_system.hpp>
 
-#include <string>
 #include <map>
 #include <memory>
-#include <vector>
+#include <optional>
 #include <span>
+#include <string>
+#include <vector>
 
 namespace svanes {
 class TextureManager;
@@ -46,6 +47,8 @@ public:
     void Initialize(svanes::ClientContext &context) override;
     svanes::NetworkMessage CreateJoinRequest() override;
     void HandleJoinResult(const svanes::JoinResult &result) override;
+    void HandleDisconnect() override;
+    bool ShouldQuit() const override;
     void Update(const svanes::ClientFrameContext &frame) override;
 
 private:
@@ -54,15 +57,21 @@ private:
     void LoadAreaAssets(std::size_t area_index);
     void ClearLevelEntities(svanes::Registry &world);
     void ActivateTilemap(svanes::Registry &world, std::size_t index);
-    void CheckGoal(svanes::Registry &world);
+    void EmitBeatEvents(const svanes::ClientFrameContext &frame);
     void SendInput(const svanes::ClientFrameContext &frame);
     void PollInputBridge();
     void ApplyServerState(svanes::Registry &world,
-                          std::span<const svanes::NetworkMessage> messages);
+                          const DoubleTimeWorldSnapshotEvent &event);
     void SynchronizeAudio(float elapsed_seconds);
+    void ReceiveMessages(const svanes::ClientFrameContext &frame);
+    void ResetPendingInput();
 
     std::string server_host;
     std::uint32_t client_id = 0;
+    bool should_quit = false;
+    bool viewing_replay = false;
+    bool replay_recording = false;
+    svanes::NetworkMessage latest_live_snapshot;
     std::unique_ptr<svanes::UdpMsgPipe> input_bridge_pipe;
     bool input_bridge_controls_platforms = false;
     bool has_bridge_input = false;
@@ -70,12 +79,16 @@ private:
     svanes::Entity character_entity = 0;
     bool has_character = false;
     svanes::Timeline client_timeline;
+    std::optional<std::uint64_t> last_beat_index;
 
     svanes::AudioManager *audio_manager = nullptr;
     DoubleTimeState state = DoubleTimeState::MainMenu;
     std::vector<DoubleTimeLevelAssets> area_assets;
     std::size_t active_area_index = 0;
     svanes::Entity active_tilemap_entity = 0;
+    svanes::Entity signal_entity = 0;
+    svanes::Entity counter_label_entity = 0;
+    svanes::TextureHandle signal_texture{};
     bool has_active_tilemap = false;
     std::size_t active_tilemap_index = 0;
     svanes::TextureManager *asset_manager = nullptr;
@@ -84,10 +97,10 @@ private:
     bool action_requested_since_last_send = false;
     bool jump_on_beat_since_last_send = false;
     bool platform_action_requested_since_last_send = false;
-    bool platform_left_was_down = false;
-    bool platform_right_was_down = false;
-    bool platform_up_was_down = false;
-    bool platform_down_was_down = false;
+    bool platform_left_requested_since_last_send = false;
+    bool platform_right_requested_since_last_send = false;
+    bool platform_up_requested_since_last_send = false;
+    bool platform_down_requested_since_last_send = false;
     bool platform_left_on_beat = false;
     bool platform_right_on_beat = false;
     bool platform_up_on_beat = false;
@@ -104,8 +117,8 @@ private:
     std::map<std::uint32_t, svanes::Entity> collectible_entities;
 
     bool has_audio_sync = false;
+    bool force_audio_seek = false;
     std::uint64_t synced_audio_tics = 0;
     float audio_sync_age_seconds = 0.0F;
     float applied_audio_rate = 1.0F;
-
 };

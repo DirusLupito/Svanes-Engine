@@ -55,8 +55,8 @@ enum class MinionKind : std::uint8_t {
  * FIELDS:
  * - spawner: The entity that spawned this minion.
  * - kind: How the minion fights.
- * - health: The health remaining. The minion is destroyed when it reaches
- *   zero.
+ * - health: The health remaining. The minion dies when it reaches zero, and is
+ *   destroyed when that death is handled.
  * - fire_cooldown: The time until an archer may fire again. Unused by melee
  *   minions.
  */
@@ -93,11 +93,14 @@ void AdvanceMinions(svanes::Registry &world,
                     std::span<const svanes::Vector2D> targets);
 
 /**
- * Takes health from a minion, destroying it once none remains.
+ * Takes health from a minion. Taking the last of it only drops it to zero;
+ * the caller raises the death, and the minion is destroyed when that is
+ * handled.
  *
  * @param world The registry containing the minion.
  * @param entity The minion's entity.
  * @param damage The health to take. Health stops at zero.
+ * @return Whether this took the minion's last health.
  */
-void DamageMinion(svanes::Registry &world, svanes::Entity entity,
+bool DamageMinion(svanes::Registry &world, svanes::Entity entity,
                   std::uint32_t damage);

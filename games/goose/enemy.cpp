@@ -1,13 +1,16 @@
 #include "enemy.hpp"
 
 #include "bullets.hpp"
+#include "goose_events.hpp"
 #include "minions.hpp"
+#include "protocol.hpp"
 
 #include <svanes/collision_system.hpp>
 #include <svanes/registry.hpp>
 
 #include <algorithm>
 #include <cmath>
+#include <memory>
 
 namespace {
 
@@ -26,7 +29,7 @@ constexpr double kMaxSpawnSeconds = 40.0;
 } // namespace
 
 Enemy::Enemy(svanes::Registry &world, svanes::Entity clock)
-    : entity(world.CreateEntity()), health(EnemyMaxHealth),
+    : entity(world.CreateEntity()), clock(clock), health(EnemyMaxHealth),
       random(std::random_device{}()), spawn_cooldown(RollSpawnDelay()) {
     world.AddComponent<svanes::Transform>(
         entity, svanes::Transform{.x = kPathCenterX, .y = kPathY});
@@ -36,7 +39,8 @@ Enemy::Enemy(svanes::Registry &world, svanes::Entity clock)
                     svanes::Rectangle2D{.width = EnemySize, .height = EnemySize}});
 }
 
-void Enemy::Advance(svanes::Registry &world, bool spawning) {
+void Enemy::Advance(svanes::Registry &world, svanes::EventManager &events,
+                    bool spawning) {
     const svanes::Timeline &timeline =
         world.GetComponent<svanes::Timeline>(entity);
     const svanes::TicCount delta_tics = timeline.GetDeltaTics();
@@ -80,22 +84,28 @@ void Enemy::Advance(svanes::Registry &world, bool spawning) {
         for (std::uint32_t index = 0; index < group_size; ++index) {
             const MinionKind kind =
                 index < archers ? MinionKind::Archer : MinionKind::Melee;
-            SpawnMinion(world, entity, kind,
-                        {transform.x + spread(random), transform.y});
+            const svanes::Vector2D position{transform.x + spread(random),
+                                            transform.y};
+            QueueGooseEvent(
+                events, world, clock,
+                std::make_unique<SpawnEvent>(
+                    entity, SpawnReport{Subject::Minion, 0, kind, position}));
         }
         spawn_cooldown = RollSpawnDelay();
     }
 }
 
-void Enemy::Hit(svanes::Registry &world) {
+bool Enemy::Hit() {
     if (!IsAlive()) {
-        return;
+        return false;
     }
 
     --health;
-    if (health == 0) {
-        world.RemoveComponent<svanes::Collider2D>(entity);
-    }
+    return health == 0;
+}
+
+void Enemy::Die(svanes::Registry &world) {
+    world.RemoveComponent<svanes::Collider2D>(entity);
 }
 
 bool Enemy::IsAlive() const { return health > 0; }

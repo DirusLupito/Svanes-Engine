@@ -1,6 +1,7 @@
 add_executable(
     svanes_game_goose
     goose_client.cpp
+    goose_events.cpp
     pause_menu.cpp
     protocol.cpp
     arena.cpp
@@ -13,6 +14,7 @@ target_compile_definitions(svanes_game_goose PRIVATE
 add_executable(
     svanes_game_goose_server
     goose_server.cpp
+    goose_events.cpp
     protocol.cpp
     arena.cpp
     goose.cpp

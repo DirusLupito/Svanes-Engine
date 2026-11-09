@@ -55,6 +55,7 @@ demonstrate engine features. Core features, in implementation order:
   Those should be documented in the implementation file.
 - Use the general written code formatting found in `.clang-format` for formatting code.
   Run `git clang-format` when making changes to code to ensure that the formatting is correct.
+- No dynamic_cast.
 
 
 Additionally, a core idea here is that we should earn our complexity.

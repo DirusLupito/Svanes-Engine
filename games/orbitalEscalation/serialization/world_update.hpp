@@ -91,6 +91,9 @@ public:
     // Whether the master gameplay clock is paused.
     bool paused = false;
 
+    // The player whose ship the death cam follows, or empty during live play.
+    std::optional<std::uint32_t> death_cam_player;
+
     // The server entity ID of the planet, whose physical properties and
     // appearance are defined by shared game code.
     svanes::Entity planet;

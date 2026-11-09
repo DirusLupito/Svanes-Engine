@@ -3,8 +3,6 @@
 #include <svanes/entity.hpp>
 #include <svanes/vector2d.hpp>
 
-#include <vector>
-
 namespace svanes {
 
 class Registry;
@@ -28,21 +26,6 @@ struct Bullet {
 };
 
 /**
- * A single bullet striking something. The bullet is already destroyed.
- *
- * FIELDS:
- * - target: The entity the bullet struck.
- * - owner: The entity that fired the bullet.
- * - direction: The bullet's velocity at the moment of impact, so the target
- *   can be pushed along the bullet's line of travel.
- */
-struct BulletHit {
-    svanes::Entity target;
-    svanes::Entity owner;
-    svanes::Vector2D direction;
-};
-
-/**
  * Creates a bullet moving outward from an origin. Its Timeline follows the
  * same clock as its owner's, so it pauses and changes speed with its owner.
  *
@@ -60,14 +43,12 @@ void SpawnBullet(svanes::Registry &world, svanes::Entity owner,
                  float speed);
 
 /**
- * Destroys every bullet that overlaps something with a Collider2D other than
- * its owner, a minion its owner spawned, or another bullet, and reports what
- * each one struck. Hits are reported, not applied, so the caller decides what
- * being hit does to a target.
- * The arena is closed on every side, so every bullet eventually strikes
- * something.
- *
- * @param world The registry containing the bullets and their targets.
- * @return One BulletHit per bullet that struck something.
+ * @param world The registry containing the bullet and the other entity.
+ * @param bullet The bullet.
+ * @param other An entity the bullet overlaps.
+ * @return Whether the bullet passes through the other entity rather than
+ * striking it, which it does for its owner, any minion its owner spawned, and
+ * other bullets.
  */
-std::vector<BulletHit> UpdateBullets(svanes::Registry &world);
+bool PassesThrough(const svanes::Registry &world, const Bullet &bullet,
+                   svanes::Entity other);

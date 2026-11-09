@@ -81,8 +81,8 @@ enum class HitSource : std::uint8_t {
  * The goose can walk, jump, dash along the ground, and fly for a limited time
  * that refills whenever it lands. It fires bullets toward an aim point, and
  * takes knockback from bullets and from touching the enemy. It has health, and
- * once that runs out it lies dead, ignoring input and hits, until it returns to
- * the spawn point it was created at.
+ * once that runs out it lies dead, ignoring input and hits, until it is
+ * spawned again at the spawn point it was created at.
  */
 class Goose final {
 public:
@@ -91,8 +91,8 @@ public:
      *
      * @param world The registry the entity is created in.
      * @param clock The entity whose Timeline the goose's Timeline follows.
-     * @param position The world position to spawn at, and to respawn at after
-     * dying.
+     * @param position The world position to spawn at, both now and every time
+     * it is spawned again.
      */
     Goose(svanes::Registry &world, svanes::Entity clock,
           svanes::Vector2D position);
@@ -100,7 +100,7 @@ public:
     /**
      * Applies input and advances timers by the goose's Timeline delta. Call
      * after the engine's physics step has moved the goose. While dead, input is
-     * ignored, and the goose respawns once its respawn timer runs out.
+     * ignored.
      *
      * @param world The registry containing the goose.
      * @param intent The input for this step.
@@ -112,26 +112,46 @@ public:
      * knockback timer and the source's invincibility timer. Player control is
      * suspended until the knockback timer expires, and further hits from the
      * same source are ignored until its invincibility timer does. Ignored
-     * entirely while dead. If this takes the last of the goose's health, the
-     * goose dies.
+     * entirely while dead. Taking the last of the goose's health only drops it
+     * to zero; the caller raises the death, and Die handles it.
      *
      * @param world The registry holding the goose entity.
      * @param direction The direction to be thrown in. Need not be normalized.
      * @param speed The speed to be thrown at, in world units per second.
      * @param damage The health to lose. Health stops at zero.
      * @param source Who the hit came from.
+     * @return Whether this hit took the goose's last health.
      *
      * @throws std::invalid_argument if the direction is not finite or is zero
      * length.
      */
-    void Hit(svanes::Registry &world, svanes::Vector2D direction, float speed,
+    bool Hit(svanes::Registry &world, svanes::Vector2D direction, float speed,
              std::uint32_t damage, HitSource source);
 
     /**
-     * Kills the goose, even while it is invincible. Does nothing if it is
-     * already dead, so its respawn timer is not restarted.
+     * Drops the goose's health to zero, even while it is invincible. Like Hit,
+     * the caller raises the death.
+     *
+     * @return Whether the goose was alive until now.
      */
-    void Kill();
+    bool Kill();
+
+    /**
+     * Handles the goose's death: it stops where it is and stays idle until it
+     * is spawned again.
+     *
+     * @param world The registry holding the goose entity.
+     */
+    void Die(svanes::Registry &world);
+
+    /**
+     * Places the goose at its spawn point, at rest, with full health and flight
+     * time and every timer cleared. Used both when its player joins and when
+     * they ask to respawn.
+     *
+     * @param world The registry holding the goose entity.
+     */
+    void Spawn(svanes::Registry &world);
 
     /** @return Whether the goose has no health left. */
     bool IsDead() const;
@@ -148,18 +168,10 @@ public:
     /** @return The animation the goose is showing. */
     GooseState GetState() const;
 
+    /** @return Where the goose is placed whenever it spawns. */
+    svanes::Vector2D GetSpawnPoint() const;
+
 private:
-    /** Drops health to zero and starts the respawn timer. */
-    void Die();
-
-    /**
-     * Returns the goose to the spawn point it was created at, at rest, with
-     * full health and flight time and every timer cleared.
-     *
-     * @param world The registry holding the goose entity.
-     */
-    void Respawn(svanes::Registry &world);
-
     svanes::Entity entity;
     svanes::Vector2D spawn;
     std::uint32_t health;
@@ -186,7 +198,4 @@ private:
     // that source are ignored
     svanes::TicCount enemy_invincible_timer = 0;
     svanes::TicCount player_invincible_timer = 0;
-
-    // counts down while dead, and the goose respawns when it reaches zero
-    svanes::TicCount respawn_timer = 0;
 };

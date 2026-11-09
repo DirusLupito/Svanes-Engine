@@ -2,7 +2,8 @@
 
 #include <svanes/audio/audio_manager.hpp>
 #include <svanes/camera2d.hpp>
-#include <svanes/input.hpp>
+#include <svanes/events/event_manager.hpp>
+#include <svanes/input/input_manager.hpp>
 #include <svanes/network/clientserver/IClient.hpp>
 #include <svanes/render/render_queue.hpp>
 #include <svanes/render/render_system.hpp>
@@ -11,7 +12,7 @@
 #include "../../MenuUtilities/font_manager_internal.hpp"
 #include "../../MenuUtilities/text_label_renderer.hpp"
 #include "../../audio/audio_manager_internal.hpp"
-#include "../../input_manager_internal.hpp"
+#include "../../input/input_manager_internal.hpp"
 #include "../../render/render_queue_executor.hpp"
 #include "../../render/texture_manager_internal.hpp"
 
@@ -364,6 +365,8 @@ void NetworkClient::RunClientLoop(IClient &client, SDL_Window *window,
                                                         texture_manager};
     RenderQueue render_queue;
     InputManager input;
+    EventManager events;
+    internal::InputManagerInternal::RegisterEventHandlers(input, events);
     Camera2D camera;
     std::int32_t output_width = 0;
     std::int32_t output_height = 0;
@@ -373,8 +376,9 @@ void NetworkClient::RunClientLoop(IClient &client, SDL_Window *window,
                                  std::string{SDL_GetError()});
     }
     camera.SetOutputSize(output_width, output_height);
-    ClientContext context{world,        *this,  texture_manager, audio_manager,
-                          font_manager, camera, output_width,    output_height};
+    ClientContext context{world,           events,        *this,
+                          texture_manager, audio_manager, font_manager,
+                          camera,          output_width,  output_height};
 
     // Custom initialization of the client. Implemented by the user of the
     // engine.
@@ -401,18 +405,8 @@ void NetworkClient::RunClientLoop(IClient &client, SDL_Window *window,
         //
 
         internal::InputManagerInternal::BeginFrame(input);
-
-        SDL_Event event{};
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_EVENT_QUIT) {
-                running = false;
-            }
-            internal::InputManagerInternal::HandleEvent(input, event);
-        }
-
-        if (!running) {
-            break;
-        }
+        internal::InputManagerInternal::Poll(input, events, window);
+        events.DispatchEvents();
 
         // Gather this frame's server messages before the client reads them.
         // Messages arriving during Update will have to wait for the next frame.
@@ -443,7 +437,7 @@ void NetworkClient::RunClientLoop(IClient &client, SDL_Window *window,
         camera.SetOutputSize(output_width, output_height);
 
         const ClientFrameContext frame_context{
-            world,        *this,         input,         real_delta_tics,
+            world,        events,        *this,         input, real_delta_tics,
             output_width, output_height, audio_manager, camera};
 
         // This will call the client's Update method, which should read input,
@@ -458,8 +452,6 @@ void NetworkClient::RunClientLoop(IClient &client, SDL_Window *window,
         // Once messages have been processed, we don't want to keep
         // applying them unless they're explicitly sent again.
         incoming.clear();
-
-        internal::InputManagerInternal::SynchronizeTextInput(input, window);
 
         if (client.ShouldQuit()) {
             running = false;

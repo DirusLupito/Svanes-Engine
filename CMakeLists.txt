@@ -170,10 +170,18 @@ target_sources(
         src/geometry/convex_polygon_geometry.cpp
         src/collision_system.cpp
         src/deterministic_math.cpp
+        src/events/collision_event.cpp
+        src/events/event_manager.cpp
+        src/events/replay_events.cpp
+        src/events/replay_recording.cpp
+        src/events/replay_session.cpp
         src/tilemaps/tilemap.cpp
         src/collision_pass.cpp
         src/geometry/geometry.cpp
-        src/input.cpp
+        src/input/input_events.cpp
+        src/input/input_manager.cpp
+        src/input/input_manager_internal.cpp
+        src/input/input_replay.cpp
         src/kinematic_system.cpp
         src/MenuUtilities/font_manager.cpp
         src/MenuUtilities/font_manager_internal.hpp
@@ -190,7 +198,7 @@ target_sources(
         src/physics_system.cpp
         src/geometry/rectangle_geometry.cpp
         src/geometry/triangle_geometry.cpp
-        src/input_manager_internal.hpp
+        src/input/input_manager_internal.hpp
         src/render/render_queue.cpp
         src/render/render_queue_executor.cpp
         src/render/render_queue_executor.hpp
@@ -203,6 +211,7 @@ target_sources(
         src/stable_id.cpp
         src/timeline_system.cpp
         src/utility/hash.cpp
+        src/utility/file_io.cpp
         src/utility/rational_number.cpp
     PUBLIC
         FILE_SET HEADERS
@@ -221,9 +230,19 @@ target_sources(
             include/svanes/tilemaps/tilemap.hpp
             include/svanes/collision_pass.hpp
             include/svanes/entity.hpp
+            include/svanes/events/abstract_event_handler_wrapper.hpp
+            include/svanes/events/collision_event.hpp
+            include/svanes/events/event.hpp
+            include/svanes/events/event_handler_wrapper.hpp
+            include/svanes/events/event_manager.hpp
+            include/svanes/events/replay_events.hpp
+            include/svanes/events/replay_recording.hpp
+            include/svanes/events/replay_session.hpp
             include/svanes/game.hpp
             include/svanes/geometry/geometry.hpp
-            include/svanes/input.hpp
+            include/svanes/input/input_events.hpp
+            include/svanes/input/input_manager.hpp
+            include/svanes/input/input_types.hpp
             include/svanes/kinematic_system.hpp
             include/svanes/MenuUtilities/font_manager.hpp
             include/svanes/MenuUtilities/text_label.hpp
@@ -249,6 +268,7 @@ target_sources(
             include/svanes/stable_id.hpp
             include/svanes/timeline_system.hpp
             include/svanes/utility/hash.hpp
+            include/svanes/utility/file_io.hpp
             include/svanes/utility/rational_number.hpp
             include/svanes/vector2d.hpp
 )
@@ -281,9 +301,19 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/tilemaps/tilemap.hpp
     include/svanes/collision_pass.hpp
     include/svanes/entity.hpp
+    include/svanes/events/abstract_event_handler_wrapper.hpp
+    include/svanes/events/collision_event.hpp
+    include/svanes/events/event.hpp
+    include/svanes/events/event_handler_wrapper.hpp
+    include/svanes/events/event_manager.hpp
+    include/svanes/events/replay_events.hpp
+    include/svanes/events/replay_recording.hpp
+    include/svanes/events/replay_session.hpp
     include/svanes/game.hpp
     include/svanes/geometry/geometry.hpp
-    include/svanes/input.hpp
+    include/svanes/input/input_events.hpp
+    include/svanes/input/input_manager.hpp
+    include/svanes/input/input_types.hpp
     include/svanes/kinematic_system.hpp
     include/svanes/MenuUtilities/font_manager.hpp
     include/svanes/MenuUtilities/text_label.hpp
@@ -309,6 +339,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/stable_id.hpp
     include/svanes/timeline_system.hpp
     include/svanes/utility/hash.hpp
+    include/svanes/utility/file_io.hpp
     include/svanes/utility/rational_number.hpp
     include/svanes/vector2d.hpp
 )
@@ -324,10 +355,18 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/geometry/convex_polygon_geometry.cpp
     src/collision_system.cpp
     src/deterministic_math.cpp
+    src/events/collision_event.cpp
+    src/events/event_manager.cpp
+    src/events/replay_events.cpp
+    src/events/replay_recording.cpp
+    src/events/replay_session.cpp
     src/tilemaps/tilemap.cpp
     src/collision_pass.cpp
     src/geometry/geometry.cpp
-    src/input.cpp
+    src/input/input_events.cpp
+    src/input/input_manager.cpp
+    src/input/input_manager_internal.cpp
+    src/input/input_replay.cpp
     src/kinematic_system.cpp
     src/MenuUtilities/font_manager.cpp
     src/MenuUtilities/font_manager_internal.hpp
@@ -344,7 +383,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/physics_system.cpp
     src/geometry/rectangle_geometry.cpp
     src/geometry/triangle_geometry.cpp
-    src/input_manager_internal.hpp
+    src/input/input_manager_internal.hpp
     src/render/render_queue.cpp
     src/render/render_queue_executor.cpp
     src/render/render_queue_executor.hpp
@@ -357,6 +396,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/stable_id.cpp
     src/timeline_system.cpp
     src/utility/hash.cpp
+    src/utility/file_io.cpp
     src/utility/rational_number.cpp
 )
 
@@ -365,6 +405,5 @@ include(cmake/game_packages.cmake)
 add_subdirectory(games/goose)
 add_subdirectory(games/orbitalEscalation)
 add_subdirectory(games/doubleTime)
-add_subdirectory(games/doubleTime/grading)
 
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT svanes_game_orbital_escalation)

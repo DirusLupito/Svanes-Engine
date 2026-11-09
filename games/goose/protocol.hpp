@@ -5,11 +5,13 @@
 
 #include <svanes/network/clientserver/network_server.hpp>
 #include <svanes/network/network_message.hpp>
+#include <svanes/timeline_system.hpp>
 #include <svanes/utility/rational_number.hpp>
 #include <svanes/vector2d.hpp>
 
 #include <cstdint>
 #include <optional>
+#include <variant>
 #include <vector>
 
 /**
@@ -57,11 +59,102 @@ struct ClockSetting {
  * - minion_spawning: Whether the player wants the enemy to drop minions, or
  *   empty if they have not asked for a change. Any player may change it for
  *   everyone.
+ * - respawn: Whether the player wants their dead goose spawned again. Sent
+ *   every frame until it takes effect, so a lost message only delays it.
+ *   Ignored while the goose is alive.
  */
 struct PlayerInput {
     GooseIntent intent;
     ClockSetting clock;
     std::optional<bool> minion_spawning;
+    bool respawn = false;
+};
+
+/**
+ * What a death or spawn report is about.
+ *
+ * MEMBERS:
+ * - Goose: A player's goose.
+ * - Enemy: The enemy.
+ * - Minion: One of the enemy's minions.
+ */
+enum class Subject : std::uint8_t {
+    Goose,
+    Enemy,
+    Minion,
+};
+
+/**
+ * What took the last of something's health.
+ *
+ * MEMBERS:
+ * - EnemyFire: A bullet from the enemy or one of its archers.
+ * - PlayerFire: A bullet from a goose.
+ * - Minion: A melee minion's touch.
+ * - DeathZone: Falling into a death zone.
+ */
+enum class DeathCause : std::uint8_t {
+    EnemyFire,
+    PlayerFire,
+    Minion,
+    DeathZone,
+};
+
+/**
+ * Something that died on the server.
+ *
+ * FIELDS:
+ * - subject: What died.
+ * - client: The client whose goose died, or 0 if subject is not Goose.
+ * - position: Where it died.
+ * - cause: What killed it.
+ * - killer: The client whose goose fired the killing bullet, or 0 if cause is
+ *   not PlayerFire or that client has left.
+ */
+struct DeathReport {
+    Subject subject;
+    svanes::ClientId client;
+    svanes::Vector2D position;
+    DeathCause cause;
+    svanes::ClientId killer;
+};
+
+/**
+ * Something that spawned on the server.
+ *
+ * FIELDS:
+ * - subject: What spawned. Never Enemy, which exists from the start.
+ * - client: The client whose goose spawned, or 0 if subject is not Goose.
+ * - minion_kind: How the minion fights. Only meaningful if subject is Minion.
+ * - position: Where it spawned.
+ */
+struct SpawnReport {
+    Subject subject;
+    svanes::ClientId client;
+    MinionKind minion_kind;
+    svanes::Vector2D position;
+};
+
+/**
+ * How many steps the server keeps sending each death and spawn report for, so
+ * a client that loses some snapshots still hears about it.
+ */
+inline constexpr std::uint64_t ReportSteps = 50;
+
+/**
+ * A death or spawn as the server sends it, in every snapshot for ReportSteps
+ * steps after it happened.
+ *
+ * FIELDS:
+ * - sequence: Counts every report the server makes, starting at 1, so a client
+ *   can skip the ones it has already seen.
+ * - time: The world clock's time when it happened, in tics.
+ * - report: What happened.
+ */
+struct SequencedReport {
+    std::uint32_t sequence;
+    svanes::TicCount time;
+    std::variant<DeathReport, SpawnReport> report;
 };
 
 /**
@@ -128,6 +221,8 @@ struct SnapshotMinion {
  * - bullets: Every live bullet.
  * - minions: Every live minion.
  * - minion_spawning: Whether the enemy is allowed to drop minions.
+ * - reports: Every death and spawn from the last ReportSteps steps, oldest
+ *   first.
  */
 struct Snapshot {
     ClockSetting clock;
@@ -136,6 +231,7 @@ struct Snapshot {
     std::vector<SnapshotBullet> bullets;
     std::vector<SnapshotMinion> minions;
     bool minion_spawning = true;
+    std::vector<SequencedReport> reports;
 };
 
 /**

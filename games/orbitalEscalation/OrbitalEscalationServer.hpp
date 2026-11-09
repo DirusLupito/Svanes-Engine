@@ -1,6 +1,10 @@
 #pragma once
 
+#include "collision_response.hpp"
+#include "combat/missile_system.hpp"
 #include "combat/weapon_system.hpp"
+#include "death_cam.hpp"
+#include "game_objects/deletion_boxes.hpp"
 #include "game_objects/dynamic_object/ship.hpp"
 #include "game_objects/planet.hpp"
 #include "game_objects/spawn_zones.hpp"
@@ -11,7 +15,6 @@
 
 #include <map>
 #include <optional>
-#include <unordered_set>
 #include <vector>
 
 inline constexpr std::uint16_t OrbitalServerPort = 45010;
@@ -158,21 +161,24 @@ private:
      * movement, including collisions, damage, and destruction.
      *
      * @param world The authoritative world after the engine's physics step.
+     * @param events The event manager to queue detected collisions.
      * @param driver The engine's parallel for driver for collision detection.
+     *
+     * @return The last player found dead, or empty if all players survived.
      */
-    void RespondToPhysics(svanes::Registry &world,
-                          svanes::AsyncParallelForDriver &driver);
+    std::optional<svanes::ClientId>
+    RespondToPhysics(svanes::Registry &world, svanes::EventManager &events,
+                     svanes::AsyncParallelForDriver &driver);
 
     /**
-     * Creates a message containing the current game state for clients
+     * Creates an update containing the current game state for clients
      * to receive and use to update their local view of the world.
      *
      * @param world The server's current game world.
      *
-     * @return The binary world state used to reconstruct the client's view.
+     * @return The world state used to reconstruct the client's view.
      */
-    svanes::NetworkMessage
-    CreateWorldUpdate(const svanes::Registry &world) const;
+    WorldUpdate CreateWorldUpdate(const svanes::Registry &world) const;
 
     // The definitions used to create gameplay objects.
     AssetCatalog assets;
@@ -209,8 +215,17 @@ private:
     // The simple static and drifting ships without player controls.
     std::vector<std::unique_ptr<Ship>> junk_ships;
 
-    // The ships touching the planet during the previous physics step.
-    std::unordered_set<svanes::Entity> touching_planet;
+    // Handler for applying planet impact damage once when a ship begins contact.
+    PlanetCollisionDamageHandler planet_collision_damage;
+
+    // Handles missile impacts and the explosions they trigger.
+    MissileCollisionHandler missile_collisions;
+
+    // Handles boundary contacts that mark objects for removal.
+    DeletionBoxCollisionHandler deletion_box_collisions;
+
+    // The recent authoritative states and shared playback of a player's death.
+    DeathCam death_cam;
 
     // Simulation time accumulated toward sending the next world update.
     svanes::TicCount snapshot_tics = 0;

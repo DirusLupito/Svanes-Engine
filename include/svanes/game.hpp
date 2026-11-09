@@ -9,6 +9,7 @@ namespace svanes {
 
 class AudioManager;
 class Camera2D;
+class EventManager;
 class FontManager;
 class InputManager;
 class Registry;
@@ -26,6 +27,8 @@ class TextureManager;
  * FIELDS:
  * - world: The engine owned registry containing the game's entities and
  * components.
+ * - events: The engine owned event manager used to register handlers and
+ * report events.
  * - assets: The engine owned texture manager used to load and create textures.
  * - audio: The engine owned audio manager used to load and play sounds and
  * music.
@@ -48,6 +51,7 @@ class TextureManager;
  */
 struct GameContext {
     Registry &world;
+    EventManager &events;
     TextureManager &assets;
     AudioManager &audio;
     FontManager &fonts;
@@ -76,6 +80,7 @@ struct GameContext {
  * FIELDS:
  * - world: The engine owned registry containing the game's entities and
  * components.
+ * - events: The engine owned event manager used to report and process events.
  * - input: The input state for the current frame.
  * - real_delta_tics: Unscaled elapsed time since the previous frame, in
  * microseconds.
@@ -90,6 +95,7 @@ struct GameContext {
  */
 struct FrameContext {
     Registry &world;
+    EventManager &events;
     InputManager &input;
     TicCount real_delta_tics;
     std::int32_t output_width;

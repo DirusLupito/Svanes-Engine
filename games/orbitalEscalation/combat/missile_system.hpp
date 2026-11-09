@@ -1,10 +1,16 @@
 #pragma once
 
 #include <optional>
-#include <span>
-#include <svanes/collision_pass.hpp>
+#include <svanes/entity.hpp>
 #include <svanes/timeline_system.hpp>
+#include <svanes/vector2d.hpp>
 #include <vector>
+
+namespace svanes {
+class CollisionEvent;
+class EventManager;
+class Registry;
+} // namespace svanes
 
 /**
  * Stores the explosion properties of a missile entity.
@@ -45,21 +51,51 @@ bool IgnoresFiringShip(const svanes::Registry &world, svanes::Entity missile,
                        svanes::Entity other);
 
 /**
- * Explodes missiles in the supplied contacts, or missiles that run out of
- * health even when there are no contacts. The caller has already removed
- * contacts between attached parts and contacts ignored during arming.
- * Every explosion causes area damage, even if the contacted entity has no
- * health. Only entities with health and collision geometry receive damage.
- * Damage can kill other missiles, so their explosions are processed here too.
- *
- * This marks missiles as dead but does not destroy registry entities. Their
- * owners remove them after all explosions have finished using their geometry.
- *
- * @param world The registry containing missiles and collision targets.
- * @param contacts The filtered collisions from this physics step.
- *
- * @return The world positions of the missiles which exploded.
+ * Handles missile impacts by recording eligible collisions and resolving their
+ * explosions after collision delivery. Contacts within an attachment tree and
+ * contacts ignored during arming do not trigger explosions.
  */
-std::vector<svanes::Vector2D>
-UpdateMissileExplosions(svanes::Registry &world,
-                        std::span<const svanes::EntityCollision2D> contacts);
+class MissileCollisionHandler final {
+public:
+    /**
+     * Registers the missile collision handler to receive collision events.
+     *
+     * @param world The registry containing missiles and collision targets.
+     * @param events The event manager receiving collisions for this world.
+     *
+     * @throws std::invalid_argument if this handler type is already registered.
+     * @throws std::logic_error if called during an event callback.
+     */
+    void Register(svanes::Registry &world, svanes::EventManager &events);
+
+    /**
+     * Explodes missiles recorded by the collision handler, or missiles that
+     * run out of health even when there are no contacts. Call after collision
+     * dispatch each physics step so physical response and planet damage finish
+     * before blast damage is applied.
+     *
+     * Every explosion causes area damage, even if the contacted entity has no
+     * health. Damage can kill other missiles, causing chain reactions.
+     * Missiles are marked as dead but remain in the registry until their
+     * owners remove them after all explosions have finished.
+     *
+     * @param world The registry containing missiles and collision targets.
+     *
+     * @return The world positions of the missiles which exploded.
+     */
+    std::vector<svanes::Vector2D> UpdateExplosions(svanes::Registry &world);
+
+private:
+    /**
+     * Records missiles involved in an eligible collision so they can explode
+     * after the other collision responses finish.
+     *
+     * @param world The registry containing the colliding entities.
+     * @param event The collision to check for missile impacts.
+     */
+    void HandleCollision(svanes::Registry &world,
+                         const svanes::CollisionEvent &event);
+
+    // Missiles with eligible impacts awaiting explosion processing.
+    std::vector<svanes::Entity> contacted_missiles;
+};

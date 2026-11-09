@@ -1,6 +1,7 @@
 #include <svanes/network/clientserver/network_server.hpp>
 
 #include <svanes/async/async_parallel_for_driver.hpp>
+#include <svanes/events/event_manager.hpp>
 #include <svanes/network/clientserver/IServer.hpp>
 #include <svanes/timeline_system.hpp>
 
@@ -297,7 +298,8 @@ std::int32_t NetworkServer::run(IServer &server) {
     // First time setup.
 
     Vector2D gravity{};
-    ServerContext context{world, *this, gravity};
+    EventManager events;
+    ServerContext context{world, events, *this, gravity};
 
     // A vector to hold pending client inputs received during the current update
     // tick. Will be swapped with the main inputs vector when processing
@@ -382,8 +384,9 @@ std::int32_t NetworkServer::run(IServer &server) {
             AdvancePhysics(world, gravity, parallel_for,
                            [&](std::span<const PhysicsTimeStep> steps) {
                                server.PhysicsUpdate(
-                                   {world, *this, steps, parallel_for});
+                                   {world, events, *this, steps, parallel_for});
                            });
+            events.DispatchEvents();
 
             inputs.clear();
             pending_tics %= DefaultPhysicsStepTics;

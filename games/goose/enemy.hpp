@@ -8,9 +8,10 @@
 
 namespace svanes {
 
+class EventManager;
 class Registry;
 
-}
+} // namespace svanes
 
 /** The width and height of the enemy's square body. */
 inline constexpr float EnemySize = 120.0F;
@@ -27,6 +28,8 @@ inline constexpr std::uint32_t EnemyMaxHealth = 20;
  *
  * Once enough bullets hit it, it dies: its collider is removed and it stops
  * acting. The entity stays, so bullets it fired still know their owner.
+ *
+ * It never creates its minions itself. It raises a SpawnEvent for each one.
  */
 class Enemy final {
 public:
@@ -43,18 +46,30 @@ public:
      * delta. Does nothing once the enemy is dead.
      *
      * @param world The registry holding the enemy.
+     * @param events The event manager to raise a SpawnEvent on for each minion
+     * dropped.
      * @param spawning Whether minions may be dropped. While false, the wait
      * until the next group is held where it is.
      */
-    void Advance(svanes::Registry &world, bool spawning);
+    void Advance(svanes::Registry &world, svanes::EventManager &events,
+                 bool spawning);
 
     /**
-     * Takes one hit, dying when no hits remain. Does nothing once the enemy is
-     * dead.
+     * Takes one hit. Does nothing once the enemy is dead. Taking the last hit
+     * only drops its health to zero; the caller raises the death, and Die
+     * handles it.
+     *
+     * @return Whether this took the enemy's last hit.
+     */
+    bool Hit();
+
+    /**
+     * Handles the enemy's death by removing its collider, so nothing touches
+     * it any more.
      *
      * @param world The registry holding the enemy.
      */
-    void Hit(svanes::Registry &world);
+    void Die(svanes::Registry &world);
 
     /** @return Whether the enemy has hits remaining. */
     bool IsAlive() const;
@@ -76,6 +91,7 @@ private:
     svanes::TicCount RollSpawnDelay();
 
     svanes::Entity entity;
+    svanes::Entity clock;
     std::uint32_t health;
     svanes::TicCount fire_cooldown = 0;
     std::mt19937 random;

@@ -1,7 +1,13 @@
 add_library(
     svanes_orbital_common STATIC
+    player_events.cpp
+    player_events.hpp
+    world_snapshot_event.cpp
+    world_snapshot_event.hpp
     attachment_system.cpp
     attachment_system.hpp
+    collision_response.cpp
+    collision_response.hpp
     propulsion_system.cpp
     propulsion_system.hpp
     combat/damage_system.cpp
@@ -64,6 +70,8 @@ target_link_libraries(svanes_orbital_common PUBLIC
 )
 add_executable(svanes_game_orbital_escalation
     client_main.cpp
+    client_event_handlers.cpp
+    client_event_handlers.hpp
     orbital_escalation_client.cpp
     orbital_escalation_client.hpp
 )
@@ -72,6 +80,8 @@ add_executable(svanes_game_orbital_escalation_server
     server_main.cpp
     OrbitalEscalationServer.hpp
     OrbitalEscalationServer.cpp
+    death_cam.hpp
+    death_cam.cpp
 )
 target_link_libraries(svanes_game_orbital_escalation_server PRIVATE svanes_orbital_common)
 

@@ -9,6 +9,7 @@ namespace svanes {
 
 class AudioManager;
 class Camera2D;
+class EventManager;
 class FontManager;
 class InputManager;
 class NetworkClient;
@@ -47,6 +48,8 @@ struct JoinResult {
  * FIELDS:
  * - world: The engine owned registry containing the client's entities and
  * components.
+ * - events: The engine owned event manager used to register handlers and
+ * report events.
  * - network: The engine owned network client used to connect to the server
  * and send/receive messages.
  * - assets: The engine owned texture manager used to load and create textures.
@@ -60,6 +63,7 @@ struct JoinResult {
  */
 struct ClientContext {
     Registry &world;
+    EventManager &events;
     NetworkClient &network;
     TextureManager &assets;
     AudioManager &audio;
@@ -88,6 +92,7 @@ struct ClientContext {
  * FIELDS:
  * - world: The engine owned registry containing the client's entities and
  * components.
+ * - events: The engine owned event manager used to report and process events.
  * - network: The engine owned network client providing this frame's server
  * messages and queuing messages to send to the server.
  * - input: The input state for the current frame.
@@ -102,6 +107,7 @@ struct ClientContext {
  */
 struct ClientFrameContext {
     Registry &world;
+    EventManager &events;
     NetworkClient &network;
     InputManager &input;
     TicCount real_delta_tics;
