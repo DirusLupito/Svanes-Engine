@@ -24,7 +24,7 @@ bool ReplaySession::IsReplaying() const {
     return state == State::Playing || state == State::Paused;
 }
 
-void ReplaySession::Play(ReplayRecording recording) {
+void ReplaySession::Play(ReplayRecording incoming_recording) {
     CheckBoundary();
     if (state != State::Idle) {
         throw std::logic_error("Playback requires an idle session.");
@@ -32,7 +32,7 @@ void ReplaySession::Play(ReplayRecording recording) {
 
     updating = true;
     try {
-        Load(std::move(recording));
+        Load(std::move(incoming_recording));
         StartPlayback();
     } catch (...) {
         updating = false;

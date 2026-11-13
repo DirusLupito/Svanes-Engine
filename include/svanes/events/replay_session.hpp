@@ -175,7 +175,7 @@ public:
     /**
      * Restores and begins playing a recording held in memory.
      *
-     * @param recording The starting state and event payloads to play.
+     * @param incoming_recording The starting state and event payloads to play.
      * Ownership transfers to the session.
      *
      * @throws std::logic_error if the session is not idle, or called while
@@ -184,7 +184,7 @@ public:
      * payloads are invalid.
      * @throws ... Propagates errors from event decoders or state restoration.
      */
-    void Play(ReplayRecording recording);
+    void Play(ReplayRecording incoming_recording);
 
     /**
      * Takes pending actions and decides what to do with them based on the
