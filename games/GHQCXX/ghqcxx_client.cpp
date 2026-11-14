@@ -1,5 +1,7 @@
 #include "ghqcxx_client.hpp"
 
+#include "PieceVisuals.hpp"
+
 #include <svanes/camera2d.hpp>
 #include <svanes/geometry/primitive_geometry.hpp>
 #include <svanes/geometry/rectangle_geometry.hpp>
@@ -17,19 +19,22 @@ namespace ghqcxx {
 // The board has eight rows and columns, with one world unit per square.
 constexpr std::int32_t BoardSize = 8;
 
+// Leave a row below the board for the piece visuals.
+constexpr float ViewHeight = BoardSize + 1.5F;
+
 /**
- * Fits the board to the shorter dimension of the window so its squares stay
- * square when the window is resized.
+ * Fits the board and the pieces below it into the window. Both dimensions use
+ * the same scale so the board's squares stay square when the window is resized.
  *
  * @param camera The client's camera, with its current rendering output size.
  */
 static void FitBoardToWindow(svanes::Camera2D &camera) {
-    const auto size = std::min(camera.OutputWidth(), camera.OutputHeight());
-
     // A minimized window may have no rendering area. Keep the previous zoom
     // until there is room to draw again, since a zero zoom is invalid.
-    if (size > 0) {
-        camera.zoom = static_cast<float>(size) / BoardSize;
+    if (camera.OutputWidth() > 0 && camera.OutputHeight() > 0) {
+        camera.zoom =
+            std::min(static_cast<float>(camera.OutputWidth()) / BoardSize,
+                     static_cast<float>(camera.OutputHeight()) / ViewHeight);
     }
 }
 
@@ -54,8 +59,20 @@ void GHQCXXClient::Initialize(svanes::ClientContext &context) {
         }
     }
 
+    const auto red_star = context.world.CreateEntity();
+    context.world.AddComponent<svanes::Transform>(
+        red_star, svanes::Transform{.x = 3.0F, .y = BoardSize + 0.75F});
+    context.world.AddComponent<svanes::SolidShape>(
+        red_star, CreateStarVisual({0xff, 0x7c, 0x7c}));
+
+    const auto blue_star = context.world.CreateEntity();
+    context.world.AddComponent<svanes::Transform>(
+        blue_star, svanes::Transform{.x = 5.0F, .y = BoardSize + 0.75F});
+    context.world.AddComponent<svanes::SolidShape>(
+        blue_star, CreateStarVisual({0x7c, 0xb7, 0xff}));
+
     context.camera.x = BoardSize * 0.5F;
-    context.camera.y = BoardSize * 0.5F;
+    context.camera.y = ViewHeight * 0.5F;
     context.camera.scale_mode = svanes::ScaleMode::Constant;
     FitBoardToWindow(context.camera);
 
