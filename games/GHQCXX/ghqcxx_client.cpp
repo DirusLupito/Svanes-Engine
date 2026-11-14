@@ -1,6 +1,7 @@
 #include "ghqcxx_client.hpp"
 
 #include "BasicArtillery.hpp"
+#include "ParachuteInfantry.hpp"
 #include "PieceVisuals.hpp"
 
 #include <svanes/camera2d.hpp>
@@ -68,14 +69,19 @@ void GHQCXXClient::Initialize(svanes::ClientContext &context) {
 
     const auto blue_star = context.world.CreateEntity();
     context.world.AddComponent<svanes::Transform>(
-        blue_star, svanes::Transform{.x = 5.0F, .y = BoardSize + 0.75F});
+        blue_star, svanes::Transform{.x = 4.6F, .y = BoardSize + 0.75F});
     context.world.AddComponent<svanes::SolidShape>(
         blue_star, CreateStarVisual({0x7c, 0xb7, 0xff}));
 
     CreateBasicArtillery(context.world, {0xff, 0x7c, 0x7c},
-                         {.x = 3.0F, .y = BoardSize + 0.75F});
+                         {.x = 2.2F, .y = BoardSize + 0.75F});
     CreateBasicArtillery(context.world, {0x7c, 0xb7, 0xff},
-                         {.x = 7.0F, .y = BoardSize + 0.75F});
+                         {.x = 5.8F, .y = BoardSize + 0.75F});
+
+    CreateParachuteInfantry(context.world, {0xff, 0x7c, 0x7c},
+                            {.x = 3.4F, .y = BoardSize + 0.75F});
+    CreateParachuteInfantry(context.world, {0x7c, 0xb7, 0xff},
+                            {.x = 7.0F, .y = BoardSize + 0.75F});
 
     context.camera.x = BoardSize * 0.5F;
     context.camera.y = ViewHeight * 0.5F;

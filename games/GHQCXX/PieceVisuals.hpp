@@ -20,4 +20,12 @@ namespace ghqcxx {
  */
 svanes::SolidShape CreateStarVisual(svanes::Color color, float diameter = 1.0F);
 
+/**
+ * Creates the white triangle shared by infantry piece visuals.
+ *
+ * @return A white triangle, 0.8 world units wide and 0.4 tall, with its tip at
+ * (0, -0.5) and its bottom edge at y = -0.1.
+ */
+svanes::SolidShape CreateInfantryHeadVisual();
+
 } // namespace ghqcxx

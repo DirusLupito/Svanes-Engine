@@ -47,4 +47,11 @@ svanes::SolidShape CreateStarVisual(svanes::Color color, float diameter) {
     return {.color = color, .geometry = std::move(star)};
 }
 
+svanes::SolidShape CreateInfantryHeadVisual() {
+    return {
+        .color = {248, 248, 248},
+        .geometry = svanes::Triangle2D{
+            {svanes::Vector2D{0.0F, -0.5F}, {-0.4F, -0.1F}, {0.4F, -0.1F}}}};
+}
+
 } // namespace ghqcxx
