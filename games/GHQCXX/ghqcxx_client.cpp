@@ -4,9 +4,9 @@
 #include "ArmoredInfantry.hpp"
 #include "BasicArtillery.hpp"
 #include "BasicInfantry.hpp"
+#include "Headquarters.hpp"
 #include "HeavyArtillery.hpp"
 #include "ParachuteInfantry.hpp"
-#include "PieceVisuals.hpp"
 
 #include <svanes/camera2d.hpp>
 #include <svanes/geometry/primitive_geometry.hpp>
@@ -67,17 +67,10 @@ void GHQCXXClient::Initialize(svanes::ClientContext &context) {
         }
     }
 
-    const auto red_star = context.world.CreateEntity();
-    context.world.AddComponent<svanes::Transform>(
-        red_star, svanes::Transform{.x = 0.7F, .y = BoardSize + 0.75F});
-    context.world.AddComponent<svanes::SolidShape>(
-        red_star, CreateStarVisual(ncStateRed));
-
-    const auto blue_star = context.world.CreateEntity();
-    context.world.AddComponent<svanes::Transform>(
-        blue_star, svanes::Transform{.x = 0.7F, .y = BoardSize + 2.0F});
-    context.world.AddComponent<svanes::SolidShape>(
-        blue_star, CreateStarVisual(carolinaBlue));
+    CreateHeadquarters(context.world, ncStateRed,
+                       {.x = 0.7F, .y = BoardSize + 0.75F});
+    CreateHeadquarters(context.world, carolinaBlue,
+                       {.x = 0.7F, .y = BoardSize + 2.0F});
 
     CreateBasicArtillery(context.world, ncStateRed,
                          {.x = 1.8F, .y = BoardSize + 0.75F});

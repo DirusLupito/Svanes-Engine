@@ -4,6 +4,8 @@ add_executable(svanes_game_ghqcxx
     ghqcxx_client.hpp
     PieceVisuals.cpp
     PieceVisuals.hpp
+    Headquarters.cpp
+    Headquarters.hpp
     BasicArtillery.cpp
     BasicArtillery.hpp
     HeavyArtillery.cpp
