@@ -1,12 +1,19 @@
 #include "PieceVisuals.hpp"
 
 #include <array>
+#include <cmath>
 #include <cstddef>
+#include <stdexcept>
 #include <utility>
 
 namespace ghqcxx {
 
-svanes::SolidShape CreateStarVisual(svanes::Color color) {
+svanes::SolidShape CreateStarVisual(svanes::Color color, float diameter) {
+    if (!std::isfinite(diameter) || diameter <= 0.0F) {
+        throw std::invalid_argument(
+            "Star diameter must be finite and positive.");
+    }
+
     // Walk around the outline, alternating between a point and an inner
     // corner. Positive y points down, so the first point is the bottom tip.
     constexpr std::array<svanes::Vector2D, 10> outline{{
@@ -30,8 +37,9 @@ svanes::SolidShape CreateStarVisual(svanes::Color color) {
     for (std::size_t index = 0; index < outline.size(); ++index) {
         star.parts.push_back({
             .shape =
-                svanes::Triangle2D{{svanes::Vector2D{}, outline[index],
-                                    outline[(index + 1) % outline.size()]}},
+                svanes::Triangle2D{
+                    {svanes::Vector2D{}, outline[index] * diameter,
+                     outline[(index + 1) % outline.size()] * diameter}},
             .transform = {},
         });
     }

@@ -4,6 +4,8 @@ add_executable(svanes_game_ghqcxx
     ghqcxx_client.hpp
     PieceVisuals.cpp
     PieceVisuals.hpp
+    BasicArtillery.cpp
+    BasicArtillery.hpp
 )
 target_link_libraries(svanes_game_ghqcxx PRIVATE Svanes::Engine)
 

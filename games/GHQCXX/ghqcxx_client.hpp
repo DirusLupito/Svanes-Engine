@@ -10,8 +10,8 @@ namespace ghqcxx {
 class GHQCXXClient final : public svanes::IClient {
 public:
     /**
-     * Creates an empty checkerboard with a red and a blue star below it, then
-     * centers the camera on the full display.
+     * Creates an empty checkerboard with red and blue stars and basic artillery
+     * below it, then centers the camera on the full display.
      *
      * @param context The engine services and window dimensions provided for
      * client initialization.
@@ -43,7 +43,7 @@ public:
     void HandleDisconnect() override;
 
     /**
-     * Fits the board and stars to the current window size and checks whether
+     * Fits the board and pieces to the current window size and checks whether
      * the Escape key was pressed to quit the client.
      *
      * @param context The current frame's input and engine services.

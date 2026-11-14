@@ -1,5 +1,6 @@
 #include "ghqcxx_client.hpp"
 
+#include "BasicArtillery.hpp"
 #include "PieceVisuals.hpp"
 
 #include <svanes/camera2d.hpp>
@@ -61,7 +62,7 @@ void GHQCXXClient::Initialize(svanes::ClientContext &context) {
 
     const auto red_star = context.world.CreateEntity();
     context.world.AddComponent<svanes::Transform>(
-        red_star, svanes::Transform{.x = 3.0F, .y = BoardSize + 0.75F});
+        red_star, svanes::Transform{.x = 1.0F, .y = BoardSize + 0.75F});
     context.world.AddComponent<svanes::SolidShape>(
         red_star, CreateStarVisual({0xff, 0x7c, 0x7c}));
 
@@ -70,6 +71,11 @@ void GHQCXXClient::Initialize(svanes::ClientContext &context) {
         blue_star, svanes::Transform{.x = 5.0F, .y = BoardSize + 0.75F});
     context.world.AddComponent<svanes::SolidShape>(
         blue_star, CreateStarVisual({0x7c, 0xb7, 0xff}));
+
+    CreateBasicArtillery(context.world, {0xff, 0x7c, 0x7c},
+                         {.x = 3.0F, .y = BoardSize + 0.75F});
+    CreateBasicArtillery(context.world, {0x7c, 0xb7, 0xff},
+                         {.x = 7.0F, .y = BoardSize + 0.75F});
 
     context.camera.x = BoardSize * 0.5F;
     context.camera.y = ViewHeight * 0.5F;
