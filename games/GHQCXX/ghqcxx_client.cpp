@@ -47,6 +47,8 @@ static void FitBoardToWindow(svanes::Camera2D &camera) {
 void GHQCXXClient::Initialize(svanes::ClientContext &context) {
     constexpr svanes::Color light{200, 204, 208};
     constexpr svanes::Color dark{72, 80, 88};
+    constexpr svanes::Color carolinaBlue{0x7b, 0xaf, 0xd4};
+    constexpr svanes::Color ncStateRed{0xcc, 0x00, 0x00};
 
     // Each square is a rectangle centered halfway into its row and column.
     // The board therefore occupies world coordinates (0, 0) through (8, 8).
@@ -69,42 +71,42 @@ void GHQCXXClient::Initialize(svanes::ClientContext &context) {
     context.world.AddComponent<svanes::Transform>(
         red_star, svanes::Transform{.x = 0.7F, .y = BoardSize + 0.75F});
     context.world.AddComponent<svanes::SolidShape>(
-        red_star, CreateStarVisual({0xff, 0x7c, 0x7c}));
+        red_star, CreateStarVisual(ncStateRed));
 
     const auto blue_star = context.world.CreateEntity();
     context.world.AddComponent<svanes::Transform>(
         blue_star, svanes::Transform{.x = 0.7F, .y = BoardSize + 2.0F});
     context.world.AddComponent<svanes::SolidShape>(
-        blue_star, CreateStarVisual({0x7c, 0xb7, 0xff}));
+        blue_star, CreateStarVisual(carolinaBlue));
 
-    CreateBasicArtillery(context.world, {0xff, 0x7c, 0x7c},
+    CreateBasicArtillery(context.world, ncStateRed,
                          {.x = 1.8F, .y = BoardSize + 0.75F});
-    CreateBasicArtillery(context.world, {0x7c, 0xb7, 0xff},
+    CreateBasicArtillery(context.world, carolinaBlue,
                          {.x = 1.8F, .y = BoardSize + 2.0F});
 
-    CreateHeavyArtillery(context.world, {0xff, 0x7c, 0x7c},
+    CreateHeavyArtillery(context.world, ncStateRed,
                          {.x = 2.9F, .y = BoardSize + 0.75F});
-    CreateHeavyArtillery(context.world, {0x7c, 0xb7, 0xff},
+    CreateHeavyArtillery(context.world, carolinaBlue,
                          {.x = 2.9F, .y = BoardSize + 2.0F});
 
-    CreateArmoredArtillery(context.world, {0xff, 0x7c, 0x7c},
+    CreateArmoredArtillery(context.world, ncStateRed,
                            {.x = 4.0F, .y = BoardSize + 0.75F});
-    CreateArmoredArtillery(context.world, {0x7c, 0xb7, 0xff},
+    CreateArmoredArtillery(context.world, carolinaBlue,
                            {.x = 4.0F, .y = BoardSize + 2.0F});
 
-    CreateBasicInfantry(context.world, {0xff, 0x7c, 0x7c},
+    CreateBasicInfantry(context.world, ncStateRed,
                         {.x = 5.1F, .y = BoardSize + 0.75F});
-    CreateBasicInfantry(context.world, {0x7c, 0xb7, 0xff},
+    CreateBasicInfantry(context.world, carolinaBlue,
                         {.x = 5.1F, .y = BoardSize + 2.0F});
 
-    CreateParachuteInfantry(context.world, {0xff, 0x7c, 0x7c},
+    CreateParachuteInfantry(context.world, ncStateRed,
                             {.x = 6.2F, .y = BoardSize + 0.75F});
-    CreateParachuteInfantry(context.world, {0x7c, 0xb7, 0xff},
+    CreateParachuteInfantry(context.world, carolinaBlue,
                             {.x = 6.2F, .y = BoardSize + 2.0F});
 
-    CreateArmoredInfantry(context.world, {0xff, 0x7c, 0x7c},
+    CreateArmoredInfantry(context.world, ncStateRed,
                           {.x = 7.3F, .y = BoardSize + 0.75F});
-    CreateArmoredInfantry(context.world, {0x7c, 0xb7, 0xff},
+    CreateArmoredInfantry(context.world, carolinaBlue,
                           {.x = 7.3F, .y = BoardSize + 2.0F});
 
     context.camera.x = BoardSize * 0.5F;
