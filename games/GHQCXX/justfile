@@ -1,0 +1,22 @@
+default:
+    @just --justfile "{{justfile()}}" --list
+
+set working-directory := "../.."
+
+import '../../scripts/common.just'
+
+build: (_build "svanes_game_ghqcxx svanes_game_ghqcxx_server")
+
+release: (_release "svanes_game_ghqcxx svanes_game_ghqcxx_server")
+
+run *args: (_release "svanes_game_ghqcxx")
+    {{release-bin-dir}}svanes_game_ghqcxx{{exe-suffix}} {{args}}
+
+server *args: (_release "svanes_game_ghqcxx_server")
+    {{release-bin-dir}}svanes_game_ghqcxx_server{{exe-suffix}} {{args}}
+
+debug *args: (_build "svanes_game_ghqcxx")
+    {{bin-dir}}svanes_game_ghqcxx{{exe-suffix}} {{args}}
+
+debug-server *args: (_build "svanes_game_ghqcxx_server")
+    {{bin-dir}}svanes_game_ghqcxx_server{{exe-suffix}} {{args}}
