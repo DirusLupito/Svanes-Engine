@@ -1,6 +1,7 @@
 #include "ghqcxx_client.hpp"
 
 #include "ArmoredArtillery.hpp"
+#include "ArmoredInfantry.hpp"
 #include "BasicArtillery.hpp"
 #include "HeavyArtillery.hpp"
 #include "ParachuteInfantry.hpp"
@@ -65,35 +66,40 @@ void GHQCXXClient::Initialize(svanes::ClientContext &context) {
 
     const auto red_star = context.world.CreateEntity();
     context.world.AddComponent<svanes::Transform>(
-        red_star, svanes::Transform{.x = 1.0F, .y = BoardSize + 0.75F});
+        red_star, svanes::Transform{.x = 0.75F, .y = BoardSize + 0.75F});
     context.world.AddComponent<svanes::SolidShape>(
         red_star, CreateStarVisual({0xff, 0x7c, 0x7c}));
 
     const auto blue_star = context.world.CreateEntity();
     context.world.AddComponent<svanes::Transform>(
-        blue_star, svanes::Transform{.x = 1.0F, .y = BoardSize + 2.0F});
+        blue_star, svanes::Transform{.x = 0.75F, .y = BoardSize + 2.0F});
     context.world.AddComponent<svanes::SolidShape>(
         blue_star, CreateStarVisual({0x7c, 0xb7, 0xff}));
 
     CreateBasicArtillery(context.world, {0xff, 0x7c, 0x7c},
-                         {.x = 2.5F, .y = BoardSize + 0.75F});
+                         {.x = 2.05F, .y = BoardSize + 0.75F});
     CreateBasicArtillery(context.world, {0x7c, 0xb7, 0xff},
-                         {.x = 2.5F, .y = BoardSize + 2.0F});
+                         {.x = 2.05F, .y = BoardSize + 2.0F});
 
     CreateHeavyArtillery(context.world, {0xff, 0x7c, 0x7c},
-                         {.x = 4.0F, .y = BoardSize + 0.75F});
+                         {.x = 3.35F, .y = BoardSize + 0.75F});
     CreateHeavyArtillery(context.world, {0x7c, 0xb7, 0xff},
-                         {.x = 4.0F, .y = BoardSize + 2.0F});
+                         {.x = 3.35F, .y = BoardSize + 2.0F});
 
     CreateArmoredArtillery(context.world, {0xff, 0x7c, 0x7c},
-                           {.x = 5.5F, .y = BoardSize + 0.75F});
+                           {.x = 4.65F, .y = BoardSize + 0.75F});
     CreateArmoredArtillery(context.world, {0x7c, 0xb7, 0xff},
-                           {.x = 5.5F, .y = BoardSize + 2.0F});
+                           {.x = 4.65F, .y = BoardSize + 2.0F});
 
     CreateParachuteInfantry(context.world, {0xff, 0x7c, 0x7c},
-                            {.x = 7.0F, .y = BoardSize + 0.75F});
+                            {.x = 5.95F, .y = BoardSize + 0.75F});
     CreateParachuteInfantry(context.world, {0x7c, 0xb7, 0xff},
-                            {.x = 7.0F, .y = BoardSize + 2.0F});
+                            {.x = 5.95F, .y = BoardSize + 2.0F});
+
+    CreateArmoredInfantry(context.world, {0xff, 0x7c, 0x7c},
+                          {.x = 7.25F, .y = BoardSize + 0.75F});
+    CreateArmoredInfantry(context.world, {0x7c, 0xb7, 0xff},
+                          {.x = 7.25F, .y = BoardSize + 2.0F});
 
     context.camera.x = BoardSize * 0.5F;
     context.camera.y = ViewHeight * 0.5F;

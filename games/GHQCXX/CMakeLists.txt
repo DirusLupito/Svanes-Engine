@@ -12,6 +12,8 @@ add_executable(svanes_game_ghqcxx
     ArmoredArtillery.hpp
     ParachuteInfantry.cpp
     ParachuteInfantry.hpp
+    ArmoredInfantry.cpp
+    ArmoredInfantry.hpp
 )
 target_link_libraries(svanes_game_ghqcxx PRIVATE Svanes::Engine)
 
