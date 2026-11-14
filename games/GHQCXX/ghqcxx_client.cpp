@@ -2,8 +2,6 @@
 
 #include <svanes/input/input_manager.hpp>
 
-#include <SDL3/SDL.h>
-
 #include <iostream>
 #include <stdexcept>
 
@@ -35,14 +33,6 @@ void GHQCXXClient::HandleDisconnect() {
 }
 
 void GHQCXXClient::Update(const svanes::ClientFrameContext &context) {
-    SDL_Event event;
-    while (SDL_PollEvent(&event)) {
-        if (event.type == SDL_EVENT_QUIT ||
-            event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) {
-            quit = true;
-        }
-    }
-
     if (context.input.WasPressed(svanes::Key::Escape)) {
         quit = true;
     }

@@ -42,7 +42,7 @@ public:
     void HandleDisconnect() override;
 
     /**
-     * Checks for a window close request or the Escape key.
+     * Checks whether the Escape key was pressed to quit the client.
      *
      * @param context The current frame's input and engine services.
      */
@@ -51,8 +51,7 @@ public:
     /**
      * Returns whether the user has requested that the client quit.
      *
-     * @return True if the user closed the window or pressed Escape, false
-     * otherwise.
+     * @return True if the user has pressed Escape, false otherwise.
      */
     bool ShouldQuit() const override;
 
@@ -64,7 +63,7 @@ public:
     svanes::TicCount GetFrameIntervalTics() const override;
 
 private:
-    // Set when the user closes the window or presses Escape.
+    // Set when the user presses Escape.
     bool quit = false;
 };
 
