@@ -1,12 +1,12 @@
 #include "ghqcxx_client.hpp"
 
-#include "ArmoredArtillery.hpp"
-#include "ArmoredInfantry.hpp"
-#include "BasicArtillery.hpp"
-#include "BasicInfantry.hpp"
-#include "Headquarters.hpp"
-#include "HeavyArtillery.hpp"
-#include "ParachuteInfantry.hpp"
+#include "pieces/ArmoredArtillery.hpp"
+#include "pieces/ArmoredInfantry.hpp"
+#include "pieces/BasicArtillery.hpp"
+#include "pieces/BasicInfantry.hpp"
+#include "pieces/Headquarters.hpp"
+#include "pieces/HeavyArtillery.hpp"
+#include "pieces/ParachuteInfantry.hpp"
 
 #include <svanes/camera2d.hpp>
 #include <svanes/geometry/primitive_geometry.hpp>
