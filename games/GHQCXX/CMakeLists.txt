@@ -10,6 +10,8 @@ add_executable(svanes_game_ghqcxx
     HeavyArtillery.hpp
     ArmoredArtillery.cpp
     ArmoredArtillery.hpp
+    BasicInfantry.cpp
+    BasicInfantry.hpp
     ParachuteInfantry.cpp
     ParachuteInfantry.hpp
     ArmoredInfantry.cpp
