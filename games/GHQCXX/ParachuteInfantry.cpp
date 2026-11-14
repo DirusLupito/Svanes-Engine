@@ -11,8 +11,8 @@ namespace ghqcxx {
 
 // Drawn as six triangles, one circle, and one rectangle.
 // The large white triangle forms the infantry head, with a narrow triangle in
-// the supplied color pointing down below it. The piece is one world unit tall
-// and faces up.
+// the supplied color meeting its bottom edge and pointing down. The piece is
+// one world unit tall and faces up.
 
 // The parachute canopy is a black circle with its lower half covered by a
 // white rectangle, leaving a semicircle. Its radius is one-twelfth of the
@@ -38,8 +38,8 @@ void CreateParachuteInfantry(svanes::Registry &world, svanes::Color color,
     const auto white = head.color;
     add_part(std::move(head), {});
     add_part({.color = color,
-              .geometry = svanes::Triangle2D{{svanes::Vector2D{-0.095F, -0.06F},
-                                              {0.095F, -0.06F},
+              .geometry = svanes::Triangle2D{{svanes::Vector2D{-0.095F, -0.1F},
+                                              {0.095F, -0.1F},
                                               {0.0F, 0.5F}}}},
              {});
 

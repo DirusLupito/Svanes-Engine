@@ -37,12 +37,12 @@ void CreateBasicArtillery(svanes::Registry &world, svanes::Color color,
               .geometry = svanes::Rectangle2D{.width = 0.3F, .height = 1.0F}},
              {});
 
-    // The side rectangles share the middle rectangle's bottom edge, leaving
-    // a small gap on either side of it.
-    for (const float x : {-0.295F, 0.295F}) {
+    // The side rectangles meet the middle rectangle's sides and share its
+    // bottom edge.
+    for (const float x : {-0.275F, 0.275F}) {
         add_part(
             {.color = color,
-             .geometry = svanes::Rectangle2D{.width = 0.21F, .height = 0.6F}},
+             .geometry = svanes::Rectangle2D{.width = 0.25F, .height = 0.6F}},
             {.x = x, .y = 0.2F});
     }
 
