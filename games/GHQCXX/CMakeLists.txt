@@ -6,6 +6,8 @@ add_executable(svanes_game_ghqcxx
     PieceVisuals.hpp
     BasicArtillery.cpp
     BasicArtillery.hpp
+    HeavyArtillery.cpp
+    HeavyArtillery.hpp
     ParachuteInfantry.cpp
     ParachuteInfantry.hpp
 )
