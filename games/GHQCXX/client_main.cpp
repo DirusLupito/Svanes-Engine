@@ -12,7 +12,7 @@ int main(int argc, char *argv[]) {
 
     ghqcxx::GHQCXXClient client;
     svanes::NetworkClient application(
-        {.title = "GHQCXX", .width = 1280, .height = 720});
+        {.title = "GHQCXX", .width = 720, .height = 720});
     application.Connect(argc == 2 ? argv[1] : "127.0.0.1:5810");
     const auto result = application.run(client);
     application.Disconnect();

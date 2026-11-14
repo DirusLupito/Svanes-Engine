@@ -10,7 +10,7 @@ namespace ghqcxx {
 class GHQCXXClient final : public svanes::IClient {
 public:
     /**
-     * Prints the client's startup message.
+     * Creates an empty checkerboard and centers the camera on it.
      *
      * @param context The engine services and window dimensions provided for
      * client initialization.
@@ -42,7 +42,8 @@ public:
     void HandleDisconnect() override;
 
     /**
-     * Checks whether the Escape key was pressed to quit the client.
+     * Fits the board to the current window size and checks whether the Escape
+     * key was pressed to quit the client.
      *
      * @param context The current frame's input and engine services.
      */
