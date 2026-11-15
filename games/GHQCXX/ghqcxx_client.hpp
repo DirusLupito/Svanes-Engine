@@ -67,7 +67,7 @@ public:
     svanes::TicCount GetFrameIntervalTics() const override;
 
 private:
-    // The checkerboard and its mouse controls.
+    // The board, its placed pieces, and its mouse controls.
     Board board;
 
     // Set when the user presses Escape.

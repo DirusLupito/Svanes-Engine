@@ -4,7 +4,6 @@
 #include "pieces/ArmoredInfantry.hpp"
 #include "pieces/BasicArtillery.hpp"
 #include "pieces/BasicInfantry.hpp"
-#include "pieces/Headquarters.hpp"
 #include "pieces/HeavyArtillery.hpp"
 #include "pieces/ParachuteInfantry.hpp"
 
@@ -39,29 +38,10 @@ static void FitViewToWindow(svanes::Camera2D &camera) {
 }
 
 void GHQCXXClient::Initialize(svanes::ClientContext &context) {
-    constexpr svanes::Color carolinaBlue{0x7b, 0xaf, 0xd4};
-    constexpr svanes::Color ncStateRed{0xcc, 0x00, 0x00};
+    const auto carolinaBlue = Board::GetTeamColor(Board::Team::Blue);
+    const auto ncStateRed = Board::GetTeamColor(Board::Team::Red);
 
     board.Initialize(context.world);
-
-    // Starting according to the rulebook.
-    CreateHeadquarters(context.world, ncStateRed, {.x = 0.5F, .y = 0.5F});
-    CreateHeadquarters(
-        context.world, carolinaBlue,
-        {.x = 7.5F, .y = 7.5F, .rotation = std::numbers::pi_v<float>});
-
-    CreateBasicArtillery(
-        context.world, ncStateRed,
-        {.x = 1.5F, .y = 0.5F, .rotation = std::numbers::pi_v<float>});
-    CreateBasicArtillery(context.world, carolinaBlue, {.x = 6.5F, .y = 7.5F});
-
-    for (const float x : {0.5F, 1.5F, 2.5F}) {
-        CreateBasicInfantry(
-            context.world, ncStateRed,
-            {.x = x, .y = 1.5F, .rotation = std::numbers::pi_v<float>});
-        CreateBasicInfantry(context.world, carolinaBlue,
-                            {.x = Board::Size - x, .y = 6.5F});
-    }
 
     CreateBasicArtillery(
         context.world, ncStateRed,
