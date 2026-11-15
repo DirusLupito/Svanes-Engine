@@ -2,6 +2,8 @@ add_executable(svanes_game_ghqcxx
     client_main.cpp
     ghqcxx_client.cpp
     ghqcxx_client.hpp
+    Board.cpp
+    Board.hpp
     pieces/PieceVisuals.cpp
     pieces/PieceVisuals.hpp
     pieces/Headquarters.cpp
