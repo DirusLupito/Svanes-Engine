@@ -44,11 +44,24 @@ void GHQCXXClient::Initialize(svanes::ClientContext &context) {
 
     board.Initialize(context.world);
 
-    CreateHeadquarters(context.world, ncStateRed, {.x = 0.7F, .y = -0.75F});
-    CreateHeadquarters(context.world, carolinaBlue,
-                       {.x = 0.7F,
-                        .y = Board::Size + 0.75F,
-                        .rotation = std::numbers::pi_v<float>});
+    // Starting according to the rulebook.
+    CreateHeadquarters(context.world, ncStateRed, {.x = 0.5F, .y = 0.5F});
+    CreateHeadquarters(
+        context.world, carolinaBlue,
+        {.x = 7.5F, .y = 7.5F, .rotation = std::numbers::pi_v<float>});
+
+    CreateBasicArtillery(
+        context.world, ncStateRed,
+        {.x = 1.5F, .y = 0.5F, .rotation = std::numbers::pi_v<float>});
+    CreateBasicArtillery(context.world, carolinaBlue, {.x = 6.5F, .y = 7.5F});
+
+    for (const float x : {0.5F, 1.5F, 2.5F}) {
+        CreateBasicInfantry(
+            context.world, ncStateRed,
+            {.x = x, .y = 1.5F, .rotation = std::numbers::pi_v<float>});
+        CreateBasicInfantry(context.world, carolinaBlue,
+                            {.x = Board::Size - x, .y = 6.5F});
+    }
 
     CreateBasicArtillery(
         context.world, ncStateRed,
