@@ -67,6 +67,15 @@ void GHQCXXClient::Initialize(svanes::ClientContext &context) {
         }
     }
 
+    // Create the highlight after the board so it draws over the squares.
+    // It starts transparent until the mouse is over the board.
+    hoverHighlight = context.world.CreateEntity();
+    context.world.AddComponent<svanes::Transform>(hoverHighlight);
+    context.world.AddComponent<svanes::SolidShape>(
+        hoverHighlight, svanes::SolidShape{.color = {255, 255, 255, 0},
+                                           .geometry = svanes::Rectangle2D{
+                                               .width = 1.0F, .height = 1.0F}});
+
     CreateHeadquarters(context.world, ncStateRed,
                        {.x = 0.7F, .y = BoardSize + 0.75F});
     CreateHeadquarters(context.world, carolinaBlue,
@@ -133,6 +142,40 @@ void GHQCXXClient::HandleDisconnect() {
 
 void GHQCXXClient::Update(const svanes::ClientFrameContext &context) {
     FitBoardToWindow(context.camera);
+
+    hoveredSquare.reset();
+    auto &highlight =
+        context.world.GetComponent<svanes::SolidShape>(hoverHighlight);
+    highlight.color.alpha = 0;
+
+    if (context.camera.OutputWidth() > 0 && context.camera.OutputHeight() > 0) {
+        const auto mouse = context.input.MousePosition();
+        const auto worldMouse =
+            context.camera.ScreenToWorld({mouse.x, mouse.y, 0.0F, 0.0F});
+
+        // Each square is one world unit wide and tall. Check the bounds before
+        // converting to integers, since a negative fraction would become zero.
+        // The right and bottom edges are outside the board.
+        if (worldMouse.x >= 0.0F && worldMouse.x < BoardSize &&
+            worldMouse.y >= 0.0F && worldMouse.y < BoardSize) {
+            hoveredSquare = BoardCoordinate{
+                .column = static_cast<std::int32_t>(worldMouse.x),
+                .row = static_cast<std::int32_t>(worldMouse.y)};
+
+            auto &position =
+                context.world.GetComponent<svanes::Transform>(hoverHighlight);
+            position.x = static_cast<float>(hoveredSquare->column) + 0.5F;
+            position.y = static_cast<float>(hoveredSquare->row) + 0.5F;
+            highlight.color.alpha = 80;
+        }
+    }
+
+    if (hoveredSquare &&
+        context.input.WasMouseButtonPressed(svanes::MouseButton::Left)) {
+        std::cout << "Clicked board square: (" << hoveredSquare->column << ", "
+                  << hoveredSquare->row << ")\n"
+                  << std::flush;
+    }
 
     if (context.input.WasPressed(svanes::Key::Escape)) {
         quit = true;

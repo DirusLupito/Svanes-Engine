@@ -1,6 +1,10 @@
 #pragma once
 
+#include <svanes/entity.hpp>
 #include <svanes/network/clientserver/IClient.hpp>
+
+#include <cstdint>
+#include <optional>
 
 namespace ghqcxx {
 
@@ -43,8 +47,10 @@ public:
     void HandleDisconnect() override;
 
     /**
-     * Fits the board and pieces to the current window size and checks whether
-     * the Escape key was pressed to quit the client.
+     * Fits the board and pieces to the current window size, highlights the
+     * hovered board square, and prints its (column, row) on a left click.
+     * Coordinates start at (0, 0) in the top-left corner. Clicks outside the
+     * board are ignored. Also checks whether Escape was pressed to quit.
      *
      * @param context The current frame's input and engine services.
      */
@@ -65,6 +71,25 @@ public:
     svanes::TicCount GetFrameIntervalTics() const override;
 
 private:
+    /**
+     * Identifies a square on the board, counting from the top-left corner.
+     *
+     * FIELDS:
+     * - column: The zero-based column, increasing to the right.
+     * - row: The zero-based row, increasing downward.
+     */
+    struct BoardCoordinate {
+        std::int32_t column;
+        std::int32_t row;
+    };
+
+    // The square under the mouse, or no value when the mouse is off the board.
+    std::optional<BoardCoordinate> hoveredSquare;
+
+    // A translucent rectangle moved over the hovered square. Its alpha is
+    // zero when no board square is hovered.
+    svanes::Entity hoverHighlight = 0;
+
     // Set when the user presses Escape.
     bool quit = false;
 };
