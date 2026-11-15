@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Board.hpp"
+#include "BoardView.hpp"
 
 #include <svanes/network/clientserver/IClient.hpp>
 
@@ -67,8 +68,11 @@ public:
     svanes::TicCount GetFrameIntervalTics() const override;
 
 private:
-    // The board, its placed pieces, and its mouse controls.
+    // The client's board state.
     Board board;
+
+    // The board's visual presentation and mouse controls.
+    BoardView boardView;
 
     // Set when the user presses Escape.
     bool quit = false;

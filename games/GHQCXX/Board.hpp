@@ -1,28 +1,17 @@
 #pragma once
 
-#include <svanes/entity.hpp>
-#include <svanes/render/basic_render_types.hpp>
-
 #include <array>
 #include <cstdint>
 #include <optional>
 
-namespace svanes {
-class Camera2D;
-class InputManager;
-class Registry;
-} // namespace svanes
-
 namespace ghqcxx {
 
 /**
- * Represents the GHQ board and owns the pieces occupying its squares.
- * Provides placement and lookup by grid coordinate, along with the board's
- * display and mouse interaction. The engine registry stores the visuals.
+ * Represents the state of the GHQ board and owns the pieces occupying its squares.
  */
 class Board final {
 public:
-    // The board has eight rows and columns, with one world unit per square.
+    // The board has eight rows and columns.
     static constexpr std::int32_t Size = 8;
 
     /**
@@ -82,20 +71,16 @@ public:
     };
 
     /**
-     * Sets up the board and both players' starting pieces. Call once before
-     * placing additional pieces or updating the board.
-     *
-     * @param world The registry that owns the board's visual entities.
+     * Sets up both players' starting pieces. Call once before placing
+     * additional pieces.
      *
      * @throws std::logic_error if the board has already been initialized.
      */
-    void Initialize(svanes::Registry &world);
+    void Initialize();
 
     /**
-     * Places a piece on an empty square. The board keeps the piece and creates
-     * its visuals centered on that square, facing toward the opposing side.
+     * Places a piece on an empty square and keeps it as part of the board.
      *
-     * @param world The registry used to initialize the board.
      * @param piece The type and team of the piece to place.
      * @param position The destination square.
      *
@@ -104,8 +89,7 @@ public:
      * @throws std::out_of_range if the position is outside the board.
      * @throws std::invalid_argument if the piece type or team is invalid.
      */
-    void PlacePiece(svanes::Registry &world, Piece piece,
-                    BoardCoordinate position);
+    void PlacePiece(Piece piece, BoardCoordinate position);
 
     /**
      * Looks up the piece occupying a square.
@@ -118,43 +102,12 @@ public:
      */
     const std::optional<Piece> &GetPiece(BoardCoordinate position) const;
 
-    /**
-     * Returns the color used to display a team's pieces, including previews.
-     *
-     * @param team The player whose color is needed.
-     *
-     * @return NC State red for Red, or Carolina blue for Blue.
-     *
-     * @throws std::invalid_argument if the team is invalid.
-     */
-    static svanes::Color GetTeamColor(Team team);
-
-    /**
-     * Highlights the square under the mouse and prints its (column, row) on a
-     * left click. Coordinates start at (0, 0) in the top-left corner. Clicks
-     * outside the board are ignored.
-     *
-     * @param world The registry used to initialize the board.
-     * @param input The current frame's mouse position and button states.
-     * @param camera The camera used to draw the board, already fitted to the
-     * current window size.
-     */
-    void Update(svanes::Registry &world, const svanes::InputManager &input,
-                const svanes::Camera2D &camera);
-
 private:
     // Indexed by row, then column. An empty square has no piece.
     std::array<std::array<std::optional<Piece>, Size>, Size> pieces;
 
-    // Placement requires the board's visual entities to exist first.
+    // The starting formation is installed once before additional placements.
     bool initialized = false;
-
-    // The square under the mouse, or no value when the mouse is off the board.
-    std::optional<BoardCoordinate> hoveredSquare;
-
-    // A translucent rectangle moved over the hovered square. Its alpha is
-    // zero when no board square is hovered.
-    svanes::Entity hoverHighlight = 0;
 };
 
 } // namespace ghqcxx

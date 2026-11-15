@@ -38,10 +38,11 @@ static void FitViewToWindow(svanes::Camera2D &camera) {
 }
 
 void GHQCXXClient::Initialize(svanes::ClientContext &context) {
-    const auto carolinaBlue = Board::GetTeamColor(Board::Team::Blue);
-    const auto ncStateRed = Board::GetTeamColor(Board::Team::Red);
+    const auto carolinaBlue = BoardView::GetTeamColor(Board::Team::Blue);
+    const auto ncStateRed = BoardView::GetTeamColor(Board::Team::Red);
 
-    board.Initialize(context.world);
+    board.Initialize();
+    boardView.Initialize(context.world, board);
 
     CreateBasicArtillery(
         context.world, ncStateRed,
@@ -110,7 +111,7 @@ void GHQCXXClient::HandleDisconnect() {
 
 void GHQCXXClient::Update(const svanes::ClientFrameContext &context) {
     FitViewToWindow(context.camera);
-    board.Update(context.world, context.input, context.camera);
+    boardView.Update(context.world, context.input, context.camera);
 
     if (context.input.WasPressed(svanes::Key::Escape)) {
         quit = true;

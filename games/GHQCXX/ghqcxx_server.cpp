@@ -5,6 +5,7 @@
 namespace ghqcxx {
 
 void GHQCXXServer::Initialize(svanes::ServerContext &) {
+    board.Initialize();
     std::cout << "Hello, world! GHQCXX server.\n" << std::flush;
 }
 

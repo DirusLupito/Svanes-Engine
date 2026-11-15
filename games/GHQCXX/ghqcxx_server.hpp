@@ -1,16 +1,19 @@
 #pragma once
 
+#include "Board.hpp"
+
 #include <svanes/network/clientserver/IServer.hpp>
 
 namespace ghqcxx {
 
 /**
- * Server implementation for the General Headquarters C++ game.
+ * Represents the GHQ game hosted by the server. Owns its board and pieces
+ * and handles clients joining and leaving the game.
  */
 class GHQCXXServer final : public svanes::IServer {
 public:
     /**
-     * Prints the server's startup message.
+     * Sets up the server's board and prints its startup message.
      *
      * @param context The engine services and configuration provided for
      * server initialization.
@@ -43,6 +46,10 @@ public:
      * update.
      */
     void Update(const svanes::ServerUpdateContext &context) override;
+
+private:
+    // The server's board state.
+    Board board;
 };
 
 } // namespace ghqcxx
