@@ -9,6 +9,7 @@
 #include "pieces/ParachuteInfantry.hpp"
 
 #include <svanes/camera2d.hpp>
+#include <svanes/geometry/circle_geometry.hpp>
 #include <svanes/geometry/primitive_geometry.hpp>
 #include <svanes/geometry/rectangle_geometry.hpp>
 #include <svanes/input/input_manager.hpp>
@@ -111,6 +112,17 @@ void BoardView::Initialize(svanes::Registry &world, const Board &board) {
 
     for (std::uint8_t row = 0; row < Board::Size; ++row) {
         for (std::uint8_t column = 0; column < Board::Size; ++column) {
+            auto &marker = movementMarkers[row][column];
+            marker = world.CreateEntity();
+            world.AddComponent<svanes::Transform>(
+                marker,
+                svanes::Transform{.x = static_cast<float>(column) + 0.5F,
+                                  .y = static_cast<float>(row) + 0.5F});
+            world.AddComponent<svanes::SolidShape>(
+                marker, svanes::SolidShape{
+                            .color = {60, 200, 90, 0},
+                            .geometry = svanes::Circle2D{.radius = 0.15F}});
+
             if (const auto &piece = board.GetPiece({column, row})) {
                 CreatePieceVisual(world, *piece, {column, row});
             }
@@ -172,8 +184,15 @@ BoardView::Update(svanes::Registry &world, const svanes::InputManager &input,
 }
 
 void BoardView::ShowSelection(
-    svanes::Registry &world,
+    svanes::Registry &world, const Board &board,
     const std::optional<Board::BoardCoordinate> &selectedSquare) {
+    // Reuse the circles for each selection, hiding the previous destinations.
+    for (const auto &row : movementMarkers) {
+        for (const auto marker : row) {
+            world.GetComponent<svanes::SolidShape>(marker).color.alpha = 0;
+        }
+    }
+
     auto &highlight =
         world.GetComponent<svanes::SolidShape>(selectionHighlight);
     highlight.color.alpha = 0;
@@ -183,6 +202,13 @@ void BoardView::ShowSelection(
         position.x = static_cast<float>(selectedSquare->column) + 0.5F;
         position.y = static_cast<float>(selectedSquare->row) + 0.5F;
         highlight.color.alpha = 96;
+
+        for (const auto destination :
+             board.GetMovementOptions(*selectedSquare)) {
+            const auto marker =
+                movementMarkers[destination.row][destination.column];
+            world.GetComponent<svanes::SolidShape>(marker).color.alpha = 220;
+        }
     }
 }
 

@@ -15,8 +15,7 @@ namespace ghqcxx {
 class GHQCXXClient final : public svanes::IClient {
 public:
     /**
-     * Sets up the board with each side's starting pieces and previews of the
-     * remaining piece types, then centers the camera on the full display.
+     * Initializes the client's game state and presentation.
      *
      * @param context The engine services and window dimensions provided for
      * client initialization.
@@ -48,9 +47,7 @@ public:
     void HandleDisconnect() override;
 
     /**
-     * Updates the board's view and selects a piece when its square is
-     * left-clicked.
-     * Also checks whether Escape was pressed to quit.
+     * Updates the client's presentation and handles player input.
      *
      * @param context The current frame's input and engine services.
      */

@@ -116,7 +116,7 @@ void GHQCXXClient::Update(const svanes::ClientFrameContext &context) {
     if (clickedSquare && board.GetPiece(*clickedSquare)) {
         selectedPiece = clickedSquare;
     }
-    boardView.ShowSelection(context.world, selectedPiece);
+    boardView.ShowSelection(context.world, board, selectedPiece);
 
     if (context.input.WasPressed(svanes::Key::Escape)) {
         quit = true;

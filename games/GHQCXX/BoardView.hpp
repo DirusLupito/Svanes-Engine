@@ -5,6 +5,7 @@
 #include <svanes/entity.hpp>
 #include <svanes/render/basic_render_types.hpp>
 
+#include <array>
 #include <optional>
 
 namespace svanes {
@@ -16,8 +17,7 @@ class Registry;
 namespace ghqcxx {
 
 /**
- * Represents the client's view of a board. Provides the checkerboard and
- * piece display, along with hover and selection feedback and click coordinates.
+ * Represents the client's interactive view of a GHQ board.
  */
 class BoardView final {
 public:
@@ -50,14 +50,16 @@ public:
            const svanes::Camera2D &camera);
 
     /**
-     * Displays the client's selected square.
+     * Highlights the selected square and its available movement destinations.
      *
      * @param world The registry used to initialize the view.
+     * @param board The board used to find the selected piece's movement
+     * options.
      * @param selectedSquare The occupied square selected by the client, or
-     * no value to hide the selection highlight.
+     * no value to clear the selection feedback.
      */
     void
-    ShowSelection(svanes::Registry &world,
+    ShowSelection(svanes::Registry &world, const Board &board,
                   const std::optional<Board::BoardCoordinate> &selectedSquare);
 
     /**
@@ -83,6 +85,10 @@ private:
 
     // A highlight rectangle behind the selected piece.
     svanes::Entity selectionHighlight = 0;
+
+    // Green destination circles, indexed by row, then column.
+    std::array<std::array<svanes::Entity, Board::Size>, Board::Size>
+        movementMarkers{};
 };
 
 } // namespace ghqcxx
