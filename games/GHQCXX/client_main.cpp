@@ -5,16 +5,21 @@
 #include <iostream>
 
 int main(int argc, char *argv[]) {
-    if (argc > 2) {
-        std::cerr << "Usage: ghqcxx [server IPv4:port]\n";
+    try {
+        if (argc > 2) {
+            std::cerr << "Usage: ghqcxx [server IPv4:port]\n";
+            return 1;
+        }
+
+        ghqcxx::GHQCXXClient client;
+        svanes::NetworkClient application(
+            {.title = "GHQCXX", .width = 1920, .height = 1080});
+        application.Connect(argc == 2 ? argv[1] : "127.0.0.1:5810");
+        const auto result = application.run(client);
+        application.Disconnect();
+        return result;
+    } catch (const std::exception &error) {
+        std::cerr << "General Headquarters Error: " << error.what() << '\n';
         return 1;
     }
-
-    ghqcxx::GHQCXXClient client;
-    svanes::NetworkClient application(
-        {.title = "GHQCXX", .width = 1920, .height = 1080});
-    application.Connect(argc == 2 ? argv[1] : "127.0.0.1:5810");
-    const auto result = application.run(client);
-    application.Disconnect();
-    return result;
 }
