@@ -5,6 +5,8 @@
 
 #include <svanes/network/clientserver/IClient.hpp>
 
+#include <optional>
+
 namespace ghqcxx {
 
 /**
@@ -46,8 +48,9 @@ public:
     void HandleDisconnect() override;
 
     /**
-     * Fits the board and pieces to the current window size, updates the
-     * board's mouse controls, and checks whether Escape was pressed to quit.
+     * Updates the board's view and selects a piece when its square is
+     * left-clicked.
+     * Also checks whether Escape was pressed to quit.
      *
      * @param context The current frame's input and engine services.
      */
@@ -73,6 +76,9 @@ private:
 
     // The board's visual presentation and mouse controls.
     BoardView boardView;
+
+    // The square containing the selected piece. Empty until a piece is clicked.
+    std::optional<Board::BoardCoordinate> selectedPiece;
 
     // Set when the user presses Escape.
     bool quit = false;

@@ -102,6 +102,14 @@ void BoardView::Initialize(svanes::Registry &world, const Board &board) {
                                            .geometry = svanes::Rectangle2D{
                                                .width = 1.0F, .height = 1.0F}});
 
+    selectionHighlight = world.CreateEntity();
+    world.AddComponent<svanes::Transform>(selectionHighlight);
+    world.AddComponent<svanes::SolidShape>(
+        selectionHighlight,
+        svanes::SolidShape{
+            .color = {255, 210, 80, 0},
+            .geometry = svanes::Rectangle2D{.width = 1.0F, .height = 1.0F}});
+
     for (std::uint8_t row = 0; row < Board::Size; ++row) {
         for (std::uint8_t column = 0; column < Board::Size; ++column) {
             if (const auto &piece = board.GetPiece({column, row})) {
@@ -124,9 +132,9 @@ svanes::Color BoardView::GetTeamColor(Board::Team team) {
     }
 }
 
-void BoardView::Update(svanes::Registry &world,
-                       const svanes::InputManager &input,
-                       const svanes::Camera2D &camera) {
+std::optional<Board::BoardCoordinate>
+BoardView::Update(svanes::Registry &world, const svanes::InputManager &input,
+                  const svanes::Camera2D &camera) {
     hoveredSquare.reset();
     auto &highlight = world.GetComponent<svanes::SolidShape>(hoverHighlight);
     highlight.color.alpha = 0;
@@ -159,6 +167,23 @@ void BoardView::Update(svanes::Registry &world,
                   << static_cast<std::uint32_t>(hoveredSquare->column) << ", "
                   << static_cast<std::uint32_t>(hoveredSquare->row) << ")\n"
                   << std::flush;
+        return hoveredSquare;
+    }
+    return std::nullopt;
+}
+
+void BoardView::ShowSelection(
+    svanes::Registry &world,
+    const std::optional<Board::BoardCoordinate> &selectedSquare) {
+    auto &highlight =
+        world.GetComponent<svanes::SolidShape>(selectionHighlight);
+    highlight.color.alpha = 0;
+    if (selectedSquare) {
+        auto &position =
+            world.GetComponent<svanes::Transform>(selectionHighlight);
+        position.x = static_cast<float>(selectedSquare->column) + 0.5F;
+        position.y = static_cast<float>(selectedSquare->row) + 0.5F;
+        highlight.color.alpha = 96;
     }
 }
 

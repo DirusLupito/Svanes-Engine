@@ -111,7 +111,12 @@ void GHQCXXClient::HandleDisconnect() {
 
 void GHQCXXClient::Update(const svanes::ClientFrameContext &context) {
     FitViewToWindow(context.camera);
-    boardView.Update(context.world, context.input, context.camera);
+    const auto clickedSquare =
+        boardView.Update(context.world, context.input, context.camera);
+    if (clickedSquare && board.GetPiece(*clickedSquare)) {
+        selectedPiece = clickedSquare;
+    }
+    boardView.ShowSelection(context.world, selectedPiece);
 
     if (context.input.WasPressed(svanes::Key::Escape)) {
         quit = true;

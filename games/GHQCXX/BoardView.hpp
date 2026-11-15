@@ -17,7 +17,7 @@ namespace ghqcxx {
 
 /**
  * Represents the client's view of a board. Provides the checkerboard and
- * piece display, along with hover feedback and click coordinates.
+ * piece display, along with hover and selection feedback and click coordinates.
  */
 class BoardView final {
 public:
@@ -41,9 +41,24 @@ public:
      * @param input The current frame's mouse position and button states.
      * @param camera The camera used to draw the board, already fitted to the
      * current window size.
+     *
+     * @return The square left-clicked this frame, or no value if no board
+     * square was clicked.
      */
-    void Update(svanes::Registry &world, const svanes::InputManager &input,
-                const svanes::Camera2D &camera);
+    std::optional<Board::BoardCoordinate>
+    Update(svanes::Registry &world, const svanes::InputManager &input,
+           const svanes::Camera2D &camera);
+
+    /**
+     * Displays the client's selected square.
+     *
+     * @param world The registry used to initialize the view.
+     * @param selectedSquare The occupied square selected by the client, or
+     * no value to hide the selection highlight.
+     */
+    void
+    ShowSelection(svanes::Registry &world,
+                  const std::optional<Board::BoardCoordinate> &selectedSquare);
 
     /**
      * Returns the color used to display a team's pieces, including previews.
@@ -65,6 +80,9 @@ private:
     // A translucent rectangle moved over the hovered square. Its alpha is
     // zero when no board square is hovered.
     svanes::Entity hoverHighlight = 0;
+
+    // A highlight rectangle behind the selected piece.
+    svanes::Entity selectionHighlight = 0;
 };
 
 } // namespace ghqcxx
