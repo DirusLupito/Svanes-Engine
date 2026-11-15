@@ -14,15 +14,16 @@
 
 #include <algorithm>
 #include <iostream>
+#include <numbers>
 #include <stdexcept>
 
 namespace ghqcxx {
 
-// Leave two rows below the board for the red and blue piece visuals.
+// Leave a row above and below the board for the red and blue piece visuals.
 constexpr float ViewHeight = Board::Size + 2.75F;
 
 /**
- * Fits the board and the pieces below it into the window. Both dimensions use
+ * Fits the board and both rows of pieces into the window. Both dimensions use
  * the same scale so the board's squares stay square when the window is resized.
  *
  * @param camera The client's camera, with its current rendering output size.
@@ -43,43 +44,50 @@ void GHQCXXClient::Initialize(svanes::ClientContext &context) {
 
     board.Initialize(context.world);
 
-    CreateHeadquarters(context.world, ncStateRed,
-                       {.x = 0.7F, .y = Board::Size + 0.75F});
+    CreateHeadquarters(context.world, ncStateRed, {.x = 0.7F, .y = -0.75F});
     CreateHeadquarters(context.world, carolinaBlue,
-                       {.x = 0.7F, .y = Board::Size + 2.0F});
+                       {.x = 0.7F,
+                        .y = Board::Size + 0.75F,
+                        .rotation = std::numbers::pi_v<float>});
 
-    CreateBasicArtillery(context.world, ncStateRed,
-                         {.x = 1.8F, .y = Board::Size + 0.75F});
+    CreateBasicArtillery(
+        context.world, ncStateRed,
+        {.x = 1.8F, .y = -0.75F, .rotation = std::numbers::pi_v<float>});
     CreateBasicArtillery(context.world, carolinaBlue,
-                         {.x = 1.8F, .y = Board::Size + 2.0F});
+                         {.x = 1.8F, .y = Board::Size + 0.75F});
 
-    CreateHeavyArtillery(context.world, ncStateRed,
-                         {.x = 2.9F, .y = Board::Size + 0.75F});
+    CreateHeavyArtillery(
+        context.world, ncStateRed,
+        {.x = 2.9F, .y = -0.75F, .rotation = std::numbers::pi_v<float>});
     CreateHeavyArtillery(context.world, carolinaBlue,
-                         {.x = 2.9F, .y = Board::Size + 2.0F});
+                         {.x = 2.9F, .y = Board::Size + 0.75F});
 
-    CreateArmoredArtillery(context.world, ncStateRed,
-                           {.x = 4.0F, .y = Board::Size + 0.75F});
+    CreateArmoredArtillery(
+        context.world, ncStateRed,
+        {.x = 4.0F, .y = -0.75F, .rotation = std::numbers::pi_v<float>});
     CreateArmoredArtillery(context.world, carolinaBlue,
-                           {.x = 4.0F, .y = Board::Size + 2.0F});
+                           {.x = 4.0F, .y = Board::Size + 0.75F});
 
-    CreateBasicInfantry(context.world, ncStateRed,
-                        {.x = 5.1F, .y = Board::Size + 0.75F});
+    CreateBasicInfantry(
+        context.world, ncStateRed,
+        {.x = 5.1F, .y = -0.75F, .rotation = std::numbers::pi_v<float>});
     CreateBasicInfantry(context.world, carolinaBlue,
-                        {.x = 5.1F, .y = Board::Size + 2.0F});
+                        {.x = 5.1F, .y = Board::Size + 0.75F});
 
-    CreateParachuteInfantry(context.world, ncStateRed,
-                            {.x = 6.2F, .y = Board::Size + 0.75F});
+    CreateParachuteInfantry(
+        context.world, ncStateRed,
+        {.x = 6.2F, .y = -0.75F, .rotation = std::numbers::pi_v<float>});
     CreateParachuteInfantry(context.world, carolinaBlue,
-                            {.x = 6.2F, .y = Board::Size + 2.0F});
+                            {.x = 6.2F, .y = Board::Size + 0.75F});
 
-    CreateArmoredInfantry(context.world, ncStateRed,
-                          {.x = 7.3F, .y = Board::Size + 0.75F});
+    CreateArmoredInfantry(
+        context.world, ncStateRed,
+        {.x = 7.3F, .y = -0.75F, .rotation = std::numbers::pi_v<float>});
     CreateArmoredInfantry(context.world, carolinaBlue,
-                          {.x = 7.3F, .y = Board::Size + 2.0F});
+                          {.x = 7.3F, .y = Board::Size + 0.75F});
 
     context.camera.x = Board::Size * 0.5F;
-    context.camera.y = ViewHeight * 0.5F;
+    context.camera.y = Board::Size * 0.5F;
     context.camera.scale_mode = svanes::ScaleMode::Constant;
     FitViewToWindow(context.camera);
 
