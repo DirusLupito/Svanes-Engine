@@ -69,7 +69,7 @@ public:
      *
      * @throws std::invalid_argument if the team is invalid.
      */
-    static svanes::Color GetTeamColor(Board::Team team);
+    static svanes::Color GetTeamColor(Team team);
 
 private:
     bool initialized = false;

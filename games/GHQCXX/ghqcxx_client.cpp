@@ -38,8 +38,8 @@ static void FitViewToWindow(svanes::Camera2D &camera) {
 }
 
 void GHQCXXClient::Initialize(svanes::ClientContext &context) {
-    const auto carolinaBlue = BoardView::GetTeamColor(Board::Team::Blue);
-    const auto ncStateRed = BoardView::GetTeamColor(Board::Team::Red);
+    const auto carolinaBlue = BoardView::GetTeamColor(Team::Blue);
+    const auto ncStateRed = BoardView::GetTeamColor(Team::Red);
 
     board.Initialize();
     boardView.Initialize(context.world, board);

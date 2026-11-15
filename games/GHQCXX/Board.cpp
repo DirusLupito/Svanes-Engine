@@ -54,13 +54,65 @@ void Board::PlacePiece(Piece piece, BoardCoordinate position) {
     pieces[position.row][position.column] = piece;
 }
 
-const std::optional<Board::Piece> &
-Board::GetPiece(BoardCoordinate position) const {
+const std::optional<Piece> &Board::GetPiece(BoardCoordinate position) const {
     if (position.column >= Size || position.row >= Size) {
         throw std::out_of_range(
             "GHQ board coordinates must be between 0 and 7.");
     }
     return pieces[position.row][position.column];
+}
+
+std::vector<Board::BoardCoordinate>
+Board::GetMovementOptions(BoardCoordinate position) const {
+    const auto &piece = GetPiece(position);
+    if (!piece) {
+        return {};
+    }
+
+    const auto rules = piece->GetMovementRules();
+    std::vector<BoardCoordinate> destinations;
+    const auto backRow = piece->team == Team::Red ? 0 : Size - 1;
+    if (rules.canParadrop && position.row == backRow) {
+        // A paradrop has no intervening squares to check. Nearby empty
+        // squares are included here too, so they are only reported once.
+        for (std::uint8_t row = 0; row < Size; ++row) {
+            for (std::uint8_t column = 0; column < Size; ++column) {
+                if (!GetPiece({column, row})) {
+                    destinations.push_back({column, row});
+                }
+            }
+        }
+        return destinations;
+    }
+
+    for (std::int8_t rowStep = -1; rowStep <= 1; ++rowStep) {
+        for (std::int8_t columnStep = -1; columnStep <= 1; ++columnStep) {
+            if (rowStep == 0 && columnStep == 0) {
+                continue;
+            }
+
+            // Keep intermediate coordinates signed so crossing the top or
+            // left edge cannot wrap around to a positive board coordinate.
+            std::int32_t column = position.column;
+            std::int32_t row = position.row;
+            for (std::uint8_t step = 0; step < rules.maxSteps; ++step) {
+                column += columnStep;
+                row += rowStep;
+                if (column < 0 || column >= Size || row < 0 || row >= Size) {
+                    break;
+                }
+
+                const BoardCoordinate destination{
+                    .column = static_cast<std::uint8_t>(column),
+                    .row = static_cast<std::uint8_t>(row)};
+                if (GetPiece(destination)) {
+                    break;
+                }
+                destinations.push_back(destination);
+            }
+        }
+    }
+    return destinations;
 }
 
 } // namespace ghqcxx

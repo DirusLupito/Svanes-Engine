@@ -6,6 +6,8 @@ add_executable(svanes_game_ghqcxx
     Board.hpp
     BoardView.cpp
     BoardView.hpp
+    pieces/Piece.cpp
+    pieces/Piece.hpp
     pieces/PieceVisuals.cpp
     pieces/PieceVisuals.hpp
     pieces/Headquarters.cpp
@@ -31,5 +33,7 @@ add_executable(svanes_game_ghqcxx_server
     ghqcxx_server.hpp
     Board.cpp
     Board.hpp
+    pieces/Piece.cpp
+    pieces/Piece.hpp
 )
 target_link_libraries(svanes_game_ghqcxx_server PRIVATE Svanes::Engine)

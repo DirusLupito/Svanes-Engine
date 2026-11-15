@@ -31,35 +31,34 @@ namespace ghqcxx {
  *
  * @throws std::invalid_argument if the piece type or team is invalid.
  */
-static void CreatePieceVisual(svanes::Registry &world, Board::Piece piece,
+static void CreatePieceVisual(svanes::Registry &world, Piece piece,
                               Board::BoardCoordinate position) {
     const auto color = BoardView::GetTeamColor(piece.team);
     const svanes::Transform transform{
         .x = static_cast<float>(position.column) + 0.5F,
         .y = static_cast<float>(position.row) + 0.5F,
-        .rotation =
-            piece.team == Board::Team::Red ? std::numbers::pi_v<float> : 0.0F};
+        .rotation = piece.team == Team::Red ? std::numbers::pi_v<float> : 0.0F};
 
     switch (piece.type) {
-    case Board::PieceType::Headquarters:
+    case PieceType::Headquarters:
         CreateHeadquarters(world, color, transform);
         break;
-    case Board::PieceType::BasicInfantry:
+    case PieceType::BasicInfantry:
         CreateBasicInfantry(world, color, transform);
         break;
-    case Board::PieceType::ArmoredInfantry:
+    case PieceType::ArmoredInfantry:
         CreateArmoredInfantry(world, color, transform);
         break;
-    case Board::PieceType::ParachuteInfantry:
+    case PieceType::ParachuteInfantry:
         CreateParachuteInfantry(world, color, transform);
         break;
-    case Board::PieceType::BasicArtillery:
+    case PieceType::BasicArtillery:
         CreateBasicArtillery(world, color, transform);
         break;
-    case Board::PieceType::HeavyArtillery:
+    case PieceType::HeavyArtillery:
         CreateHeavyArtillery(world, color, transform);
         break;
-    case Board::PieceType::ArmoredArtillery:
+    case PieceType::ArmoredArtillery:
         CreateArmoredArtillery(world, color, transform);
         break;
     default:
@@ -121,11 +120,11 @@ void BoardView::Initialize(svanes::Registry &world, const Board &board) {
     initialized = true;
 }
 
-svanes::Color BoardView::GetTeamColor(Board::Team team) {
+svanes::Color BoardView::GetTeamColor(Team team) {
     switch (team) {
-    case Board::Team::Red:
+    case Team::Red:
         return {0xcc, 0x00, 0x00};
-    case Board::Team::Blue:
+    case Team::Blue:
         return {0x7b, 0xaf, 0xd4};
     default:
         throw std::invalid_argument("Unknown GHQ team.");

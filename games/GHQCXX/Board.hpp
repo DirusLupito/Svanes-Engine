@@ -1,8 +1,11 @@
 #pragma once
 
+#include "pieces/Piece.hpp"
+
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <vector>
 
 namespace ghqcxx {
 
@@ -14,50 +17,6 @@ class Board final {
 public:
     // The board has eight rows and columns.
     static constexpr std::int32_t Size = 8;
-
-    /**
-     * Identifies the player a piece belongs to.
-     *
-     * MEMBERS:
-     * - Red: The player starting in the upper-left corner.
-     * - Blue: The player starting in the lower-right corner.
-     */
-    enum class Team : std::uint8_t { Red, Blue };
-
-    /**
-     * Identifies the kind of piece on a square.
-     *
-     * MEMBERS:
-     * - Headquarters: The HQ that the opposing player must capture.
-     * - BasicInfantry: Regular infantry.
-     * - ArmoredInfantry: Infantry that can move two squares.
-     * - ParachuteInfantry: Infantry that can paradrop from its back row.
-     * - BasicArtillery: Regular artillery.
-     * - HeavyArtillery: Artillery with a range of three squares.
-     * - ArmoredArtillery: Artillery that can move two squares.
-     */
-    enum class PieceType : std::uint8_t {
-        Headquarters,
-        BasicInfantry,
-        ArmoredInfantry,
-        ParachuteInfantry,
-        BasicArtillery,
-        HeavyArtillery,
-        ArmoredArtillery
-    };
-
-    /**
-     * Represents a piece belonging to one player. Its square is determined
-     * by where the board stores it.
-     *
-     * FIELDS:
-     * - type: The kind of piece.
-     * - team: The player the piece belongs to.
-     */
-    struct Piece {
-        PieceType type;
-        Team team;
-    };
 
     /**
      * Identifies a square on the board, counting from the top-left corner.
@@ -102,6 +61,20 @@ public:
      * @throws std::out_of_range if the position is outside the board.
      */
     const std::optional<Piece> &GetPiece(BoardCoordinate position) const;
+
+    /**
+     * Finds destinations allowed by the piece's movement rules, board edges,
+     * and occupied squares.
+     *
+     * @param position The square containing the piece to inspect.
+     *
+     * @return The available destinations, or an empty list if the square is
+     * empty or the piece has no available destination.
+     *
+     * @throws std::out_of_range if the position is outside the board.
+     */
+    std::vector<BoardCoordinate>
+    GetMovementOptions(BoardCoordinate position) const;
 
 private:
     // Indexed by row, then column. An empty square has no piece.
