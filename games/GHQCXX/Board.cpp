@@ -26,8 +26,8 @@ void Board::Initialize(svanes::Registry &world) {
         throw std::logic_error("The GHQ board has already been initialized.");
     }
 
-    constexpr svanes::Color light{200, 204, 208};
-    constexpr svanes::Color dark{72, 80, 88};
+    constexpr svanes::Color light{100, 102, 104};
+    constexpr svanes::Color dark{36, 40, 44};
 
     // Each square is a rectangle centered halfway into its row and column.
     // The board therefore occupies world coordinates (0, 0) through (8, 8).
