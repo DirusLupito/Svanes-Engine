@@ -7,7 +7,8 @@
 namespace ghqcxx {
 
 /**
- * Represents the state of the GHQ board and owns the pieces occupying its squares.
+ * Represents the state of the GHQ board and owns the pieces occupying its
+ * squares.
  */
 class Board final {
 public:
