@@ -1,6 +1,7 @@
 #include "ghqcxx_client.hpp"
 
 #include "events/ClientPacketReceivedEvent.hpp"
+#include "events/MovementEvent.hpp"
 #include "handlers/ClientPacketReceivedHandler.hpp"
 #include "handlers/MovementHandler.hpp"
 #include "pieces/ArmoredArtillery.hpp"
@@ -126,8 +127,20 @@ void GHQCXXClient::Update(const svanes::ClientFrameContext &context) {
     FitViewToWindow(context.camera);
     const auto clickedSquare =
         boardView.Update(context.world, context.input, context.camera);
-    if (clickedSquare && board.GetPiece(*clickedSquare)) {
-        selectedPiece = clickedSquare;
+    if (clickedSquare) {
+        if (board.GetPiece(*clickedSquare)) {
+            selectedPiece = clickedSquare;
+        } else if (selectedPiece) {
+            for (const auto destination :
+                 board.GetMovementOptions(*selectedPiece)) {
+                if (destination.column == clickedSquare->column &&
+                    destination.row == clickedSquare->row) {
+                    context.events.TriggerEvent(
+                        MovementEvent(*selectedPiece, *clickedSquare));
+                    break;
+                }
+            }
+        }
     }
     boardView.ShowSelection(context.world, board, selectedPiece);
 
