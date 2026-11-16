@@ -1,8 +1,22 @@
 #include "Board.hpp"
 
+#include "GameMessage.hpp"
+
+#include <svanes/network/message_serialization.hpp>
+
+#include <limits>
 #include <stdexcept>
 
 namespace ghqcxx {
+
+// The byte value written for both the type and team of an empty square.
+static constexpr std::uint8_t EmptySquare =
+    std::numeric_limits<std::uint8_t>::max();
+
+// The size of a complete board state message in bytes.
+static constexpr std::size_t BoardMessageSize =
+    sizeof(GameMessageType) +
+    Board::Size * Board::Size * (sizeof(Piece::type) + sizeof(Piece::team));
 
 void Board::Initialize() {
     if (initialized) {
@@ -65,6 +79,53 @@ void Board::MovePiece(BoardCoordinate from, BoardCoordinate to) {
     }
     throw std::invalid_argument(
         "The selected piece cannot move to that square.");
+}
+
+svanes::NetworkMessage Board::ToMessage() const {
+    svanes::MessageWriter writer;
+    writer.WriteUint8(static_cast<std::uint8_t>(GameMessageType::BoardState));
+    for (const auto &row : pieces) {
+        for (const auto &piece : row) {
+            writer.WriteUint8(piece ? static_cast<std::uint8_t>(piece->type)
+                                    : EmptySquare);
+            writer.WriteUint8(piece ? static_cast<std::uint8_t>(piece->team)
+                                    : EmptySquare);
+        }
+    }
+    return writer.Finish();
+}
+
+Board Board::FromMessage(const svanes::NetworkMessage &message) {
+    if (message.bytes.size() != BoardMessageSize) {
+        throw std::invalid_argument("Invalid GHQ board packet size.");
+    }
+    if (GetGameMessageType(message) != GameMessageType::BoardState) {
+        throw std::invalid_argument("Expected a GHQ board state packet.");
+    }
+
+    svanes::MessageReader reader(message);
+    reader.ReadUint8();
+    Board board;
+    // Restore exactly the transmitted squares.
+    // The caller receives the board only after all fields validate.
+    board.initialized = true;
+    for (std::uint8_t row = 0; row < Size; ++row) {
+        for (std::uint8_t column = 0; column < Size; ++column) {
+            const auto type = reader.ReadUint8();
+            const auto team = reader.ReadUint8();
+            if (type == EmptySquare) {
+                if (team != EmptySquare) {
+                    throw std::invalid_argument(
+                        "An empty GHQ square cannot have a team.");
+                }
+            } else {
+                board.PlacePiece(
+                    {static_cast<PieceType>(type), static_cast<Team>(team)},
+                    {column, row});
+            }
+        }
+    }
+    return board;
 }
 
 const std::optional<Piece> &Board::GetPiece(BoardCoordinate position) const {

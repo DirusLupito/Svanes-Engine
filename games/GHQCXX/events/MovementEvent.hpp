@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Board.hpp"
+#include "../GameMessage.hpp"
 #include "../pieces/Piece.hpp"
 
 #include <svanes/events/event.hpp>
@@ -47,7 +48,8 @@ public:
      *
      * @return The decoded request.
      *
-     * @throws std::invalid_argument if the message size or facing is invalid.
+     * @throws std::invalid_argument if the message type, size, or facing is
+     * invalid.
      */
     static MovementEvent FromMessage(const svanes::NetworkMessage &message);
 
@@ -61,11 +63,10 @@ public:
     std::optional<Facing> facing;
 
 private:
-    // Counts the transmitted fields, excluding object padding and optional
-    // bookkeeping. Facing is encoded as one unsigned byte.
+    // The size of a complete movement message in bytes.
     static constexpr std::size_t MessageSize =
-        sizeof(from.column) + sizeof(from.row) + sizeof(to.column) +
-        sizeof(to.row) + sizeof(std::uint8_t);
+        sizeof(GameMessageType) + sizeof(from.column) + sizeof(from.row) +
+        sizeof(to.column) + sizeof(to.row) + sizeof(std::uint8_t);
 
     // The reserved facing byte that requests no direction change.
     static constexpr std::uint8_t UnchangedFacing =

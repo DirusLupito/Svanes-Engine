@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../Board.hpp"
 #include "../events/ServerPacketReceivedEvent.hpp"
 
 #include <svanes/events/event_handler_wrapper.hpp>
@@ -25,10 +26,13 @@ public:
      * outlive the handler.
      * @param network The server used to relay moves. Must outlive the handler.
      * @param clients The server's current clients. Must outlive the handler.
+     * @param board The authoritative board used for corrections. Must outlive
+     * the handler.
      */
     ServerPacketReceivedHandler(svanes::EventManager &events,
                                 svanes::NetworkServer &network,
-                                const std::vector<svanes::ClientId> &clients);
+                                const std::vector<svanes::ClientId> &clients,
+                                const Board &board);
 };
 
 } // namespace ghqcxx

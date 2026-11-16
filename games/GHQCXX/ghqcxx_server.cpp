@@ -17,7 +17,7 @@ void GHQCXXServer::Initialize(svanes::ServerContext &context) {
     board.Initialize();
 
     context.events.Subscribe(std::make_unique<ServerPacketReceivedHandler>(
-        context.events, context.network, clients));
+        context.events, context.network, clients, board));
     context.events.Subscribe(std::make_unique<MovementHandler>(board));
 
     std::cout << "Hello, world! GHQCXX server.\n" << std::flush;

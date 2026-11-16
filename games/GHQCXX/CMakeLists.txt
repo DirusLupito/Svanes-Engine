@@ -12,6 +12,8 @@ add_executable(svanes_game_ghqcxx
     handlers/MovementHandler.hpp
     Board.cpp
     Board.hpp
+    GameMessage.cpp
+    GameMessage.hpp
     BoardView.cpp
     BoardView.hpp
     pieces/Piece.cpp
@@ -49,6 +51,8 @@ add_executable(svanes_game_ghqcxx_server
     handlers/MovementHandler.hpp
     Board.cpp
     Board.hpp
+    GameMessage.cpp
+    GameMessage.hpp
     pieces/Piece.cpp
     pieces/Piece.hpp
 )

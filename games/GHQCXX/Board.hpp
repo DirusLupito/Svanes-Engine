@@ -2,6 +2,8 @@
 
 #include "pieces/Piece.hpp"
 
+#include <svanes/network/network_message.hpp>
+
 #include <array>
 #include <cstdint>
 #include <optional>
@@ -61,6 +63,24 @@ public:
      * @throws std::invalid_argument if the move is not allowed.
      */
     void MovePiece(BoardCoordinate from, BoardCoordinate to);
+
+    /**
+     * Encodes the board's current state for transmission.
+     *
+     * @return A message containing every square's contents.
+     */
+    svanes::NetworkMessage ToMessage() const;
+
+    /**
+     * Restores a board from an authoritative state message.
+     *
+     * @param message The board state to read.
+     *
+     * @return The complete board, ready for use without initialization.
+     *
+     * @throws std::invalid_argument if the message is not a valid board state.
+     */
+    static Board FromMessage(const svanes::NetworkMessage &message);
 
     /**
      * Looks up the piece occupying a square.
