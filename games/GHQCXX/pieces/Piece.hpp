@@ -36,6 +36,30 @@ enum class PieceType : std::uint8_t {
 };
 
 /**
+ * Identifies a piece's facing on the board. North points toward the top row.
+ *
+ * MEMBERS:
+ * - North: Toward the top of the board.
+ * - NorthEast: Diagonally toward the top-right.
+ * - East: Toward the right of the board.
+ * - SouthEast: Diagonally toward the bottom-right.
+ * - South: Toward the bottom of the board.
+ * - SouthWest: Diagonally toward the bottom-left.
+ * - West: Toward the left of the board.
+ * - NorthWest: Diagonally toward the top-left.
+ */
+enum class Facing : std::uint8_t {
+    North,
+    NorthEast,
+    East,
+    SouthEast,
+    South,
+    SouthWest,
+    West,
+    NorthWest
+};
+
+/**
  * Describes a piece's movement before the board checks its surroundings.
  * Ordinary movement follows any of the eight directions, with all steps
  * taken in the same direction.
