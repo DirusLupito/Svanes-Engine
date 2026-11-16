@@ -11,23 +11,27 @@ class NetworkClient;
 namespace ghqcxx {
 
 /**
- * Handles requests to move or turn a piece on the board.
+ * Applies piece movement to a board.
  */
 class MovementHandler final
     : public svanes::EventHandlerWrapper<MovementEvent> {
 public:
     /**
-     * Creates a handler for piece movement and rotation requests.
+     * Creates a handler that updates the server's board.
+     *
+     * @param board The board to update. Must outlive the handler.
      */
-    MovementHandler();
+    explicit MovementHandler(Board &board);
 
     /**
-     * Creates a client handler that forwards movement requests to the server.
+     * Creates a handler that updates the client's board and sends its moves
+     * to the server.
      *
+     * @param board The board to update. Must outlive the handler.
      * @param network The client used to send requests. Must outlive the
      * handler.
      */
-    explicit MovementHandler(svanes::NetworkClient &network);
+    MovementHandler(Board &board, svanes::NetworkClient &network);
 };
 
 } // namespace ghqcxx

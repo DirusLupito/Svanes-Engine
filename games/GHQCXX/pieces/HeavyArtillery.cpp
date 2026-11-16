@@ -21,8 +21,11 @@ namespace ghqcxx {
 // but is only 0.7 units tall. The three stars use the same size and spacing as
 // basic artillery's two stars, starting at the same position near the top.
 
-void CreateHeavyArtillery(svanes::Registry &world, svanes::Color color,
-                          const svanes::Transform &transform) {
+std::vector<svanes::Entity>
+CreateHeavyArtillery(svanes::Registry &world, svanes::Color color,
+                     const svanes::Transform &transform) {
+    std::vector<svanes::Entity> parts;
+
     // Apply the same initial position and rotation to every part, keeping the
     // base, rectangle, and stars together when placing the piece.
     const auto add_part = [&](svanes::SolidShape visual,
@@ -33,6 +36,7 @@ void CreateHeavyArtillery(svanes::Registry &world, svanes::Color color,
             entity, svanes::ComposeTransforms(transform, local));
         world.AddComponent<svanes::SolidShape>(entity, std::move(visual));
         world.AddComponent<svanes::ZOrder>(entity, svanes::ZOrder{z_order});
+        parts.push_back(entity);
     };
 
     add_part({.color = color,
@@ -54,6 +58,7 @@ void CreateHeavyArtillery(svanes::Registry &world, svanes::Color color,
         add_part(CreateStarVisual({}, 0.1F),
                  {.y = y, .rotation = std::numbers::pi_v<float>}, 2);
     }
+    return parts;
 }
 
 } // namespace ghqcxx

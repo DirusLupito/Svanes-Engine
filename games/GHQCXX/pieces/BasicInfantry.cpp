@@ -14,8 +14,9 @@ namespace ghqcxx {
 // The rectangle is 0.4 units wide and 0.6 units tall, extending to y = 0.5.
 // Its width is half the width of the infantry head's bottom edge.
 
-void CreateBasicInfantry(svanes::Registry &world, svanes::Color color,
-                         const svanes::Transform &transform) {
+std::vector<svanes::Entity>
+CreateBasicInfantry(svanes::Registry &world, svanes::Color color,
+                    const svanes::Transform &transform) {
     const auto head = world.CreateEntity();
     world.AddComponent<svanes::Transform>(head, transform);
     world.AddComponent<svanes::SolidShape>(head, CreateInfantryHeadVisual());
@@ -27,6 +28,7 @@ void CreateBasicInfantry(svanes::Registry &world, svanes::Color color,
         body, svanes::SolidShape{.color = color,
                                  .geometry = svanes::Rectangle2D{
                                      .width = 0.4F, .height = 0.6F}});
+    return {head, body};
 }
 
 } // namespace ghqcxx

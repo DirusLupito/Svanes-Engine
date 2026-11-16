@@ -54,6 +54,18 @@ void Board::PlacePiece(Piece piece, BoardCoordinate position) {
     pieces[position.row][position.column] = piece;
 }
 
+void Board::MovePiece(BoardCoordinate from, BoardCoordinate to) {
+    GetPiece(to);
+    for (const auto destination : GetMovementOptions(from)) {
+        if (destination.column == to.column && destination.row == to.row) {
+            pieces[to.row][to.column] = pieces[from.row][from.column];
+            pieces[from.row][from.column].reset();
+            return;
+        }
+    }
+    throw std::invalid_argument("The selected piece cannot move to that square.");
+}
+
 const std::optional<Piece> &Board::GetPiece(BoardCoordinate position) const {
     if (position.column >= Size || position.row >= Size) {
         throw std::out_of_range(

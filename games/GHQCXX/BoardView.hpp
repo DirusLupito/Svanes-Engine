@@ -7,6 +7,7 @@
 
 #include <array>
 #include <optional>
+#include <vector>
 
 namespace svanes {
 class Camera2D;
@@ -33,9 +34,16 @@ public:
     void Initialize(svanes::Registry &world, const Board &board);
 
     /**
-     * Highlights the square under the mouse and prints its (column, row) on a
-     * left click. Coordinates start at (0, 0) in the top-left corner. Clicks
-     * outside the board are ignored.
+     * Synchronizes the displayed pieces with the board's state.
+     *
+     * @param world The registry used to initialize the view.
+     * @param board The board whose pieces will be displayed.
+     */
+    void UpdatePieces(svanes::Registry &world, const Board &board);
+
+    /**
+     * Updates mouse feedback and reports a clicked square. Coordinates start
+     * at (0, 0) in the top-left corner. Clicks outside the board are ignored.
      *
      * @param world The registry used to initialize the view.
      * @param input The current frame's mouse position and button states.
@@ -75,6 +83,15 @@ public:
 
 private:
     bool initialized = false;
+
+    // The pieces currently displayed, indexed by row, then column.
+    std::array<std::array<std::optional<Piece>, Board::Size>, Board::Size>
+        displayedPieces;
+
+    // The visual entities belonging to each square's displayed piece.
+    std::array<std::array<std::vector<svanes::Entity>, Board::Size>,
+               Board::Size>
+        pieceEntities;
 
     // The square under the mouse, or no value when the mouse is off the board.
     std::optional<Board::BoardCoordinate> hoveredSquare;

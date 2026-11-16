@@ -4,7 +4,11 @@
 #include "../pieces/Piece.hpp"
 
 #include <svanes/events/event.hpp>
+#include <svanes/network/network_message.hpp>
 
+#include <cstddef>
+#include <cstdint>
+#include <limits>
 #include <optional>
 #include <string_view>
 
@@ -29,6 +33,24 @@ public:
     MovementEvent(Board::BoardCoordinate from, Board::BoardCoordinate to,
                   std::optional<Facing> facing = std::nullopt);
 
+    /**
+     * Encodes this movement request for transmission.
+     *
+     * @return A message containing the requested movement.
+     */
+    svanes::NetworkMessage ToMessage() const;
+
+    /**
+     * Decodes a movement request from a received message.
+     *
+     * @param message The movement message to read.
+     *
+     * @return The decoded request.
+     *
+     * @throws std::invalid_argument if the message size or facing is invalid.
+     */
+    static MovementEvent FromMessage(const svanes::NetworkMessage &message);
+
     // The square containing the piece to move.
     Board::BoardCoordinate from;
 
@@ -37,6 +59,17 @@ public:
 
     // The final facing after the action. Empty leaves the direction unchanged.
     std::optional<Facing> facing;
+
+private:
+    // Counts the transmitted fields, excluding object padding and optional
+    // bookkeeping. Facing is encoded as one unsigned byte.
+    static constexpr std::size_t MessageSize =
+        sizeof(from.column) + sizeof(from.row) + sizeof(to.column) +
+        sizeof(to.row) + sizeof(std::uint8_t);
+
+    // The reserved facing byte that requests no direction change.
+    static constexpr std::uint8_t UnchangedFacing =
+        std::numeric_limits<std::uint8_t>::max();
 };
 
 } // namespace ghqcxx

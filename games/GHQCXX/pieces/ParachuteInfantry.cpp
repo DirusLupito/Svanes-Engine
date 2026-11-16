@@ -21,8 +21,11 @@ namespace ghqcxx {
 // draw over them, leaving black outlines for the suspension lines and a
 // shared center line.
 
-void CreateParachuteInfantry(svanes::Registry &world, svanes::Color color,
-                             const svanes::Transform &transform) {
+std::vector<svanes::Entity>
+CreateParachuteInfantry(svanes::Registry &world, svanes::Color color,
+                        const svanes::Transform &transform) {
+    std::vector<svanes::Entity> parts;
+
     const auto add_part = [&](svanes::SolidShape visual,
                               svanes::Transform local,
                               std::int32_t z_order = 0) {
@@ -31,6 +34,7 @@ void CreateParachuteInfantry(svanes::Registry &world, svanes::Color color,
             entity, svanes::ComposeTransforms(transform, local));
         world.AddComponent<svanes::SolidShape>(entity, std::move(visual));
         world.AddComponent<svanes::ZOrder>(entity, svanes::ZOrder{z_order});
+        parts.push_back(entity);
     };
 
     auto head = CreateInfantryHeadVisual();
@@ -73,6 +77,7 @@ void CreateParachuteInfantry(svanes::Registry &world, svanes::Color color,
                            {side * 0.006F * decalScale, 0.106F * decalScale}}}},
                  {.y = -0.28F}, 4);
     }
+    return parts;
 }
 
 } // namespace ghqcxx

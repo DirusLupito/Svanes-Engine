@@ -4,6 +4,10 @@
 
 #include <svanes/events/event_handler_wrapper.hpp>
 
+namespace svanes {
+class EventManager;
+} // namespace svanes
+
 namespace ghqcxx {
 
 /**
@@ -14,8 +18,11 @@ class ServerPacketReceivedHandler final
 public:
     /**
      * Creates a handler for the server's incoming gameplay packets.
+     *
+     * @param events The manager used to raise decoded game events. Must
+     * outlive the handler.
      */
-    ServerPacketReceivedHandler();
+    explicit ServerPacketReceivedHandler(svanes::EventManager &events);
 };
 
 } // namespace ghqcxx

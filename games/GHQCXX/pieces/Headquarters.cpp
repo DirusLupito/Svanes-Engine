@@ -12,13 +12,15 @@ namespace ghqcxx {
 // Its bounding circle has a diameter of one world unit. Rotated
 // half a turn so HQ faces up before the supplied rotation is applied.
 
-void CreateHeadquarters(svanes::Registry &world, svanes::Color color,
-                        const svanes::Transform &transform) {
+std::vector<svanes::Entity>
+CreateHeadquarters(svanes::Registry &world, svanes::Color color,
+                   const svanes::Transform &transform) {
     const auto star = world.CreateEntity();
     world.AddComponent<svanes::Transform>(
         star, svanes::ComposeTransforms(
                   transform, {.rotation = std::numbers::pi_v<float>}));
     world.AddComponent<svanes::SolidShape>(star, CreateStarVisual(color));
+    return {star};
 }
 
 } // namespace ghqcxx

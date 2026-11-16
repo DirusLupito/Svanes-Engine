@@ -19,8 +19,11 @@ namespace ghqcxx {
 // one-third of the middle rectangle's width, limiting the distance between any
 // two vertices to that size.
 
-void CreateBasicArtillery(svanes::Registry &world, svanes::Color color,
-                          const svanes::Transform &transform) {
+std::vector<svanes::Entity>
+CreateBasicArtillery(svanes::Registry &world, svanes::Color color,
+                     const svanes::Transform &transform) {
+    std::vector<svanes::Entity> parts;
+
     // Apply the same initial position and rotation to every part, keeping the
     // rectangles and stars together when placing the piece.
     const auto add_part = [&](svanes::SolidShape visual,
@@ -31,6 +34,7 @@ void CreateBasicArtillery(svanes::Registry &world, svanes::Color color,
             entity, svanes::ComposeTransforms(transform, local));
         world.AddComponent<svanes::SolidShape>(entity, std::move(visual));
         world.AddComponent<svanes::ZOrder>(entity, svanes::ZOrder{z_order});
+        parts.push_back(entity);
     };
 
     add_part({.color = {248, 248, 248},
@@ -53,6 +57,7 @@ void CreateBasicArtillery(svanes::Registry &world, svanes::Color color,
         add_part(CreateStarVisual({}, 0.1F),
                  {.y = y, .rotation = std::numbers::pi_v<float>}, 1);
     }
+    return parts;
 }
 
 } // namespace ghqcxx

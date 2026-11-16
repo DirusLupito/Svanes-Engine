@@ -93,7 +93,7 @@ void GHQCXXClient::Initialize(svanes::ClientContext &context) {
 
     context.events.Subscribe(std::make_unique<ClientPacketReceivedHandler>());
     context.events.Subscribe(
-        std::make_unique<MovementHandler>(context.network));
+        std::make_unique<MovementHandler>(board, context.network));
 
     std::cout << "Hello, world! GHQCXX client.\n" << std::flush;
 }
@@ -138,11 +138,13 @@ void GHQCXXClient::Update(const svanes::ClientFrameContext &context) {
                     destination.row == clickedSquare->row) {
                     context.events.TriggerEvent(
                         MovementEvent(*selectedPiece, *clickedSquare));
+                    selectedPiece = clickedSquare;
                     break;
                 }
             }
         }
     }
+    boardView.UpdatePieces(context.world, board);
     boardView.ShowSelection(context.world, board, selectedPiece);
 
     if (context.input.WasPressed(svanes::Key::Escape)) {

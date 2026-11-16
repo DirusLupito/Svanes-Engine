@@ -19,8 +19,11 @@ namespace ghqcxx {
 // as basic artillery's. Two circles sit near the bottom of the rectangle, each
 // with a diameter of 0.1 units, matching the stars' bounding circles.
 
-void CreateArmoredArtillery(svanes::Registry &world, svanes::Color color,
-                            const svanes::Transform &transform) {
+std::vector<svanes::Entity>
+CreateArmoredArtillery(svanes::Registry &world, svanes::Color color,
+                       const svanes::Transform &transform) {
+    std::vector<svanes::Entity> parts;
+
     // Apply the same initial position and rotation to every part, keeping the
     // triangles, rectangle, stars, and circles together when placing the piece.
     const auto add_part = [&](svanes::SolidShape visual,
@@ -31,6 +34,7 @@ void CreateArmoredArtillery(svanes::Registry &world, svanes::Color color,
             entity, svanes::ComposeTransforms(transform, local));
         world.AddComponent<svanes::SolidShape>(entity, std::move(visual));
         world.AddComponent<svanes::ZOrder>(entity, svanes::ZOrder{z_order});
+        parts.push_back(entity);
     };
 
     for (const float side : {-1.0F, 1.0F}) {
@@ -54,6 +58,7 @@ void CreateArmoredArtillery(svanes::Registry &world, svanes::Color color,
         add_part({.color = {}, .geometry = svanes::Circle2D{.radius = 0.05F}},
                  {.y = y}, 1);
     }
+    return parts;
 }
 
 } // namespace ghqcxx

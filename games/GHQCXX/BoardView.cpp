@@ -16,7 +16,6 @@
 #include <svanes/registry.hpp>
 #include <svanes/render/render_system.hpp>
 
-#include <iostream>
 #include <numbers>
 #include <stdexcept>
 
@@ -30,10 +29,13 @@ namespace ghqcxx {
  * @param piece The piece to display.
  * @param position The piece's square.
  *
+ * @return The entities making up the piece.
+ *
  * @throws std::invalid_argument if the piece type or team is invalid.
  */
-static void CreatePieceVisual(svanes::Registry &world, Piece piece,
-                              Board::BoardCoordinate position) {
+static std::vector<svanes::Entity>
+CreatePieceVisual(svanes::Registry &world, Piece piece,
+                  Board::BoardCoordinate position) {
     const auto color = BoardView::GetTeamColor(piece.team);
     const svanes::Transform transform{
         .x = static_cast<float>(position.column) + 0.5F,
@@ -42,26 +44,19 @@ static void CreatePieceVisual(svanes::Registry &world, Piece piece,
 
     switch (piece.type) {
     case PieceType::Headquarters:
-        CreateHeadquarters(world, color, transform);
-        break;
+        return CreateHeadquarters(world, color, transform);
     case PieceType::BasicInfantry:
-        CreateBasicInfantry(world, color, transform);
-        break;
+        return CreateBasicInfantry(world, color, transform);
     case PieceType::ArmoredInfantry:
-        CreateArmoredInfantry(world, color, transform);
-        break;
+        return CreateArmoredInfantry(world, color, transform);
     case PieceType::ParachuteInfantry:
-        CreateParachuteInfantry(world, color, transform);
-        break;
+        return CreateParachuteInfantry(world, color, transform);
     case PieceType::BasicArtillery:
-        CreateBasicArtillery(world, color, transform);
-        break;
+        return CreateBasicArtillery(world, color, transform);
     case PieceType::HeavyArtillery:
-        CreateHeavyArtillery(world, color, transform);
-        break;
+        return CreateHeavyArtillery(world, color, transform);
     case PieceType::ArmoredArtillery:
-        CreateArmoredArtillery(world, color, transform);
-        break;
+        return CreateArmoredArtillery(world, color, transform);
     default:
         throw std::invalid_argument("Unknown GHQ piece type.");
     }
@@ -122,14 +117,38 @@ void BoardView::Initialize(svanes::Registry &world, const Board &board) {
                 marker, svanes::SolidShape{
                             .color = {60, 200, 90, 0},
                             .geometry = svanes::Circle2D{.radius = 0.15F}});
-
-            if (const auto &piece = board.GetPiece({column, row})) {
-                CreatePieceVisual(world, *piece, {column, row});
-            }
         }
     }
 
+    UpdatePieces(world, board);
     initialized = true;
+}
+
+void BoardView::UpdatePieces(svanes::Registry &world, const Board &board) {
+    for (std::uint8_t row = 0; row < Board::Size; ++row) {
+        for (std::uint8_t column = 0; column < Board::Size; ++column) {
+            const auto &piece = board.GetPiece({column, row});
+            auto &displayed = displayedPieces[row][column];
+            if (!piece && !displayed) {
+                continue;
+            }
+            if (piece && displayed && piece->type == displayed->type &&
+                piece->team == displayed->team) {
+                continue;
+            }
+
+            // Rebuild only changed squares, including every part of a piece.
+            auto &entities = pieceEntities[row][column];
+            for (const auto entity : entities) {
+                world.DestroyEntity(entity);
+            }
+            entities.clear();
+            if (piece) {
+                entities = CreatePieceVisual(world, *piece, {column, row});
+            }
+            displayed = piece;
+        }
+    }
 }
 
 svanes::Color BoardView::GetTeamColor(Team team) {
@@ -174,10 +193,6 @@ BoardView::Update(svanes::Registry &world, const svanes::InputManager &input,
 
     if (hoveredSquare &&
         input.WasMouseButtonPressed(svanes::MouseButton::Left)) {
-        std::cout << "Clicked board square: ("
-                  << static_cast<std::uint32_t>(hoveredSquare->column) << ", "
-                  << static_cast<std::uint32_t>(hoveredSquare->row) << ")\n"
-                  << std::flush;
         return hoveredSquare;
     }
     return std::nullopt;

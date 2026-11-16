@@ -52,6 +52,17 @@ public:
     void PlacePiece(Piece piece, BoardCoordinate position);
 
     /**
+     * Moves a piece to an available destination, leaving its old square empty.
+     *
+     * @param from The square containing the piece.
+     * @param to The destination square.
+     *
+     * @throws std::out_of_range if either square is outside the board.
+     * @throws std::invalid_argument if the move is not allowed.
+     */
+    void MovePiece(BoardCoordinate from, BoardCoordinate to);
+
+    /**
      * Looks up the piece occupying a square.
      *
      * @param position The square to inspect.
