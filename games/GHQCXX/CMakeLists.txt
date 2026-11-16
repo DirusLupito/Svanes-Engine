@@ -6,6 +6,10 @@ add_executable(svanes_game_ghqcxx
     events/ClientPacketReceivedEvent.hpp
     events/MovementEvent.cpp
     events/MovementEvent.hpp
+    handlers/ClientPacketReceivedHandler.cpp
+    handlers/ClientPacketReceivedHandler.hpp
+    handlers/MovementHandler.cpp
+    handlers/MovementHandler.hpp
     Board.cpp
     Board.hpp
     BoardView.cpp
@@ -39,6 +43,10 @@ add_executable(svanes_game_ghqcxx_server
     events/ServerPacketReceivedEvent.hpp
     events/MovementEvent.cpp
     events/MovementEvent.hpp
+    handlers/ServerPacketReceivedHandler.cpp
+    handlers/ServerPacketReceivedHandler.hpp
+    handlers/MovementHandler.cpp
+    handlers/MovementHandler.hpp
     Board.cpp
     Board.hpp
     pieces/Piece.cpp

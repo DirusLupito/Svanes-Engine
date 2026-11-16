@@ -1,0 +1,21 @@
+#pragma once
+
+#include "../events/MovementEvent.hpp"
+
+#include <svanes/events/event_handler_wrapper.hpp>
+
+namespace ghqcxx {
+
+/**
+ * Handles requests to move or turn a piece on the board.
+ */
+class MovementHandler final
+    : public svanes::EventHandlerWrapper<MovementEvent> {
+public:
+    /**
+     * Creates a handler for piece movement and rotation requests.
+     */
+    MovementHandler();
+};
+
+} // namespace ghqcxx
