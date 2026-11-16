@@ -1,3 +1,4 @@
+# List available commands.
 default:
     @just --justfile "{{justfile()}}" --list
 
@@ -5,18 +6,24 @@ set working-directory := "../.."
 
 import '../../scripts/common.just'
 
+# Build the GHQCXX client and server in Debug mode.
 build: (_build "svanes_game_ghqcxx svanes_game_ghqcxx_server")
 
+# Build the GHQCXX client and server in RelWithDebInfo mode.
 release: (_release "svanes_game_ghqcxx svanes_game_ghqcxx_server")
 
+# Build and launch the RelWithDebInfo GHQCXX client.
 run *args: (_release "svanes_game_ghqcxx")
     {{release-bin-dir}}svanes_game_ghqcxx{{exe-suffix}} {{args}}
 
+# Build and launch the RelWithDebInfo GHQCXX server.
 server *args: (_release "svanes_game_ghqcxx_server")
     {{release-bin-dir}}svanes_game_ghqcxx_server{{exe-suffix}} {{args}}
 
+# Build and launch the Debug GHQCXX client.
 debug *args: (_build "svanes_game_ghqcxx")
     {{bin-dir}}svanes_game_ghqcxx{{exe-suffix}} {{args}}
 
+# Build and launch the Debug GHQCXX server.
 debug-server *args: (_build "svanes_game_ghqcxx_server")
     {{bin-dir}}svanes_game_ghqcxx_server{{exe-suffix}} {{args}}
