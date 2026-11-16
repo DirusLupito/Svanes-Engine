@@ -1,16 +1,23 @@
 #include "ghqcxx_server.hpp"
 
 #include "events/ServerPacketReceivedEvent.hpp"
+#include "handlers/MovementHandler.hpp"
+#include "handlers/ServerPacketReceivedHandler.hpp"
 
 #include <svanes/events/event_manager.hpp>
 
 #include <iostream>
+#include <memory>
 
 namespace ghqcxx {
 
 void GHQCXXServer::Initialize(svanes::ServerContext &context) {
     events = &context.events;
     board.Initialize();
+
+    context.events.Subscribe(std::make_unique<ServerPacketReceivedHandler>());
+    context.events.Subscribe(std::make_unique<MovementHandler>());
+
     std::cout << "Hello, world! GHQCXX server.\n" << std::flush;
 }
 

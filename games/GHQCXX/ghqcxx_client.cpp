@@ -1,6 +1,8 @@
 #include "ghqcxx_client.hpp"
 
 #include "events/ClientPacketReceivedEvent.hpp"
+#include "handlers/ClientPacketReceivedHandler.hpp"
+#include "handlers/MovementHandler.hpp"
 #include "pieces/ArmoredArtillery.hpp"
 #include "pieces/ArmoredInfantry.hpp"
 #include "pieces/BasicArtillery.hpp"
@@ -15,6 +17,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <memory>
 #include <numbers>
 #include <stdexcept>
 
@@ -86,6 +89,9 @@ void GHQCXXClient::Initialize(svanes::ClientContext &context) {
     context.camera.y = Board::Size * 0.5F;
     context.camera.scale_mode = svanes::ScaleMode::Constant;
     FitViewToWindow(context.camera);
+
+    context.events.Subscribe(std::make_unique<ClientPacketReceivedHandler>());
+    context.events.Subscribe(std::make_unique<MovementHandler>());
 
     std::cout << "Hello, world! GHQCXX client.\n" << std::flush;
 }
