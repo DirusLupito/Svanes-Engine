@@ -20,6 +20,14 @@ run *args: (_release "svanes_game_ghqcxx")
 server *args: (_release "svanes_game_ghqcxx_server")
     {{release-bin-dir}}svanes_game_ghqcxx_server{{exe-suffix}} {{args}}
 
+# Launch the RelWithDebInfo GHQCXX client without compiling.
+nocompile *args:
+    {{release-bin-dir}}svanes_game_ghqcxx{{exe-suffix}} {{args}}
+
+# Launch the RelWithDebInfo GHQCXX server without compiling.
+nocompile-server *args:
+    {{release-bin-dir}}svanes_game_ghqcxx_server{{exe-suffix}} {{args}}
+
 # Build and launch the Debug GHQCXX client.
 debug *args: (_build "svanes_game_ghqcxx")
     {{bin-dir}}svanes_game_ghqcxx{{exe-suffix}} {{args}}
