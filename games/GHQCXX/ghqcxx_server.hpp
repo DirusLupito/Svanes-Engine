@@ -4,6 +4,8 @@
 
 #include <svanes/network/clientserver/IServer.hpp>
 
+#include <vector>
+
 namespace ghqcxx {
 
 /**
@@ -53,6 +55,9 @@ private:
 
     // The server's board state.
     Board board;
+
+    // The clients currently admitted to the game.
+    std::vector<svanes::ClientId> clients;
 };
 
 } // namespace ghqcxx

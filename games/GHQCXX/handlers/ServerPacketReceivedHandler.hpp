@@ -4,6 +4,8 @@
 
 #include <svanes/events/event_handler_wrapper.hpp>
 
+#include <vector>
+
 namespace svanes {
 class EventManager;
 } // namespace svanes
@@ -21,8 +23,12 @@ public:
      *
      * @param events The manager used to raise decoded game events. Must
      * outlive the handler.
+     * @param network The server used to relay moves. Must outlive the handler.
+     * @param clients The server's current clients. Must outlive the handler.
      */
-    explicit ServerPacketReceivedHandler(svanes::EventManager &events);
+    ServerPacketReceivedHandler(svanes::EventManager &events,
+                                svanes::NetworkServer &network,
+                                const std::vector<svanes::ClientId> &clients);
 };
 
 } // namespace ghqcxx

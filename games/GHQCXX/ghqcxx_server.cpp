@@ -6,6 +6,7 @@
 
 #include <svanes/events/event_manager.hpp>
 
+#include <algorithm>
 #include <iostream>
 #include <memory>
 
@@ -15,8 +16,8 @@ void GHQCXXServer::Initialize(svanes::ServerContext &context) {
     events = &context.events;
     board.Initialize();
 
-    context.events.Subscribe(
-        std::make_unique<ServerPacketReceivedHandler>(context.events));
+    context.events.Subscribe(std::make_unique<ServerPacketReceivedHandler>(
+        context.events, context.network, clients));
     context.events.Subscribe(std::make_unique<MovementHandler>(board));
 
     std::cout << "Hello, world! GHQCXX server.\n" << std::flush;
@@ -24,6 +25,7 @@ void GHQCXXServer::Initialize(svanes::ServerContext &context) {
 
 svanes::JoinResponse
 GHQCXXServer::HandleJoinRequest(const svanes::ServerJoinContext &context) {
+    clients.push_back(context.client);
     std::cout << "Accepting GHQCXX client " << context.client << ".\n"
               << std::flush;
     return {.accepted = true, .message = {}};
@@ -31,6 +33,7 @@ GHQCXXServer::HandleJoinRequest(const svanes::ServerJoinContext &context) {
 
 void GHQCXXServer::HandleDisconnect(svanes::Registry &,
                                     svanes::ClientId client) {
+    std::erase(clients, client);
     std::cout << "GHQCXX client " << client << " disconnected.\n" << std::flush;
 }
 

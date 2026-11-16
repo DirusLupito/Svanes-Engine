@@ -91,7 +91,8 @@ void GHQCXXClient::Initialize(svanes::ClientContext &context) {
     context.camera.scale_mode = svanes::ScaleMode::Constant;
     FitViewToWindow(context.camera);
 
-    context.events.Subscribe(std::make_unique<ClientPacketReceivedHandler>());
+    context.events.Subscribe(
+        std::make_unique<ClientPacketReceivedHandler>(board, selectedPiece));
     context.events.Subscribe(
         std::make_unique<MovementHandler>(board, context.network));
 
