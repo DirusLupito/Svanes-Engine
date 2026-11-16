@@ -1,10 +1,15 @@
 #include "ghqcxx_server.hpp"
 
+#include "events/ServerPacketReceivedEvent.hpp"
+
+#include <svanes/events/event_manager.hpp>
+
 #include <iostream>
 
 namespace ghqcxx {
 
-void GHQCXXServer::Initialize(svanes::ServerContext &) {
+void GHQCXXServer::Initialize(svanes::ServerContext &context) {
+    events = &context.events;
     board.Initialize();
     std::cout << "Hello, world! GHQCXX server.\n" << std::flush;
 }
@@ -21,6 +26,11 @@ void GHQCXXServer::HandleDisconnect(svanes::Registry &,
     std::cout << "GHQCXX client " << client << " disconnected.\n" << std::flush;
 }
 
-void GHQCXXServer::Update(const svanes::ServerUpdateContext &) {}
+void GHQCXXServer::Update(const svanes::ServerUpdateContext &context) {
+    for (const auto &input : context.network.PollInputs()) {
+        events->TriggerEvent(
+            ServerPacketReceivedEvent(input.client, input.message));
+    }
+}
 
 } // namespace ghqcxx

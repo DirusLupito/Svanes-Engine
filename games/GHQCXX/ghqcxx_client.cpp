@@ -1,5 +1,6 @@
 #include "ghqcxx_client.hpp"
 
+#include "events/ClientPacketReceivedEvent.hpp"
 #include "pieces/ArmoredArtillery.hpp"
 #include "pieces/ArmoredInfantry.hpp"
 #include "pieces/BasicArtillery.hpp"
@@ -8,8 +9,9 @@
 #include "pieces/ParachuteInfantry.hpp"
 
 #include <svanes/camera2d.hpp>
+#include <svanes/events/event_manager.hpp>
 #include <svanes/input/input_manager.hpp>
-#include <svanes/render/basic_render_types.hpp>
+#include <svanes/network/clientserver/network_client.hpp>
 
 #include <algorithm>
 #include <iostream>
@@ -110,6 +112,11 @@ void GHQCXXClient::HandleDisconnect() {
 }
 
 void GHQCXXClient::Update(const svanes::ClientFrameContext &context) {
+    // Trigger immediately so handlers can update the board before it is drawn.
+    for (const auto &message : context.network.PollMessages()) {
+        context.events.TriggerEvent(ClientPacketReceivedEvent(message));
+    }
+
     FitViewToWindow(context.camera);
     const auto clickedSquare =
         boardView.Update(context.world, context.input, context.camera);

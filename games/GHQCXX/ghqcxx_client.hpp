@@ -4,6 +4,7 @@
 #include "BoardView.hpp"
 
 #include <svanes/network/clientserver/IClient.hpp>
+#include <svanes/network/network_message.hpp>
 
 #include <optional>
 
@@ -47,7 +48,8 @@ public:
     void HandleDisconnect() override;
 
     /**
-     * Updates the client's presentation and handles player input.
+     * Handles server messages and player input, and updates the client's
+     * presentation.
      *
      * @param context The current frame's input and engine services.
      */

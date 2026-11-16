@@ -40,7 +40,7 @@ public:
                           svanes::ClientId client) override;
 
     /**
-     * Leaves the server's state unchanged until there is gameplay to run.
+     * Handles gameplay messages received from clients.
      *
      * @param context The server's registry, networking, and gravity for this
      * update.
@@ -48,6 +48,9 @@ public:
     void Update(const svanes::ServerUpdateContext &context) override;
 
 private:
+    // The engine's event manager, supplied during initialization.
+    svanes::EventManager *events = nullptr;
+
     // The server's board state.
     Board board;
 };
