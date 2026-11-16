@@ -92,7 +92,8 @@ void GHQCXXClient::Initialize(svanes::ClientContext &context) {
     FitViewToWindow(context.camera);
 
     context.events.Subscribe(std::make_unique<ClientPacketReceivedHandler>());
-    context.events.Subscribe(std::make_unique<MovementHandler>());
+    context.events.Subscribe(
+        std::make_unique<MovementHandler>(context.network));
 
     std::cout << "Hello, world! GHQCXX client.\n" << std::flush;
 }

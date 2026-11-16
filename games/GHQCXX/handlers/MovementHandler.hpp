@@ -4,6 +4,10 @@
 
 #include <svanes/events/event_handler_wrapper.hpp>
 
+namespace svanes {
+class NetworkClient;
+} // namespace svanes
+
 namespace ghqcxx {
 
 /**
@@ -16,6 +20,14 @@ public:
      * Creates a handler for piece movement and rotation requests.
      */
     MovementHandler();
+
+    /**
+     * Creates a client handler that forwards movement requests to the server.
+     *
+     * @param network The client used to send requests. Must outlive the
+     * handler.
+     */
+    explicit MovementHandler(svanes::NetworkClient &network);
 };
 
 } // namespace ghqcxx
