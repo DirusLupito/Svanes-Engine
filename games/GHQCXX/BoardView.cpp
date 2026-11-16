@@ -71,11 +71,19 @@ void BoardView::Initialize(svanes::Registry &world, const Board &board) {
     constexpr svanes::Color light{100, 102, 104};
     constexpr svanes::Color dark{36, 40, 44};
 
+    // Pieces draw at layer zero and above while the board and highlights draw
+    // below zero so that pieces appear on top of the board and highlights.
+    constexpr std::int32_t boardLayer = -3;
+    constexpr std::int32_t hoverLayer = boardLayer + 1;
+    constexpr std::int32_t selectionLayer = hoverLayer + 1;
+
     // Each square is a rectangle centered halfway into its row and column.
     // The board therefore occupies world coordinates (0, 0) through (8, 8).
     for (std::uint8_t row = 0; row < Board::Size; ++row) {
         for (std::uint8_t column = 0; column < Board::Size; ++column) {
             const auto square = world.CreateEntity();
+            world.AddComponent<svanes::ZOrder>(square,
+                                               svanes::ZOrder{boardLayer});
             world.AddComponent<svanes::Transform>(
                 square,
                 svanes::Transform{.x = static_cast<float>(column) + 0.5F,
@@ -88,9 +96,10 @@ void BoardView::Initialize(svanes::Registry &world, const Board &board) {
         }
     }
 
-    // Create the highlight after the board so it draws over the squares.
-    // It starts transparent until the mouse is over the board.
+    // The hover highlight starts transparent until the mouse is over the board.
     hoverHighlight = world.CreateEntity();
+    world.AddComponent<svanes::ZOrder>(hoverHighlight,
+                                       svanes::ZOrder{hoverLayer});
     world.AddComponent<svanes::Transform>(hoverHighlight);
     world.AddComponent<svanes::SolidShape>(
         hoverHighlight, svanes::SolidShape{.color = {255, 255, 255, 0},
@@ -98,6 +107,8 @@ void BoardView::Initialize(svanes::Registry &world, const Board &board) {
                                                .width = 1.0F, .height = 1.0F}});
 
     selectionHighlight = world.CreateEntity();
+    world.AddComponent<svanes::ZOrder>(selectionHighlight,
+                                       svanes::ZOrder{selectionLayer});
     world.AddComponent<svanes::Transform>(selectionHighlight);
     world.AddComponent<svanes::SolidShape>(
         selectionHighlight,

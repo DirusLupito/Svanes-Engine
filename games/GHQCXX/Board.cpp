@@ -63,7 +63,8 @@ void Board::MovePiece(BoardCoordinate from, BoardCoordinate to) {
             return;
         }
     }
-    throw std::invalid_argument("The selected piece cannot move to that square.");
+    throw std::invalid_argument(
+        "The selected piece cannot move to that square.");
 }
 
 const std::optional<Piece> &Board::GetPiece(BoardCoordinate position) const {
