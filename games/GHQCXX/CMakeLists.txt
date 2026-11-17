@@ -36,6 +36,7 @@ add_executable(svanes_game_ghqcxx
     pieces/ArmoredInfantry.hpp
 )
 target_link_libraries(svanes_game_ghqcxx PRIVATE Svanes::Engine)
+svanes_game_package(svanes_game_ghqcxx ghqcxx GHQCXX ghqcxx)
 
 add_executable(svanes_game_ghqcxx_server
     server_main.cpp
