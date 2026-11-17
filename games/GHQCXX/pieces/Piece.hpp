@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 
 namespace ghqcxx {
@@ -12,6 +13,10 @@ namespace ghqcxx {
  * - Blue: The player starting in the lower-right corner.
  */
 enum class Team : std::uint8_t { Red, Blue };
+
+// The number of consecutive team values, for storage indexed by Team.
+inline constexpr std::size_t TeamCount =
+    static_cast<std::size_t>(Team::Blue) + 1;
 
 /**
  * Identifies the kind of piece on a square.
@@ -34,6 +39,10 @@ enum class PieceType : std::uint8_t {
     HeavyArtillery,
     ArmoredArtillery
 };
+
+// The number of consecutive piece types, for storage indexed by PieceType.
+inline constexpr std::size_t PieceTypeCount =
+    static_cast<std::size_t>(PieceType::ArmoredArtillery) + 1;
 
 /**
  * Identifies a piece's facing on the board. North points toward the top row.

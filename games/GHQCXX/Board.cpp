@@ -6,8 +6,28 @@
 
 #include <limits>
 #include <stdexcept>
+#include <utility>
 
 namespace ghqcxx {
+
+// Number of basic infantry each team starts with on the board.
+static constexpr std::uint8_t StartingInfantryCount = 3;
+
+// Red's starting infantry row. Blue uses the mirrored row.
+static constexpr std::uint8_t StartingInfantryRow = 1;
+
+// Red's starting basic artillery column. Blue uses the mirrored column.
+static constexpr std::uint8_t StartingArtilleryColumn = 1;
+
+// Pieces left in reserve after the starting formation is placed, per team.
+static constexpr std::array StartingReserveCounts{
+    std::pair{PieceType::Headquarters, std::uint8_t{0}},
+    std::pair{PieceType::BasicInfantry, std::uint8_t{5}},
+    std::pair{PieceType::ArmoredInfantry, std::uint8_t{3}},
+    std::pair{PieceType::ParachuteInfantry, std::uint8_t{1}},
+    std::pair{PieceType::BasicArtillery, std::uint8_t{2}},
+    std::pair{PieceType::HeavyArtillery, std::uint8_t{1}},
+    std::pair{PieceType::ArmoredArtillery, std::uint8_t{1}}};
 
 // The byte value written for both the type and team of an empty square.
 static constexpr std::uint8_t EmptySquare =
@@ -16,7 +36,8 @@ static constexpr std::uint8_t EmptySquare =
 // The size of a complete board state message in bytes.
 static constexpr std::size_t BoardMessageSize =
     sizeof(GameMessageType) +
-    Board::Size * Board::Size * (sizeof(Piece::type) + sizeof(Piece::team));
+    Board::Size * Board::Size * (sizeof(Piece::type) + sizeof(Piece::team)) +
+    TeamCount * PieceTypeCount * sizeof(std::uint8_t);
 
 void Board::Initialize() {
     if (initialized) {
@@ -27,14 +48,24 @@ void Board::Initialize() {
 
     // Starting according to the rulebook.
     PlacePiece({PieceType::Headquarters, Team::Red}, {0, 0});
-    PlacePiece({PieceType::Headquarters, Team::Blue}, {7, 7});
-    PlacePiece({PieceType::BasicArtillery, Team::Red}, {1, 0});
-    PlacePiece({PieceType::BasicArtillery, Team::Blue}, {6, 7});
+    PlacePiece({PieceType::Headquarters, Team::Blue}, {Size - 1, Size - 1});
+    PlacePiece({PieceType::BasicArtillery, Team::Red},
+               {StartingArtilleryColumn, 0});
+    PlacePiece({PieceType::BasicArtillery, Team::Blue},
+               {Size - 1 - StartingArtilleryColumn, Size - 1});
 
-    for (std::uint8_t column = 0; column < 3; ++column) {
-        PlacePiece({PieceType::BasicInfantry, Team::Red}, {column, 1});
+    for (std::uint8_t column = 0; column < StartingInfantryCount; ++column) {
+        PlacePiece({PieceType::BasicInfantry, Team::Red},
+                   {column, StartingInfantryRow});
         PlacePiece({PieceType::BasicInfantry, Team::Blue},
-                   {static_cast<std::uint8_t>(Size - 1 - column), 6});
+                   {static_cast<std::uint8_t>(Size - 1 - column),
+                    Size - 1 - StartingInfantryRow});
+    }
+
+    for (auto &reserve : reserves) {
+        for (const auto &[type, count] : StartingReserveCounts) {
+            reserve[static_cast<std::size_t>(type)] = count;
+        }
     }
 }
 
@@ -92,6 +123,12 @@ svanes::NetworkMessage Board::ToMessage() const {
                                     : EmptySquare);
         }
     }
+    // Reserve bytes follow the squares, ordered by Team, then PieceType.
+    for (const auto &reserve : reserves) {
+        for (const auto count : reserve) {
+            writer.WriteUint8(count);
+        }
+    }
     return writer.Finish();
 }
 
@@ -106,7 +143,7 @@ Board Board::FromMessage(const svanes::NetworkMessage &message) {
     svanes::MessageReader reader(message);
     reader.ReadUint8();
     Board board;
-    // Restore exactly the transmitted squares.
+    // Restore the transmitted state without applying the starting formation.
     // The caller receives the board only after all fields validate.
     board.initialized = true;
     for (std::uint8_t row = 0; row < Size; ++row) {
@@ -125,6 +162,11 @@ Board Board::FromMessage(const svanes::NetworkMessage &message) {
             }
         }
     }
+    for (auto &reserve : board.reserves) {
+        for (auto &count : reserve) {
+            count = reader.ReadUint8();
+        }
+    }
     return board;
 }
 
@@ -134,6 +176,11 @@ const std::optional<Piece> &Board::GetPiece(BoardCoordinate position) const {
             "GHQ board coordinates must be between 0 and 7.");
     }
     return pieces[position.row][position.column];
+}
+
+std::uint8_t Board::GetReserveCount(Piece piece) const {
+    return reserves.at(static_cast<std::size_t>(piece.team))
+        .at(static_cast<std::size_t>(piece.type));
 }
 
 std::vector<Board::BoardCoordinate>

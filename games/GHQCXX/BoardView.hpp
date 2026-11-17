@@ -2,6 +2,7 @@
 
 #include "Board.hpp"
 
+#include <svanes/MenuUtilities/font_manager.hpp>
 #include <svanes/entity.hpp>
 #include <svanes/render/basic_render_types.hpp>
 
@@ -18,28 +19,35 @@ class Registry;
 namespace ghqcxx {
 
 /**
- * Represents the client's interactive view of a GHQ board.
+ * Represents the client's interactive view of a GHQ board and its reserves.
  */
 class BoardView final {
 public:
     /**
-     * Creates the board's visuals from its current pieces. Call once before
-     * updating the view.
+     * Creates the board and reserve visuals from the current state. Call once
+     * before updating the view.
      *
      * @param world The registry that owns the view's visual entities.
      * @param board The board whose current setup will be displayed.
+     * @param fonts The manager used to load the reserve labels' font.
+     * @param camera The camera used to position the labels.
      *
      * @throws std::logic_error if the view has already been initialized.
+     * @throws std::runtime_error if the reserve font cannot be loaded.
      */
-    void Initialize(svanes::Registry &world, const Board &board);
+    void Initialize(svanes::Registry &world, const Board &board,
+                    svanes::FontManager &fonts, const svanes::Camera2D &camera);
 
     /**
-     * Synchronizes the displayed pieces with the board's state.
+     * Synchronizes the displayed pieces and reserve counts with the board's
+     * state. Only nonempty reserves are shown.
      *
      * @param world The registry used to initialize the view.
      * @param board The board whose pieces will be displayed.
+     * @param camera The camera used to position the reserve labels.
      */
-    void UpdatePieces(svanes::Registry &world, const Board &board);
+    void UpdatePieces(svanes::Registry &world, const Board &board,
+                      const svanes::Camera2D &camera);
 
     /**
      * Updates mouse feedback and reports a clicked square. Coordinates start
@@ -82,6 +90,13 @@ public:
     static svanes::Color GetTeamColor(Team team);
 
 private:
+    // Left-to-right order of the piece types displayed in each reserve row.
+    static constexpr std::array ReserveTypes{
+        PieceType::BasicArtillery,    PieceType::HeavyArtillery,
+        PieceType::ArmoredArtillery,  PieceType::BasicInfantry,
+        PieceType::ParachuteInfantry, PieceType::ArmoredInfantry};
+
+    // The board and feedback entities are created once before view updates.
     bool initialized = false;
 
     // The pieces currently displayed, indexed by row, then column.
@@ -92,6 +107,14 @@ private:
     std::array<std::array<std::vector<svanes::Entity>, Board::Size>,
                Board::Size>
         pieceEntities;
+
+    // Piece visuals and count labels for each team's available reserves.
+    std::array<std::array<std::vector<svanes::Entity>, ReserveTypes.size()>,
+               TeamCount>
+        reserveEntities;
+
+    // Font used by the reserve count labels, owned by the font manager.
+    svanes::FontHandle reserveFont;
 
     // The square under the mouse, or no value when the mouse is off the board.
     std::optional<Board::BoardCoordinate> hoveredSquare;

@@ -6,7 +6,6 @@
 
 #include <svanes/events/event_manager.hpp>
 
-#include <algorithm>
 #include <iostream>
 #include <memory>
 

@@ -13,7 +13,7 @@ namespace ghqcxx {
 
 /**
  * Represents the state of the GHQ board and owns the pieces occupying its
- * squares.
+ * squares and the quantities remaining in reserve.
  */
 class Board final {
 public:
@@ -33,8 +33,8 @@ public:
     };
 
     /**
-     * Sets up both players' starting pieces. Call once before placing
-     * additional pieces.
+     * Sets up both players' starting pieces and reserves. Call once before
+     * placing additional pieces.
      *
      * @throws std::logic_error if the board has already been initialized.
      */
@@ -67,7 +67,7 @@ public:
     /**
      * Encodes the board's current state for transmission.
      *
-     * @return A message containing every square's contents.
+     * @return A message containing every square's contents and both reserves.
      */
     svanes::NetworkMessage ToMessage() const;
 
@@ -94,6 +94,17 @@ public:
     const std::optional<Piece> &GetPiece(BoardCoordinate position) const;
 
     /**
+     * Reports how many pieces of a type remain in a team's reserve.
+     *
+     * @param piece The type and team to inspect.
+     *
+     * @return The remaining quantity, or zero when none are in reserve.
+     *
+     * @throws std::out_of_range if the piece type or team is invalid.
+     */
+    std::uint8_t GetReserveCount(Piece piece) const;
+
+    /**
      * Finds destinations allowed by the piece's movement rules, board edges,
      * and occupied squares.
      *
@@ -110,6 +121,9 @@ public:
 private:
     // Indexed by row, then column. An empty square has no piece.
     std::array<std::array<std::optional<Piece>, Size>, Size> pieces;
+
+    // The number of pieces each team can still deploy, by piece type.
+    std::array<std::array<std::uint8_t, PieceTypeCount>, TeamCount> reserves{};
 
     // The starting formation is installed once before additional placements.
     bool initialized = false;
