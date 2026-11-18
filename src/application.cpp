@@ -71,9 +71,9 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
                                  std::string{SDL_GetError()});
     }
     camera.SetOutputSize(output_width, output_height);
-    GameContext game_context{world,         events,        texture_manager,
-                             audio_manager, font_manager,  camera,
-                             output_width,  output_height, gravity};
+    GameContext game_context{
+        world,        events, input,        texture_manager, audio_manager,
+        font_manager, camera, output_width, output_height,   gravity};
 
     // Custom initialization of the game. Implemented by the user of the engine.
 
@@ -110,21 +110,13 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
         const auto frame_start = std::chrono::steady_clock::now();
 
         //
-        // INPUT DETECTION AND PROCESSING
-        //
-
-        InputManagerInternal::BeginFrame(input);
-        InputManagerInternal::Poll(input, events, window);
-        events.DispatchEvents();
-
-        //
         // DELTA TIME CALCULATION
         //
-        const TicCount current_tics = static_cast<TicCount>(
-            std::chrono::duration_cast<std::chrono::microseconds>(
-                std::chrono::steady_clock::now() - start_time)
-                .count());
 
+        const TicCount current_tics = static_cast<TicCount>(
+            std::chrono::duration_cast<std::chrono::microseconds>(frame_start -
+                                                                  start_time)
+                .count());
         const TicCount real_delta_tics = current_tics - previous_tics;
         previous_tics = current_tics;
 
@@ -132,6 +124,13 @@ void RunGameLoop(IGame &game, SDL_Window *window, SDL_Renderer *renderer,
             pending_tics += real_delta_tics;
         }
 
+        //
+        // INPUT DETECTION AND PROCESSING
+        //
+
+        InputManagerInternal::BeginFrame(input, current_tics);
+        InputManagerInternal::Poll(input, events, window);
+        events.DispatchEvents();
 
         //
         // GAME STATE UPDATE

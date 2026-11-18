@@ -2,7 +2,51 @@
 
 #include <svanes/input/input_events.hpp>
 
+#include <algorithm>
+
 namespace svanes {
+
+void InputManager::SetChordWindow(TicCount tics) {
+    chordWindow = tics;
+    if (tics == 0) {
+        chordHistory.clear();
+        return;
+    }
+
+    TrimChordHistory();
+    if (chordHistory.empty()) {
+        chordHistory.push_back(CurrentChordSample());
+    }
+}
+
+Chord::Sample InputManager::CurrentChordSample() const {
+    Chord::Sample sample{sampleTics, {}, {}};
+    for (std::size_t i = 0; i < kKeyCount; ++i) {
+        sample.before[i] = previous[i];
+        sample.down[i] = current[i];
+    }
+    return sample;
+}
+
+void InputManager::TrimChordHistory() {
+    if (sampleTics > chordWindow) {
+        const auto oldest = sampleTics - chordWindow;
+        const auto keep = std::ranges::lower_bound(chordHistory, oldest, {},
+                                                   &Chord::Sample::tics);
+        chordHistory.erase(chordHistory.begin(), keep);
+    }
+}
+
+bool InputManager::WasTriggered(const Chord &chord) const {
+    if (current == previous) {
+        return false;
+    }
+    if (chordHistory.empty()) {
+        const auto currentPoll = CurrentChordSample();
+        return chord.TriggeredBy({&currentPoll, 1});
+    }
+    return chord.TriggeredBy(chordHistory);
+}
 
 // To test if something is down, we can just look at the current state.
 // If it's down, it's down :)
@@ -51,7 +95,11 @@ Vector2D InputManager::MouseDeltaThisFrame() const {
 }
 
 void InputManager::HandleKeyInput(const KeyInputEvent &event) {
-    current.at(static_cast<std::size_t>(event.key)) = event.down;
+    const auto index = static_cast<std::size_t>(event.key);
+    current.at(index) = event.down;
+    if (!chordHistory.empty()) {
+        chordHistory.back().down.set(index, event.down);
+    }
 }
 
 void InputManager::HandleMouseButtonInput(const MouseButtonInputEvent &event) {

@@ -32,7 +32,19 @@ void internal::InputManagerInternal::RegisterEventHandlers(
             }));
 }
 
-void internal::InputManagerInternal::BeginFrame(InputManager &input) {
+void internal::InputManagerInternal::BeginFrame(InputManager &input,
+                                                TicCount sampleTics) {
+    input.sampleTics = sampleTics;
+    if (!input.chordHistory.empty()) {
+        const auto held = input.chordHistory.back().down;
+        if (input.current == input.previous) {
+            input.chordHistory.pop_back();
+        }
+
+        input.TrimChordHistory();
+        input.chordHistory.push_back({sampleTics, held, held});
+    }
+
     input.previous = input.current;
     input.mouse_previous = input.mouse_current;
     input.mouse_delta_this_frame = {};

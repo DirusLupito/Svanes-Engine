@@ -52,6 +52,7 @@ struct JoinResult {
  * report events.
  * - network: The engine owned network client used to connect to the server
  * and send/receive messages.
+ * - input: The engine owned input manager for the client.
  * - assets: The engine owned texture manager used to load and create textures.
  * - audio: The engine owned audio manager used to load and play sounds and
  * music.
@@ -65,6 +66,7 @@ struct ClientContext {
     Registry &world;
     EventManager &events;
     NetworkClient &network;
+    InputManager &input;
     TextureManager &assets;
     AudioManager &audio;
     FontManager &fonts;

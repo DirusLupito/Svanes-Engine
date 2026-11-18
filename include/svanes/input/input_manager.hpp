@@ -1,10 +1,12 @@
 #pragma once
 
+#include <svanes/input/chord.hpp>
 #include <svanes/input/input_types.hpp>
 #include <svanes/vector2d.hpp>
 
 #include <array>
 #include <cstddef>
+#include <vector>
 
 namespace svanes {
 
@@ -25,6 +27,24 @@ class InputManagerInternal;
  */
 class InputManager final {
 public:
+    /**
+     * Sets how far back chord queries can look, in ticks..
+     * Zero (the default) uses only the current poll. Increasing the window
+     * retains future changes. Previously discarded polls are unavailable.
+     *
+     * @param tics The history to keep for the game's longest chord.
+     */
+    void SetChordWindow(TicCount tics);
+
+    /**
+     * Checks whether a chord completed in this poll. Multiple queries in
+     * the same frame can observe the same match.
+     *
+     * @param chord The game's keyboard binding.
+     * @return True if the current poll completed the chord.
+     */
+    bool WasTriggered(const Chord &chord) const;
+
     /**
      * Checks if a specific key is currently pressed down.
      * @param key The key to check.
@@ -148,6 +168,27 @@ private:
     // Mouse movement delta (change in position) for this frame.
     // This should be reset to (0, 0) at the start of each frame.
     Vector2D mouse_delta_this_frame{};
+
+    // The duration of keyboard history requested by the game.
+    TicCount chordWindow = 0;
+
+    // The time of the current input poll in unscaled microseconds.
+    TicCount sampleTics = 0;
+
+    // Retained keyboard changes, followed by the current poll while enabled.
+    std::vector<Chord::Sample> chordHistory;
+
+    /**
+     * Captures the keyboard state for a chord query.
+     *
+     * @return The time of this poll and the keys held before and after it.
+     */
+    Chord::Sample CurrentChordSample() const;
+
+    /**
+     * Discards polls older than the game's chord window.
+     */
+    void TrimChordHistory();
 
     // Expose the private members to the internal InputManagerInternal class for
     // managing input state.

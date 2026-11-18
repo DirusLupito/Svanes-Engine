@@ -178,6 +178,7 @@ target_sources(
         src/tilemaps/tilemap.cpp
         src/collision_pass.cpp
         src/geometry/geometry.cpp
+        src/input/chord.cpp
         src/input/input_events.cpp
         src/input/input_manager.cpp
         src/input/input_manager_internal.cpp
@@ -240,6 +241,7 @@ target_sources(
             include/svanes/events/replay_session.hpp
             include/svanes/game.hpp
             include/svanes/geometry/geometry.hpp
+            include/svanes/input/chord.hpp
             include/svanes/input/input_events.hpp
             include/svanes/input/input_manager.hpp
             include/svanes/input/input_types.hpp
@@ -312,6 +314,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
     include/svanes/events/replay_session.hpp
     include/svanes/game.hpp
     include/svanes/geometry/geometry.hpp
+    include/svanes/input/chord.hpp
     include/svanes/input/input_events.hpp
     include/svanes/input/input_manager.hpp
     include/svanes/input/input_types.hpp
@@ -365,6 +368,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source Files" FILES
     src/tilemaps/tilemap.cpp
     src/collision_pass.cpp
     src/geometry/geometry.cpp
+    src/input/chord.cpp
     src/input/input_events.cpp
     src/input/input_manager.cpp
     src/input/input_manager_internal.cpp

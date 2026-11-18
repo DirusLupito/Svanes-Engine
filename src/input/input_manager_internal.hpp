@@ -44,8 +44,9 @@ public:
      * this frame's mouse movement to (0, 0).
      *
      * @param input The InputManager instance to prepare for the new frame.
+     * @param sampleTics The time of this poll in elapsed microseconds.
      */
-    static void BeginFrame(InputManager &input);
+    static void BeginFrame(InputManager &input, TicCount sampleTics);
 
     /**
      * Reads the keyboard and mouse state from SDL and queues input events

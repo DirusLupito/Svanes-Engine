@@ -29,6 +29,7 @@ class TextureManager;
  * components.
  * - events: The engine owned event manager used to register handlers and
  * report events.
+ * - input: The engine owned input manager for the game.
  * - assets: The engine owned texture manager used to load and create textures.
  * - audio: The engine owned audio manager used to load and play sounds and
  * music.
@@ -52,6 +53,7 @@ class TextureManager;
 struct GameContext {
     Registry &world;
     EventManager &events;
+    InputManager &input;
     TextureManager &assets;
     AudioManager &audio;
     FontManager &fonts;

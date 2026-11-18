@@ -376,9 +376,9 @@ void NetworkClient::RunClientLoop(IClient &client, SDL_Window *window,
                                  std::string{SDL_GetError()});
     }
     camera.SetOutputSize(output_width, output_height);
-    ClientContext context{world,           events,        *this,
-                          texture_manager, audio_manager, font_manager,
-                          camera,          output_width,  output_height};
+    ClientContext context{world,           events,        *this,        input,
+                          texture_manager, audio_manager, font_manager, camera,
+                          output_width,    output_height};
 
     // Custom initialization of the client. Implemented by the user of the
     // engine.
@@ -401,28 +401,28 @@ void NetworkClient::RunClientLoop(IClient &client, SDL_Window *window,
         const auto frame_start = std::chrono::steady_clock::now();
 
         //
+        // DELTA TIME CALCULATION
+        //
+
+        const TicCount current_tics = static_cast<TicCount>(
+            std::chrono::duration_cast<std::chrono::microseconds>(frame_start -
+                                                                  start_time)
+                .count());
+
+        const TicCount real_delta_tics = current_tics - previous_tics;
+        previous_tics = current_tics;
+
+        //
         // INPUT DETECTION AND PROCESSING
         //
 
-        internal::InputManagerInternal::BeginFrame(input);
+        internal::InputManagerInternal::BeginFrame(input, current_tics);
         internal::InputManagerInternal::Poll(input, events, window);
         events.DispatchEvents();
 
         // Gather this frame's server messages before the client reads them.
         // Messages arriving during Update will have to wait for the next frame.
         ReceiveMessages(client);
-
-        //
-        // DELTA TIME CALCULATION
-        //
-        const TicCount current_tics = static_cast<TicCount>(
-            std::chrono::duration_cast<std::chrono::microseconds>(
-                std::chrono::steady_clock::now() - start_time)
-                .count());
-
-        const TicCount real_delta_tics = current_tics - previous_tics;
-        previous_tics = current_tics;
-
 
         //
         // CLIENT STATE UPDATE
