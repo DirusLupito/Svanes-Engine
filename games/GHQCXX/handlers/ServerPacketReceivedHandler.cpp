@@ -1,5 +1,6 @@
 #include "ServerPacketReceivedHandler.hpp"
 
+#include "../events/EndTurnEvent.hpp"
 #include "../events/MovementEvent.hpp"
 #include "../events/PlacementEvent.hpp"
 
@@ -22,8 +23,14 @@ ServerPacketReceivedHandler::ServerPacketReceivedHandler(
                   << " bytes).\n"
                   << std::flush;
 
+              bool includeSender = false;
               try {
                   switch (GetGameMessageType(event.message)) {
+                  case GameMessageType::EndTurn:
+                      events.TriggerEvent(
+                          EndTurnEvent::FromMessage(event.message));
+                      includeSender = true;
+                      break;
                   case GameMessageType::Placement:
                       events.TriggerEvent(
                           PlacementEvent::FromMessage(event.message));
@@ -50,9 +57,10 @@ ServerPacketReceivedHandler::ServerPacketReceivedHandler(
                   return;
               }
 
-              // The sender already applied this action to its board.
+              // The sender predicts moves and placements. All clients advance
+              // the turn when they receive the server's end-turn event.
               for (const auto client : clients) {
-                  if (client != event.client) {
+                  if (includeSender || client != event.client) {
                       network.Send(client, event.message);
                   }
               }

@@ -50,6 +50,27 @@ public:
     void Initialize();
 
     /**
+     * Reports which team is taking its turn.
+     *
+     * @return The active team.
+     */
+    Team GetActiveTeam() const {
+        return turnNumber % 2 == 1 ? Team::Blue : Team::Red;
+    }
+
+    /**
+     * Reports the current turn, counting from Blue's opening turn.
+     *
+     * @return The one-based turn number.
+     */
+    std::uint32_t GetTurnNumber() const { return turnNumber; }
+
+    /**
+     * Passes the turn to the other team.
+     */
+    void EndTurn();
+
+    /**
      * Places a piece on an empty square and keeps it as part of the board.
      *
      * @param piece The type and team of the piece to place.
@@ -120,7 +141,7 @@ public:
     /**
      * Encodes the board's current state for transmission.
      *
-     * @return A message containing every square's contents and both reserves.
+     * @return The encoded board state.
      */
     svanes::NetworkMessage ToMessage() const;
 
@@ -183,6 +204,9 @@ public:
     GetMovementOptions(BoardCoordinate position) const;
 
 private:
+    // The current turn number. Blue takes the first turn.
+    std::uint32_t turnNumber = 1;
+
     // Indexed by row, then column. An empty square has no piece.
     std::array<std::array<std::optional<Piece>, Size>, Size> pieces;
 

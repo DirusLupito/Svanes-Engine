@@ -13,8 +13,14 @@ namespace ghqcxx {
  * - Movement: A request or notification to move a piece.
  * - BoardState: The server's authoritative board.
  * - Placement: A request or notification to place a piece from reserve.
+ * - EndTurn: A request or notification to pass the turn to the other team.
  */
-enum class GameMessageType : std::uint8_t { Movement, BoardState, Placement };
+enum class GameMessageType : std::uint8_t {
+    Movement,
+    BoardState,
+    Placement,
+    EndTurn
+};
 
 /**
  * Reads the type identifying a gameplay message.

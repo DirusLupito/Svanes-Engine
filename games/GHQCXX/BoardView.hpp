@@ -44,7 +44,7 @@ public:
      * @param camera The camera used to position the labels.
      *
      * @throws std::logic_error if the view has already been initialized.
-     * @throws std::runtime_error if the reserve font cannot be loaded.
+     * @throws std::runtime_error if a board font cannot be loaded.
      */
     void Initialize(svanes::Registry &world, const Board &board,
                     svanes::FontManager &fontManager,
@@ -92,6 +92,16 @@ public:
                        const BoardSelection &selection, bool choosingFacing);
 
     /**
+     * Displays the active team's turn beside the board.
+     *
+     * @param world The registry used to initialize the view.
+     * @param team The team taking its turn.
+     * @param camera The camera used to draw the board.
+     */
+    void ShowTurn(svanes::Registry &world, Team team,
+                  const svanes::Camera2D &camera);
+
+    /**
      * Returns the color used to display a team's pieces, including previews.
      *
      * @param team The player whose color is needed.
@@ -135,8 +145,14 @@ private:
                TeamCount>
         reserveEntities;
 
-    // Font used by the reserve count labels, owned by the font manager.
-    svanes::FontHandle reserveFont;
+    // The point sizes for board labels. Reserve quantities use the smallest.
+    static constexpr std::array LabelFontSizes{24.0F, 56.0F, 112.0F};
+
+    // The label fonts, ordered from smallest to largest.
+    std::array<svanes::FontHandle, LabelFontSizes.size()> labelFonts{};
+
+    // The label beside the board naming the team taking its turn.
+    svanes::Entity turnLabel = 0;
 
     // A translucent rectangle moved over the hovered square. Its alpha is
     // zero when no board square is hovered.

@@ -27,7 +27,7 @@ public:
      *
      * @param context The client's request and reserved ID.
      *
-     * @return An acceptance with no additional game data.
+     * @return An acceptance with the current board state.
      */
     svanes::JoinResponse
     HandleJoinRequest(const svanes::ServerJoinContext &context) override;

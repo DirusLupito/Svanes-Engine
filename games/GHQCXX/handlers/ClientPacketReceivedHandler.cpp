@@ -1,6 +1,7 @@
 #include "ClientPacketReceivedHandler.hpp"
 
 #include "../GameMessage.hpp"
+#include "../events/EndTurnEvent.hpp"
 #include "../events/MovementEvent.hpp"
 #include "../events/PlacementEvent.hpp"
 
@@ -11,6 +12,10 @@ ClientPacketReceivedHandler::ClientPacketReceivedHandler(
     : svanes::EventHandlerWrapper<ClientPacketReceivedEvent>(
           [&board, &selection](const ClientPacketReceivedEvent &event) {
               switch (GetGameMessageType(event.message)) {
+              case GameMessageType::EndTurn:
+                  EndTurnEvent::FromMessage(event.message);
+                  board.EndTurn();
+                  return;
               case GameMessageType::BoardState:
                   board = Board::FromMessage(event.message);
                   selection = std::monostate{};

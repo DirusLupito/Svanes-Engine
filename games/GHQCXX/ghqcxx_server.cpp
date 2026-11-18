@@ -1,6 +1,7 @@
 #include "ghqcxx_server.hpp"
 
 #include "events/ServerPacketReceivedEvent.hpp"
+#include "handlers/EndTurnHandler.hpp"
 #include "handlers/MovementHandler.hpp"
 #include "handlers/PlacementHandler.hpp"
 #include "handlers/ServerPacketReceivedHandler.hpp"
@@ -20,6 +21,7 @@ void GHQCXXServer::Initialize(svanes::ServerContext &context) {
         context.events, context.network, clients, board));
     context.events.Subscribe(std::make_unique<MovementHandler>(board));
     context.events.Subscribe(std::make_unique<PlacementHandler>(board));
+    context.events.Subscribe(std::make_unique<EndTurnHandler>(board));
 
     std::cout << "Hello, world! GHQCXX server.\n" << std::flush;
 }
@@ -29,7 +31,7 @@ GHQCXXServer::HandleJoinRequest(const svanes::ServerJoinContext &context) {
     clients.push_back(context.client);
     std::cout << "Accepting GHQCXX client " << context.client << ".\n"
               << std::flush;
-    return {.accepted = true, .message = {}};
+    return {.accepted = true, .message = board.ToMessage()};
 }
 
 void GHQCXXServer::HandleDisconnect(svanes::Registry &,

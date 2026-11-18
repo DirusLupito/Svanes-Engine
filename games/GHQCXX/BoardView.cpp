@@ -60,9 +60,6 @@ static constexpr float ReservePieceOffsetX = -0.14F;
 // center.
 static constexpr float ReserveLabelEdge = ReserveInsetSize / 2.0F - 0.04F;
 
-// The point size of the reserve quantity labels.
-static constexpr float ReserveFontSize = 24.0F;
-
 // Size of each available-move indicator, in world units.
 static constexpr float MovementMarkerRadius = 0.15F;
 
@@ -178,12 +175,18 @@ void BoardView::Initialize(svanes::Registry &world, const Board &board,
             "The GHQ board view has already been initialized.");
     }
 
-    reserveFont = fontManager.LoadFont(
-        svanes::AssetPath("assets/ghqcxx/fonts/consola.ttf"), ReserveFontSize);
-    if (reserveFont.id == 0) {
-        throw std::runtime_error(
-            "Could not load Consolas for the GHQCXX reserve labels.");
+    const auto fontPath = svanes::AssetPath("assets/ghqcxx/fonts/consola.ttf");
+    for (std::size_t i = 0; i < labelFonts.size(); ++i) {
+        labelFonts[i] = fontManager.LoadFont(fontPath, LabelFontSizes[i]);
+        if (labelFonts[i].id == 0) {
+            throw std::runtime_error(
+                "Could not load Consolas for the GHQCXX board labels.");
+        }
     }
+
+    turnLabel = world.CreateEntity();
+    world.AddComponent<svanes::TextLabel>(turnLabel);
+    ShowTurn(world, board.GetActiveTeam(), camera);
 
     // Pieces draw at layer zero and above while the board and highlights draw
     // below zero so that pieces appear on top of the board and highlights.
@@ -332,7 +335,7 @@ void BoardView::UpdatePieces(svanes::Registry &world, const Board &board,
                 world.AddComponent<svanes::TextLabel>(
                     label,
                     svanes::TextLabel{.color = GetTeamColor(team),
-                                      .font = reserveFont,
+                                      .font = labelFonts.front(),
                                       .alignment =
                                           svanes::TextAlignment::BottomRight});
                 entities.push_back(label);
@@ -349,6 +352,30 @@ void BoardView::UpdatePieces(svanes::Registry &world, const Board &board,
             label.position = {screen.x, screen.y};
         }
     }
+}
+
+void BoardView::ShowTurn(svanes::Registry &world, Team team,
+                         const svanes::Camera2D &camera) {
+    const auto topLeft = camera.WorldToScreen({});
+    const float sideWidth = topLeft.x;
+    const bool red = team == Team::Red;
+    auto &label = world.GetComponent<svanes::TextLabel>(turnLabel);
+    label.text = red ? "RED'S\nTURN" : "BLUE'S\nTURN";
+    label.color = GetTeamColor(team);
+    label.alignment = red ? svanes::TextAlignment::TopCenter
+                          : svanes::TextAlignment::BottomCenter;
+    label.position =
+        red ? svanes::Vector2D{sideWidth * 0.5F, topLeft.y}
+            : svanes::Vector2D{camera.OutputWidth() - sideWidth * 0.5F,
+                               camera.OutputHeight() - topLeft.y};
+
+    // Allow room for the six characters in BLUE'S and a little padding.
+    std::size_t size = labelFonts.size() - 1;
+    while (size > 0 && sideWidth < 4.0F * LabelFontSizes[size]) {
+        --size;
+    }
+
+    label.font = labelFonts[size];
 }
 
 svanes::Color BoardView::GetTeamColor(Team team) {

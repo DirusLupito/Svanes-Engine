@@ -4,6 +4,7 @@
 #include "events/MovementEvent.hpp"
 #include "events/PlacementEvent.hpp"
 #include "handlers/ClientPacketReceivedHandler.hpp"
+#include "handlers/EndTurnHandler.hpp"
 #include "handlers/MovementHandler.hpp"
 #include "handlers/PlacementHandler.hpp"
 
@@ -22,6 +23,11 @@ namespace ghqcxx {
 // Leave a row above and below the board for the red and blue piece visuals.
 constexpr float ViewHeight = BoardView::BoardWidth + 2.75F;
 
+// The board width including two squares of space on either side for the turn
+// label.
+constexpr float ViewWidth =
+    BoardView::BoardWidth + 4.0F * BoardView::SquareSize;
+
 /**
  * Fits the board and both rows of pieces into the window. Both dimensions use
  * the same scale so the board's squares stay square when the window is resized.
@@ -32,9 +38,9 @@ static void FitViewToWindow(svanes::Camera2D &camera) {
     // A minimized window may have no rendering area. Keep the previous zoom
     // until there is room to draw again, since a zero zoom is invalid.
     if (camera.OutputWidth() > 0 && camera.OutputHeight() > 0) {
-        camera.zoom = std::min(
-            static_cast<float>(camera.OutputWidth()) / BoardView::BoardWidth,
-            static_cast<float>(camera.OutputHeight()) / ViewHeight);
+        camera.zoom =
+            std::min(static_cast<float>(camera.OutputWidth()) / ViewWidth,
+                     static_cast<float>(camera.OutputHeight()) / ViewHeight);
     }
 }
 
@@ -53,6 +59,7 @@ void GHQCXXClient::Initialize(svanes::ClientContext &context) {
         std::make_unique<MovementHandler>(board, context.network));
     context.events.Subscribe(
         std::make_unique<PlacementHandler>(board, context.network));
+    context.events.Subscribe(std::make_unique<EndTurnHandler>(context.network));
 
     std::cout << "Hello, world! GHQCXX client.\n" << std::flush;
 }
@@ -62,6 +69,7 @@ svanes::NetworkMessage GHQCXXClient::CreateJoinRequest() { return {}; }
 void GHQCXXClient::HandleJoinResult(const svanes::JoinResult &result) {
     switch (result.status) {
     case svanes::JoinStatus::Accepted:
+        board = Board::FromMessage(result.message);
         std::cout << "Connected to GHQCXX as client " << result.client_id
                   << ".\n"
                   << std::flush;
@@ -85,6 +93,11 @@ void GHQCXXClient::Update(const svanes::ClientFrameContext &context) {
     }
 
     FitViewToWindow(context.camera);
+    if (context.network.IsConnected() &&
+        context.input.WasPressed(svanes::Key::D)) {
+        context.events.TriggerEvent(EndTurnEvent{});
+    }
+
     const auto clicked =
         boardView.Update(context.world, board, context.input, context.camera);
     if (const auto *clickedSquare =
@@ -94,7 +107,9 @@ void GHQCXXClient::Update(const svanes::ClientFrameContext &context) {
         selection = *reserve;
         choosingFacing = false;
     }
+
     boardView.UpdatePieces(context.world, board, context.camera);
+    boardView.ShowTurn(context.world, board.GetActiveTeam(), context.camera);
     boardView.ShowSelection(context.world, board, selection, choosingFacing);
 
     if (context.input.WasPressed(svanes::Key::Escape)) {

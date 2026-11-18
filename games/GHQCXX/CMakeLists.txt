@@ -4,12 +4,16 @@ add_executable(svanes_game_ghqcxx
     ghqcxx_client.hpp
     events/ClientPacketReceivedEvent.cpp
     events/ClientPacketReceivedEvent.hpp
+    events/EndTurnEvent.cpp
+    events/EndTurnEvent.hpp
     events/MovementEvent.cpp
     events/MovementEvent.hpp
     events/PlacementEvent.cpp
     events/PlacementEvent.hpp
     handlers/ClientPacketReceivedHandler.cpp
     handlers/ClientPacketReceivedHandler.hpp
+    handlers/EndTurnHandler.cpp
+    handlers/EndTurnHandler.hpp
     handlers/MovementHandler.cpp
     handlers/MovementHandler.hpp
     handlers/PlacementHandler.cpp
@@ -48,12 +52,16 @@ add_executable(svanes_game_ghqcxx_server
     ghqcxx_server.hpp
     events/ServerPacketReceivedEvent.cpp
     events/ServerPacketReceivedEvent.hpp
+    events/EndTurnEvent.cpp
+    events/EndTurnEvent.hpp
     events/MovementEvent.cpp
     events/MovementEvent.hpp
     events/PlacementEvent.cpp
     events/PlacementEvent.hpp
     handlers/ServerPacketReceivedHandler.cpp
     handlers/ServerPacketReceivedHandler.hpp
+    handlers/EndTurnHandler.cpp
+    handlers/EndTurnHandler.hpp
     handlers/MovementHandler.cpp
     handlers/MovementHandler.hpp
     handlers/PlacementHandler.cpp

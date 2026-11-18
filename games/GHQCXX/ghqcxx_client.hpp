@@ -29,7 +29,7 @@ public:
     svanes::NetworkMessage CreateJoinRequest() override;
 
     /**
-     * Reports the assigned client ID, or throws if the connection failed.
+     * Loads the server's board and reports the assigned client ID.
      *
      * @param result The server's response or the engine's timeout result.
      *

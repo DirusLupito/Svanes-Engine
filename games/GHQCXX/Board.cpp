@@ -39,7 +39,7 @@ static constexpr std::size_t BoardMessageSize =
     sizeof(GameMessageType) +
     Board::Size * Board::Size *
         (sizeof(Piece::type) + sizeof(Piece::team) + sizeof(Piece::facing)) +
-    TeamCount * PieceTypeCount * sizeof(std::uint8_t);
+    TeamCount * PieceTypeCount * sizeof(std::uint8_t) + sizeof(std::uint32_t);
 
 void Board::Initialize() {
     if (initialized) {
@@ -70,6 +70,8 @@ void Board::Initialize() {
         }
     }
 }
+
+void Board::EndTurn() { ++turnNumber; }
 
 void Board::PlacePiece(Piece piece, BoardCoordinate position) {
     if (!initialized) {
@@ -200,6 +202,7 @@ svanes::NetworkMessage Board::ToMessage() const {
             writer.WriteUint8(count);
         }
     }
+    writer.WriteUint32(turnNumber);
     return writer.Finish();
 }
 
@@ -240,6 +243,12 @@ Board Board::FromMessage(const svanes::NetworkMessage &message) {
             count = reader.ReadUint8();
         }
     }
+
+    board.turnNumber = reader.ReadUint32();
+    if (board.turnNumber == 0) {
+        throw std::invalid_argument("GHQ turn numbers start at one.");
+    }
+
     return board;
 }
 
