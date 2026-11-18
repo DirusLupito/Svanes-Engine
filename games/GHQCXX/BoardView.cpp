@@ -12,6 +12,7 @@
 #include <svanes/asset_path.hpp>
 #include <svanes/camera2d.hpp>
 #include <svanes/geometry/circle_geometry.hpp>
+#include <svanes/geometry/composite_geometry.hpp>
 #include <svanes/geometry/primitive_geometry.hpp>
 #include <svanes/geometry/rectangle_geometry.hpp>
 #include <svanes/input/input_manager.hpp>
@@ -83,6 +84,12 @@ static constexpr svanes::Color MovementMarkerColor{60, 200, 90, 220};
 // Color of the squares covered by a possible artillery facing.
 static constexpr svanes::Color FireMarkerColor{255, 220, 40, 255};
 
+// The layer for Blue's fire hatching above the checkerboard.
+static constexpr std::int32_t BlueHatchLayer = -4;
+
+// The layer for Red's fire hatching where the two colors cross.
+static constexpr std::int32_t RedHatchLayer = BlueHatchLayer + 1;
+
 // Color used for Red's board and reserve pieces.
 static constexpr svanes::Color NCStateRed{0xcc, 0x00, 0x00};
 
@@ -94,6 +101,32 @@ svanes::Vector2D BoardView::ReserveCenter(Team team, std::size_t index) {
     return {(static_cast<float>(index) + 0.5F) * spacing,
             team == Team::Red ? -ReserveRowOffset
                               : BoardWidth + ReserveRowOffset};
+}
+
+/**
+ * Creates the diagonal stripes that mark a square under artillery fire.
+ *
+ * @return The stripes centered on one board square.
+ */
+static svanes::CompositeShape2D CreateFireHatch() {
+    constexpr float size = BoardView::SquareSize;
+    constexpr float thickness = 0.035F * size;
+    svanes::CompositeShape2D hatch;
+    for (const float offset : {-0.375F, -0.125F, 0.125F, 0.375F}) {
+        const float center = offset * size;
+        // Shorten each diagonal by its thickness so its corners stay inside
+        // the square.
+        const float span = size - 2.0F * std::abs(center);
+        hatch.parts.push_back(
+            {.shape =
+                 svanes::Rectangle2D{
+                     .width = span * std::numbers::sqrt2_v<float> - thickness,
+                     .height = thickness},
+             .transform = {.x = center,
+                           .y = center,
+                           .rotation = -std::numbers::pi_v<float> / 4.0F}});
+    }
+    return hatch;
 }
 
 /**
@@ -154,8 +187,8 @@ void BoardView::Initialize(svanes::Registry &world, const Board &board,
 
     // Pieces draw at layer zero and above while the board and highlights draw
     // below zero so that pieces appear on top of the board and highlights.
-    constexpr std::int32_t boardLayer = -3;
-    constexpr std::int32_t hoverLayer = boardLayer + 1;
+    constexpr std::int32_t boardLayer = BlueHatchLayer - 1;
+    constexpr std::int32_t hoverLayer = RedHatchLayer + 1;
     constexpr std::int32_t selectionLayer = hoverLayer + 1;
 
     // The marker layer above the piece decals on occupied squares.
@@ -230,6 +263,7 @@ void BoardView::Initialize(svanes::Registry &world, const Board &board,
 
 void BoardView::UpdatePieces(svanes::Registry &world, const Board &board,
                              const svanes::Camera2D &camera) {
+    static const auto fireHatch = CreateFireHatch();
     for (std::uint8_t row = 0; row < Board::Size; ++row) {
         for (std::uint8_t column = 0; column < Board::Size; ++column) {
             const auto &piece = board.GetPiece({column, row});
@@ -247,6 +281,29 @@ void BoardView::UpdatePieces(svanes::Registry &world, const Board &board,
             if (piece) {
                 entities = CreatePieceVisual(
                     world, *piece, {SquareCenter(column), SquareCenter(row)});
+                for (const auto &[square, facing] :
+                     board.GetFireOptions({column, row})) {
+                    if (facing != piece->facing) {
+                        continue;
+                    }
+                    const bool red = piece->team == Team::Red;
+                    const auto hatch = world.CreateEntity();
+                    world.AddComponent<svanes::Transform>(
+                        hatch,
+                        svanes::Transform{
+                            .x = SquareCenter(square.column),
+                            .y = SquareCenter(square.row),
+                            .rotation =
+                                red ? std::numbers::pi_v<float> / 2.0F : 0.0F});
+                    world.AddComponent<svanes::ZOrder>(
+                        hatch,
+                        svanes::ZOrder{red ? RedHatchLayer : BlueHatchLayer});
+                    world.AddComponent<svanes::SolidShape>(
+                        hatch,
+                        svanes::SolidShape{.color = GetTeamColor(piece->team),
+                                           .geometry = fireHatch});
+                    entities.push_back(hatch);
+                }
             }
             displayed = piece;
         }
