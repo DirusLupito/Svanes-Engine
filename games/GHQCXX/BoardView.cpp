@@ -35,22 +35,24 @@ static constexpr svanes::Rectangle2D SquareGeometry{.width = 1.0F,
 static constexpr float SquareCenterOffset = SquareGeometry.width / 2.0F;
 
 // Reserve row centers sit this far outside the top and bottom board edges.
-static constexpr float ReserveRowOffset = 0.75F;
+static constexpr float ReserveRowOffset = 0.69F;
 
-// World x coordinate of the first reserve piece's center.
-static constexpr float ReserveStartX = 1.8F;
+// The side length of the team-colored reserve square in world units.
+static constexpr float ReserveOutlineSize = 1.24F;
 
-// Distance between reserve piece centers, in world units.
-static constexpr float ReserveSpacing = 1.1F;
-
-// Width and height of the team-colored square around a selected reserve piece.
-static constexpr float ReserveOutlineSize = 1.08F;
-
-// The label's bottom-left anchor relative to the piece's center, in world
+// The side length of the black square inside the reserve outline, in world
 // units.
-static constexpr svanes::Vector2D ReserveLabelOffset{0.45F, 0.5F};
+static constexpr float ReserveInsetSize = ReserveOutlineSize - 0.08F;
 
-// Font size in points, independent of the camera's world scale.
+// The horizontal offset of a reserve piece from its slot center, in world
+// units.
+static constexpr float ReservePieceOffsetX = -0.14F;
+
+// The right and bottom edges of the reserve label, measured from the slot
+// center.
+static constexpr float ReserveLabelEdge = ReserveInsetSize / 2.0F - 0.04F;
+
+// The point size of the reserve quantity labels.
 static constexpr float ReserveFontSize = 24.0F;
 
 // Size of each available-move indicator, in world units.
@@ -77,15 +79,10 @@ static constexpr svanes::Color NCStateRed{0xcc, 0x00, 0x00};
 // Color used for Blue's board and reserve pieces.
 static constexpr svanes::Color CarolinaBlue{0x7b, 0xaf, 0xd4};
 
-/**
- * Locates a reserve slot in world coordinates.
- *
- * @param team The team whose reserve row contains the slot.
- * @param index The slot's left-to-right index in that row.
- * @return The center of the slot.
- */
-static svanes::Vector2D ReserveCenter(Team team, std::size_t index) {
-    return {ReserveStartX + static_cast<float>(index) * ReserveSpacing,
+svanes::Vector2D BoardView::ReserveCenter(Team team, std::size_t index) {
+    constexpr float spacing =
+        static_cast<float>(Board::Size) / ReserveTypes.size();
+    return {(static_cast<float>(index) + 0.5F) * spacing,
             team == Team::Red ? -ReserveRowOffset
                               : Board::Size + ReserveRowOffset};
 }
@@ -132,17 +129,18 @@ CreatePieceVisual(svanes::Registry &world, Piece piece,
 }
 
 void BoardView::Initialize(svanes::Registry &world, const Board &board,
-                           svanes::FontManager &fonts,
+                           svanes::FontManager &fontManager,
                            const svanes::Camera2D &camera) {
     if (initialized) {
         throw std::logic_error(
             "The GHQ board view has already been initialized.");
     }
 
-    reserveFont = fonts.LoadFont(
+    reserveFont = fontManager.LoadFont(
         svanes::AssetPath("assets/ghqcxx/fonts/consola.ttf"), ReserveFontSize);
     if (reserveFont.id == 0) {
-        throw std::runtime_error("Could not load the GHQCXX reserve font.");
+        throw std::runtime_error(
+            "Could not load Consolas for the GHQCXX reserve labels.");
     }
 
     // Pieces draw at layer zero and above while the board and highlights draw
@@ -269,13 +267,15 @@ void BoardView::UpdatePieces(svanes::Registry &world, const Board &board,
 
             const auto center = ReserveCenter(team, index);
             if (entities.empty()) {
-                entities = CreatePieceVisual(world, piece, center);
+                entities = CreatePieceVisual(
+                    world, piece, {center.x + ReservePieceOffsetX, center.y});
                 const auto label = world.CreateEntity();
                 world.AddComponent<svanes::TextLabel>(
-                    label, svanes::TextLabel{
-                               .color = GetTeamColor(team),
-                               .font = reserveFont,
-                               .alignment = svanes::TextAlignment::BottomLeft});
+                    label,
+                    svanes::TextLabel{.color = GetTeamColor(team),
+                                      .font = reserveFont,
+                                      .alignment =
+                                          svanes::TextAlignment::BottomRight});
                 entities.push_back(label);
             }
 
@@ -284,8 +284,8 @@ void BoardView::UpdatePieces(svanes::Registry &world, const Board &board,
             // Labels use screen coordinates. Convert their world positions
             // each frame so they follow the pieces as the camera changes.
             const auto screen =
-                camera.WorldToScreen({.x = center.x + ReserveLabelOffset.x,
-                                      .y = center.y + ReserveLabelOffset.y});
+                camera.WorldToScreen({.x = center.x + ReserveLabelEdge,
+                                      .y = center.y + ReserveLabelEdge});
             label.text = std::to_string(count);
             label.position = {screen.x, screen.y};
         }
@@ -376,6 +376,7 @@ void BoardView::ShowSelection(svanes::Registry &world, const Board &board,
         position.y =
             static_cast<float>(selectedSquare->row) + SquareCenterOffset;
         highlight.color = SelectionColor;
+        highlight.geometry = SquareGeometry;
 
         for (const auto destination :
              board.GetMovementOptions(*selectedSquare)) {
@@ -392,6 +393,8 @@ void BoardView::ShowSelection(svanes::Registry &world, const Board &board,
             position.x = center.x;
             position.y = center.y;
             highlight.color = {0, 0, 0, 255};
+            highlight.geometry = svanes::Rectangle2D{
+                .width = ReserveInsetSize, .height = ReserveInsetSize};
             world.GetComponent<svanes::Transform>(reserveOutline) = position;
             outline.color = GetTeamColor(piece->team);
         }

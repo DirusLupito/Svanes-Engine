@@ -5,6 +5,7 @@
 #include <svanes/MenuUtilities/font_manager.hpp>
 #include <svanes/entity.hpp>
 #include <svanes/render/basic_render_types.hpp>
+#include <svanes/vector2d.hpp>
 
 #include <array>
 #include <variant>
@@ -40,7 +41,8 @@ public:
      * @throws std::runtime_error if the reserve font cannot be loaded.
      */
     void Initialize(svanes::Registry &world, const Board &board,
-                    svanes::FontManager &fonts, const svanes::Camera2D &camera);
+                    svanes::FontManager &fontManager,
+                    const svanes::Camera2D &camera);
 
     /**
      * Synchronizes the displayed pieces and reserve counts with the board's
@@ -98,6 +100,15 @@ private:
         PieceType::BasicArtillery,    PieceType::HeavyArtillery,
         PieceType::ArmoredArtillery,  PieceType::BasicInfantry,
         PieceType::ParachuteInfantry, PieceType::ArmoredInfantry};
+
+    /**
+     * Locates a reserve slot in world coordinates.
+     *
+     * @param team The team whose reserve row contains the slot.
+     * @param index The slot's left-to-right index in that row.
+     * @return The center of the slot.
+     */
+    static svanes::Vector2D ReserveCenter(Team team, std::size_t index);
 
     // The board and feedback entities are created once before view updates.
     bool initialized = false;
