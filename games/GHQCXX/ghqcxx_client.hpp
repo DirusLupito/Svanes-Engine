@@ -6,6 +6,7 @@
 #include <svanes/network/clientserver/IClient.hpp>
 #include <svanes/network/network_message.hpp>
 
+#include <cstdint>
 #include <optional>
 
 namespace ghqcxx {
@@ -84,6 +85,9 @@ private:
 
     // The team assigned at join, or no team for a spectator.
     std::optional<Team> team;
+
+    // The last turn this client asked the server to end.
+    std::uint32_t lastEndedTurn = 0;
 
     // The board's visual presentation and mouse controls.
     BoardView boardView;

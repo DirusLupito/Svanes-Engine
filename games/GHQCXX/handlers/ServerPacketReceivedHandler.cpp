@@ -1,5 +1,6 @@
 #include "ServerPacketReceivedHandler.hpp"
 
+#include "../ClientRole.hpp"
 #include "../events/EndTurnEvent.hpp"
 #include "../events/MovementEvent.hpp"
 #include "../events/PlacementEvent.hpp"
@@ -25,20 +26,37 @@ ServerPacketReceivedHandler::ServerPacketReceivedHandler(
 
               bool includeSender = false;
               try {
+                  const auto activeTeam = board.GetActiveTeam();
+                  if (GetClientTeam(event.client) != activeTeam) {
+                      throw std::invalid_argument("It is not your turn.");
+                  }
                   switch (GetGameMessageType(event.message)) {
                   case GameMessageType::EndTurn:
                       events.TriggerEvent(
                           EndTurnEvent::FromMessage(event.message));
                       includeSender = true;
                       break;
-                  case GameMessageType::Placement:
-                      events.TriggerEvent(
-                          PlacementEvent::FromMessage(event.message));
+                  case GameMessageType::Placement: {
+                      const auto placement =
+                          PlacementEvent::FromMessage(event.message);
+                      if (placement.piece.team != activeTeam) {
+                          throw std::invalid_argument(
+                              "That reserve belongs to the other team.");
+                      }
+                      events.TriggerEvent(placement);
                       break;
-                  case GameMessageType::Movement:
-                      events.TriggerEvent(
-                          MovementEvent::FromMessage(event.message));
+                  }
+                  case GameMessageType::Movement: {
+                      const auto movement =
+                          MovementEvent::FromMessage(event.message);
+                      const auto &piece = board.GetPiece(movement.from);
+                      if (piece && piece->team != activeTeam) {
+                          throw std::invalid_argument(
+                              "That piece belongs to the other team.");
+                      }
+                      events.TriggerEvent(movement);
                       break;
+                  }
                   case GameMessageType::BoardState:
                       throw std::invalid_argument(
                           "Only the GHQ server can supply a board state.");

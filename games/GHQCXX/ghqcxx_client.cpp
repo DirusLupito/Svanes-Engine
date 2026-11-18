@@ -95,19 +95,23 @@ void GHQCXXClient::Update(const svanes::ClientFrameContext &context) {
     }
 
     FitViewToWindow(context.camera);
-    if (context.network.IsConnected() &&
-        context.input.WasPressed(svanes::Key::D)) {
-        context.events.TriggerEvent(EndTurnEvent{});
-    }
-
     const auto clicked =
         boardView.Update(context.world, board, context.input, context.camera);
-    if (const auto *clickedSquare =
-            std::get_if<Board::BoardCoordinate>(&clicked)) {
-        ClickSquare(*clickedSquare, context.events);
-    } else if (const auto *reserve = std::get_if<Piece>(&clicked)) {
-        selection = *reserve;
-        choosingFacing = false;
+    if (team == board.GetActiveTeam() &&
+        board.GetTurnNumber() != lastEndedTurn) {
+        if (context.input.WasPressed(svanes::Key::D)) {
+            context.events.TriggerEvent(EndTurnEvent{});
+            lastEndedTurn = board.GetTurnNumber();
+            selection = std::monostate{};
+            choosingFacing = false;
+        } else if (const auto *square =
+                       std::get_if<Board::BoardCoordinate>(&clicked)) {
+            ClickSquare(*square, context.events);
+        } else if (const auto *reserve = std::get_if<Piece>(&clicked);
+                   reserve && reserve->team == team) {
+            selection = *reserve;
+            choosingFacing = false;
+        }
     }
 
     boardView.UpdatePieces(context.world, board, context.camera);
@@ -145,6 +149,10 @@ void GHQCXXClient::ClickSquare(Board::BoardCoordinate square,
     }
 
     if (const auto &piece = board.GetPiece(square)) {
+        if (piece->team != team) {
+            return;
+        }
+
         choosingFacing =
             selected && *selected == square && piece->GetFireRange() > 0;
         selection = square;
