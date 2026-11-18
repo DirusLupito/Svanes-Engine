@@ -8,9 +8,10 @@
 namespace ghqcxx {
 
 ClientPacketReceivedHandler::ClientPacketReceivedHandler(
-    Board &board, BoardSelection &selection)
+    Board &board, BoardSelection &selection, bool &choosingFacing)
     : svanes::EventHandlerWrapper<ClientPacketReceivedEvent>(
-          [&board, &selection](const ClientPacketReceivedEvent &event) {
+          [&board, &selection,
+           &choosingFacing](const ClientPacketReceivedEvent &event) {
               switch (GetGameMessageType(event.message)) {
               case GameMessageType::EndTurn:
                   EndTurnEvent::FromMessage(event.message);
@@ -19,6 +20,7 @@ ClientPacketReceivedHandler::ClientPacketReceivedHandler(
               case GameMessageType::BoardState:
                   board = Board::FromMessage(event.message);
                   selection = std::monostate{};
+                  choosingFacing = false;
                   return;
               case GameMessageType::Placement: {
                   const auto placement =
@@ -42,9 +44,9 @@ ClientPacketReceivedHandler::ClientPacketReceivedHandler(
                   board.MovePiece(movement.from, movement.to, movement.facing);
                   if (const auto *square =
                           std::get_if<Board::BoardCoordinate>(&selection);
-                      square && square->column == movement.from.column &&
-                      square->row == movement.from.row) {
-                      selection = movement.to;
+                      square && *square == movement.from) {
+                      selection = std::monostate{};
+                      choosingFacing = false;
                   }
                   return;
               }

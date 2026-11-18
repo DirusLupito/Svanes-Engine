@@ -53,8 +53,8 @@ void GHQCXXClient::Initialize(svanes::ClientContext &context) {
     FitViewToWindow(context.camera);
     boardView.Initialize(context.world, board, context.fonts, context.camera);
 
-    context.events.Subscribe(
-        std::make_unique<ClientPacketReceivedHandler>(board, selection));
+    context.events.Subscribe(std::make_unique<ClientPacketReceivedHandler>(
+        board, selection, choosingFacing));
     context.events.Subscribe(
         std::make_unique<MovementHandler>(board, context.network));
     context.events.Subscribe(
@@ -122,6 +122,7 @@ void GHQCXXClient::ClickSquare(Board::BoardCoordinate square,
     const auto *selected = std::get_if<Board::BoardCoordinate>(&selection);
     if (selected && choosingFacing) {
         if (square == *selected) {
+            selection = std::monostate{};
             choosingFacing = false;
             return;
         }
@@ -129,6 +130,7 @@ void GHQCXXClient::ClickSquare(Board::BoardCoordinate square,
             if (square == covered) {
                 events.TriggerEvent(
                     MovementEvent(*selected, *selected, facing));
+                selection = std::monostate{};
                 choosingFacing = false;
                 break;
             }
@@ -147,8 +149,12 @@ void GHQCXXClient::ClickSquare(Board::BoardCoordinate square,
         }
     } else if (selected && board.CanMovePiece(*selected, square)) {
         events.TriggerEvent(MovementEvent(*selected, square));
-        selection = square;
         choosingFacing = board.GetPiece(square)->GetFireRange() > 0;
+        if (choosingFacing) {
+            selection = square;
+        } else {
+            selection = std::monostate{};
+        }
     }
 }
 

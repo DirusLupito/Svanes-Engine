@@ -19,8 +19,11 @@ public:
      * @param board The board to update. Must outlive the handler.
      * @param selection The client's current selection. Must outlive the
      * handler.
+     * @param choosingFacing Whether the client is choosing the selected
+     * piece's facing. Must outlive the handler.
      */
-    ClientPacketReceivedHandler(Board &board, BoardSelection &selection);
+    ClientPacketReceivedHandler(Board &board, BoardSelection &selection,
+                                bool &choosingFacing);
 };
 
 } // namespace ghqcxx
