@@ -132,6 +132,12 @@ void GHQCXXClient::ClickSquare(Board::BoardCoordinate square,
     const auto *selected = std::get_if<Board::BoardCoordinate>(&selection);
     if (selected && choosingFacing) {
         if (square == *selected) {
+            const auto &piece = board.GetPiece(square);
+            if (piece->action == ActionState::ChoosingFacing) {
+                events.TriggerEvent(
+                    MovementEvent(square, square, piece->facing));
+            }
+
             selection = std::monostate{};
             choosingFacing = false;
             return;
@@ -149,12 +155,13 @@ void GHQCXXClient::ClickSquare(Board::BoardCoordinate square,
     }
 
     if (const auto &piece = board.GetPiece(square)) {
-        if (piece->team != team) {
+        if (piece->team != team || piece->action == ActionState::Exhausted) {
             return;
         }
 
         choosingFacing =
-            selected && *selected == square && piece->GetFireRange() > 0;
+            piece->action == ActionState::ChoosingFacing ||
+            (selected && *selected == square && piece->GetFireRange() > 0);
         selection = square;
     } else if (const auto *reserve = std::get_if<Piece>(&selection)) {
         if (board.CanPlaceFromReserve(*reserve, square)) {
@@ -163,7 +170,8 @@ void GHQCXXClient::ClickSquare(Board::BoardCoordinate square,
         }
     } else if (selected && board.CanMovePiece(*selected, square)) {
         events.TriggerEvent(MovementEvent(*selected, square));
-        choosingFacing = board.GetPiece(square)->GetFireRange() > 0;
+        choosingFacing =
+            board.GetPiece(square)->action == ActionState::ChoosingFacing;
         if (choosingFacing) {
             selection = square;
         } else {

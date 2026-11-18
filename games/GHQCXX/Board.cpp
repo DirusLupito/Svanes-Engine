@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <limits>
+#include <ranges>
 #include <stdexcept>
 #include <utility>
 
@@ -38,7 +39,8 @@ static constexpr std::uint8_t EmptySquare =
 static constexpr std::size_t BoardMessageSize =
     sizeof(GameMessageType) +
     Board::Size * Board::Size *
-        (sizeof(Piece::type) + sizeof(Piece::team) + sizeof(Piece::facing)) +
+        (sizeof(Piece::type) + sizeof(Piece::team) + sizeof(Piece::facing) +
+         sizeof(Piece::action)) +
     TeamCount * PieceTypeCount * sizeof(std::uint8_t) + sizeof(std::uint32_t);
 
 void Board::Initialize() {
@@ -71,13 +73,29 @@ void Board::Initialize() {
     }
 }
 
-void Board::EndTurn() { ++turnNumber; }
+void Board::EndTurn() {
+    ++turnNumber;
+    for (auto &piece : pieces | std::views::join) {
+        if (piece) {
+            piece->action = ActionState::Ready;
+        }
+    }
+}
+
+void Board::FinishArtilleryMove() {
+    for (auto &piece : pieces | std::views::join) {
+        if (piece && piece->action == ActionState::ChoosingFacing) {
+            piece->action = ActionState::Exhausted;
+        }
+    }
+}
 
 void Board::PlacePiece(Piece piece, BoardCoordinate position) {
     if (!initialized) {
         throw std::logic_error(
             "Initialize the GHQ board before placing pieces.");
     }
+
     if (GetPiece(position)) {
         throw std::logic_error(
             "Cannot place a piece on an occupied GHQ square.");
@@ -86,8 +104,15 @@ void Board::PlacePiece(Piece piece, BoardCoordinate position) {
     if (piece.team != Team::Red && piece.team != Team::Blue) {
         throw std::invalid_argument("Unknown GHQ team.");
     }
+
     if (piece.facing > Facing::NorthWest) {
         throw std::invalid_argument("Invalid GHQ piece facing.");
+    }
+
+    if (piece.action > ActionState::Exhausted ||
+        (piece.action == ActionState::ChoosingFacing &&
+         piece.GetFireRange() == 0)) {
+        throw std::invalid_argument("Invalid GHQ piece action state.");
     }
 
     switch (piece.type) {
@@ -119,7 +144,9 @@ void Board::PlaceFromReserve(Piece piece, BoardCoordinate position) {
         throw std::invalid_argument(
             "The reserve piece cannot be placed on that square.");
     }
+    piece.action = ActionState::Exhausted;
     PlacePiece(piece, position);
+    FinishArtilleryMove();
     SetReserveCount(piece, GetReserveCount(piece) - 1);
 }
 
@@ -132,26 +159,39 @@ void Board::MovePiece(BoardCoordinate from, BoardCoordinate to,
             "There is no piece on the selected square.");
     }
 
-    if (facing) {
-        if (*facing > Facing::NorthWest) {
-            throw std::invalid_argument(
-                "Invalid facing for the selected piece.");
-        }
-        piece->facing = *facing;
+    if (facing && *facing > Facing::NorthWest) {
+        throw std::invalid_argument("Invalid facing for the selected piece.");
     }
 
     if (from == to && facing) {
-        pieces[from.row][from.column] = piece;
-        return;
-    }
+        // Infantry facing only marks engagements and never spends an action.
+        if (piece->type == PieceType::BasicInfantry ||
+            piece->type == PieceType::ArmoredInfantry ||
+            piece->type == PieceType::ParachuteInfantry) {
+            pieces[from.row][from.column]->facing = *facing;
+            return;
+        }
 
-    if (!CanMovePiece(from, to)) {
+        if (piece->action == ActionState::Exhausted) {
+            throw std::invalid_argument(
+                "The selected piece has already acted.");
+        }
+
+        if (piece->action == ActionState::Ready && piece->facing == *facing) {
+            return;
+        }
+    } else if (!CanMovePiece(from, to)) {
         throw std::invalid_argument(
             "The selected piece cannot move to that square.");
     }
 
-    pieces[to.row][to.column] = piece;
+    FinishArtilleryMove();
+    piece->action = !facing && piece->GetFireRange() > 0
+                        ? ActionState::ChoosingFacing
+                        : ActionState::Exhausted;
+    piece->facing = facing.value_or(piece->facing);
     pieces[from.row][from.column].reset();
+    pieces[to.row][to.column] = piece;
 }
 
 bool Board::CanMovePiece(BoardCoordinate from, BoardCoordinate to) const {
@@ -194,6 +234,8 @@ svanes::NetworkMessage Board::ToMessage() const {
                                     : EmptySquare);
             writer.WriteUint8(piece ? static_cast<std::uint8_t>(piece->facing)
                                     : EmptySquare);
+            writer.WriteUint8(piece ? static_cast<std::uint8_t>(piece->action)
+                                    : EmptySquare);
         }
     }
     // Reserve bytes follow the squares, ordered by Team, then PieceType.
@@ -225,15 +267,18 @@ Board Board::FromMessage(const svanes::NetworkMessage &message) {
             const auto type = reader.ReadUint8();
             const auto team = reader.ReadUint8();
             const auto facing = reader.ReadUint8();
+            const auto action = reader.ReadUint8();
             if (type == EmptySquare) {
-                if (team != EmptySquare || facing != EmptySquare) {
+                if (team != EmptySquare || facing != EmptySquare ||
+                    action != EmptySquare) {
                     throw std::invalid_argument(
-                        "An empty GHQ square cannot have a team or facing.");
+                        "An empty GHQ square cannot contain piece data.");
                 }
             } else {
                 board.PlacePiece({static_cast<PieceType>(type),
                                   static_cast<Team>(team),
-                                  static_cast<Facing>(facing)},
+                                  static_cast<Facing>(facing),
+                                  static_cast<ActionState>(action)},
                                  {column, row});
             }
         }
@@ -277,7 +322,7 @@ void Board::SetReserveCount(Piece piece, std::uint8_t count) {
 std::vector<Board::BoardCoordinate>
 Board::GetMovementOptions(BoardCoordinate position) const {
     const auto &piece = GetPiece(position);
-    if (!piece) {
+    if (!piece || piece->action != ActionState::Ready) {
         return {};
     }
 

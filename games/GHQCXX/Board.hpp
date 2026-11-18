@@ -79,8 +79,7 @@ public:
      * @throws std::logic_error if the board has not been initialized or the
      * square is already occupied.
      * @throws std::out_of_range if the position is outside the board.
-     * @throws std::invalid_argument if the piece type, team, or facing is
-     * invalid.
+     * @throws std::invalid_argument if the piece has invalid state.
      */
     void PlacePiece(Piece piece, BoardCoordinate position);
 
@@ -204,6 +203,11 @@ public:
     GetMovementOptions(BoardCoordinate position) const;
 
 private:
+    /**
+     * Ends the free facing choice from a previous artillery move.
+     */
+    void FinishArtilleryMove();
+
     // The current turn number. Blue takes the first turn.
     std::uint32_t turnNumber = 1;
 

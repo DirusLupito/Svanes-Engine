@@ -69,6 +69,17 @@ enum class Facing : std::uint8_t {
 };
 
 /**
+ * Tracks a piece's action for the current turn.
+ *
+ * MEMBERS:
+ * - Ready: The piece can take an action.
+ * - ChoosingFacing: The piece has moved and can still set its facing
+ * (artillery).
+ * - Exhausted: The piece has finished its action.
+ */
+enum class ActionState : std::uint8_t { Ready, ChoosingFacing, Exhausted };
+
+/**
  * Describes a piece's movement before the board checks its surroundings.
  * Ordinary movement follows any of the eight directions, with all steps
  * taken in the same direction.
@@ -91,17 +102,19 @@ struct MovementRules {
  * - type: The kind of piece.
  * - team: The player the piece belongs to.
  * - facing: The direction the piece points on the board.
+ * - action: The piece's action state this turn.
  */
 struct Piece {
     PieceType type;
     Team team;
     Facing facing = team == Team::Red ? Facing::South : Facing::North;
+    ActionState action = ActionState::Ready;
 
     /**
      * Compares the state of two pieces.
      *
      * @param other The piece to compare.
-     * @return True if the type, team, and facing match.
+     * @return True if both pieces have the same state.
      */
     bool operator==(const Piece &other) const = default;
 

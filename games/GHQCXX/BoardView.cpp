@@ -82,6 +82,9 @@ static constexpr svanes::Color MovementMarkerColor{60, 200, 90, 220};
 // Color of the squares covered by a possible artillery facing.
 static constexpr svanes::Color FireMarkerColor{255, 220, 40, 255};
 
+// The opacity of a board piece that has used its action.
+static constexpr std::uint8_t ExhaustedPieceAlpha = 80;
+
 // The layer for Blue's fire hatching above the checkerboard.
 static constexpr std::int32_t BlueHatchLayer = -4;
 
@@ -297,6 +300,14 @@ void BoardView::UpdatePieces(svanes::Registry &world, const Board &board,
             if (piece) {
                 entities = CreatePieceVisual(
                     world, *piece, {SquareCenter(column), SquareCenter(row)});
+
+                if (piece->action != ActionState::Ready) {
+                    for (const auto entity : entities) {
+                        world.GetComponent<svanes::SolidShape>(entity)
+                            .color.alpha = ExhaustedPieceAlpha;
+                    }
+                }
+
                 for (const auto &[square, facing] :
                      board.GetFireOptions({column, row})) {
                     if (facing != piece->facing) {
