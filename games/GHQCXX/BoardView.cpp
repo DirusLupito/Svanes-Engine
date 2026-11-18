@@ -27,12 +27,19 @@
 
 namespace ghqcxx {
 
-// One-unit square shared by the board tiles and their highlights.
-static constexpr svanes::Rectangle2D SquareGeometry{.width = 1.0F,
-                                                    .height = 1.0F};
+// The rectangle shared by the board tiles and their highlights.
+static constexpr svanes::Rectangle2D SquareGeometry{
+    .width = BoardView::SquareSize, .height = BoardView::SquareSize};
 
-// Offset from a square's upper-left corner to its center on either axis.
-static constexpr float SquareCenterOffset = SquareGeometry.width / 2.0F;
+/**
+ * Locates the center of a row or column in world coordinates.
+ *
+ * @param index The row or column on the board.
+ * @return The center along that axis.
+ */
+static constexpr float SquareCenter(std::uint8_t index) {
+    return (index + 0.5F) * BoardView::SquareSize;
+}
 
 // Reserve row centers sit this far outside the top and bottom board edges.
 static constexpr float ReserveRowOffset = 0.69F;
@@ -83,11 +90,10 @@ static constexpr svanes::Color NCStateRed{0xcc, 0x00, 0x00};
 static constexpr svanes::Color CarolinaBlue{0x7b, 0xaf, 0xd4};
 
 svanes::Vector2D BoardView::ReserveCenter(Team team, std::size_t index) {
-    constexpr float spacing =
-        static_cast<float>(Board::Size) / ReserveTypes.size();
+    constexpr float spacing = BoardWidth / ReserveTypes.size();
     return {(static_cast<float>(index) + 0.5F) * spacing,
             team == Team::Red ? -ReserveRowOffset
-                              : Board::Size + ReserveRowOffset};
+                              : BoardWidth + ReserveRowOffset};
 }
 
 /**
@@ -155,18 +161,14 @@ void BoardView::Initialize(svanes::Registry &world, const Board &board,
     // The marker layer above the piece decals on occupied squares.
     constexpr std::int32_t markerLayer = 5;
 
-    // Each square is a rectangle centered halfway into its row and column.
-    // The board therefore occupies world coordinates (0, 0) through (8, 8).
     for (std::uint8_t row = 0; row < Board::Size; ++row) {
         for (std::uint8_t column = 0; column < Board::Size; ++column) {
             const auto square = world.CreateEntity();
             world.AddComponent<svanes::ZOrder>(square,
                                                svanes::ZOrder{boardLayer});
             world.AddComponent<svanes::Transform>(
-                square,
-                svanes::Transform{
-                    .x = static_cast<float>(column) + SquareCenterOffset,
-                    .y = static_cast<float>(row) + SquareCenterOffset});
+                square, svanes::Transform{.x = SquareCenter(column),
+                                          .y = SquareCenter(row)});
             world.AddComponent<svanes::SolidShape>(
                 square, svanes::SolidShape{.color = (row + column) % 2 == 0
                                                         ? LightSquareColor
@@ -211,10 +213,8 @@ void BoardView::Initialize(svanes::Registry &world, const Board &board,
             world.AddComponent<svanes::ZOrder>(marker,
                                                svanes::ZOrder{markerLayer});
             world.AddComponent<svanes::Transform>(
-                marker,
-                svanes::Transform{
-                    .x = static_cast<float>(column) + SquareCenterOffset,
-                    .y = static_cast<float>(row) + SquareCenterOffset});
+                marker, svanes::Transform{.x = SquareCenter(column),
+                                          .y = SquareCenter(row)});
             auto &markerShape = world.AddComponent<svanes::SolidShape>(
                 marker,
                 svanes::SolidShape{.color = MovementMarkerColor,
@@ -246,9 +246,7 @@ void BoardView::UpdatePieces(svanes::Registry &world, const Board &board,
             entities.clear();
             if (piece) {
                 entities = CreatePieceVisual(
-                    world, *piece,
-                    {static_cast<float>(column) + SquareCenterOffset,
-                     static_cast<float>(row) + SquareCenterOffset});
+                    world, *piece, {SquareCenter(column), SquareCenter(row)});
             }
             displayed = piece;
         }
@@ -321,19 +319,18 @@ BoardSelection BoardView::Update(svanes::Registry &world, const Board &board,
     const auto worldMouse =
         camera.ScreenToWorld({mouse.x, mouse.y, 0.0F, 0.0F});
 
-    // Each square is one world unit wide and tall. Check the bounds before
-    // converting to integers, since a negative fraction would become zero.
+    // Check the bounds before converting to integers, since a negative
+    // fraction would become zero.
     // The right and bottom edges are outside the board.
-    if (worldMouse.x >= 0.0F && worldMouse.x < Board::Size &&
-        worldMouse.y >= 0.0F && worldMouse.y < Board::Size) {
+    if (worldMouse.x >= 0.0F && worldMouse.x < BoardWidth &&
+        worldMouse.y >= 0.0F && worldMouse.y < BoardWidth) {
         const Board::BoardCoordinate hoveredSquare{
-            .column = static_cast<std::uint8_t>(worldMouse.x),
-            .row = static_cast<std::uint8_t>(worldMouse.y)};
+            .column = static_cast<std::uint8_t>(worldMouse.x / SquareSize),
+            .row = static_cast<std::uint8_t>(worldMouse.y / SquareSize)};
 
         auto &position = world.GetComponent<svanes::Transform>(hoverHighlight);
-        position.x =
-            static_cast<float>(hoveredSquare.column) + SquareCenterOffset;
-        position.y = static_cast<float>(hoveredSquare.row) + SquareCenterOffset;
+        position.x = SquareCenter(hoveredSquare.column);
+        position.y = SquareCenter(hoveredSquare.row);
         highlight.color = HoverColor;
         if (clicked) {
             return hoveredSquare;
@@ -382,10 +379,8 @@ void BoardView::ShowSelection(svanes::Registry &world, const Board &board,
     auto &position = world.GetComponent<svanes::Transform>(selectionHighlight);
     if (const auto *selectedSquare =
             std::get_if<Board::BoardCoordinate>(&selection)) {
-        position.x =
-            static_cast<float>(selectedSquare->column) + SquareCenterOffset;
-        position.y =
-            static_cast<float>(selectedSquare->row) + SquareCenterOffset;
+        position.x = SquareCenter(selectedSquare->column);
+        position.y = SquareCenter(selectedSquare->row);
         highlight.color = SelectionColor;
         highlight.geometry = SquareGeometry;
 

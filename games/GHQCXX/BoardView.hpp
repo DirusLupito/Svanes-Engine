@@ -28,6 +28,12 @@ using BoardSelection =
  */
 class BoardView final {
 public:
+    // The side length of a board square in world units.
+    static constexpr float SquareSize = 1.4F;
+
+    // The side length of the checkerboard in world units.
+    static constexpr float BoardWidth = Board::Size * SquareSize;
+
     /**
      * Creates the board and reserve visuals from the current state. Call once
      * before updating the view.

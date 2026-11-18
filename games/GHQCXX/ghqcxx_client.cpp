@@ -20,7 +20,7 @@
 namespace ghqcxx {
 
 // Leave a row above and below the board for the red and blue piece visuals.
-constexpr float ViewHeight = Board::Size + 2.75F;
+constexpr float ViewHeight = BoardView::BoardWidth + 2.75F;
 
 /**
  * Fits the board and both rows of pieces into the window. Both dimensions use
@@ -32,17 +32,17 @@ static void FitViewToWindow(svanes::Camera2D &camera) {
     // A minimized window may have no rendering area. Keep the previous zoom
     // until there is room to draw again, since a zero zoom is invalid.
     if (camera.OutputWidth() > 0 && camera.OutputHeight() > 0) {
-        camera.zoom =
-            std::min(static_cast<float>(camera.OutputWidth()) / Board::Size,
-                     static_cast<float>(camera.OutputHeight()) / ViewHeight);
+        camera.zoom = std::min(
+            static_cast<float>(camera.OutputWidth()) / BoardView::BoardWidth,
+            static_cast<float>(camera.OutputHeight()) / ViewHeight);
     }
 }
 
 void GHQCXXClient::Initialize(svanes::ClientContext &context) {
     board.Initialize();
 
-    context.camera.x = Board::Size * 0.5F;
-    context.camera.y = Board::Size * 0.5F;
+    context.camera.x = BoardView::BoardWidth * 0.5F;
+    context.camera.y = BoardView::BoardWidth * 0.5F;
     context.camera.scale_mode = svanes::ScaleMode::Constant;
     FitViewToWindow(context.camera);
     boardView.Initialize(context.world, board, context.fonts, context.camera);
