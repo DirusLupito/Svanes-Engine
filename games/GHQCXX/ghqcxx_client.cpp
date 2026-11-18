@@ -89,35 +89,51 @@ void GHQCXXClient::Update(const svanes::ClientFrameContext &context) {
         boardView.Update(context.world, board, context.input, context.camera);
     if (const auto *clickedSquare =
             std::get_if<Board::BoardCoordinate>(&clicked)) {
-        if (board.GetPiece(*clickedSquare)) {
-            selection = *clickedSquare;
-        } else if (const auto *reserve = std::get_if<Piece>(&selection)) {
-            if (board.CanPlaceFromReserve(*reserve, *clickedSquare)) {
-                context.events.TriggerEvent(
-                    PlacementEvent(*reserve, *clickedSquare));
-                selection = std::monostate{};
-            }
-        } else if (const auto *selectedSquare =
-                       std::get_if<Board::BoardCoordinate>(&selection)) {
-            for (const auto destination :
-                 board.GetMovementOptions(*selectedSquare)) {
-                if (destination.column == clickedSquare->column &&
-                    destination.row == clickedSquare->row) {
-                    context.events.TriggerEvent(
-                        MovementEvent(*selectedSquare, *clickedSquare));
-                    selection = *clickedSquare;
-                    break;
-                }
-            }
-        }
+        ClickSquare(*clickedSquare, context.events);
     } else if (const auto *reserve = std::get_if<Piece>(&clicked)) {
         selection = *reserve;
+        choosingFacing = false;
     }
     boardView.UpdatePieces(context.world, board, context.camera);
-    boardView.ShowSelection(context.world, board, selection);
+    boardView.ShowSelection(context.world, board, selection, choosingFacing);
 
     if (context.input.WasPressed(svanes::Key::Escape)) {
         quit = true;
+    }
+}
+
+void GHQCXXClient::ClickSquare(Board::BoardCoordinate square,
+                               svanes::EventManager &events) {
+    const auto *selected = std::get_if<Board::BoardCoordinate>(&selection);
+    if (selected && choosingFacing) {
+        if (square == *selected) {
+            choosingFacing = false;
+            return;
+        }
+        for (const auto &[covered, facing] : board.GetFireOptions(*selected)) {
+            if (square == covered) {
+                events.TriggerEvent(
+                    MovementEvent(*selected, *selected, facing));
+                choosingFacing = false;
+                break;
+            }
+        }
+        return;
+    }
+
+    if (const auto &piece = board.GetPiece(square)) {
+        choosingFacing =
+            selected && *selected == square && piece->GetFireRange() > 0;
+        selection = square;
+    } else if (const auto *reserve = std::get_if<Piece>(&selection)) {
+        if (board.CanPlaceFromReserve(*reserve, square)) {
+            events.TriggerEvent(PlacementEvent(*reserve, square));
+            selection = std::monostate{};
+        }
+    } else if (selected && board.CanMovePiece(*selected, square)) {
+        events.TriggerEvent(MovementEvent(*selected, square));
+        selection = square;
+        choosingFacing = board.GetPiece(square)->GetFireRange() > 0;
     }
 }
 

@@ -34,7 +34,7 @@ ClientPacketReceivedHandler::ClientPacketReceivedHandler(
                       MovementEvent::FromMessage(event.message);
                   // Apply the server's move directly; a local movement event
                   // would send it back to the server.
-                  board.MovePiece(movement.from, movement.to);
+                  board.MovePiece(movement.from, movement.to, movement.facing);
                   if (const auto *square =
                           std::get_if<Board::BoardCoordinate>(&selection);
                       square && square->column == movement.from.column &&

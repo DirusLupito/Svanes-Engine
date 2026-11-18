@@ -4,6 +4,18 @@
 
 namespace ghqcxx {
 
+std::uint8_t Piece::GetFireRange() const {
+    switch (type) {
+    case PieceType::BasicArtillery:
+    case PieceType::ArmoredArtillery:
+        return 2;
+    case PieceType::HeavyArtillery:
+        return 3;
+    default:
+        return 0;
+    }
+}
+
 MovementRules Piece::GetMovementRules() const {
     switch (type) {
     case PieceType::Headquarters:

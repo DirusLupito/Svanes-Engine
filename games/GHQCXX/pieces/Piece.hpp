@@ -90,10 +90,28 @@ struct MovementRules {
  * FIELDS:
  * - type: The kind of piece.
  * - team: The player the piece belongs to.
+ * - facing: The direction the piece points on the board.
  */
 struct Piece {
     PieceType type;
     Team team;
+    Facing facing = team == Team::Red ? Facing::South : Facing::North;
+
+    /**
+     * Compares the state of two pieces.
+     *
+     * @param other The piece to compare.
+     * @return True if the type, team, and facing match.
+     */
+    bool operator==(const Piece &other) const = default;
+
+    /**
+     * Reports how far the piece can bombard along its facing.
+     *
+     * @return The number of squares in range, or zero for a non-artillery
+     * piece.
+     */
+    std::uint8_t GetFireRange() const;
 
     /**
      * Reports the movement allowed by this piece's type. Armored pieces can

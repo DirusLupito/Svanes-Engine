@@ -73,6 +73,9 @@ static constexpr svanes::Color SelectionColor{255, 210, 80, 96};
 // Color and visible opacity of the available-move indicators.
 static constexpr svanes::Color MovementMarkerColor{60, 200, 90, 220};
 
+// Color of the squares covered by a possible artillery facing.
+static constexpr svanes::Color FireMarkerColor{255, 220, 40, 255};
+
 // Color used for Red's board and reserve pieces.
 static constexpr svanes::Color NCStateRed{0xcc, 0x00, 0x00};
 
@@ -88,8 +91,7 @@ svanes::Vector2D BoardView::ReserveCenter(Team team, std::size_t index) {
 }
 
 /**
- * Creates a piece's visuals at a world position, facing the opposing
- * side.
+ * Creates a piece's visuals at a world position using its board facing.
  *
  * @param world The registry that owns the created entities.
  * @param piece The piece to display.
@@ -103,10 +105,11 @@ static std::vector<svanes::Entity>
 CreatePieceVisual(svanes::Registry &world, Piece piece,
                   svanes::Vector2D position) {
     const auto color = BoardView::GetTeamColor(piece.team);
+    constexpr float eighthTurn = std::numbers::pi_v<float> / 4.0F;
     const svanes::Transform transform{
         .x = position.x,
         .y = position.y,
-        .rotation = piece.team == Team::Red ? std::numbers::pi_v<float> : 0.0F};
+        .rotation = static_cast<float>(piece.facing) * eighthTurn};
 
     switch (piece.type) {
     case PieceType::Headquarters:
@@ -148,6 +151,9 @@ void BoardView::Initialize(svanes::Registry &world, const Board &board,
     constexpr std::int32_t boardLayer = -3;
     constexpr std::int32_t hoverLayer = boardLayer + 1;
     constexpr std::int32_t selectionLayer = hoverLayer + 1;
+
+    // The marker layer above the piece decals on occupied squares.
+    constexpr std::int32_t markerLayer = 5;
 
     // Each square is a rectangle centered halfway into its row and column.
     // The board therefore occupies world coordinates (0, 0) through (8, 8).
@@ -202,6 +208,8 @@ void BoardView::Initialize(svanes::Registry &world, const Board &board,
         for (std::uint8_t column = 0; column < Board::Size; ++column) {
             auto &marker = movementMarkers[row][column];
             marker = world.CreateEntity();
+            world.AddComponent<svanes::ZOrder>(marker,
+                                               svanes::ZOrder{markerLayer});
             world.AddComponent<svanes::Transform>(
                 marker,
                 svanes::Transform{
@@ -226,11 +234,7 @@ void BoardView::UpdatePieces(svanes::Registry &world, const Board &board,
         for (std::uint8_t column = 0; column < Board::Size; ++column) {
             const auto &piece = board.GetPiece({column, row});
             auto &displayed = displayedPieces[row][column];
-            if (!piece && !displayed) {
-                continue;
-            }
-            if (piece && displayed && piece->type == displayed->type &&
-                piece->team == displayed->team) {
+            if (piece == displayed) {
                 continue;
             }
 
@@ -355,7 +359,8 @@ BoardSelection BoardView::Update(svanes::Registry &world, const Board &board,
 }
 
 void BoardView::ShowSelection(svanes::Registry &world, const Board &board,
-                              const BoardSelection &selection) {
+                              const BoardSelection &selection,
+                              bool choosingFacing) {
     const auto *reserve = std::get_if<Piece>(&selection);
     for (std::uint8_t row = 0; row < Board::Size; ++row) {
         for (std::uint8_t column = 0; column < Board::Size; ++column) {
@@ -383,6 +388,16 @@ void BoardView::ShowSelection(svanes::Registry &world, const Board &board,
             static_cast<float>(selectedSquare->row) + SquareCenterOffset;
         highlight.color = SelectionColor;
         highlight.geometry = SquareGeometry;
+
+        if (choosingFacing) {
+            for (const auto &[square, facing] :
+                 board.GetFireOptions(*selectedSquare)) {
+                const auto marker = movementMarkers[square.row][square.column];
+                world.GetComponent<svanes::SolidShape>(marker).color =
+                    FireMarkerColor;
+            }
+            return;
+        }
 
         for (const auto destination :
              board.GetMovementOptions(*selectedSquare)) {

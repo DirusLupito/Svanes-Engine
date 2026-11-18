@@ -7,6 +7,7 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <utility>
 #include <vector>
 
 namespace ghqcxx {
@@ -30,6 +31,14 @@ public:
     struct BoardCoordinate {
         std::uint8_t column;
         std::uint8_t row;
+
+        /**
+         * Compares two board positions.
+         *
+         * @param other The position to compare.
+         * @return True if both coordinates identify the same square.
+         */
+        bool operator==(const BoardCoordinate &other) const = default;
     };
 
     /**
@@ -49,7 +58,8 @@ public:
      * @throws std::logic_error if the board has not been initialized or the
      * square is already occupied.
      * @throws std::out_of_range if the position is outside the board.
-     * @throws std::invalid_argument if the piece type or team is invalid.
+     * @throws std::invalid_argument if the piece type, team, or facing is
+     * invalid.
      */
     void PlacePiece(Piece piece, BoardCoordinate position);
 
@@ -75,15 +85,37 @@ public:
     void PlaceFromReserve(Piece piece, BoardCoordinate position);
 
     /**
-     * Moves a piece to an available destination, leaving its old square empty.
+     * Moves a piece or turns it in place.
      *
      * @param from The square containing the piece.
-     * @param to The destination square.
+     * @param to The destination square, or the source square to turn in place.
+     * @param facing The piece's final direction. Omit to keep its facing.
      *
      * @throws std::out_of_range if either square is outside the board.
      * @throws std::invalid_argument if the move is not allowed.
      */
-    void MovePiece(BoardCoordinate from, BoardCoordinate to);
+    void MovePiece(BoardCoordinate from, BoardCoordinate to,
+                   std::optional<Facing> facing = std::nullopt);
+
+    /**
+     * Checks whether a piece can move to a destination.
+     *
+     * @param from The square containing the piece.
+     * @param to The proposed destination.
+     *
+     * @return True if the destination is one of the piece's movement options.
+     */
+    bool CanMovePiece(BoardCoordinate from, BoardCoordinate to) const;
+
+    /**
+     * Finds the squares an artillery piece could bombard from a position.
+     *
+     * @param position The square containing the piece.
+     *
+     * @return Each covered board square and the facing that would cover it.
+     */
+    std::vector<std::pair<BoardCoordinate, Facing>>
+    GetFireOptions(BoardCoordinate position) const;
 
     /**
      * Encodes the board's current state for transmission.

@@ -19,7 +19,7 @@ class Registry;
 
 namespace ghqcxx {
 
-// A board square, a team's reserve piece, or no selection.
+// The client's current board or reserve selection.
 using BoardSelection =
     std::variant<std::monostate, Board::BoardCoordinate, Piece>;
 
@@ -79,9 +79,11 @@ public:
      * @param board The board used to find the selected piece's movement
      * options.
      * @param selection The client's current selection.
+     * @param choosingFacing Whether the player is choosing the selected
+     * artillery's facing.
      */
     void ShowSelection(svanes::Registry &world, const Board &board,
-                       const BoardSelection &selection);
+                       const BoardSelection &selection, bool choosingFacing);
 
     /**
      * Returns the color used to display a team's pieces, including previews.
@@ -141,7 +143,7 @@ private:
     // highlight.
     svanes::Entity reserveOutline = 0;
 
-    // Green destination circles, indexed by row, then column.
+    // Circles marking selectable squares, indexed by row, then column.
     std::array<std::array<svanes::Entity, Board::Size>, Board::Size>
         movementMarkers{};
 };

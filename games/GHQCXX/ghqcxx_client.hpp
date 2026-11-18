@@ -68,6 +68,15 @@ public:
     svanes::TicCount GetFrameIntervalTics() const override;
 
 private:
+    /**
+     * Interprets a board click using the client's current selection.
+     *
+     * @param square The square the player clicked.
+     * @param events The manager used to raise the chosen action.
+     */
+    void ClickSquare(Board::BoardCoordinate square,
+                     svanes::EventManager &events);
+
     // The client's board state.
     Board board;
 
@@ -76,6 +85,9 @@ private:
 
     // The piece selected by the client, on the board or in reserve.
     BoardSelection selection;
+
+    // Whether the player is choosing a facing for the selected artillery.
+    bool choosingFacing = false;
 
     // Set when the user presses Escape.
     bool quit = false;

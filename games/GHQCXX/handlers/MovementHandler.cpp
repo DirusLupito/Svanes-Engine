@@ -9,7 +9,7 @@ namespace ghqcxx {
 MovementHandler::MovementHandler(Board &board)
     : svanes::EventHandlerWrapper<MovementEvent>(
           [&board](const MovementEvent &event) {
-              board.MovePiece(event.from, event.to);
+              board.MovePiece(event.from, event.to, event.facing);
               std::cout << "GHQCXX server moved a piece from ("
                         << static_cast<std::uint32_t>(event.from.column) << ", "
                         << static_cast<std::uint32_t>(event.from.row)
@@ -22,7 +22,7 @@ MovementHandler::MovementHandler(Board &board)
 MovementHandler::MovementHandler(Board &board, svanes::NetworkClient &network)
     : svanes::EventHandlerWrapper<MovementEvent>(
           [&board, &network](const MovementEvent &event) {
-              board.MovePiece(event.from, event.to);
+              board.MovePiece(event.from, event.to, event.facing);
 
               network.Send(event.ToMessage());
           }) {}

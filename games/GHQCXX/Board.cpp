@@ -4,6 +4,7 @@
 
 #include <svanes/network/message_serialization.hpp>
 
+#include <algorithm>
 #include <limits>
 #include <stdexcept>
 #include <utility>
@@ -29,14 +30,15 @@ static constexpr std::array StartingReserveCounts{
     std::pair{PieceType::HeavyArtillery, std::uint8_t{1}},
     std::pair{PieceType::ArmoredArtillery, std::uint8_t{1}}};
 
-// The byte value written for both the type and team of an empty square.
+// The byte value written for each field of an empty square.
 static constexpr std::uint8_t EmptySquare =
     std::numeric_limits<std::uint8_t>::max();
 
 // The size of a complete board state message in bytes.
 static constexpr std::size_t BoardMessageSize =
     sizeof(GameMessageType) +
-    Board::Size * Board::Size * (sizeof(Piece::type) + sizeof(Piece::team)) +
+    Board::Size * Board::Size *
+        (sizeof(Piece::type) + sizeof(Piece::team) + sizeof(Piece::facing)) +
     TeamCount * PieceTypeCount * sizeof(std::uint8_t);
 
 void Board::Initialize() {
@@ -82,6 +84,9 @@ void Board::PlacePiece(Piece piece, BoardCoordinate position) {
     if (piece.team != Team::Red && piece.team != Team::Blue) {
         throw std::invalid_argument("Unknown GHQ team.");
     }
+    if (piece.facing > Facing::NorthWest) {
+        throw std::invalid_argument("Invalid GHQ piece facing.");
+    }
 
     switch (piece.type) {
     case PieceType::Headquarters:
@@ -116,17 +121,64 @@ void Board::PlaceFromReserve(Piece piece, BoardCoordinate position) {
     SetReserveCount(piece, GetReserveCount(piece) - 1);
 }
 
-void Board::MovePiece(BoardCoordinate from, BoardCoordinate to) {
+void Board::MovePiece(BoardCoordinate from, BoardCoordinate to,
+                      std::optional<Facing> facing) {
+    auto piece = GetPiece(from);
     GetPiece(to);
-    for (const auto destination : GetMovementOptions(from)) {
-        if (destination.column == to.column && destination.row == to.row) {
-            pieces[to.row][to.column] = pieces[from.row][from.column];
-            pieces[from.row][from.column].reset();
-            return;
+    if (!piece) {
+        throw std::invalid_argument(
+            "There is no piece on the selected square.");
+    }
+
+    if (facing) {
+        if (*facing > Facing::NorthWest) {
+            throw std::invalid_argument(
+                "Invalid facing for the selected piece.");
+        }
+        piece->facing = *facing;
+    }
+
+    if (from == to && facing) {
+        pieces[from.row][from.column] = piece;
+        return;
+    }
+
+    if (!CanMovePiece(from, to)) {
+        throw std::invalid_argument(
+            "The selected piece cannot move to that square.");
+    }
+
+    pieces[to.row][to.column] = piece;
+    pieces[from.row][from.column].reset();
+}
+
+bool Board::CanMovePiece(BoardCoordinate from, BoardCoordinate to) const {
+    return std::ranges::contains(GetMovementOptions(from), to);
+}
+
+std::vector<std::pair<Board::BoardCoordinate, Facing>>
+Board::GetFireOptions(BoardCoordinate position) const {
+    // Column and row steps in Facing order, clockwise from north.
+    static constexpr std::array<std::pair<std::int8_t, std::int8_t>, 8> steps{
+        {{0, -1}, {1, -1}, {1, 0}, {1, 1}, {0, 1}, {-1, 1}, {-1, 0}, {-1, -1}}};
+    const auto &piece = GetPiece(position);
+    const auto range = piece ? piece->GetFireRange() : 0;
+    std::vector<std::pair<BoardCoordinate, Facing>> options;
+    for (std::size_t direction = 0; direction < steps.size(); ++direction) {
+        const auto [dx, dy] = steps[direction];
+        for (std::uint8_t distance = 1; distance <= range; ++distance) {
+            const auto column = position.column + dx * distance;
+            const auto row = position.row + dy * distance;
+            if (column < 0 || column >= Size || row < 0 || row >= Size) {
+                break;
+            }
+            options.emplace_back(
+                BoardCoordinate{static_cast<std::uint8_t>(column),
+                                static_cast<std::uint8_t>(row)},
+                static_cast<Facing>(direction));
         }
     }
-    throw std::invalid_argument(
-        "The selected piece cannot move to that square.");
+    return options;
 }
 
 svanes::NetworkMessage Board::ToMessage() const {
@@ -137,6 +189,8 @@ svanes::NetworkMessage Board::ToMessage() const {
             writer.WriteUint8(piece ? static_cast<std::uint8_t>(piece->type)
                                     : EmptySquare);
             writer.WriteUint8(piece ? static_cast<std::uint8_t>(piece->team)
+                                    : EmptySquare);
+            writer.WriteUint8(piece ? static_cast<std::uint8_t>(piece->facing)
                                     : EmptySquare);
         }
     }
@@ -167,15 +221,17 @@ Board Board::FromMessage(const svanes::NetworkMessage &message) {
         for (std::uint8_t column = 0; column < Size; ++column) {
             const auto type = reader.ReadUint8();
             const auto team = reader.ReadUint8();
+            const auto facing = reader.ReadUint8();
             if (type == EmptySquare) {
-                if (team != EmptySquare) {
+                if (team != EmptySquare || facing != EmptySquare) {
                     throw std::invalid_argument(
-                        "An empty GHQ square cannot have a team.");
+                        "An empty GHQ square cannot have a team or facing.");
                 }
             } else {
-                board.PlacePiece(
-                    {static_cast<PieceType>(type), static_cast<Team>(team)},
-                    {column, row});
+                board.PlacePiece({static_cast<PieceType>(type),
+                                  static_cast<Team>(team),
+                                  static_cast<Facing>(facing)},
+                                 {column, row});
             }
         }
     }
