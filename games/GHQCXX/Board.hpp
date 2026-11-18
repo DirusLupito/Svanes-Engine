@@ -105,6 +105,17 @@ public:
     std::uint8_t GetReserveCount(Piece piece) const;
 
     /**
+     * Sets how many pieces of a type remain in a team's reserve.
+     *
+     * @param piece The type and team to update.
+     * @param count The remaining quantity.
+     *
+     * @throws std::logic_error if the board has not been initialized.
+     * @throws std::out_of_range if the piece type or team is invalid.
+     */
+    void SetReserveCount(Piece piece, std::uint8_t count);
+
+    /**
      * Finds destinations allowed by the piece's movement rules, board edges,
      * and occupied squares.
      *

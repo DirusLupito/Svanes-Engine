@@ -183,6 +183,15 @@ std::uint8_t Board::GetReserveCount(Piece piece) const {
         .at(static_cast<std::size_t>(piece.type));
 }
 
+void Board::SetReserveCount(Piece piece, std::uint8_t count) {
+    if (!initialized) {
+        throw std::logic_error(
+            "Initialize the GHQ board before changing reserves.");
+    }
+    reserves.at(static_cast<std::size_t>(piece.team))
+        .at(static_cast<std::size_t>(piece.type)) = count;
+}
+
 std::vector<Board::BoardCoordinate>
 Board::GetMovementOptions(BoardCoordinate position) const {
     const auto &piece = GetPiece(position);
