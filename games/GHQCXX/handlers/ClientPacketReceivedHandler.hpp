@@ -1,11 +1,9 @@
 #pragma once
 
-#include "../Board.hpp"
+#include "../BoardView.hpp"
 #include "../events/ClientPacketReceivedEvent.hpp"
 
 #include <svanes/events/event_handler_wrapper.hpp>
-
-#include <optional>
 
 namespace ghqcxx {
 
@@ -19,11 +17,10 @@ public:
      * Creates a handler that applies server updates to the client's board.
      *
      * @param board The board to update. Must outlive the handler.
-     * @param selectedPiece The client's selected square. Must outlive the
+     * @param selection The client's current selection. Must outlive the
      * handler.
      */
-    ClientPacketReceivedHandler(
-        Board &board, std::optional<Board::BoardCoordinate> &selectedPiece);
+    ClientPacketReceivedHandler(Board &board, BoardSelection &selection);
 };
 
 } // namespace ghqcxx

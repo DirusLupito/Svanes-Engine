@@ -7,7 +7,7 @@
 #include <svanes/render/basic_render_types.hpp>
 
 #include <array>
-#include <optional>
+#include <variant>
 #include <vector>
 
 namespace svanes {
@@ -17,6 +17,10 @@ class Registry;
 } // namespace svanes
 
 namespace ghqcxx {
+
+// A board square, a team's reserve piece, or no selection.
+using BoardSelection =
+    std::variant<std::monostate, Board::BoardCoordinate, Piece>;
 
 /**
  * Represents the client's interactive view of a GHQ board and its reserves.
@@ -50,33 +54,32 @@ public:
                       const svanes::Camera2D &camera);
 
     /**
-     * Updates mouse feedback and reports a clicked square. Coordinates start
-     * at (0, 0) in the top-left corner. Clicks outside the board are ignored.
+     * Updates mouse feedback and reports clicks on board squares and
+     * available reserve pieces.
      *
      * @param world The registry used to initialize the view.
+     * @param board The board containing the current reserves.
      * @param input The current frame's mouse position and button states.
      * @param camera The camera used to draw the board, already fitted to the
      * current window size.
      *
-     * @return The square left-clicked this frame, or no value if no board
-     * square was clicked.
+     * @return The square or reserve piece left-clicked this frame, or no
+     * selection.
      */
-    std::optional<Board::BoardCoordinate>
-    Update(svanes::Registry &world, const svanes::InputManager &input,
-           const svanes::Camera2D &camera);
+    BoardSelection Update(svanes::Registry &world, const Board &board,
+                          const svanes::InputManager &input,
+                          const svanes::Camera2D &camera);
 
     /**
-     * Highlights the selected square and its available movement destinations.
+     * Displays selection feedback for a piece on the board or in reserve.
      *
      * @param world The registry used to initialize the view.
      * @param board The board used to find the selected piece's movement
      * options.
-     * @param selectedSquare The occupied square selected by the client, or
-     * no value to clear the selection feedback.
+     * @param selection The client's current selection.
      */
-    void
-    ShowSelection(svanes::Registry &world, const Board &board,
-                  const std::optional<Board::BoardCoordinate> &selectedSquare);
+    void ShowSelection(svanes::Registry &world, const Board &board,
+                       const BoardSelection &selection);
 
     /**
      * Returns the color used to display a team's pieces, including previews.
@@ -116,15 +119,16 @@ private:
     // Font used by the reserve count labels, owned by the font manager.
     svanes::FontHandle reserveFont;
 
-    // The square under the mouse, or no value when the mouse is off the board.
-    std::optional<Board::BoardCoordinate> hoveredSquare;
-
     // A translucent rectangle moved over the hovered square. Its alpha is
     // zero when no board square is hovered.
     svanes::Entity hoverHighlight = 0;
 
     // A highlight rectangle behind the selected piece.
     svanes::Entity selectionHighlight = 0;
+
+    // The team-colored square behind the selected reserve piece's black
+    // highlight.
+    svanes::Entity reserveOutline = 0;
 
     // Green destination circles, indexed by row, then column.
     std::array<std::array<svanes::Entity, Board::Size>, Board::Size>

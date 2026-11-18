@@ -19,6 +19,8 @@
 #include <svanes/render/render_system.hpp>
 #include <svanes/vector2d.hpp>
 
+#include <algorithm>
+#include <cmath>
 #include <numbers>
 #include <stdexcept>
 #include <string>
@@ -40,6 +42,9 @@ static constexpr float ReserveStartX = 1.8F;
 
 // Distance between reserve piece centers, in world units.
 static constexpr float ReserveSpacing = 1.1F;
+
+// Width and height of the team-colored square around a selected reserve piece.
+static constexpr float ReserveOutlineSize = 1.08F;
 
 // The label's bottom-left anchor relative to the piece's center, in world
 // units.
@@ -71,6 +76,19 @@ static constexpr svanes::Color NCStateRed{0xcc, 0x00, 0x00};
 
 // Color used for Blue's board and reserve pieces.
 static constexpr svanes::Color CarolinaBlue{0x7b, 0xaf, 0xd4};
+
+/**
+ * Locates a reserve slot in world coordinates.
+ *
+ * @param team The team whose reserve row contains the slot.
+ * @param index The slot's left-to-right index in that row.
+ * @return The center of the slot.
+ */
+static svanes::Vector2D ReserveCenter(Team team, std::size_t index) {
+    return {ReserveStartX + static_cast<float>(index) * ReserveSpacing,
+            team == Team::Red ? -ReserveRowOffset
+                              : Board::Size + ReserveRowOffset};
+}
 
 /**
  * Creates a piece's visuals at a world position, facing the opposing
@@ -172,6 +190,16 @@ void BoardView::Initialize(svanes::Registry &world, const Board &board,
                                                .geometry = SquareGeometry});
     selectionShape.color.alpha = 0;
 
+    reserveOutline = world.CreateEntity();
+    world.AddComponent<svanes::ZOrder>(reserveOutline,
+                                       svanes::ZOrder{selectionLayer - 1});
+    world.AddComponent<svanes::Transform>(reserveOutline);
+    world.AddComponent<svanes::SolidShape>(
+        reserveOutline, svanes::SolidShape{.color = {0, 0, 0, 0},
+                                           .geometry = svanes::Rectangle2D{
+                                               .width = ReserveOutlineSize,
+                                               .height = ReserveOutlineSize}});
+
     for (std::uint8_t row = 0; row < Board::Size; ++row) {
         for (std::uint8_t column = 0; column < Board::Size; ++column) {
             auto &marker = movementMarkers[row][column];
@@ -225,8 +253,6 @@ void BoardView::UpdatePieces(svanes::Registry &world, const Board &board,
     }
 
     for (const auto team : {Team::Red, Team::Blue}) {
-        const float y = team == Team::Red ? -ReserveRowOffset
-                                          : Board::Size + ReserveRowOffset;
         auto &reserve = reserveEntities[static_cast<std::size_t>(team)];
         for (std::size_t index = 0; index < ReserveTypes.size(); ++index) {
             const Piece piece{ReserveTypes[index], team};
@@ -241,11 +267,9 @@ void BoardView::UpdatePieces(svanes::Registry &world, const Board &board,
                 continue;
             }
 
-            // Keep each type's slot fixed when another reserve is exhausted.
-            const float x =
-                ReserveStartX + static_cast<float>(index) * ReserveSpacing;
+            const auto center = ReserveCenter(team, index);
             if (entities.empty()) {
-                entities = CreatePieceVisual(world, piece, {x, y});
+                entities = CreatePieceVisual(world, piece, center);
                 const auto label = world.CreateEntity();
                 world.AddComponent<svanes::TextLabel>(
                     label, svanes::TextLabel{
@@ -259,8 +283,9 @@ void BoardView::UpdatePieces(svanes::Registry &world, const Board &board,
                 world.GetComponent<svanes::TextLabel>(entities.back());
             // Labels use screen coordinates. Convert their world positions
             // each frame so they follow the pieces as the camera changes.
-            const auto screen = camera.WorldToScreen(
-                {.x = x + ReserveLabelOffset.x, .y = y + ReserveLabelOffset.y});
+            const auto screen =
+                camera.WorldToScreen({.x = center.x + ReserveLabelOffset.x,
+                                      .y = center.y + ReserveLabelOffset.y});
             label.text = std::to_string(count);
             label.position = {screen.x, screen.y};
         }
@@ -278,47 +303,59 @@ svanes::Color BoardView::GetTeamColor(Team team) {
     }
 }
 
-std::optional<Board::BoardCoordinate>
-BoardView::Update(svanes::Registry &world, const svanes::InputManager &input,
-                  const svanes::Camera2D &camera) {
-    hoveredSquare.reset();
+BoardSelection BoardView::Update(svanes::Registry &world, const Board &board,
+                                 const svanes::InputManager &input,
+                                 const svanes::Camera2D &camera) {
     auto &highlight = world.GetComponent<svanes::SolidShape>(hoverHighlight);
     highlight.color.alpha = 0;
 
-    if (camera.OutputWidth() > 0 && camera.OutputHeight() > 0) {
-        const auto mouse = input.MousePosition();
-        const auto worldMouse =
-            camera.ScreenToWorld({mouse.x, mouse.y, 0.0F, 0.0F});
+    if (camera.OutputWidth() <= 0 || camera.OutputHeight() <= 0) {
+        return {};
+    }
+    const bool clicked = input.WasMouseButtonPressed(svanes::MouseButton::Left);
+    const auto mouse = input.MousePosition();
+    const auto worldMouse =
+        camera.ScreenToWorld({mouse.x, mouse.y, 0.0F, 0.0F});
 
-        // Each square is one world unit wide and tall. Check the bounds before
-        // converting to integers, since a negative fraction would become zero.
-        // The right and bottom edges are outside the board.
-        if (worldMouse.x >= 0.0F && worldMouse.x < Board::Size &&
-            worldMouse.y >= 0.0F && worldMouse.y < Board::Size) {
-            hoveredSquare = Board::BoardCoordinate{
-                .column = static_cast<std::uint8_t>(worldMouse.x),
-                .row = static_cast<std::uint8_t>(worldMouse.y)};
+    // Each square is one world unit wide and tall. Check the bounds before
+    // converting to integers, since a negative fraction would become zero.
+    // The right and bottom edges are outside the board.
+    if (worldMouse.x >= 0.0F && worldMouse.x < Board::Size &&
+        worldMouse.y >= 0.0F && worldMouse.y < Board::Size) {
+        const Board::BoardCoordinate hoveredSquare{
+            .column = static_cast<std::uint8_t>(worldMouse.x),
+            .row = static_cast<std::uint8_t>(worldMouse.y)};
 
-            auto &position =
-                world.GetComponent<svanes::Transform>(hoverHighlight);
-            position.x =
-                static_cast<float>(hoveredSquare->column) + SquareCenterOffset;
-            position.y =
-                static_cast<float>(hoveredSquare->row) + SquareCenterOffset;
-            highlight.color = HoverColor;
+        auto &position = world.GetComponent<svanes::Transform>(hoverHighlight);
+        position.x =
+            static_cast<float>(hoveredSquare.column) + SquareCenterOffset;
+        position.y = static_cast<float>(hoveredSquare.row) + SquareCenterOffset;
+        highlight.color = HoverColor;
+        if (clicked) {
+            return hoveredSquare;
+        }
+        return {};
+    }
+
+    if (clicked) {
+        const Team team = worldMouse.y < 0.0F ? Team::Red : Team::Blue;
+        for (std::size_t index = 0; index < ReserveTypes.size(); ++index) {
+            const auto center = ReserveCenter(team, index);
+            const Piece piece{ReserveTypes[index], team};
+            if (std::abs(worldMouse.x - center.x) <=
+                    ReserveOutlineSize / 2.0F &&
+                std::abs(worldMouse.y - center.y) <=
+                    ReserveOutlineSize / 2.0F &&
+                board.GetReserveCount(piece) > 0) {
+                return piece;
+            }
         }
     }
-
-    if (hoveredSquare &&
-        input.WasMouseButtonPressed(svanes::MouseButton::Left)) {
-        return hoveredSquare;
-    }
-    return std::nullopt;
+    return {};
 }
 
-void BoardView::ShowSelection(
-    svanes::Registry &world, const Board &board,
-    const std::optional<Board::BoardCoordinate> &selectedSquare) {
+void BoardView::ShowSelection(svanes::Registry &world, const Board &board,
+                              const BoardSelection &selection) {
     // Reuse the circles for each selection, hiding the previous destinations.
     for (const auto &row : movementMarkers) {
         for (const auto marker : row) {
@@ -329,9 +366,11 @@ void BoardView::ShowSelection(
     auto &highlight =
         world.GetComponent<svanes::SolidShape>(selectionHighlight);
     highlight.color.alpha = 0;
-    if (selectedSquare) {
-        auto &position =
-            world.GetComponent<svanes::Transform>(selectionHighlight);
+    auto &outline = world.GetComponent<svanes::SolidShape>(reserveOutline);
+    outline.color.alpha = 0;
+    auto &position = world.GetComponent<svanes::Transform>(selectionHighlight);
+    if (const auto *selectedSquare =
+            std::get_if<Board::BoardCoordinate>(&selection)) {
         position.x =
             static_cast<float>(selectedSquare->column) + SquareCenterOffset;
         position.y =
@@ -344,6 +383,17 @@ void BoardView::ShowSelection(
                 movementMarkers[destination.row][destination.column];
             world.GetComponent<svanes::SolidShape>(marker).color =
                 MovementMarkerColor;
+        }
+    } else if (const auto *piece = std::get_if<Piece>(&selection)) {
+        const auto slot = std::ranges::find(ReserveTypes, piece->type);
+        if (slot != ReserveTypes.end() && board.GetReserveCount(*piece) > 0) {
+            const auto center =
+                ReserveCenter(piece->team, slot - ReserveTypes.begin());
+            position.x = center.x;
+            position.y = center.y;
+            highlight.color = {0, 0, 0, 255};
+            world.GetComponent<svanes::Transform>(reserveOutline) = position;
+            outline.color = GetTeamColor(piece->team);
         }
     }
 }

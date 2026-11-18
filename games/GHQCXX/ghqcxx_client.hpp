@@ -6,8 +6,6 @@
 #include <svanes/network/clientserver/IClient.hpp>
 #include <svanes/network/network_message.hpp>
 
-#include <optional>
-
 namespace ghqcxx {
 
 /**
@@ -76,8 +74,8 @@ private:
     // The board's visual presentation and mouse controls.
     BoardView boardView;
 
-    // The square containing the selected piece. Empty until a piece is clicked.
-    std::optional<Board::BoardCoordinate> selectedPiece;
+    // The piece selected by the client, on the board or in reserve.
+    BoardSelection selection;
 
     // Set when the user presses Escape.
     bool quit = false;

@@ -6,13 +6,13 @@
 namespace ghqcxx {
 
 ClientPacketReceivedHandler::ClientPacketReceivedHandler(
-    Board &board, std::optional<Board::BoardCoordinate> &selectedPiece)
+    Board &board, BoardSelection &selection)
     : svanes::EventHandlerWrapper<ClientPacketReceivedEvent>(
-          [&board, &selectedPiece](const ClientPacketReceivedEvent &event) {
+          [&board, &selection](const ClientPacketReceivedEvent &event) {
               if (GetGameMessageType(event.message) ==
                   GameMessageType::BoardState) {
                   board = Board::FromMessage(event.message);
-                  selectedPiece.reset();
+                  selection = std::monostate{};
                   return;
               }
 
@@ -20,10 +20,11 @@ ClientPacketReceivedHandler::ClientPacketReceivedHandler(
               // Apply the server's move directly; a local movement event
               // would send it back to the server.
               board.MovePiece(movement.from, movement.to);
-              if (selectedPiece &&
-                  selectedPiece->column == movement.from.column &&
-                  selectedPiece->row == movement.from.row) {
-                  selectedPiece = movement.to;
+              if (const auto *square =
+                      std::get_if<Board::BoardCoordinate>(&selection);
+                  square && square->column == movement.from.column &&
+                  square->row == movement.from.row) {
+                  selection = movement.to;
               }
           }) {}
 

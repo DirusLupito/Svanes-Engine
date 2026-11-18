@@ -46,7 +46,7 @@ void GHQCXXClient::Initialize(svanes::ClientContext &context) {
     boardView.Initialize(context.world, board, context.fonts, context.camera);
 
     context.events.Subscribe(
-        std::make_unique<ClientPacketReceivedHandler>(board, selectedPiece));
+        std::make_unique<ClientPacketReceivedHandler>(board, selection));
     context.events.Subscribe(
         std::make_unique<MovementHandler>(board, context.network));
 
@@ -81,26 +81,30 @@ void GHQCXXClient::Update(const svanes::ClientFrameContext &context) {
     }
 
     FitViewToWindow(context.camera);
-    const auto clickedSquare =
-        boardView.Update(context.world, context.input, context.camera);
-    if (clickedSquare) {
+    const auto clicked =
+        boardView.Update(context.world, board, context.input, context.camera);
+    if (const auto *clickedSquare =
+            std::get_if<Board::BoardCoordinate>(&clicked)) {
         if (board.GetPiece(*clickedSquare)) {
-            selectedPiece = clickedSquare;
-        } else if (selectedPiece) {
+            selection = *clickedSquare;
+        } else if (const auto *selectedSquare =
+                       std::get_if<Board::BoardCoordinate>(&selection)) {
             for (const auto destination :
-                 board.GetMovementOptions(*selectedPiece)) {
+                 board.GetMovementOptions(*selectedSquare)) {
                 if (destination.column == clickedSquare->column &&
                     destination.row == clickedSquare->row) {
                     context.events.TriggerEvent(
-                        MovementEvent(*selectedPiece, *clickedSquare));
-                    selectedPiece = clickedSquare;
+                        MovementEvent(*selectedSquare, *clickedSquare));
+                    selection = *clickedSquare;
                     break;
                 }
             }
         }
+    } else if (const auto *reserve = std::get_if<Piece>(&clicked)) {
+        selection = *reserve;
     }
     boardView.UpdatePieces(context.world, board, context.camera);
-    boardView.ShowSelection(context.world, board, selectedPiece);
+    boardView.ShowSelection(context.world, board, selection);
 
     if (context.input.WasPressed(svanes::Key::Escape)) {
         quit = true;
