@@ -1,5 +1,6 @@
 #include "ghqcxx_client.hpp"
 
+#include "ClientRole.hpp"
 #include "events/ClientPacketReceivedEvent.hpp"
 #include "events/MovementEvent.hpp"
 #include "events/PlacementEvent.hpp"
@@ -70,6 +71,7 @@ void GHQCXXClient::HandleJoinResult(const svanes::JoinResult &result) {
     switch (result.status) {
     case svanes::JoinStatus::Accepted:
         board = Board::FromMessage(result.message);
+        team = GetClientTeam(result.client_id);
         std::cout << "Connected to GHQCXX as client " << result.client_id
                   << ".\n"
                   << std::flush;
@@ -110,6 +112,10 @@ void GHQCXXClient::Update(const svanes::ClientFrameContext &context) {
 
     boardView.UpdatePieces(context.world, board, context.camera);
     boardView.ShowTurn(context.world, board.GetActiveTeam(), context.camera);
+    if (context.network.IsConnected()) {
+        boardView.ShowClientRole(context.world, team, context.camera);
+    }
+
     boardView.ShowSelection(context.world, board, selection, choosingFacing);
 
     if (context.input.WasPressed(svanes::Key::Escape)) {

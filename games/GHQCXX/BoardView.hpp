@@ -8,6 +8,7 @@
 #include <svanes/vector2d.hpp>
 
 #include <array>
+#include <optional>
 #include <variant>
 #include <vector>
 
@@ -102,6 +103,16 @@ public:
                   const svanes::Camera2D &camera);
 
     /**
+     * Displays the client's role in the upper-right corner of the window.
+     *
+     * @param world The registry used to initialize the view.
+     * @param team The client's assigned team, or no team for a spectator.
+     * @param camera The camera used to draw the board.
+     */
+    void ShowClientRole(svanes::Registry &world, std::optional<Team> team,
+                        const svanes::Camera2D &camera);
+
+    /**
      * Returns the color used to display a team's pieces, including previews.
      *
      * @param team The player whose color is needed.
@@ -153,6 +164,12 @@ private:
 
     // The label beside the board naming the team taking its turn.
     svanes::Entity turnLabel = 0;
+
+    // The heading above the client's role.
+    svanes::Entity roleHeading = 0;
+
+    // The client's team name or spectator label.
+    svanes::Entity roleLabel = 0;
 
     // A translucent rectangle moved over the hovered square. Its alpha is
     // zero when no board square is hovered.

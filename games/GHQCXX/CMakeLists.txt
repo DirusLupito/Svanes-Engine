@@ -2,6 +2,8 @@ add_executable(svanes_game_ghqcxx
     client_main.cpp
     ghqcxx_client.cpp
     ghqcxx_client.hpp
+    ClientRole.cpp
+    ClientRole.hpp
     events/ClientPacketReceivedEvent.cpp
     events/ClientPacketReceivedEvent.hpp
     events/EndTurnEvent.cpp
@@ -50,6 +52,8 @@ add_executable(svanes_game_ghqcxx_server
     server_main.cpp
     ghqcxx_server.cpp
     ghqcxx_server.hpp
+    ClientRole.cpp
+    ClientRole.hpp
     events/ServerPacketReceivedEvent.cpp
     events/ServerPacketReceivedEvent.hpp
     events/EndTurnEvent.cpp

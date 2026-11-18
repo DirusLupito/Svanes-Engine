@@ -1,5 +1,6 @@
 #include "ghqcxx_server.hpp"
 
+#include "ClientRole.hpp"
 #include "events/ServerPacketReceivedEvent.hpp"
 #include "handlers/EndTurnHandler.hpp"
 #include "handlers/MovementHandler.hpp"
@@ -29,7 +30,8 @@ void GHQCXXServer::Initialize(svanes::ServerContext &context) {
 svanes::JoinResponse
 GHQCXXServer::HandleJoinRequest(const svanes::ServerJoinContext &context) {
     clients.push_back(context.client);
-    std::cout << "Accepting GHQCXX client " << context.client << ".\n"
+    std::cout << "Accepting GHQCXX client " << context.client << " as "
+              << GetRoleName(GetClientTeam(context.client)) << ".\n"
               << std::flush;
     return {.accepted = true, .message = board.ToMessage()};
 }

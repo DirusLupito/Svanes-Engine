@@ -1,5 +1,6 @@
 #include "BoardView.hpp"
 
+#include "ClientRole.hpp"
 #include "pieces/ArmoredArtillery.hpp"
 #include "pieces/ArmoredInfantry.hpp"
 #include "pieces/BasicArtillery.hpp"
@@ -187,6 +188,18 @@ void BoardView::Initialize(svanes::Registry &world, const Board &board,
     turnLabel = world.CreateEntity();
     world.AddComponent<svanes::TextLabel>(turnLabel);
     ShowTurn(world, board.GetActiveTeam(), camera);
+
+    roleHeading = world.CreateEntity();
+    world.AddComponent<svanes::TextLabel>(
+        roleHeading,
+        svanes::TextLabel{.text = "Playing as:",
+                          .color = {255, 255, 255},
+                          .alignment = svanes::TextAlignment::TopRight,
+                          .visible = false});
+    roleLabel = world.CreateEntity();
+    world.AddComponent<svanes::TextLabel>(
+        roleLabel,
+        svanes::TextLabel{.alignment = svanes::TextAlignment::TopRight});
 
     // Pieces draw at layer zero and above while the board and highlights draw
     // below zero so that pieces appear on top of the board and highlights.
@@ -376,6 +389,27 @@ void BoardView::ShowTurn(svanes::Registry &world, Team team,
     }
 
     label.font = labelFonts[size];
+}
+
+void BoardView::ShowClientRole(svanes::Registry &world,
+                               std::optional<Team> team,
+                               const svanes::Camera2D &camera) {
+    // Use the smaller font when the heading would be wider than the side
+    // margin.
+    const float sideWidth = camera.WorldToScreen({}).x;
+    const std::size_t size = sideWidth >= 6.5F * LabelFontSizes[1] ? 1 : 0;
+    const float padding = LabelFontSizes[size] * 0.25F;
+    auto &heading = world.GetComponent<svanes::TextLabel>(roleHeading);
+    heading.visible = true;
+    heading.font = labelFonts[size];
+    heading.position = {camera.OutputWidth() - padding, padding};
+
+    auto &label = world.GetComponent<svanes::TextLabel>(roleLabel);
+    label.text = GetRoleName(team);
+    label.color = team ? GetTeamColor(*team) : heading.color;
+    label.font = heading.font;
+    label.position = {heading.position.x,
+                      heading.position.y + LabelFontSizes[size] + padding};
 }
 
 svanes::Color BoardView::GetTeamColor(Team team) {

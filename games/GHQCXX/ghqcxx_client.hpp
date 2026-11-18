@@ -6,6 +6,8 @@
 #include <svanes/network/clientserver/IClient.hpp>
 #include <svanes/network/network_message.hpp>
 
+#include <optional>
+
 namespace ghqcxx {
 
 /**
@@ -79,6 +81,9 @@ private:
 
     // The client's board state.
     Board board;
+
+    // The team assigned at join, or no team for a spectator.
+    std::optional<Team> team;
 
     // The board's visual presentation and mouse controls.
     BoardView boardView;
