@@ -356,10 +356,16 @@ BoardSelection BoardView::Update(svanes::Registry &world, const Board &board,
 
 void BoardView::ShowSelection(svanes::Registry &world, const Board &board,
                               const BoardSelection &selection) {
-    // Reuse the circles for each selection, hiding the previous destinations.
-    for (const auto &row : movementMarkers) {
-        for (const auto marker : row) {
-            world.GetComponent<svanes::SolidShape>(marker).color.alpha = 0;
+    const auto *reserve = std::get_if<Piece>(&selection);
+    for (std::uint8_t row = 0; row < Board::Size; ++row) {
+        for (std::uint8_t column = 0; column < Board::Size; ++column) {
+            auto &marker = world.GetComponent<svanes::SolidShape>(
+                movementMarkers[row][column]);
+            if (reserve && board.CanPlaceFromReserve(*reserve, {column, row})) {
+                marker.color = MovementMarkerColor;
+            } else {
+                marker.color.alpha = 0;
+            }
         }
     }
 
@@ -385,18 +391,18 @@ void BoardView::ShowSelection(svanes::Registry &world, const Board &board,
             world.GetComponent<svanes::SolidShape>(marker).color =
                 MovementMarkerColor;
         }
-    } else if (const auto *piece = std::get_if<Piece>(&selection)) {
-        const auto slot = std::ranges::find(ReserveTypes, piece->type);
-        if (slot != ReserveTypes.end() && board.GetReserveCount(*piece) > 0) {
+    } else if (reserve) {
+        const auto slot = std::ranges::find(ReserveTypes, reserve->type);
+        if (slot != ReserveTypes.end() && board.GetReserveCount(*reserve) > 0) {
             const auto center =
-                ReserveCenter(piece->team, slot - ReserveTypes.begin());
+                ReserveCenter(reserve->team, slot - ReserveTypes.begin());
             position.x = center.x;
             position.y = center.y;
             highlight.color = {0, 0, 0, 255};
             highlight.geometry = svanes::Rectangle2D{
                 .width = ReserveInsetSize, .height = ReserveInsetSize};
             world.GetComponent<svanes::Transform>(reserveOutline) = position;
-            outline.color = GetTeamColor(piece->team);
+            outline.color = GetTeamColor(reserve->team);
         }
     }
 }

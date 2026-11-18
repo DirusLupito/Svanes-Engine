@@ -2,8 +2,10 @@
 
 #include "events/ClientPacketReceivedEvent.hpp"
 #include "events/MovementEvent.hpp"
+#include "events/PlacementEvent.hpp"
 #include "handlers/ClientPacketReceivedHandler.hpp"
 #include "handlers/MovementHandler.hpp"
+#include "handlers/PlacementHandler.hpp"
 
 #include <svanes/camera2d.hpp>
 #include <svanes/events/event_manager.hpp>
@@ -49,6 +51,8 @@ void GHQCXXClient::Initialize(svanes::ClientContext &context) {
         std::make_unique<ClientPacketReceivedHandler>(board, selection));
     context.events.Subscribe(
         std::make_unique<MovementHandler>(board, context.network));
+    context.events.Subscribe(
+        std::make_unique<PlacementHandler>(board, context.network));
 
     std::cout << "Hello, world! GHQCXX client.\n" << std::flush;
 }
@@ -87,6 +91,12 @@ void GHQCXXClient::Update(const svanes::ClientFrameContext &context) {
             std::get_if<Board::BoardCoordinate>(&clicked)) {
         if (board.GetPiece(*clickedSquare)) {
             selection = *clickedSquare;
+        } else if (const auto *reserve = std::get_if<Piece>(&selection)) {
+            if (board.CanPlaceFromReserve(*reserve, *clickedSquare)) {
+                context.events.TriggerEvent(
+                    PlacementEvent(*reserve, *clickedSquare));
+                selection = std::monostate{};
+            }
         } else if (const auto *selectedSquare =
                        std::get_if<Board::BoardCoordinate>(&selection)) {
             for (const auto destination :

@@ -99,6 +99,23 @@ void Board::PlacePiece(Piece piece, BoardCoordinate position) {
     pieces[position.row][position.column] = piece;
 }
 
+bool Board::CanPlaceFromReserve(Piece piece, BoardCoordinate position) const {
+    const auto count = GetReserveCount(piece);
+    const auto backRow = piece.team == Team::Red ? 0 : Size - 1;
+    return count > 0 && piece.type != PieceType::Headquarters &&
+           position.row == backRow && position.column < Size &&
+           !GetPiece(position);
+}
+
+void Board::PlaceFromReserve(Piece piece, BoardCoordinate position) {
+    if (!CanPlaceFromReserve(piece, position)) {
+        throw std::invalid_argument(
+            "The reserve piece cannot be placed on that square.");
+    }
+    PlacePiece(piece, position);
+    SetReserveCount(piece, GetReserveCount(piece) - 1);
+}
+
 void Board::MovePiece(BoardCoordinate from, BoardCoordinate to) {
     GetPiece(to);
     for (const auto destination : GetMovementOptions(from)) {

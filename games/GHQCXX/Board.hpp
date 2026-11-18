@@ -54,6 +54,27 @@ public:
     void PlacePiece(Piece piece, BoardCoordinate position);
 
     /**
+     * Checks whether a reserve piece can enter the board on a square.
+     *
+     * @param piece The type and team to deploy.
+     * @param position The proposed destination.
+     * @return True if the piece is available and the square is empty on its
+     * team's back row.
+     * @throws std::out_of_range if the piece type or team is invalid.
+     */
+    bool CanPlaceFromReserve(Piece piece, BoardCoordinate position) const;
+
+    /**
+     * Transfers one piece from its team's reserve to the board.
+     *
+     * @param piece The type and team to deploy.
+     * @param position The destination square.
+     * @throws std::invalid_argument if the piece cannot be placed there.
+     * @throws std::out_of_range if the piece type or team is invalid.
+     */
+    void PlaceFromReserve(Piece piece, BoardCoordinate position);
+
+    /**
      * Moves a piece to an available destination, leaving its old square empty.
      *
      * @param from The square containing the piece.

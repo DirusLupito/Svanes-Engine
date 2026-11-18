@@ -2,6 +2,7 @@
 
 #include "events/ServerPacketReceivedEvent.hpp"
 #include "handlers/MovementHandler.hpp"
+#include "handlers/PlacementHandler.hpp"
 #include "handlers/ServerPacketReceivedHandler.hpp"
 
 #include <svanes/events/event_manager.hpp>
@@ -18,6 +19,7 @@ void GHQCXXServer::Initialize(svanes::ServerContext &context) {
     context.events.Subscribe(std::make_unique<ServerPacketReceivedHandler>(
         context.events, context.network, clients, board));
     context.events.Subscribe(std::make_unique<MovementHandler>(board));
+    context.events.Subscribe(std::make_unique<PlacementHandler>(board));
 
     std::cout << "Hello, world! GHQCXX server.\n" << std::flush;
 }
