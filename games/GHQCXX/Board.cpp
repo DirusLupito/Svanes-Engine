@@ -93,9 +93,26 @@ std::uint8_t Board::GetActionsRemaining(Team team) const {
 
 void Board::EndTurn() {
     ++turnNumber;
-    for (auto &piece : pieces | std::views::join) {
-        if (piece) {
+    const auto activeTeam = GetActiveTeam();
+    for (std::uint8_t row = 0; row < Size; ++row) {
+        for (std::uint8_t column = 0; column < Size; ++column) {
+            auto &piece = pieces[row][column];
+            if (!piece) {
+                continue;
+            }
             piece->action = ActionState::Ready;
+            if (piece->team != activeTeam || piece->GetFireRange() == 0) {
+                continue;
+            }
+
+            // Artillery captures at the start of its own team's turn.
+            for (const auto &[square, facing] : GetFireOptions({column, row})) {
+                auto &target = pieces[square.row][square.column];
+                if (facing == piece->facing && target &&
+                    target->team != activeTeam) {
+                    target.reset();
+                }
+            }
         }
     }
 }

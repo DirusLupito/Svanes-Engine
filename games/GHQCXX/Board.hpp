@@ -82,7 +82,7 @@ public:
     std::uint8_t GetActionsRemaining(Team team) const;
 
     /**
-     * Passes the turn to the other team.
+     * Passes the turn to the other team and resolves its artillery captures.
      */
     void EndTurn();
 
