@@ -25,6 +25,29 @@ public:
     static constexpr std::uint8_t ActionsPerTurn = 3;
 
     /**
+     * The outcome of the game as of the last turn's end.
+     *
+     * MEMBERS:
+     * - InProgress: Both teams are still playing.
+     * - RedVictory: Only Red's headquarters survived.
+     * - BlueVictory: Only Blue's headquarters survived.
+     * - Draw: Neither headquarters survived.
+     */
+    enum class Result : std::uint8_t {
+        InProgress,
+        RedVictory,
+        BlueVictory,
+        Draw
+    };
+
+    /**
+     * Reports the result decided at the end of a turn.
+     *
+     * @return The outcome, or InProgress while play continues.
+     */
+    Result GetResult() const { return result; }
+
+    /**
      * Identifies a square on the board, counting from the top-left corner.
      *
      * FIELDS:
@@ -85,7 +108,8 @@ public:
     std::uint8_t GetActionsRemaining(Team team) const;
 
     /**
-     * Passes the turn to the other team and resolves its free captures.
+     * Handles the end of a turn, including captures,
+     * piece resets, and victory checks.
      */
     void EndTurn();
 
@@ -301,6 +325,9 @@ private:
 
     // The current turn number. Blue takes the first turn.
     std::uint32_t turnNumber = 1;
+
+    // The result after resolving the last turn's captures.
+    Result result = Result::InProgress;
 
     // Indexed by row, then column. An empty square has no piece.
     std::array<std::array<std::optional<Piece>, Size>, Size> pieces;

@@ -28,10 +28,15 @@ ServerPacketReceivedHandler::ServerPacketReceivedHandler(
               bool includeSender = false;
               auto reply = event.message;
               try {
+                  if (board.GetResult() != Board::Result::InProgress) {
+                      throw std::invalid_argument("The game has ended.");
+                  }
+
                   const auto activeTeam = board.GetActiveTeam();
                   if (GetClientTeam(event.client) != activeTeam) {
                       throw std::invalid_argument("It is not your turn.");
                   }
+
                   switch (GetGameMessageType(event.message)) {
                   case GameMessageType::UndoMove:
                       events.TriggerEvent(

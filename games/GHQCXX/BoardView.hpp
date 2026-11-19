@@ -139,6 +139,15 @@ public:
      */
     static svanes::Color GetTeamColor(Team team);
 
+    /**
+     * Selects a board font that fits the requested point size.
+     *
+     * @param maxPointSize The largest desired size in points.
+     *
+     * @return The largest fitting font, or the smallest available font.
+     */
+    svanes::FontHandle GetLabelFont(float maxPointSize) const;
+
 private:
     // Left-to-right order of the piece types displayed in each reserve row.
     static constexpr std::array ReserveTypes{

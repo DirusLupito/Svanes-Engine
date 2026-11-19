@@ -32,6 +32,8 @@ add_executable(svanes_game_ghqcxx
     MoveHistory.hpp
     BoardView.cpp
     BoardView.hpp
+    EndScreen.cpp
+    EndScreen.hpp
     pieces/Piece.cpp
     pieces/Piece.hpp
     pieces/PieceVisuals.cpp

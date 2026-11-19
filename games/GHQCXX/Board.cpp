@@ -41,7 +41,8 @@ static constexpr std::size_t BoardMessageSize =
     Board::Size * Board::Size *
         (sizeof(Piece::type) + sizeof(Piece::team) + sizeof(Piece::facing) +
          sizeof(Piece::action)) +
-    TeamCount * PieceTypeCount * sizeof(std::uint8_t) + sizeof(std::uint32_t);
+    TeamCount * PieceTypeCount * sizeof(std::uint8_t) + sizeof(std::uint32_t) +
+    sizeof(Board::Result);
 
 // Column and row steps in Facing order, clockwise from north.
 static constexpr std::array<std::pair<std::int8_t, std::int8_t>, 8> FacingSteps{
@@ -130,6 +131,10 @@ std::uint8_t Board::GetActionsRemaining(Team team) const {
 }
 
 void Board::EndTurn() {
+    if (result != Result::InProgress) {
+        return;
+    }
+
     ++turnNumber;
     const auto activeTeam = GetActiveTeam();
     // Mark every target before removing pieces. Breaking an engagement
@@ -147,21 +152,33 @@ void Board::EndTurn() {
         }
     }
 
+    std::array<bool, TeamCount> survivingHQs{};
     for (std::uint8_t row = 0; row < Size; ++row) {
         for (std::uint8_t column = 0; column < Size; ++column) {
             auto &piece = pieces[row][column];
             if (!piece) {
                 continue;
             }
-            // Artillery and infantry captures at the start of its own team's turn.
+            // Artillery and infantry captures at the start of its own team's
+            // turn.
             if (piece->team != activeTeam && targets[row][column]) {
                 piece.reset();
             } else {
                 piece->action = ActionState::Ready;
+                if (piece->type == PieceType::Headquarters) {
+                    survivingHQs[static_cast<std::size_t>(piece->team)] = true;
+                }
             }
         }
     }
     UpdateEngagements();
+    const bool red = survivingHQs[static_cast<std::size_t>(Team::Red)];
+    const bool blue = survivingHQs[static_cast<std::size_t>(Team::Blue)];
+    if (!red) {
+        result = blue ? Result::BlueVictory : Result::Draw;
+    } else if (!blue) {
+        result = Result::RedVictory;
+    }
 }
 
 void Board::FinishArtilleryMove() {
@@ -425,6 +442,7 @@ svanes::NetworkMessage Board::ToMessage() const {
         }
     }
     writer.WriteUint32(turnNumber);
+    writer.WriteUint8(static_cast<std::uint8_t>(result));
     return writer.Finish();
 }
 
@@ -473,6 +491,11 @@ Board Board::FromMessage(const svanes::NetworkMessage &message) {
     board.turnNumber = reader.ReadUint32();
     if (board.turnNumber == 0) {
         throw std::invalid_argument("GHQ turn numbers start at one.");
+    }
+
+    board.result = static_cast<Result>(reader.ReadUint8());
+    if (board.result > Result::Draw) {
+        throw std::invalid_argument("Unknown GHQ game result.");
     }
 
     // Read all facings before resolving pairs so the order of the squares

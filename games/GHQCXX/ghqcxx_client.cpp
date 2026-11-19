@@ -109,6 +109,21 @@ void GHQCXXClient::Update(const svanes::ClientFrameContext &context) {
     }
 
     FitViewToWindow(context.camera);
+    if (context.input.WasPressed(svanes::Key::Escape)) {
+        quit = true;
+    }
+
+    if (board.GetResult() != Board::Result::InProgress) {
+        if (!endScreen) {
+            boardView.UpdatePieces(context.world, board, context.camera);
+            boardView.ShowSelection(context.world, board, std::monostate{},
+                                    false);
+            endScreen.emplace(context.world, board.GetResult());
+        }
+        endScreen->Update(context, boardView);
+        return;
+    }
+
     const auto clicked =
         boardView.Update(context.world, board, context.input, context.camera);
     if (team == board.GetActiveTeam() && !waitingForBoard) {
@@ -145,10 +160,6 @@ void GHQCXXClient::Update(const svanes::ClientFrameContext &context) {
     }
 
     boardView.ShowSelection(context.world, board, selection, choosingFacing);
-
-    if (context.input.WasPressed(svanes::Key::Escape)) {
-        quit = true;
-    }
 }
 
 void GHQCXXClient::ClickSquare(Board::BoardCoordinate square,

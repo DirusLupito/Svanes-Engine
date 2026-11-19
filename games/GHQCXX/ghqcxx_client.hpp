@@ -2,6 +2,7 @@
 
 #include "Board.hpp"
 #include "BoardView.hpp"
+#include "EndScreen.hpp"
 
 #include <svanes/network/clientserver/IClient.hpp>
 #include <svanes/network/network_message.hpp>
@@ -91,6 +92,9 @@ private:
 
     // The board's visual presentation and mouse controls.
     BoardView boardView;
+
+    // The result screen shown after the deciding end turn.
+    std::optional<EndScreen> endScreen;
 
     // The piece selected by the client, on the board or in reserve.
     BoardSelection selection;

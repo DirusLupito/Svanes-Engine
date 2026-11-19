@@ -448,6 +448,16 @@ void BoardView::ShowClientRole(svanes::Registry &world,
                       heading.position.y + LabelFontSizes[size] + padding};
 }
 
+svanes::FontHandle BoardView::GetLabelFont(float maxPointSize) const {
+    for (std::size_t i = labelFonts.size() - 1; i > 0; --i) {
+        if (LabelFontSizes[i] <= maxPointSize) {
+            return labelFonts[i];
+        }
+    }
+
+    return labelFonts.front();
+}
+
 svanes::Color BoardView::GetTeamColor(Team team) {
     switch (team) {
     case Team::Red:
