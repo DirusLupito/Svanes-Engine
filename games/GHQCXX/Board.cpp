@@ -12,6 +12,9 @@
 
 namespace ghqcxx {
 
+// The number of actions a player may take in one turn.
+static constexpr std::uint8_t ActionsPerTurn = 3;
+
 // Number of basic infantry each team starts with on the board.
 static constexpr std::uint8_t StartingInfantryCount = 3;
 
@@ -71,6 +74,15 @@ void Board::Initialize() {
             reserve[static_cast<std::size_t>(type)] = count;
         }
     }
+}
+
+bool Board::HasActionsRemaining(Team team) const {
+    const auto used = std::ranges::count_if(
+        pieces | std::views::join, [team](const auto &piece) {
+            return piece && piece->team == team &&
+                   piece->action != ActionState::Ready;
+        });
+    return used < ActionsPerTurn;
 }
 
 void Board::EndTurn() {
@@ -136,7 +148,7 @@ bool Board::CanPlaceFromReserve(Piece piece, BoardCoordinate position) const {
     const auto backRow = piece.team == Team::Red ? 0 : Size - 1;
     return count > 0 && piece.type != PieceType::Headquarters &&
            position.row == backRow && position.column < Size &&
-           !GetPiece(position);
+           !GetPiece(position) && HasActionsRemaining(piece.team);
 }
 
 void Board::PlaceFromReserve(Piece piece, BoardCoordinate position) {
@@ -179,6 +191,11 @@ void Board::MovePiece(BoardCoordinate from, BoardCoordinate to,
 
         if (piece->action == ActionState::Ready && piece->facing == *facing) {
             return;
+        }
+
+        if (piece->action == ActionState::Ready &&
+            !HasActionsRemaining(piece->team)) {
+            throw std::invalid_argument("The team has used all three actions.");
         }
     } else if (!CanMovePiece(from, to)) {
         throw std::invalid_argument(
@@ -322,7 +339,8 @@ void Board::SetReserveCount(Piece piece, std::uint8_t count) {
 std::vector<Board::BoardCoordinate>
 Board::GetMovementOptions(BoardCoordinate position) const {
     const auto &piece = GetPiece(position);
-    if (!piece || piece->action != ActionState::Ready) {
+    if (!piece || piece->action != ActionState::Ready ||
+        !HasActionsRemaining(piece->team)) {
         return {};
     }
 

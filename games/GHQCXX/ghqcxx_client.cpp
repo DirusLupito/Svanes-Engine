@@ -123,7 +123,8 @@ void GHQCXXClient::Update(const svanes::ClientFrameContext &context) {
                        std::get_if<Board::BoardCoordinate>(&clicked)) {
             ClickSquare(*square, context.events);
         } else if (const auto *reserve = std::get_if<Piece>(&clicked);
-                   reserve && reserve->team == team) {
+                   reserve && reserve->team == team &&
+                   board.HasActionsRemaining(reserve->team)) {
             selection = *reserve;
             choosingFacing = false;
         }
@@ -170,7 +171,9 @@ void GHQCXXClient::ClickSquare(Board::BoardCoordinate square,
     }
 
     if (const auto &piece = board.GetPiece(square)) {
-        if (piece->team != team || piece->action == ActionState::Exhausted) {
+        if (piece->team != team || piece->action == ActionState::Exhausted ||
+            (piece->action == ActionState::Ready &&
+             !board.HasActionsRemaining(piece->team))) {
             return;
         }
 

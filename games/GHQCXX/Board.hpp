@@ -66,6 +66,14 @@ public:
     std::uint32_t GetTurnNumber() const { return turnNumber; }
 
     /**
+     * Checks whether a team has any actions left this turn.
+     *
+     * @param team The team whose actions to count.
+     * @return True if fewer than three of its pieces have acted.
+     */
+    bool HasActionsRemaining(Team team) const;
+
+    /**
      * Passes the turn to the other team.
      */
     void EndTurn();
