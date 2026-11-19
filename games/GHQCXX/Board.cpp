@@ -46,6 +46,47 @@ static constexpr std::size_t BoardMessageSize =
          sizeof(Piece::action)) +
     TeamCount * PieceTypeCount * sizeof(std::uint8_t) + sizeof(std::uint32_t);
 
+// Column and row steps in Facing order, clockwise from north.
+static constexpr std::array<std::pair<std::int8_t, std::int8_t>, 8> FacingSteps{
+    {{0, -1}, {1, -1}, {1, 0}, {1, 1}, {0, 1}, {-1, 1}, {-1, 0}, {-1, -1}}};
+
+// The directions in which infantry can engage an opponent.
+static constexpr std::array InfantryFacings{Facing::North, Facing::East,
+                                            Facing::South, Facing::West};
+
+/**
+ * Finds a square along a piece's facing.
+ *
+ * @param from The starting square.
+ * @param facing The direction to follow.
+ * @param distance The number of squares to travel.
+ * @return The destination, or no value if it falls outside the board.
+ */
+static std::optional<Board::BoardCoordinate>
+SquareInDirection(Board::BoardCoordinate from, Facing facing,
+                  std::uint8_t distance = 1) {
+    const auto [dx, dy] = FacingSteps[static_cast<std::size_t>(facing)];
+    const auto column = from.column + dx * distance;
+    const auto row = from.row + dy * distance;
+    if (column < 0 || column >= Board::Size || row < 0 || row >= Board::Size) {
+        return std::nullopt;
+    }
+    return Board::BoardCoordinate{static_cast<std::uint8_t>(column),
+                                  static_cast<std::uint8_t>(row)};
+}
+
+/**
+ * Finds the facing for a piece looking back at its opponent.
+ *
+ * @param facing The opponent's facing.
+ * @return The direction half a turn away.
+ */
+static Facing OppositeFacing(Facing facing) {
+    return static_cast<Facing>(
+        (static_cast<std::size_t>(facing) + FacingSteps.size() / 2) %
+        FacingSteps.size());
+}
+
 void Board::Initialize() {
     if (initialized) {
         throw std::logic_error("The GHQ board has already been initialized.");
@@ -109,6 +150,7 @@ void Board::EndTurn() {
             }
         }
     }
+    UpdateEngagements();
 }
 
 void Board::FinishArtilleryMove() {
@@ -119,17 +161,13 @@ void Board::FinishArtilleryMove() {
     }
 }
 
-void Board::PlacePiece(Piece piece, BoardCoordinate position) {
-    if (!initialized) {
-        throw std::logic_error(
-            "Initialize the GHQ board before placing pieces.");
-    }
-
-    if (GetPiece(position)) {
-        throw std::logic_error(
-            "Cannot place a piece on an occupied GHQ square.");
-    }
-
+/**
+ * Checks the state of a piece before adding it to the board.
+ *
+ * @param piece The piece to check.
+ * @throws std::invalid_argument if the piece has invalid state.
+ */
+static void ValidatePiece(Piece piece) {
     if (piece.team != Team::Red && piece.team != Team::Blue) {
         throw std::invalid_argument("Unknown GHQ team.");
     }
@@ -156,8 +194,23 @@ void Board::PlacePiece(Piece piece, BoardCoordinate position) {
     default:
         throw std::invalid_argument("Unknown GHQ piece type.");
     }
+}
 
+void Board::PlacePiece(Piece piece, BoardCoordinate position) {
+    if (!initialized) {
+        throw std::logic_error(
+            "Initialize the GHQ board before placing pieces.");
+    }
+    if (GetPiece(position)) {
+        throw std::logic_error(
+            "Cannot place a piece on an occupied GHQ square.");
+    }
+
+    ValidatePiece(piece);
     pieces[position.row][position.column] = piece;
+    if (piece.IsInfantry()) {
+        UpdateEngagements();
+    }
 }
 
 bool Board::CanPlaceFromReserve(Piece piece, BoardCoordinate position) const {
@@ -193,11 +246,11 @@ void Board::MovePiece(BoardCoordinate from, BoardCoordinate to,
     }
 
     if (from == to && facing) {
-        // Infantry facing only marks engagements and never spends an action.
-        if (piece->type == PieceType::BasicInfantry ||
-            piece->type == PieceType::ArmoredInfantry ||
-            piece->type == PieceType::ParachuteInfantry) {
-            pieces[from.row][from.column]->facing = *facing;
+        // Engaged infantry face their opponent.
+        if (piece->IsInfantry()) {
+            if (!GetEngagedOpponent(from)) {
+                pieces[from.row][from.column]->facing = *facing;
+            }
             return;
         }
 
@@ -226,6 +279,9 @@ void Board::MovePiece(BoardCoordinate from, BoardCoordinate to,
     piece->facing = facing.value_or(piece->facing);
     pieces[from.row][from.column].reset();
     pieces[to.row][to.column] = piece;
+    if (piece->IsInfantry()) {
+        UpdateEngagements();
+    }
 }
 
 bool Board::CanMovePiece(BoardCoordinate from, BoardCoordinate to) const {
@@ -234,31 +290,25 @@ bool Board::CanMovePiece(BoardCoordinate from, BoardCoordinate to) const {
 
 std::vector<std::pair<Board::BoardCoordinate, Facing>>
 Board::GetFireOptions(BoardCoordinate position) const {
-    // Column and row steps in Facing order, clockwise from north.
-    static constexpr std::array<std::pair<std::int8_t, std::int8_t>, 8> steps{
-        {{0, -1}, {1, -1}, {1, 0}, {1, 1}, {0, 1}, {-1, 1}, {-1, 0}, {-1, -1}}};
     const auto &piece = GetPiece(position);
     const auto range = piece ? piece->GetFireRange() : 0;
     std::vector<std::pair<BoardCoordinate, Facing>> options;
-    for (std::size_t direction = 0; direction < steps.size(); ++direction) {
-        const auto [dx, dy] = steps[direction];
+    for (std::size_t direction = 0; direction < FacingSteps.size();
+         ++direction) {
+        const auto facing = static_cast<Facing>(direction);
         for (std::uint8_t distance = 1; distance <= range; ++distance) {
-            const auto column = position.column + dx * distance;
-            const auto row = position.row + dy * distance;
-            if (column < 0 || column >= Size || row < 0 || row >= Size) {
+            const auto square = SquareInDirection(position, facing, distance);
+            if (!square) {
                 break;
             }
-            options.emplace_back(
-                BoardCoordinate{static_cast<std::uint8_t>(column),
-                                static_cast<std::uint8_t>(row)},
-                static_cast<Facing>(direction));
+            options.emplace_back(*square, facing);
         }
     }
     return options;
 }
 
-Board::Bombardment Board::GetBombardment(Team team) const {
-    Bombardment covered{};
+Board::SquareMask Board::GetBombardment(Team team) const {
+    SquareMask covered{};
     for (std::uint8_t row = 0; row < Size; ++row) {
         for (std::uint8_t column = 0; column < Size; ++column) {
             const auto &piece = pieces[row][column];
@@ -328,11 +378,12 @@ Board Board::FromMessage(const svanes::NetworkMessage &message) {
                         "An empty GHQ square cannot contain piece data.");
                 }
             } else {
-                board.PlacePiece({static_cast<PieceType>(type),
+                const Piece piece{static_cast<PieceType>(type),
                                   static_cast<Team>(team),
                                   static_cast<Facing>(facing),
-                                  static_cast<ActionState>(action)},
-                                 {column, row});
+                                  static_cast<ActionState>(action)};
+                ValidatePiece(piece);
+                board.pieces[row][column] = piece;
             }
         }
     }
@@ -347,6 +398,9 @@ Board Board::FromMessage(const svanes::NetworkMessage &message) {
         throw std::invalid_argument("GHQ turn numbers start at one.");
     }
 
+    // Read all facings before resolving pairs so the order of the squares
+    // in the snapshot cannot break an existing engagement.
+    board.UpdateEngagements();
     return board;
 }
 
@@ -356,6 +410,71 @@ const std::optional<Piece> &Board::GetPiece(BoardCoordinate position) const {
             "GHQ board coordinates must be between 0 and 7.");
     }
     return pieces[position.row][position.column];
+}
+
+std::optional<Board::BoardCoordinate>
+Board::GetEngagedOpponent(BoardCoordinate position) const {
+    const auto &piece = GetPiece(position);
+    if (!piece || !piece->IsInfantry() ||
+        !std::ranges::contains(InfantryFacings, piece->facing)) {
+        return std::nullopt;
+    }
+
+    const auto square = SquareInDirection(position, piece->facing);
+    if (square) {
+        const auto &opponent = GetPiece(*square);
+        if (opponent && opponent->IsInfantry() &&
+            opponent->team != piece->team &&
+            opponent->facing == OppositeFacing(piece->facing)) {
+            return square;
+        }
+    }
+
+    return std::nullopt;
+}
+
+void Board::UpdateEngagements() {
+    // Infantry already facing each other form the starting pairs. Only
+    // unpaired Red infantry need to look for a partner.
+    for (std::uint8_t row = 0; row < Size; ++row) {
+        for (std::uint8_t column = 0; column < Size; ++column) {
+            const BoardCoordinate red{column, row};
+            const auto &piece = GetPiece(red);
+            if (piece && piece->team == Team::Red && piece->IsInfantry() &&
+                !GetEngagedOpponent(red)) {
+                SquareMask visited{};
+                TryEngage(red, visited);
+            }
+        }
+    }
+}
+
+bool Board::TryEngage(BoardCoordinate red, SquareMask &visited) {
+    for (const auto facing : InfantryFacings) {
+        const auto blue = SquareInDirection(red, facing);
+        if (!blue || visited[blue->row][blue->column]) {
+            continue;
+        }
+
+        auto &opponent = pieces[blue->row][blue->column];
+        if (!opponent || opponent->team != Team::Blue ||
+            !opponent->IsInfantry()) {
+            continue;
+        }
+
+        visited[blue->row][blue->column] = true;
+        const auto partner = GetEngagedOpponent(*blue);
+        // A paired Blue infantry is available if its Red partner can engage
+        // someone else. Turn the pieces only after finding a free partner.
+        if (partner && !TryEngage(*partner, visited)) {
+            continue;
+        }
+
+        pieces[red.row][red.column]->facing = facing;
+        opponent->facing = OppositeFacing(facing);
+        return true;
+    }
+    return false;
 }
 
 std::uint8_t Board::GetReserveCount(Piece piece) const {

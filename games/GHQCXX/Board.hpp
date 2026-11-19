@@ -183,6 +183,16 @@ public:
     const std::optional<Piece> &GetPiece(BoardCoordinate position) const;
 
     /**
+     * Looks up the infantry engaged with the piece on a square.
+     *
+     * @param position The square to inspect.
+     * @return The opposing infantry's square, or no value if unengaged.
+     * @throws std::out_of_range if the position is outside the board.
+     */
+    std::optional<BoardCoordinate>
+    GetEngagedOpponent(BoardCoordinate position) const;
+
+    /**
      * Reports how many pieces of a type remain in a team's reserve.
      *
      * @param piece The type and team to inspect.
@@ -218,8 +228,8 @@ public:
     GetMovementOptions(BoardCoordinate position) const;
 
 private:
-    // The squares covered by one team's artillery, indexed by row and column.
-    using Bombardment = std::array<std::array<bool, Size>, Size>;
+    // A set of board squares indexed by row, then column.
+    using SquareMask = std::array<std::array<bool, Size>, Size>;
 
     /**
      * Finds the squares under fire from a team's artillery.
@@ -227,7 +237,23 @@ private:
      * @param team The team firing.
      * @return The squares covered by its guns in their current facings.
      */
-    Bombardment GetBombardment(Team team) const;
+    SquareMask GetBombardment(Team team) const;
+
+    /**
+     * Pairs as many opposing infantry as possible and turns them to face
+     * each other.
+     */
+    void UpdateEngagements();
+
+    /**
+     * Finds a partner for a Red infantry, moving existing engagements to
+     * other neighbors if needed.
+     *
+     * @param red The Red infantry's square.
+     * @param visited The Blue squares already considered in this search.
+     * @return True if the infantry found a partner.
+     */
+    bool TryEngage(BoardCoordinate red, SquareMask &visited);
 
     /**
      * Ends the free facing choice from a previous artillery move.

@@ -119,6 +119,13 @@ struct Piece {
     bool operator==(const Piece &other) const = default;
 
     /**
+     * Checks whether the piece can engage opposing infantry.
+     *
+     * @return True for basic, armored, and parachute infantry.
+     */
+    bool IsInfantry() const;
+
+    /**
      * Reports how far the piece can bombard along its facing.
      *
      * @return The number of squares in range, or zero for a non-artillery

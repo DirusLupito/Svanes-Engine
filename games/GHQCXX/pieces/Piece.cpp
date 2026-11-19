@@ -4,6 +4,12 @@
 
 namespace ghqcxx {
 
+bool Piece::IsInfantry() const {
+    return type == PieceType::BasicInfantry ||
+           type == PieceType::ArmoredInfantry ||
+           type == PieceType::ParachuteInfantry;
+}
+
 std::uint8_t Piece::GetFireRange() const {
     switch (type) {
     case PieceType::BasicArtillery:
