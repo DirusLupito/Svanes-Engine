@@ -94,24 +94,18 @@ std::uint8_t Board::GetActionsRemaining(Team team) const {
 void Board::EndTurn() {
     ++turnNumber;
     const auto activeTeam = GetActiveTeam();
+    const auto bombardment = GetBombardment(activeTeam);
     for (std::uint8_t row = 0; row < Size; ++row) {
         for (std::uint8_t column = 0; column < Size; ++column) {
             auto &piece = pieces[row][column];
             if (!piece) {
                 continue;
             }
-            piece->action = ActionState::Ready;
-            if (piece->team != activeTeam || piece->GetFireRange() == 0) {
-                continue;
-            }
-
             // Artillery captures at the start of its own team's turn.
-            for (const auto &[square, facing] : GetFireOptions({column, row})) {
-                auto &target = pieces[square.row][square.column];
-                if (facing == piece->facing && target &&
-                    target->team != activeTeam) {
-                    target.reset();
-                }
+            if (piece->team != activeTeam && bombardment[row][column]) {
+                piece.reset();
+            } else {
+                piece->action = ActionState::Ready;
             }
         }
     }
@@ -263,6 +257,25 @@ Board::GetFireOptions(BoardCoordinate position) const {
     return options;
 }
 
+Board::Bombardment Board::GetBombardment(Team team) const {
+    Bombardment covered{};
+    for (std::uint8_t row = 0; row < Size; ++row) {
+        for (std::uint8_t column = 0; column < Size; ++column) {
+            const auto &piece = pieces[row][column];
+            if (!piece || piece->team != team || piece->GetFireRange() == 0) {
+                continue;
+            }
+
+            for (const auto &[square, facing] : GetFireOptions({column, row})) {
+                if (facing == piece->facing) {
+                    covered[square.row][square.column] = true;
+                }
+            }
+        }
+    }
+    return covered;
+}
+
 svanes::NetworkMessage Board::ToMessage() const {
     svanes::MessageWriter writer;
     writer.WriteUint8(static_cast<std::uint8_t>(GameMessageType::BoardState));
@@ -368,6 +381,8 @@ Board::GetMovementOptions(BoardCoordinate position) const {
     }
 
     const auto rules = piece->GetMovementRules();
+    const auto enemyFire =
+        GetBombardment(piece->team == Team::Red ? Team::Blue : Team::Red);
     std::vector<BoardCoordinate> destinations;
     const auto backRow = piece->team == Team::Red ? 0 : Size - 1;
     if (rules.canParadrop && position.row == backRow) {
@@ -375,7 +390,7 @@ Board::GetMovementOptions(BoardCoordinate position) const {
         // squares are included here too, so they are only reported once.
         for (std::uint8_t row = 0; row < Size; ++row) {
             for (std::uint8_t column = 0; column < Size; ++column) {
-                if (!GetPiece({column, row})) {
+                if (!GetPiece({column, row}) && !enemyFire[row][column]) {
                     destinations.push_back({column, row});
                 }
             }
@@ -403,7 +418,8 @@ Board::GetMovementOptions(BoardCoordinate position) const {
                 const BoardCoordinate destination{
                     .column = static_cast<std::uint8_t>(column),
                     .row = static_cast<std::uint8_t>(row)};
-                if (GetPiece(destination)) {
+                if (GetPiece(destination) ||
+                    enemyFire[destination.row][destination.column]) {
                     break;
                 }
                 destinations.push_back(destination);

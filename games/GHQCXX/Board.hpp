@@ -205,8 +205,7 @@ public:
     void SetReserveCount(Piece piece, std::uint8_t count);
 
     /**
-     * Finds destinations allowed by the piece's movement rules, board edges,
-     * and occupied squares.
+     * Finds the squares a piece can reach from its current position.
      *
      * @param position The square containing the piece to inspect.
      *
@@ -219,6 +218,17 @@ public:
     GetMovementOptions(BoardCoordinate position) const;
 
 private:
+    // The squares covered by one team's artillery, indexed by row and column.
+    using Bombardment = std::array<std::array<bool, Size>, Size>;
+
+    /**
+     * Finds the squares under fire from a team's artillery.
+     *
+     * @param team The team firing.
+     * @return The squares covered by its guns in their current facings.
+     */
+    Bombardment GetBombardment(Team team) const;
+
     /**
      * Ends the free facing choice from a previous artillery move.
      */
