@@ -20,9 +20,25 @@ class Registry;
 
 namespace ghqcxx {
 
-// The client's current board or reserve selection.
-using BoardSelection =
-    std::variant<std::monostate, Board::BoardCoordinate, Piece>;
+/**
+ * An infantry move awaiting the player's choice of a capture.
+ *
+ * FIELDS:
+ * - from: The infantry's starting square.
+ * - to: The infantry's landing square.
+ * - preview: The position displayed while choosing a target.
+ * - targets: The enemy squares the player may choose.
+ */
+struct CaptureSelection {
+    Board::BoardCoordinate from;
+    Board::BoardCoordinate to;
+    Board preview;
+    std::vector<Board::BoardCoordinate> targets;
+};
+
+// The client's current selection on the board or in reserve.
+using BoardSelection = std::variant<std::monostate, Board::BoardCoordinate,
+                                    Piece, CaptureSelection>;
 
 /**
  * Represents the client's interactive view of a GHQ board and its reserves.
@@ -185,7 +201,7 @@ private:
     // highlight.
     svanes::Entity reserveOutline = 0;
 
-    // Circles marking selectable squares, indexed by row, then column.
+    // Markers for selectable squares, indexed by row, then column.
     std::array<std::array<svanes::Entity, Board::Size>, Board::Size>
         movementMarkers{};
 };

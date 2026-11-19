@@ -30,9 +30,12 @@ public:
      * @param to The requested destination square.
      * @param facing The requested final direction, or no value to keep the
      * current facing.
+     * @param captureSquare The enemy square chosen for an infantry capture.
      */
-    MovementEvent(Board::BoardCoordinate from, Board::BoardCoordinate to,
-                  std::optional<Facing> facing = std::nullopt);
+    MovementEvent(
+        Board::BoardCoordinate from, Board::BoardCoordinate to,
+        std::optional<Facing> facing = std::nullopt,
+        std::optional<Board::BoardCoordinate> captureSquare = std::nullopt);
 
     /**
      * Encodes this movement request for transmission.
@@ -62,11 +65,18 @@ public:
     // The final facing after the action. Empty leaves the direction unchanged.
     std::optional<Facing> facing;
 
+    // The enemy square captured by this move, if any.
+    std::optional<Board::BoardCoordinate> captureSquare;
+
 private:
-    // The size of a complete movement message in bytes.
+    // The size of a movement message without a capture, in bytes.
     static constexpr std::size_t MessageSize =
         sizeof(GameMessageType) + sizeof(from.column) + sizeof(from.row) +
         sizeof(to.column) + sizeof(to.row) + sizeof(std::uint8_t);
+
+    // The size of a movement message with the captured square, in bytes.
+    static constexpr std::size_t CaptureMessageSize =
+        MessageSize + sizeof(to.column) + sizeof(to.row);
 
     // The reserved facing byte that requests no direction change.
     static constexpr std::uint8_t UnchangedFacing =

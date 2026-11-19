@@ -233,7 +233,28 @@ void Board::PlaceFromReserve(Piece piece, BoardCoordinate position) {
 }
 
 void Board::MovePiece(BoardCoordinate from, BoardCoordinate to,
-                      std::optional<Facing> facing) {
+                      std::optional<Facing> facing,
+                      std::optional<BoardCoordinate> captureSquare) {
+    Board next = PreviewMove(from, to, facing);
+    const auto targets = from == to ? std::vector<BoardCoordinate>{}
+                                    : next.GetCaptureOptions(to);
+    if (captureSquare) {
+        if (!std::ranges::contains(targets, *captureSquare)) {
+            throw std::invalid_argument(
+                "That piece cannot be captured by this move.");
+        }
+
+        next.pieces[captureSquare->row][captureSquare->column].reset();
+        next.UpdateEngagements();
+    } else if (!targets.empty()) {
+        throw std::invalid_argument(
+            "Choose a piece to capture with this move.");
+    }
+    *this = next;
+}
+
+Board Board::PreviewMove(BoardCoordinate from, BoardCoordinate to,
+                         std::optional<Facing> facing) const {
     auto piece = GetPiece(from);
     GetPiece(to);
     if (!piece) {
@@ -245,13 +266,14 @@ void Board::MovePiece(BoardCoordinate from, BoardCoordinate to,
         throw std::invalid_argument("Invalid facing for the selected piece.");
     }
 
+    Board next = *this;
     if (from == to && facing) {
         // Engaged infantry face their opponent.
         if (piece->IsInfantry()) {
             if (!GetEngagedOpponent(from)) {
-                pieces[from.row][from.column]->facing = *facing;
+                next.pieces[from.row][from.column]->facing = *facing;
             }
-            return;
+            return next;
         }
 
         if (piece->action == ActionState::Exhausted) {
@@ -260,7 +282,7 @@ void Board::MovePiece(BoardCoordinate from, BoardCoordinate to,
         }
 
         if (piece->action == ActionState::Ready && piece->facing == *facing) {
-            return;
+            return next;
         }
 
         if (piece->action == ActionState::Ready &&
@@ -272,16 +294,60 @@ void Board::MovePiece(BoardCoordinate from, BoardCoordinate to,
             "The selected piece cannot move to that square.");
     }
 
-    FinishArtilleryMove();
+    next.FinishArtilleryMove();
     piece->action = !facing && piece->GetFireRange() > 0
                         ? ActionState::ChoosingFacing
                         : ActionState::Exhausted;
     piece->facing = facing.value_or(piece->facing);
-    pieces[from.row][from.column].reset();
-    pieces[to.row][to.column] = piece;
+    next.pieces[from.row][from.column].reset();
+    next.pieces[to.row][to.column] = piece;
     if (piece->IsInfantry()) {
-        UpdateEngagements();
+        next.UpdateEngagements();
     }
+    return next;
+}
+
+std::vector<Board::BoardCoordinate>
+Board::GetCaptureOptions(BoardCoordinate position) const {
+    const auto &infantry = GetPiece(position);
+    if (!infantry || !infantry->IsInfantry() || GetEngagedOpponent(position)) {
+        return {};
+    }
+
+    std::vector<BoardCoordinate> targets;
+    for (const auto facing : InfantryFacings) {
+        const auto square = SquareInDirection(position, facing);
+        if (!square) {
+            continue;
+        }
+
+        const auto &enemy = GetPiece(*square);
+        if (!enemy || enemy->team == infantry->team) {
+            continue;
+        }
+
+        if (GetEngagedOpponent(*square) ||
+            (enemy->GetFireRange() > 0 &&
+             enemy->facing != OppositeFacing(facing))) {
+            targets.push_back(*square);
+        } else if (enemy->type == PieceType::Headquarters) {
+            // A second infantry must be free to attack the HQ with this one.
+            for (const auto side : InfantryFacings) {
+                const auto neighbor = SquareInDirection(*square, side);
+                if (!neighbor || *neighbor == position) {
+                    continue;
+                }
+
+                const auto &support = GetPiece(*neighbor);
+                if (support && support->team == infantry->team &&
+                    support->IsInfantry() && !GetEngagedOpponent(*neighbor)) {
+                    targets.push_back(*square);
+                    break;
+                }
+            }
+        }
+    }
+    return targets;
 }
 
 bool Board::CanMovePiece(BoardCoordinate from, BoardCoordinate to) const {

@@ -13,6 +13,10 @@ ClientPacketReceivedHandler::ClientPacketReceivedHandler(
     : svanes::EventHandlerWrapper<ClientPacketReceivedEvent>(
           [&board, &selection, &waitingForBoard,
            &choosingFacing](const ClientPacketReceivedEvent &event) {
+              // A capture preview belongs to the board it was chosen on.
+              if (std::holds_alternative<CaptureSelection>(selection)) {
+                  selection = std::monostate{};
+              }
               switch (GetGameMessageType(event.message)) {
               case GameMessageType::EndTurn:
                   EndTurnEvent::FromMessage(event.message);
@@ -44,7 +48,8 @@ ClientPacketReceivedHandler::ClientPacketReceivedHandler(
                       MovementEvent::FromMessage(event.message);
                   // Apply the server's move directly; a local movement event
                   // would send it back to the server.
-                  board.MovePiece(movement.from, movement.to, movement.facing);
+                  board.MovePiece(movement.from, movement.to, movement.facing,
+                                  movement.captureSquare);
                   if (const auto *square =
                           std::get_if<Board::BoardCoordinate>(&selection);
                       square && *square == movement.from) {

@@ -121,17 +121,44 @@ public:
     void PlaceFromReserve(Piece piece, BoardCoordinate position);
 
     /**
-     * Moves a piece or turns it in place.
+     * Moves a piece or turns it in place, resolving any capture it makes.
      *
      * @param from The square containing the piece.
      * @param to The destination square, or the source square to turn in place.
      * @param facing The piece's final direction. Omit to keep its facing.
+     * @param captureSquare The enemy square chosen when the move earns a
+     * capture.
+     *
+     * @throws std::out_of_range if either square is outside the board.
+     * @throws std::invalid_argument if the move or capture choice is invalid.
+     */
+    void MovePiece(BoardCoordinate from, BoardCoordinate to,
+                   std::optional<Facing> facing = std::nullopt,
+                   std::optional<BoardCoordinate> captureSquare = std::nullopt);
+
+    /**
+     * Previews a move with its engagements resolved, before choosing a capture.
+     *
+     * @param from The square containing the piece.
+     * @param to The destination square.
+     * @param facing The piece's requested final direction.
+     * @return A copy of the board after the piece moves or turns.
      *
      * @throws std::out_of_range if either square is outside the board.
      * @throws std::invalid_argument if the move is not allowed.
      */
-    void MovePiece(BoardCoordinate from, BoardCoordinate to,
-                   std::optional<Facing> facing = std::nullopt);
+    Board PreviewMove(BoardCoordinate from, BoardCoordinate to,
+                      std::optional<Facing> facing = std::nullopt) const;
+
+    /**
+     * Finds the enemies an infantry can capture after moving.
+     *
+     * @param position The square where the infantry landed.
+     *
+     * @return The squares from which the player can choose one enemy.
+     */
+    std::vector<BoardCoordinate>
+    GetCaptureOptions(BoardCoordinate position) const;
 
     /**
      * Checks whether a piece can move to a destination.

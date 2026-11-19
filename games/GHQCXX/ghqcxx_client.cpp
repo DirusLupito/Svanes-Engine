@@ -20,6 +20,7 @@
 #include <iostream>
 #include <memory>
 #include <stdexcept>
+#include <utility>
 
 namespace ghqcxx {
 
@@ -111,7 +112,12 @@ void GHQCXXClient::Update(const svanes::ClientFrameContext &context) {
     const auto clicked =
         boardView.Update(context.world, board, context.input, context.camera);
     if (team == board.GetActiveTeam() && !waitingForBoard) {
-        if (context.input.WasPressed(svanes::Key::D)) {
+        if (std::holds_alternative<CaptureSelection>(selection)) {
+            if (const auto *square =
+                    std::get_if<Board::BoardCoordinate>(&clicked)) {
+                ClickSquare(*square, context.events);
+            }
+        } else if (context.input.WasPressed(svanes::Key::D)) {
             context.events.TriggerEvent(EndTurnEvent{});
             waitingForBoard = true;
             selection = std::monostate{};
@@ -130,7 +136,9 @@ void GHQCXXClient::Update(const svanes::ClientFrameContext &context) {
         }
     }
 
-    boardView.UpdatePieces(context.world, board, context.camera);
+    const auto *capture = std::get_if<CaptureSelection>(&selection);
+    boardView.UpdatePieces(context.world, capture ? capture->preview : board,
+                           context.camera);
     boardView.ShowTurn(context.world, board, context.camera);
     if (context.network.IsConnected()) {
         boardView.ShowClientRole(context.world, team, context.camera);
@@ -145,6 +153,14 @@ void GHQCXXClient::Update(const svanes::ClientFrameContext &context) {
 
 void GHQCXXClient::ClickSquare(Board::BoardCoordinate square,
                                svanes::EventManager &events) {
+    if (const auto *capture = std::get_if<CaptureSelection>(&selection)) {
+        if (std::ranges::contains(capture->targets, square)) {
+            events.TriggerEvent(MovementEvent(capture->from, capture->to,
+                                              std::nullopt, square));
+            selection = std::monostate{};
+        }
+        return;
+    }
     const auto *selected = std::get_if<Board::BoardCoordinate>(&selection);
     if (selected && choosingFacing) {
         if (square == *selected) {
@@ -187,6 +203,15 @@ void GHQCXXClient::ClickSquare(Board::BoardCoordinate square,
             selection = std::monostate{};
         }
     } else if (selected && board.CanMovePiece(*selected, square)) {
+        if (board.GetPiece(*selected)->IsInfantry()) {
+            auto preview = board.PreviewMove(*selected, square);
+            auto targets = preview.GetCaptureOptions(square);
+            if (!targets.empty()) {
+                selection = CaptureSelection{
+                    *selected, square, std::move(preview), std::move(targets)};
+                return;
+            }
+        }
         events.TriggerEvent(MovementEvent(*selected, square));
         choosingFacing =
             board.GetPiece(square)->action == ActionState::ChoosingFacing;

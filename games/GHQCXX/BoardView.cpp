@@ -82,6 +82,16 @@ static constexpr svanes::Color MovementMarkerColor{60, 200, 90, 220};
 // Color of the squares covered by a possible artillery facing.
 static constexpr svanes::Color FireMarkerColor{255, 220, 40, 255};
 
+// The color of the X over each possible capture.
+static constexpr svanes::Color CaptureMarkerColor{255, 255, 0, 255};
+
+// The two diagonal strokes of a capture marker, centered on the target.
+static const svanes::CompositeShape2D CaptureMarker{
+    {{.shape = svanes::Rectangle2D{.width = 1.0F, .height = 0.10F},
+      .transform = {.rotation = std::numbers::pi_v<float> / 4.0F}},
+     {.shape = svanes::Rectangle2D{.width = 1.0F, .height = 0.10F},
+      .transform = {.rotation = -std::numbers::pi_v<float> / 4.0F}}}};
+
 // The opacity of a board piece that has used its action.
 static constexpr std::uint8_t ExhaustedPieceAlpha = 80;
 
@@ -503,11 +513,25 @@ void BoardView::ShowSelection(svanes::Registry &world, const Board &board,
                               const BoardSelection &selection,
                               bool choosingFacing) {
     const auto *reserve = std::get_if<Piece>(&selection);
+    const auto *capture = std::get_if<CaptureSelection>(&selection);
     for (std::uint8_t row = 0; row < Board::Size; ++row) {
         for (std::uint8_t column = 0; column < Board::Size; ++column) {
             auto &marker = world.GetComponent<svanes::SolidShape>(
                 movementMarkers[row][column]);
-            if (reserve && board.CanPlaceFromReserve(*reserve, {column, row})) {
+            const Board::BoardCoordinate square{column, row};
+            if (capture && std::ranges::contains(capture->targets, square)) {
+                marker.geometry = CaptureMarker;
+                marker.color = CaptureMarkerColor;
+                continue;
+            }
+
+            if (std::holds_alternative<svanes::CompositeShape2D>(
+                    marker.geometry)) {
+                marker.geometry =
+                    svanes::Circle2D{.radius = MovementMarkerRadius};
+            }
+
+            if (reserve && board.CanPlaceFromReserve(*reserve, square)) {
                 marker.color = MovementMarkerColor;
             } else {
                 marker.color.alpha = 0;

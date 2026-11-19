@@ -10,7 +10,8 @@ MovementHandler::MovementHandler(Board &board, std::vector<Board> &moveHistory)
     : svanes::EventHandlerWrapper<MovementEvent>(
           [&board, &moveHistory](const MovementEvent &event) {
               Board next = board;
-              next.MovePiece(event.from, event.to, event.facing);
+              next.MovePiece(event.from, event.to, event.facing,
+                             event.captureSquare);
 
               // Rotating an artillery piece goes hand in hand with
               // moving it.
@@ -34,7 +35,8 @@ MovementHandler::MovementHandler(Board &board, std::vector<Board> &moveHistory)
 MovementHandler::MovementHandler(Board &board, svanes::NetworkClient &network)
     : svanes::EventHandlerWrapper<MovementEvent>(
           [&board, &network](const MovementEvent &event) {
-              board.MovePiece(event.from, event.to, event.facing);
+              board.MovePiece(event.from, event.to, event.facing,
+                              event.captureSquare);
 
               network.Send(event.ToMessage());
           }) {}
