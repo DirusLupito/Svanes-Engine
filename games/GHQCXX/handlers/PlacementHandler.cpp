@@ -1,15 +1,17 @@
 #include "PlacementHandler.hpp"
+
+#include "../MoveHistory.hpp"
+
 #include <svanes/network/clientserver/network_client.hpp>
 
 namespace ghqcxx {
 
-PlacementHandler::PlacementHandler(Board &board,
-                                   std::vector<Board> &moveHistory)
+PlacementHandler::PlacementHandler(Board &board, MoveHistory &moveHistory)
     : svanes::EventHandlerWrapper<PlacementEvent>(
           [&board, &moveHistory](const PlacementEvent &event) {
               Board next = board;
               next.PlaceFromReserve(event.piece, event.to);
-              moveHistory.push_back(board);
+              moveHistory.Save(board);
               board = next;
           }) {}
 

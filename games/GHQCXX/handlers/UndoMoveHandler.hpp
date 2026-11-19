@@ -5,13 +5,13 @@
 
 #include <svanes/events/event_handler_wrapper.hpp>
 
-#include <vector>
-
 namespace svanes {
 class NetworkClient;
 } // namespace svanes
 
 namespace ghqcxx {
+
+class MoveHistory;
 
 /**
  * Handles a player's decision to take back a move.
@@ -25,7 +25,7 @@ public:
      * @param board The server's board.
      * @param moveHistory The positions saved during the current turn.
      */
-    UndoMoveHandler(Board &board, std::vector<Board> &moveHistory);
+    UndoMoveHandler(Board &board, MoveHistory &moveHistory);
 
     /**
      * Creates a handler that sends the client's request to the server.

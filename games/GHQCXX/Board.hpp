@@ -21,6 +21,9 @@ public:
     // The board has eight rows and columns.
     static constexpr std::int32_t Size = 8;
 
+    // The number of actions a player may take in one turn.
+    static constexpr std::uint8_t ActionsPerTurn = 3;
+
     /**
      * Identifies a square on the board, counting from the top-left corner.
      *

@@ -1,16 +1,17 @@
 #include "EndTurnHandler.hpp"
 
 #include "../Board.hpp"
+#include "../MoveHistory.hpp"
 
 #include <svanes/network/clientserver/network_client.hpp>
 
 namespace ghqcxx {
 
-EndTurnHandler::EndTurnHandler(Board &board, std::vector<Board> &moveHistory)
+EndTurnHandler::EndTurnHandler(Board &board, MoveHistory &moveHistory)
     : svanes::EventHandlerWrapper<EndTurnEvent>(
           [&board, &moveHistory](const EndTurnEvent &) {
               board.EndTurn();
-              moveHistory.clear();
+              moveHistory.Clear();
           }) {}
 
 EndTurnHandler::EndTurnHandler(svanes::NetworkClient &network)

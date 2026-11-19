@@ -1,12 +1,14 @@
 #include "MovementHandler.hpp"
 
+#include "../MoveHistory.hpp"
+
 #include <svanes/network/clientserver/network_client.hpp>
 
 #include <iostream>
 
 namespace ghqcxx {
 
-MovementHandler::MovementHandler(Board &board, std::vector<Board> &moveHistory)
+MovementHandler::MovementHandler(Board &board, MoveHistory &moveHistory)
     : svanes::EventHandlerWrapper<MovementEvent>(
           [&board, &moveHistory](const MovementEvent &event) {
               Board next = board;
@@ -19,7 +21,7 @@ MovementHandler::MovementHandler(Board &board, std::vector<Board> &moveHistory)
               if (event.from != event.to ||
                   (piece->action != ActionState::ChoosingFacing &&
                    piece != next.GetPiece(event.from))) {
-                  moveHistory.push_back(board);
+                  moveHistory.Save(board);
               }
 
               board = next;

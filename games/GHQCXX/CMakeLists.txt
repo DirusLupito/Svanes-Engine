@@ -28,6 +28,8 @@ add_executable(svanes_game_ghqcxx
     Board.hpp
     GameMessage.cpp
     GameMessage.hpp
+    MoveHistory.cpp
+    MoveHistory.hpp
     BoardView.cpp
     BoardView.hpp
     pieces/Piece.cpp
@@ -82,6 +84,8 @@ add_executable(svanes_game_ghqcxx_server
     Board.hpp
     GameMessage.cpp
     GameMessage.hpp
+    MoveHistory.cpp
+    MoveHistory.hpp
     pieces/Piece.cpp
     pieces/Piece.hpp
 )

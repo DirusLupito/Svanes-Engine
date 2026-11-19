@@ -1,20 +1,15 @@
 #include "UndoMoveHandler.hpp"
 
-#include <svanes/network/clientserver/network_client.hpp>
+#include "../MoveHistory.hpp"
 
-#include <stdexcept>
+#include <svanes/network/clientserver/network_client.hpp>
 
 namespace ghqcxx {
 
-UndoMoveHandler::UndoMoveHandler(Board &board, std::vector<Board> &moveHistory)
+UndoMoveHandler::UndoMoveHandler(Board &board, MoveHistory &moveHistory)
     : svanes::EventHandlerWrapper<UndoMoveEvent>(
           [&board, &moveHistory](const UndoMoveEvent &) {
-              if (moveHistory.empty()) {
-                  throw std::invalid_argument(
-                      "There are no moves to undo this turn.");
-              }
-              board = moveHistory.back();
-              moveHistory.pop_back();
+              moveHistory.Undo(board);
           }) {}
 
 UndoMoveHandler::UndoMoveHandler(svanes::NetworkClient &network)

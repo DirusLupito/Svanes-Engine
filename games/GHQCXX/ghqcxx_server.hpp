@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Board.hpp"
+#include "MoveHistory.hpp"
 
 #include <svanes/network/clientserver/IServer.hpp>
 
@@ -57,7 +58,7 @@ private:
     Board board;
 
     // The board before each action of the current turn, oldest first.
-    std::vector<Board> moveHistory;
+    MoveHistory moveHistory;
 
     // The clients currently admitted to the game.
     std::vector<svanes::ClientId> clients;

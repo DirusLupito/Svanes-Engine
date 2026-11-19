@@ -12,9 +12,6 @@
 
 namespace ghqcxx {
 
-// The number of actions a player may take in one turn.
-static constexpr std::uint8_t ActionsPerTurn = 3;
-
 // Number of basic infantry each team starts with on the board.
 static constexpr std::uint8_t StartingInfantryCount = 3;
 

@@ -4,8 +4,6 @@
 
 #include <svanes/events/event_handler_wrapper.hpp>
 
-#include <vector>
-
 namespace svanes {
 class NetworkClient;
 }
@@ -13,6 +11,7 @@ class NetworkClient;
 namespace ghqcxx {
 
 class Board;
+class MoveHistory;
 
 /**
  * Handles a player's decision to end the current turn.
@@ -25,7 +24,7 @@ public:
      * @param board The server's board. Must outlive the handler.
      * @param moveHistory The positions saved during the current turn.
      */
-    EndTurnHandler(Board &board, std::vector<Board> &moveHistory);
+    EndTurnHandler(Board &board, MoveHistory &moveHistory);
 
     /**
      * Creates a handler that sends the client's request to the server.
