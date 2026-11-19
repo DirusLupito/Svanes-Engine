@@ -240,6 +240,15 @@ private:
     SquareMask GetBombardment(Team team) const;
 
     /**
+     * Checks the squares sharing an edge with a position for infantry.
+     *
+     * @param position The square to check around.
+     * @param team The team whose infantry to look for.
+     * @return True if any neighboring square holds infantry of that team.
+     */
+    bool HasAdjacentInfantry(BoardCoordinate position, Team team) const;
+
+    /**
      * Pairs as many opposing infantry as possible and turns them to face
      * each other.
      */

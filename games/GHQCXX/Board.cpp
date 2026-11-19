@@ -433,6 +433,19 @@ Board::GetEngagedOpponent(BoardCoordinate position) const {
     return std::nullopt;
 }
 
+bool Board::HasAdjacentInfantry(BoardCoordinate position, Team team) const {
+    for (const auto facing : InfantryFacings) {
+        const auto neighbor = SquareInDirection(position, facing);
+        if (neighbor) {
+            const auto &piece = GetPiece(*neighbor);
+            if (piece && piece->team == team && piece->IsInfantry()) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 void Board::UpdateEngagements() {
     // Infantry already facing each other form the starting pairs. Only
     // unpaired Red infantry need to look for a partner.
@@ -500,8 +513,9 @@ Board::GetMovementOptions(BoardCoordinate position) const {
     }
 
     const auto rules = piece->GetMovementRules();
-    const auto enemyFire =
-        GetBombardment(piece->team == Team::Red ? Team::Blue : Team::Red);
+    const auto enemy = piece->team == Team::Red ? Team::Blue : Team::Red;
+    const auto enemyFire = GetBombardment(enemy);
+    const bool engaged = GetEngagedOpponent(position).has_value();
     std::vector<BoardCoordinate> destinations;
     const auto backRow = piece->team == Team::Red ? 0 : Size - 1;
     if (rules.canParadrop && position.row == backRow) {
@@ -509,8 +523,10 @@ Board::GetMovementOptions(BoardCoordinate position) const {
         // squares are included here too, so they are only reported once.
         for (std::uint8_t row = 0; row < Size; ++row) {
             for (std::uint8_t column = 0; column < Size; ++column) {
-                if (!GetPiece({column, row}) && !enemyFire[row][column]) {
-                    destinations.push_back({column, row});
+                const BoardCoordinate landing{column, row};
+                if (!GetPiece(landing) && !enemyFire[row][column] &&
+                    !(engaged && HasAdjacentInfantry(landing, enemy))) {
+                    destinations.push_back(landing);
                 }
             }
         }
@@ -539,6 +555,12 @@ Board::GetMovementOptions(BoardCoordinate position) const {
                     .row = static_cast<std::uint8_t>(row)};
                 if (GetPiece(destination) ||
                     enemyFire[destination.row][destination.column]) {
+                    break;
+                }
+                // The first step must clear even enemy infantry already in
+                // another engagement. Armored infantry may engage on step two.
+                if (step == 0 && engaged &&
+                    HasAdjacentInfantry(destination, enemy)) {
                     break;
                 }
                 destinations.push_back(destination);
