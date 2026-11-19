@@ -82,7 +82,7 @@ public:
     std::uint8_t GetActionsRemaining(Team team) const;
 
     /**
-     * Passes the turn to the other team and resolves its artillery captures.
+     * Passes the turn to the other team and resolves its free captures.
      */
     void EndTurn();
 
@@ -151,11 +151,11 @@ public:
                       std::optional<Facing> facing = std::nullopt) const;
 
     /**
-     * Finds the enemies an infantry can capture after moving.
+     * Finds the enemies an infantry can capture from its current square.
      *
-     * @param position The square where the infantry landed.
+     * @param position The infantry's square.
      *
-     * @return The squares from which the player can choose one enemy.
+     * @return The squares occupied by capturable enemies.
      */
     std::vector<BoardCoordinate>
     GetCaptureOptions(BoardCoordinate position) const;

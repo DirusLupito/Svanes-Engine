@@ -135,15 +135,29 @@ std::uint8_t Board::GetActionsRemaining(Team team) const {
 void Board::EndTurn() {
     ++turnNumber;
     const auto activeTeam = GetActiveTeam();
-    const auto bombardment = GetBombardment(activeTeam);
+    // Mark every target before removing pieces. Breaking an engagement
+    // during these captures cannot give the freed infantry another capture.
+    auto targets = GetBombardment(activeTeam);
+    for (std::uint8_t row = 0; row < Size; ++row) {
+        for (std::uint8_t column = 0; column < Size; ++column) {
+            const auto &piece = pieces[row][column];
+            if (!piece || piece->team != activeTeam) {
+                continue;
+            }
+            for (const auto square : GetCaptureOptions({column, row})) {
+                targets[square.row][square.column] = true;
+            }
+        }
+    }
+
     for (std::uint8_t row = 0; row < Size; ++row) {
         for (std::uint8_t column = 0; column < Size; ++column) {
             auto &piece = pieces[row][column];
             if (!piece) {
                 continue;
             }
-            // Artillery captures at the start of its own team's turn.
-            if (piece->team != activeTeam && bombardment[row][column]) {
+            // Artillery and infantry captures at the start of its own team's turn.
+            if (piece->team != activeTeam && targets[row][column]) {
                 piece.reset();
             } else {
                 piece->action = ActionState::Ready;
