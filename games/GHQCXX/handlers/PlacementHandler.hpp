@@ -3,6 +3,8 @@
 #include "../events/PlacementEvent.hpp"
 #include <svanes/events/event_handler_wrapper.hpp>
 
+#include <vector>
+
 namespace svanes {
 class NetworkClient;
 }
@@ -19,8 +21,9 @@ public:
      * Creates a handler that places reserve pieces on the server's board.
      *
      * @param board The server's board. Must outlive the handler.
+     * @param moveHistory The positions saved during the current turn.
      */
-    explicit PlacementHandler(Board &board);
+    PlacementHandler(Board &board, std::vector<Board> &moveHistory);
 
     /**
      * Creates a handler that places reserve pieces on the client's board and

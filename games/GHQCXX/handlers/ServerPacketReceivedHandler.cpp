@@ -4,6 +4,7 @@
 #include "../events/EndTurnEvent.hpp"
 #include "../events/MovementEvent.hpp"
 #include "../events/PlacementEvent.hpp"
+#include "../events/UndoMoveEvent.hpp"
 
 #include <svanes/events/event_manager.hpp>
 
@@ -25,12 +26,19 @@ ServerPacketReceivedHandler::ServerPacketReceivedHandler(
                   << std::flush;
 
               bool includeSender = false;
+              auto reply = event.message;
               try {
                   const auto activeTeam = board.GetActiveTeam();
                   if (GetClientTeam(event.client) != activeTeam) {
                       throw std::invalid_argument("It is not your turn.");
                   }
                   switch (GetGameMessageType(event.message)) {
+                  case GameMessageType::UndoMove:
+                      events.TriggerEvent(
+                          UndoMoveEvent::FromMessage(event.message));
+                      reply = board.ToMessage();
+                      includeSender = true;
+                      break;
                   case GameMessageType::EndTurn:
                       events.TriggerEvent(
                           EndTurnEvent::FromMessage(event.message));
@@ -75,11 +83,10 @@ ServerPacketReceivedHandler::ServerPacketReceivedHandler(
                   return;
               }
 
-              // The sender predicts moves and placements. All clients advance
-              // the turn when they receive the server's end-turn event.
+              // The sender already applied its own moves and placements.
               for (const auto client : clients) {
                   if (includeSender || client != event.client) {
-                      network.Send(client, event.message);
+                      network.Send(client, reply);
                   }
               }
           }) {}

@@ -8,17 +8,20 @@
 namespace ghqcxx {
 
 ClientPacketReceivedHandler::ClientPacketReceivedHandler(
-    Board &board, BoardSelection &selection, bool &choosingFacing)
+    Board &board, BoardSelection &selection, bool &choosingFacing,
+    bool &waitingForBoard)
     : svanes::EventHandlerWrapper<ClientPacketReceivedEvent>(
-          [&board, &selection,
+          [&board, &selection, &waitingForBoard,
            &choosingFacing](const ClientPacketReceivedEvent &event) {
               switch (GetGameMessageType(event.message)) {
               case GameMessageType::EndTurn:
                   EndTurnEvent::FromMessage(event.message);
                   board.EndTurn();
+                  waitingForBoard = false;
                   return;
               case GameMessageType::BoardState:
                   board = Board::FromMessage(event.message);
+                  waitingForBoard = false;
                   selection = std::monostate{};
                   choosingFacing = false;
                   return;
@@ -50,6 +53,9 @@ ClientPacketReceivedHandler::ClientPacketReceivedHandler(
                   }
                   return;
               }
+              case GameMessageType::UndoMove:
+                  // The server sends the restored board to all clients.
+                  return;
               }
           }) {}
 

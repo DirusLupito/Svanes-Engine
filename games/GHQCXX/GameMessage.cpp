@@ -14,6 +14,7 @@ GameMessageType GetGameMessageType(const svanes::NetworkMessage &message) {
     case GameMessageType::BoardState:
     case GameMessageType::Placement:
     case GameMessageType::EndTurn:
+    case GameMessageType::UndoMove:
         return type;
     default:
         throw std::invalid_argument("Unknown GHQ gameplay message type.");

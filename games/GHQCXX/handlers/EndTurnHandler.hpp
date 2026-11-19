@@ -4,6 +4,8 @@
 
 #include <svanes/events/event_handler_wrapper.hpp>
 
+#include <vector>
+
 namespace svanes {
 class NetworkClient;
 }
@@ -21,8 +23,9 @@ public:
      * Creates a handler that advances the server's turn.
      *
      * @param board The server's board. Must outlive the handler.
+     * @param moveHistory The positions saved during the current turn.
      */
-    explicit EndTurnHandler(Board &board);
+    EndTurnHandler(Board &board, std::vector<Board> &moveHistory);
 
     /**
      * Creates a handler that sends the client's request to the server.

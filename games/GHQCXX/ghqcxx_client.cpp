@@ -8,9 +8,11 @@
 #include "handlers/EndTurnHandler.hpp"
 #include "handlers/MovementHandler.hpp"
 #include "handlers/PlacementHandler.hpp"
+#include "handlers/UndoMoveHandler.hpp"
 
 #include <svanes/camera2d.hpp>
 #include <svanes/events/event_manager.hpp>
+#include <svanes/input/chord.hpp>
 #include <svanes/input/input_manager.hpp>
 #include <svanes/network/clientserver/network_client.hpp>
 
@@ -28,6 +30,14 @@ constexpr float ViewHeight = BoardView::BoardWidth + 2.75F;
 // label.
 constexpr float ViewWidth =
     BoardView::BoardWidth + 4.0F * BoardView::SquareSize;
+
+// The maximum time between presses of the undo key, in microseconds.
+constexpr svanes::TicCount UndoWindow = 500000;
+
+// The active player's double-tap binding for undo.
+static const auto UndoChord =
+    svanes::Chord::Then(svanes::Chord::Press(svanes::Key::Z),
+                        svanes::Chord::Press(svanes::Key::Z), UndoWindow);
 
 /**
  * Fits the board and both rows of pieces into the window. Both dimensions use
@@ -47,6 +57,7 @@ static void FitViewToWindow(svanes::Camera2D &camera) {
 
 void GHQCXXClient::Initialize(svanes::ClientContext &context) {
     board.Initialize();
+    context.input.SetChordWindow(UndoWindow);
 
     context.camera.x = BoardView::BoardWidth * 0.5F;
     context.camera.y = BoardView::BoardWidth * 0.5F;
@@ -55,12 +66,14 @@ void GHQCXXClient::Initialize(svanes::ClientContext &context) {
     boardView.Initialize(context.world, board, context.fonts, context.camera);
 
     context.events.Subscribe(std::make_unique<ClientPacketReceivedHandler>(
-        board, selection, choosingFacing));
+        board, selection, choosingFacing, waitingForBoard));
     context.events.Subscribe(
         std::make_unique<MovementHandler>(board, context.network));
     context.events.Subscribe(
         std::make_unique<PlacementHandler>(board, context.network));
     context.events.Subscribe(std::make_unique<EndTurnHandler>(context.network));
+    context.events.Subscribe(
+        std::make_unique<UndoMoveHandler>(context.network));
 
     std::cout << "Hello, world! GHQCXX client.\n" << std::flush;
 }
@@ -97,13 +110,15 @@ void GHQCXXClient::Update(const svanes::ClientFrameContext &context) {
     FitViewToWindow(context.camera);
     const auto clicked =
         boardView.Update(context.world, board, context.input, context.camera);
-    if (team == board.GetActiveTeam() &&
-        board.GetTurnNumber() != lastEndedTurn) {
+    if (team == board.GetActiveTeam() && !waitingForBoard) {
         if (context.input.WasPressed(svanes::Key::D)) {
             context.events.TriggerEvent(EndTurnEvent{});
-            lastEndedTurn = board.GetTurnNumber();
+            waitingForBoard = true;
             selection = std::monostate{};
             choosingFacing = false;
+        } else if (context.input.WasTriggered(UndoChord)) {
+            context.events.TriggerEvent(UndoMoveEvent{});
+            waitingForBoard = true;
         } else if (const auto *square =
                        std::get_if<Board::BoardCoordinate>(&clicked)) {
             ClickSquare(*square, context.events);

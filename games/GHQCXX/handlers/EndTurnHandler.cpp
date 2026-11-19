@@ -6,9 +6,12 @@
 
 namespace ghqcxx {
 
-EndTurnHandler::EndTurnHandler(Board &board)
+EndTurnHandler::EndTurnHandler(Board &board, std::vector<Board> &moveHistory)
     : svanes::EventHandlerWrapper<EndTurnEvent>(
-          [&board](const EndTurnEvent &) { board.EndTurn(); }) {}
+          [&board, &moveHistory](const EndTurnEvent &) {
+              board.EndTurn();
+              moveHistory.clear();
+          }) {}
 
 EndTurnHandler::EndTurnHandler(svanes::NetworkClient &network)
     : svanes::EventHandlerWrapper<EndTurnEvent>(

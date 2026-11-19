@@ -14,12 +14,14 @@ namespace ghqcxx {
  * - BoardState: The server's authoritative board.
  * - Placement: A request or notification to place a piece from reserve.
  * - EndTurn: A request or notification to pass the turn to the other team.
+ * - UndoMove: A request to undo the active player's last action.
  */
 enum class GameMessageType : std::uint8_t {
     Movement,
     BoardState,
     Placement,
-    EndTurn
+    EndTurn,
+    UndoMove
 };
 
 /**

@@ -21,9 +21,11 @@ public:
      * handler.
      * @param choosingFacing Whether the client is choosing the selected
      * piece's facing. Must outlive the handler.
+     * @param waitingForBoard Whether input is waiting for the server to
+     * confirm an action. Must outlive the handler.
      */
     ClientPacketReceivedHandler(Board &board, BoardSelection &selection,
-                                bool &choosingFacing);
+                                bool &choosingFacing, bool &waitingForBoard);
 };
 
 } // namespace ghqcxx

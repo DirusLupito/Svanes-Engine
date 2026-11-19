@@ -3,10 +3,14 @@
 
 namespace ghqcxx {
 
-PlacementHandler::PlacementHandler(Board &board)
+PlacementHandler::PlacementHandler(Board &board,
+                                   std::vector<Board> &moveHistory)
     : svanes::EventHandlerWrapper<PlacementEvent>(
-          [&board](const PlacementEvent &event) {
-              board.PlaceFromReserve(event.piece, event.to);
+          [&board, &moveHistory](const PlacementEvent &event) {
+              Board next = board;
+              next.PlaceFromReserve(event.piece, event.to);
+              moveHistory.push_back(board);
+              board = next;
           }) {}
 
 PlacementHandler::PlacementHandler(Board &board, svanes::NetworkClient &network)

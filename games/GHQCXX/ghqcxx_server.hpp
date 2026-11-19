@@ -56,6 +56,9 @@ private:
     // The server's board state.
     Board board;
 
+    // The board before each action of the current turn, oldest first.
+    std::vector<Board> moveHistory;
+
     // The clients currently admitted to the game.
     std::vector<svanes::ClientId> clients;
 };

@@ -6,10 +6,22 @@
 
 namespace ghqcxx {
 
-MovementHandler::MovementHandler(Board &board)
+MovementHandler::MovementHandler(Board &board, std::vector<Board> &moveHistory)
     : svanes::EventHandlerWrapper<MovementEvent>(
-          [&board](const MovementEvent &event) {
-              board.MovePiece(event.from, event.to, event.facing);
+          [&board, &moveHistory](const MovementEvent &event) {
+              Board next = board;
+              next.MovePiece(event.from, event.to, event.facing);
+
+              // Rotating an artillery piece goes hand in hand with
+              // moving it.
+              const auto &piece = board.GetPiece(event.from);
+              if (event.from != event.to ||
+                  (piece->action != ActionState::ChoosingFacing &&
+                   piece != next.GetPiece(event.from))) {
+                  moveHistory.push_back(board);
+              }
+
+              board = next;
               std::cout << "GHQCXX server moved a piece from ("
                         << static_cast<std::uint32_t>(event.from.column) << ", "
                         << static_cast<std::uint32_t>(event.from.row)
