@@ -77,12 +77,18 @@ void Board::Initialize() {
 }
 
 bool Board::HasActionsRemaining(Team team) const {
+    return GetActionsRemaining(team) > 0;
+}
+
+std::uint8_t Board::GetActionsRemaining(Team team) const {
     const auto used = std::ranges::count_if(
         pieces | std::views::join, [team](const auto &piece) {
             return piece && piece->team == team &&
                    piece->action != ActionState::Ready;
         });
-    return used < ActionsPerTurn;
+    return used < ActionsPerTurn
+               ? static_cast<std::uint8_t>(ActionsPerTurn - used)
+               : 0;
 }
 
 void Board::EndTurn() {

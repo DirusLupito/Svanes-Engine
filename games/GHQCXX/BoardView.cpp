@@ -190,7 +190,10 @@ void BoardView::Initialize(svanes::Registry &world, const Board &board,
 
     turnLabel = world.CreateEntity();
     world.AddComponent<svanes::TextLabel>(turnLabel);
-    ShowTurn(world, board.GetActiveTeam(), camera);
+    movesLeftLabel = world.CreateEntity();
+    world.AddComponent<svanes::TextLabel>(
+        movesLeftLabel, svanes::TextLabel{.color = {255, 255, 255}});
+    ShowTurn(world, board, camera);
 
     roleHeading = world.CreateEntity();
     world.AddComponent<svanes::TextLabel>(
@@ -359,7 +362,7 @@ void BoardView::UpdatePieces(svanes::Registry &world, const Board &board,
                 world.AddComponent<svanes::TextLabel>(
                     label,
                     svanes::TextLabel{.color = GetTeamColor(team),
-                                      .font = labelFonts.front(),
+                                      .font = labelFonts[1],
                                       .alignment =
                                           svanes::TextAlignment::BottomRight});
                 entities.push_back(label);
@@ -378,8 +381,9 @@ void BoardView::UpdatePieces(svanes::Registry &world, const Board &board,
     }
 }
 
-void BoardView::ShowTurn(svanes::Registry &world, Team team,
+void BoardView::ShowTurn(svanes::Registry &world, const Board &board,
                          const svanes::Camera2D &camera) {
+    const auto team = board.GetActiveTeam();
     const auto topLeft = camera.WorldToScreen({});
     const float sideWidth = topLeft.x;
     const bool red = team == Team::Red;
@@ -395,11 +399,22 @@ void BoardView::ShowTurn(svanes::Registry &world, Team team,
 
     // Allow room for the six characters in BLUE'S and a little padding.
     std::size_t size = labelFonts.size() - 1;
-    while (size > 0 && sideWidth < 4.0F * LabelFontSizes[size]) {
+    while (size > 1 && sideWidth < 4.0F * LabelFontSizes[size]) {
         --size;
     }
 
     label.font = labelFonts[size];
+
+    const auto remaining = board.GetActionsRemaining(team);
+    auto &moves = world.GetComponent<svanes::TextLabel>(movesLeftLabel);
+    moves.text = std::to_string(remaining) +
+                 (remaining == 1 ? " move left" : " moves left");
+    moves.font = labelFonts[size - 1];
+    moves.alignment = label.alignment;
+    // Leave room for the two lines of the turn label.
+    const float offset = 2.6F * LabelFontSizes[size];
+    moves.position = {label.position.x,
+                      label.position.y + (red ? offset : -offset)};
 }
 
 void BoardView::ShowClientRole(svanes::Registry &world,
@@ -408,7 +423,7 @@ void BoardView::ShowClientRole(svanes::Registry &world,
     // Use the smaller font when the heading would be wider than the side
     // margin.
     const float sideWidth = camera.WorldToScreen({}).x;
-    const std::size_t size = sideWidth >= 6.5F * LabelFontSizes[1] ? 1 : 0;
+    const std::size_t size = sideWidth >= 6.5F * LabelFontSizes[2] ? 2 : 1;
     const float padding = LabelFontSizes[size] * 0.25F;
     auto &heading = world.GetComponent<svanes::TextLabel>(roleHeading);
     heading.visible = true;

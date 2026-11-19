@@ -131,7 +131,7 @@ void GHQCXXClient::Update(const svanes::ClientFrameContext &context) {
     }
 
     boardView.UpdatePieces(context.world, board, context.camera);
-    boardView.ShowTurn(context.world, board.GetActiveTeam(), context.camera);
+    boardView.ShowTurn(context.world, board, context.camera);
     if (context.network.IsConnected()) {
         boardView.ShowClientRole(context.world, team, context.camera);
     }

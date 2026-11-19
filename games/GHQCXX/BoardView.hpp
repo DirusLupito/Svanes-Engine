@@ -96,10 +96,10 @@ public:
      * Displays the active team's turn beside the board.
      *
      * @param world The registry used to initialize the view.
-     * @param team The team taking its turn.
+     * @param board The board whose turn is displayed.
      * @param camera The camera used to draw the board.
      */
-    void ShowTurn(svanes::Registry &world, Team team,
+    void ShowTurn(svanes::Registry &world, const Board &board,
                   const svanes::Camera2D &camera);
 
     /**
@@ -156,14 +156,17 @@ private:
                TeamCount>
         reserveEntities;
 
-    // The point sizes for board labels. Reserve quantities use the smallest.
-    static constexpr std::array LabelFontSizes{24.0F, 56.0F, 112.0F};
+    // The point sizes for board labels, from smallest to largest.
+    static constexpr std::array LabelFontSizes{12.0F, 24.0F, 56.0F, 112.0F};
 
     // The label fonts, ordered from smallest to largest.
     std::array<svanes::FontHandle, LabelFontSizes.size()> labelFonts{};
 
     // The label beside the board naming the team taking its turn.
     svanes::Entity turnLabel = 0;
+
+    // The number of moves left in the active team's turn.
+    svanes::Entity movesLeftLabel = 0;
 
     // The heading above the client's role.
     svanes::Entity roleHeading = 0;

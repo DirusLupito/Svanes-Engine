@@ -74,6 +74,14 @@ public:
     bool HasActionsRemaining(Team team) const;
 
     /**
+     * Counts the actions a team can still take this turn.
+     *
+     * @param team The team whose actions to count.
+     * @return The number of actions remaining.
+     */
+    std::uint8_t GetActionsRemaining(Team team) const;
+
+    /**
      * Passes the turn to the other team.
      */
     void EndTurn();
