@@ -1,0 +1,37 @@
+# List available commands.
+default:
+    @just --justfile "{{justfile()}}" --list
+
+set working-directory := "../.."
+
+import '../../scripts/common.just'
+
+# Build the marchingOrders client and server in Debug mode.
+build: (_build "svanes_game_marching_orders svanes_game_marching_orders_server")
+
+# Build the marchingOrders client and server in RelWithDebInfo mode.
+release: (_release "svanes_game_marching_orders svanes_game_marching_orders_server")
+
+# Build and launch the RelWithDebInfo marchingOrders client.
+run *args: (_release "svanes_game_marching_orders")
+    {{release-bin-dir}}svanes_game_marching_orders{{exe-suffix}} {{args}}
+
+# Build and launch the RelWithDebInfo marchingOrders server.
+server *args: (_release "svanes_game_marching_orders_server")
+    {{release-bin-dir}}svanes_game_marching_orders_server{{exe-suffix}} {{args}}
+
+# Launch the RelWithDebInfo marchingOrders client without compiling.
+nocompile *args:
+    {{release-bin-dir}}svanes_game_marching_orders{{exe-suffix}} {{args}}
+
+# Launch the RelWithDebInfo marchingOrders server without compiling.
+nocompile-server *args:
+    {{release-bin-dir}}svanes_game_marching_orders_server{{exe-suffix}} {{args}}
+
+# Build and launch the Debug marchingOrders client.
+debug *args: (_build "svanes_game_marching_orders")
+    {{bin-dir}}svanes_game_marching_orders{{exe-suffix}} {{args}}
+
+# Build and launch the Debug marchingOrders server.
+debug-server *args: (_build "svanes_game_marching_orders_server")
+    {{bin-dir}}svanes_game_marching_orders_server{{exe-suffix}} {{args}}
