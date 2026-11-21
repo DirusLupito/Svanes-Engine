@@ -42,6 +42,27 @@ public:
     void Update(svanes::Registry &world, float seconds);
 
 private:
+    /**
+     * An entity of the road view and where it sits when the view is not
+     * shifted.
+     *
+     * FIELDS:
+     * - entity: The entity.
+     * - resting_y: The y position of its Transform with no shift applied.
+     */
+    struct RestingShape {
+        svanes::Entity entity;
+        float resting_y;
+    };
+
+    /**
+     * Moves every entity of the road view up or down from where it rests.
+     * @param world The world holding them.
+     * @param offset How far to move them, in pixels, positive downward.
+     */
+    void ShiftVertically(svanes::Registry &world, float offset);
+
+    std::vector<RestingShape> shapes;
     std::vector<svanes::Entity> dashes;
     std::vector<svanes::Entity> telephone_poles;
     std::vector<svanes::Entity> street_lamps;

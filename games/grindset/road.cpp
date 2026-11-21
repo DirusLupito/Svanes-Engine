@@ -19,6 +19,7 @@ namespace {
 constexpr float kViewWidth = 1920.0F;
 constexpr float kHorizonY = 600.0F;
 constexpr std::int32_t kSkyBandCount = 60;
+constexpr float kShiftMargin = 8.0F;
 
 constexpr std::int32_t kSkyZ = 0;
 constexpr std::int32_t kSunGlowZ = 1;
@@ -166,27 +167,34 @@ svanes::Color SkyColorAt(float position) {
     return kSkyStops.back().color;
 }
 
-void CreateSky(svanes::Registry &world) {
+std::vector<svanes::Entity> CreateSky(svanes::Registry &world) {
+    std::vector<svanes::Entity> bands;
     const float band_height = kHorizonY / static_cast<float>(kSkyBandCount);
     for (std::int32_t band = 0; band < kSkyBandCount; ++band) {
-        const float top = band_height * static_cast<float>(band);
+        float center_y = band_height * (static_cast<float>(band) + 0.5F);
+        float height = band_height + 1.0F;
+        if (band == 0) {
+            center_y -= kShiftMargin * 0.5F;
+            height += kShiftMargin;
+        }
         const float position = (static_cast<float>(band) + 0.5F) /
                                static_cast<float>(kSkyBandCount);
 
         const svanes::Entity entity = world.CreateEntity();
         world.AddComponent<svanes::Transform>(
-            entity, svanes::Transform{.x = kViewWidth * 0.5F,
-                                      .y = top + band_height * 0.5F});
+            entity, svanes::Transform{.x = kViewWidth * 0.5F, .y = center_y});
         world.AddComponent<svanes::SolidShape>(
-            entity, svanes::SolidShape{.color = SkyColorAt(position),
-                                       .geometry = svanes::Rectangle2D{
-                                           .width = kViewWidth,
-                                           .height = band_height + 1.0F}});
+            entity,
+            svanes::SolidShape{.color = SkyColorAt(position),
+                               .geometry = svanes::Rectangle2D{
+                                   .width = kViewWidth, .height = height}});
         world.AddComponent<svanes::ZOrder>(entity, svanes::ZOrder{kSkyZ});
+        bands.push_back(entity);
     }
+    return bands;
 }
 
-void CreateSun(svanes::Registry &world) {
+std::array<svanes::Entity, 2> CreateSun(svanes::Registry &world) {
     const svanes::Entity glow = world.CreateEntity();
     world.AddComponent<svanes::Transform>(
         glow, svanes::Transform{.x = kSun.x, .y = kSun.y});
@@ -207,6 +215,7 @@ void CreateSun(svanes::Registry &world) {
                  .color = {.red = 255, .green = 238, .blue = 196},
                  .geometry = svanes::Circle2D{.radius = kSun.radius}});
     world.AddComponent<svanes::ZOrder>(sun, svanes::ZOrder{kSunZ});
+    return {glow, sun};
 }
 
 svanes::Entity CreatePolygon(svanes::Registry &world,
@@ -396,44 +405,48 @@ void PlaceWires(svanes::Registry &world,
     }
 }
 
-void CreateGround(svanes::Registry &world) {
+svanes::Entity CreateGround(svanes::Registry &world) {
+    const float bottom = kViewHeight + kShiftMargin;
     const svanes::Entity entity = world.CreateEntity();
     world.AddComponent<svanes::Transform>(
         entity, svanes::Transform{.x = kViewWidth * 0.5F,
-                                  .y = (kHorizonY + kViewHeight) * 0.5F});
+                                  .y = (kHorizonY + bottom) * 0.5F});
     world.AddComponent<svanes::SolidShape>(
-        entity, svanes::SolidShape{.color = kGroundColor,
-                                   .geometry = svanes::Rectangle2D{
-                                       .width = kViewWidth,
-                                       .height = kViewHeight - kHorizonY}});
+        entity, svanes::SolidShape{
+                    .color = kGroundColor,
+                    .geometry = svanes::Rectangle2D{
+                        .width = kViewWidth, .height = bottom - kHorizonY}});
     world.AddComponent<svanes::ZOrder>(entity, svanes::ZOrder{kGroundZ});
+    return entity;
 }
 
-void CreateStrip(svanes::Registry &world, float left, float right,
-                 svanes::Color color, std::int32_t z_order) {
+svanes::Entity CreateStrip(svanes::Registry &world, float left, float right,
+                           svanes::Color color, std::int32_t z_order) {
     const svanes::ConvexPolygon2D shape =
         RoadStrip(left, right, kNearestDepth, kHorizonDepth);
-    CreatePolygon(world, shape.Vertices(), color, z_order);
+    return CreatePolygon(world, shape.Vertices(), color, z_order);
 }
 
-void CreateRoad(svanes::Registry &world) {
+std::array<svanes::Entity, 3> CreateRoad(svanes::Registry &world) {
     const float left = kRoadCenter - kRoadHalfWidth;
     const float right = kRoadCenter + kRoadHalfWidth;
-    CreateStrip(world, left, right, kRoadColor, kRoadZ);
-    CreateStrip(world, left + kEdgeLineInset,
-                left + kEdgeLineInset + kEdgeLineWidth, kRoadLineColor,
-                kRoadLineZ);
-    CreateStrip(world, right - kEdgeLineInset - kEdgeLineWidth,
-                right - kEdgeLineInset, kRoadLineColor, kRoadLineZ);
+    return {CreateStrip(world, left, right, kRoadColor, kRoadZ),
+            CreateStrip(world, left + kEdgeLineInset,
+                        left + kEdgeLineInset + kEdgeLineWidth, kRoadLineColor,
+                        kRoadLineZ),
+            CreateStrip(world, right - kEdgeLineInset - kEdgeLineWidth,
+                        right - kEdgeLineInset, kRoadLineColor, kRoadLineZ)};
 }
 
 } // namespace
 
 void Road::Initialize(svanes::Registry &world) {
-    CreateSky(world);
-    CreateSun(world);
-    CreateGround(world);
-    CreateRoad(world);
+    std::vector<svanes::Entity> created = CreateSky(world);
+    const std::array<svanes::Entity, 2> sun = CreateSun(world);
+    created.insert(created.end(), sun.begin(), sun.end());
+    created.push_back(CreateGround(world));
+    const std::array<svanes::Entity, 3> road = CreateRoad(world);
+    created.insert(created.end(), road.begin(), road.end());
 
     for (std::size_t index = 0; index < kDashCount; ++index) {
         dashes.push_back(CreateMovingShape(world, kRoadLineColor, kRoadLineZ));
@@ -443,8 +456,26 @@ void Road::Initialize(svanes::Registry &world) {
     for (std::size_t index = 0; index < kWireCount; ++index) {
         wires.push_back(CreateMovingShape(world, kWireColor, kPropZ));
     }
+    created.insert(created.end(), dashes.begin(), dashes.end());
+    created.insert(created.end(), telephone_poles.begin(),
+                   telephone_poles.end());
+    created.insert(created.end(), street_lamps.begin(), street_lamps.end());
+    created.insert(created.end(), wires.begin(), wires.end());
+
+    for (const svanes::Entity entity : created) {
+        shapes.push_back(
+            {.entity = entity,
+             .resting_y = world.GetComponent<svanes::Transform>(entity).y});
+    }
 
     Update(world, 0.0F);
+}
+
+void Road::ShiftVertically(svanes::Registry &world, float offset) {
+    for (const RestingShape &shape : shapes) {
+        world.GetComponent<svanes::Transform>(shape.entity).y =
+            shape.resting_y + offset;
+    }
 }
 
 void Road::Update(svanes::Registry &world, float seconds) {
@@ -461,6 +492,7 @@ void Road::Update(svanes::Registry &world, float seconds) {
                  distance);
     PlacePropRow(world, street_lamps, kStreetLamp, kLampPeriod, distance);
     PlaceWires(world, wires, distance);
+    ShiftVertically(world, 0.0F);
 }
 
 } // namespace grindset

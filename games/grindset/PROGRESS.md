@@ -9,8 +9,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [x] 1.4 Scrolling lane dashes
 - [x] 1.5 Telephone poles (left) + unlit street lamps (right)
 - [x] 1.6 Sagging wires between telephone poles
-- [ ] 1.7a Refactor: `Road` records each entity's resting y and can shift them all by one vertical offset (no visual change) — **NEXT, awaiting approval**
-- [ ] 1.7b Faint camera bob (two slow sines, ~±3px) driving that offset
+- [x] 1.7a Refactor: `Road` records each entity's resting y and can shift them all by one vertical offset (no visual change)
+- [ ] 1.7b Faint camera bob (two slow sines, ~±3px) driving that offset — **NEXT, awaiting approval**
 
 ## Phase 2: Phone
 - [ ] 2.1 Phone frame + screen rect in held position
@@ -68,7 +68,7 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 
 ## Where we left off
 All work through 1.6 is committed (last: `keep wires until far pole passes`).
-Next up is 1.7a, proposed but not yet approved.
+1.7a done (uncommitted). Next up is 1.7b, proposed but not yet approved.
 
 ## Deviations from plan
 - Emoji check moved to 2.4 (status bar glyph) so the risk is seen early.
