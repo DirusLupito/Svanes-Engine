@@ -13,8 +13,8 @@ blackjack (bet → player turn → dealer turn).
 
 ### Phone
 - Space/Tab toggles pocket ↔ held (ignored while typing in chat).
-- Held in the right side of the view, nearly full height (~1000px tall, ~480px
-  wide), fully on screen since it is all players interact with; slides up/down with easing;
+- Held in the right side of the view, large (422x880, bottom edge at y=1040,
+  x=1400), fully on screen since it is all players interact with; slides up/down with easing;
   gentle translate-only sway while held (text can't rotate).
 - Status bar: clock fixed at 5:30, balance.
 - Home bar at the bottom returns to the home screen.

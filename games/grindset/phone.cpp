@@ -15,11 +15,13 @@ namespace grindset {
 
 namespace {
 
-constexpr svanes::Vector2D kHeldPosition{1400.0F, 540.0F};
+constexpr float kBodyWidth = 422.0F;
+constexpr float kBodyHeight = 880.0F;
+constexpr float kBodyBottom = 1040.0F;
+constexpr svanes::Vector2D kHeldPosition{1400.0F,
+                                         kBodyBottom - kBodyHeight * 0.5F};
 
-constexpr float kBodyWidth = 480.0F;
-constexpr float kBodyHeight = 1000.0F;
-constexpr float kBodyCornerRadius = 56.0F;
+constexpr float kBodyCornerRadius = 50.0F;
 constexpr float kBezel = 14.0F;
 constexpr float kScreenWidth = kBodyWidth - kBezel * 2.0F;
 constexpr float kScreenHeight = kBodyHeight - kBezel * 2.0F;

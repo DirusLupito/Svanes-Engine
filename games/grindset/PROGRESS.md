@@ -80,7 +80,7 @@ All work through 1.7b is committed (last: `more bob`).
   projected by `ProjectPoint` in `road.cpp`; camera sits in the right lane.
 - Camera bob can't use the engine camera: text labels ignore it, so the phone
   text would drift from the phone frame. Bob is applied inside `Road` instead.
-- Phone is ~1000x480 at x=1400 (not 60% coverage). All phone parts share one
+- Phone is 422x880 at x=1400, bottom edge at y=1040 (not 60% coverage; first tried 480x1000, too tall). All phone parts share one
   Transform at the phone center with geometry relative to it, so moving the
   phone is one position. Phone z starts at 100, leaving room for the car interior.
 - 2.1b car interior added by Erik, right after the phone frame.
