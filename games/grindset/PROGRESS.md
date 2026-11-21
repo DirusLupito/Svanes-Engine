@@ -17,8 +17,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [x] 2.1b First-person car interior around the road view
 - [x] 2.2 Space/Tab pocket ↔ held toggle with eased slide (starts in pocket)
 - [x] 2.2b Fonts + assets setup (pulled from 2.4), hint text on screen to take out the phone
-- [ ] 2.3 Gentle translate-only sway while held — **NEXT, awaiting approval**
-- [ ] 2.4 Status bar (5:30 clock, balance, an emoji glyph as the early emoji check)
+- [x] 2.3 Gentle translate-only sway while held
+- [ ] 2.4 Status bar (5:30 clock, balance) — **NEXT, awaiting approval**
 - [ ] 2.5 Home screen wallpaper + two clickable app icons
 - [ ] 2.6 Home bar returns to home screen
 - [ ] 2.7 App-open transition (rect grows from icon, content fades in) into placeholder apps
@@ -69,11 +69,11 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [ ] 6.5 Dealer banter + chat-reply captions
 
 ## Where we left off
-All work through 2.2 is committed (last: `toggle phone between pocket and hand`).
-2.2b done (uncommitted). Next up is 2.3, proposed but not yet approved.
+All work through 2.2b is committed (last: `add font assets and pocket hint for taking out the phone`).
+2.3 done (uncommitted). Next up is 2.4, proposed but not yet approved.
 
 ## Deviations from plan
-- Emoji check moved to 2.4 (status bar glyph) so the risk is seen early.
+- Emoji check dropped from 2.4 (Erik); revisit when reels need emoji (5.10), with the PNG or no-emoji fallback still open.
 - `svanes_game_package` + `GRINDSET_ASSETS_DIR` added in 2.2b with the first asset (font); packaging needs an `assets/` folder. Font is goose's `consola.ttf` (28pt), loaded once in `Grindset`.
 - 1.5 split into poles/lamps (1.5) and wires (1.6); camera bob moved to 1.7.
 - Poles and lamps use even spacing, not random gaps (wires need regular poles).

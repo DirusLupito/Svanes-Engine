@@ -27,6 +27,11 @@ constexpr float kPocketGap = 20.0F;
 constexpr float kPocketY = kViewHeight + kBodyHeight * 0.5F + kPocketGap;
 constexpr float kSlideSeconds = 0.35F;
 
+constexpr float kSwaySidewaysPeriod = 3.7F;
+constexpr float kSwaySidewaysAmplitude = 5.0F;
+constexpr float kSwayVerticalPeriod = 2.6F;
+constexpr float kSwayVerticalAmplitude = 4.0F;
+
 constexpr float kBodyCornerRadius = 50.0F;
 constexpr float kBezel = 14.0F;
 constexpr float kScreenWidth = kBodyWidth - kBezel * 2.0F;
@@ -94,6 +99,22 @@ svanes::Entity CreatePart(svanes::Registry &world, svanes::Vector2D position,
     return entity;
 }
 
+/**
+ * Finds how far an unsteady hand has moved the held phone from where it rests.
+ * The sideways and up-down waves have different lengths so the motion does
+ * not repeat in an obvious way.
+ *
+ * @param elapsed The time since the phone was created, in seconds.
+ * @return The shift from the held position, in pixels.
+ */
+svanes::Vector2D SwayOffset(float elapsed) {
+    constexpr float kTau = 2.0F * std::numbers::pi_v<float>;
+    return {kSwaySidewaysAmplitude *
+                std::sin(kTau * elapsed / kSwaySidewaysPeriod),
+            kSwayVerticalAmplitude *
+                std::sin(kTau * elapsed / kSwayVerticalPeriod)};
+}
+
 } // namespace
 
 void Phone::Initialize(svanes::Registry &world, svanes::FontHandle font) {
@@ -134,6 +155,7 @@ void Phone::Initialize(svanes::Registry &world, svanes::FontHandle font) {
 void Phone::Toggle() { held = !held; }
 
 void Phone::Update(svanes::Registry &world, float seconds) {
+    elapsed += seconds;
     const float step = seconds / kSlideSeconds;
     if (held) {
         slide = std::min(slide + step, 1.0F);
@@ -146,7 +168,9 @@ void Phone::Update(svanes::Registry &world, float seconds) {
 
 void Phone::Place(svanes::Registry &world) {
     const float eased = slide * slide * (3.0F - 2.0F * slide);
-    position = {kHeldPosition.x, std::lerp(kPocketY, kHeldPosition.y, eased)};
+    const svanes::Vector2D sway = SwayOffset(elapsed);
+    position = {kHeldPosition.x + sway.x * eased,
+                std::lerp(kPocketY, kHeldPosition.y, eased) + sway.y * eased};
     for (const svanes::Entity entity : parts) {
         svanes::Transform &transform =
             world.GetComponent<svanes::Transform>(entity);

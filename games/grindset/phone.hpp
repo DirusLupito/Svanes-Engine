@@ -19,7 +19,9 @@ namespace grindset {
  * The phone is either held up or put away in the pocket, fully below the
  * bottom of the view, and eases between the two when toggled. It starts in the
  * pocket. While it is all the way in the pocket, a hint near where it comes up
- * tells the player how to take it out.
+ * tells the player how to take it out. While held, it sways gently as if in an
+ * unsteady hand, without tilting, since text on it cannot rotate. The sway
+ * fades in and out with the slide.
  *
  * Every part of the phone shares one Transform at the phone's center, with its
  * geometry placed relative to that center, so the whole phone moves by moving
@@ -60,7 +62,7 @@ public:
 private:
     /**
      * Puts the phone where its slide currently has it, eased so it starts and
-     * stops gently.
+     * stops gently, plus as much of the hand's sway as the slide allows.
      * @param world The world holding it.
      */
     void Place(svanes::Registry &world);
@@ -69,6 +71,7 @@ private:
     svanes::Entity hint{};
     svanes::Vector2D position{};
     float slide = 0.0F;
+    float elapsed = 0.0F;
     bool held = false;
 };
 
