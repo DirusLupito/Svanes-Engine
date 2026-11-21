@@ -3,5 +3,6 @@ add_executable(
     main.cpp
     grindset.cpp
     road.cpp
+    phone.cpp
 )
 target_link_libraries(svanes_game_grindset PRIVATE Svanes::Engine)

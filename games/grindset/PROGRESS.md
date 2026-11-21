@@ -13,7 +13,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [x] 1.7b Faint camera bob (two slow sines, ~±6px) driving that offset
 
 ## Phase 2: Phone
-- [ ] 2.1 Phone frame + screen rect in held position
+- [x] 2.1 Phone frame + screen rect in held position
+- [ ] 2.1b First-person car interior around the road view — **NEXT, details to discuss**
 - [ ] 2.2 Space/Tab pocket ↔ held toggle with eased slide
 - [ ] 2.3 Gentle translate-only sway while held
 - [ ] 2.4 Fonts + status bar (5:30 clock, balance, an emoji glyph as the early emoji check)
@@ -67,8 +68,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [ ] 6.5 Dealer banter + chat-reply captions
 
 ## Where we left off
-All work through 1.7a is committed (last: `let road shift vertically from resting positions`).
-1.7b done (uncommitted). Next up is 2.1, proposed but not yet approved.
+All work through 1.7b is committed (last: `more bob`).
+2.1 done (uncommitted). Next up is 2.1b (car interior, added by Erik), details not yet agreed.
 
 ## Deviations from plan
 - Emoji check moved to 2.4 (status bar glyph) so the risk is seen early.
@@ -79,3 +80,7 @@ All work through 1.7a is committed (last: `let road shift vertically from restin
   projected by `ProjectPoint` in `road.cpp`; camera sits in the right lane.
 - Camera bob can't use the engine camera: text labels ignore it, so the phone
   text would drift from the phone frame. Bob is applied inside `Road` instead.
+- Phone is ~1000x480 at x=1400 (not 60% coverage). All phone parts share one
+  Transform at the phone center with geometry relative to it, so moving the
+  phone is one position. Phone z starts at 100, leaving room for the car interior.
+- 2.1b car interior added by Erik, right after the phone frame.

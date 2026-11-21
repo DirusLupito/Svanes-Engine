@@ -1,5 +1,6 @@
 #pragma once
 
+#include "phone.hpp"
 #include "road.hpp"
 
 #include <svanes/game.hpp>
@@ -38,6 +39,7 @@ public:
 
 private:
     Road road;
+    Phone phone;
     bool quit = false;
 };
 
