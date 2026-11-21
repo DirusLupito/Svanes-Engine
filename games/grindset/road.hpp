@@ -16,30 +16,35 @@ namespace grindset {
  * horizon, since the engine has no linear gradients. The ground below the
  * horizon hides the bottom of the sun.
  *
- * Center line dashes scroll toward the camera in perspective, growing as they
- * approach, and start over at the horizon once they pass the bottom of the
- * view.
+ * Center line dashes, telephone poles on the left, and street lamps on the
+ * right scroll toward the camera in perspective, growing as they approach, and
+ * start over at the horizon once they pass the camera. The lamps reach out over
+ * the road and are unlit, since the sun is up. Poles and lamps fade in out of
+ * the distance so they don't pop into view.
  */
 class Road final {
 public:
     /**
      * Creates the sky bands, the sun and its glow, the ground, and the road
-     * with its edge lines and center line dashes.
+     * with its edge lines, center line dashes, telephone poles, and street
+     * lamps.
      * @param world The world to create them in. World coordinates are expected
      * to match screen pixels on a 1920x1080 view.
      */
     void Initialize(svanes::Registry &world);
 
     /**
-     * Moves the center line dashes toward the camera.
-     * @param world The world holding the dashes.
+     * Moves the dashes, poles, and lamps toward the camera.
+     * @param world The world holding them.
      * @param seconds The time since the previous update, in seconds.
      */
     void Update(svanes::Registry &world, float seconds);
 
 private:
     std::vector<svanes::Entity> dashes;
-    float dash_offset = 0.0F;
+    std::vector<svanes::Entity> telephone_poles;
+    std::vector<svanes::Entity> street_lamps;
+    float distance = 0.0F;
 };
 
 } // namespace grindset
