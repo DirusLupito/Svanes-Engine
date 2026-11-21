@@ -26,7 +26,7 @@ constexpr float kHoodRaise = 24.0F;
 constexpr float kHoodInset = 60.0F;
 constexpr std::int32_t kArchSegments = 16;
 
-constexpr svanes::Vector2D kWheelCenter{560.0F, 1180.0F};
+constexpr svanes::Vector2D kWheelCenter{960.0F, 1180.0F};
 constexpr float kWheelRadius = 400.0F;
 constexpr float kWheelThickness = 44.0F;
 constexpr float kWheelStartDegrees = -195.0F;
@@ -34,10 +34,10 @@ constexpr float kWheelEndDegrees = 15.0F;
 constexpr std::int32_t kWheelSegments = 28;
 
 constexpr svanes::Rectangle2D kMirrorStem{
-    .x = 900.0F, .y = 84.0F, .width = 12.0F, .height = 40.0F};
+    .x = 1189.0F, .y = 88.0F, .width = 16.0F, .height = 56.0F};
 constexpr svanes::Rectangle2D kMirrorFrame{
-    .x = 900.0F, .y = 128.0F, .width = 216.0F, .height = 66.0F};
-constexpr float kMirrorFrameWidth = 8.0F;
+    .x = 1189.0F, .y = 172.0F, .width = 380.0F, .height = 116.0F};
+constexpr float kMirrorFrameWidth = 10.0F;
 
 constexpr std::int32_t kHoodZ = 50;
 constexpr std::int32_t kDashZ = 51;
@@ -119,26 +119,16 @@ void CreateWindshieldFrame(svanes::Registry &world,
                                     .width = kViewWidth + kMargin * 2.0F,
                                     .height = kRoofBottom + kMargin}},
         kFrameZ));
-    parts.push_back(CreatePart(
-        world,
-        svanes::SolidShape{
-            .color = kFrameColor,
-            .geometry =
-                svanes::ConvexPolygon2D{{{150.0F, kRoofBottom - 10.0F},
-                                         {260.0F, kRoofBottom - 10.0F},
-                                         {60.0F, kDashEdgeY + 10.0F},
-                                         {-kMargin, kDashEdgeY + 10.0F}}}},
-        kFrameZ));
-    parts.push_back(CreatePart(
-        world,
-        svanes::SolidShape{.color = kFrameColor,
-                           .geometry =
-                               svanes::ConvexPolygon2D{
-                                   {{kViewWidth - 260.0F, kRoofBottom - 10.0F},
-                                    {kViewWidth - 150.0F, kRoofBottom - 10.0F},
-                                    {kViewWidth + kMargin, kDashEdgeY + 10.0F},
-                                    {kViewWidth - 60.0F, kDashEdgeY + 10.0F}}}},
-        kFrameZ));
+    parts.push_back(
+        CreatePart(world,
+                   svanes::SolidShape{.color = kFrameColor,
+                                      .geometry =
+                                          svanes::ConvexPolygon2D{
+                                              {{-kMargin, kRoofBottom - 10.0F},
+                                               {130.0F, kRoofBottom - 10.0F},
+                                               {280.0F, kDashEdgeY + 10.0F},
+                                               {210.0F, kDashEdgeY + 10.0F}}}},
+                   kFrameZ));
 }
 
 void CreateDashboard(svanes::Registry &world,

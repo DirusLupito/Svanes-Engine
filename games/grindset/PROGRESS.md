@@ -84,7 +84,8 @@ All work through 2.1 is committed (last: `change phone size`).
   Transform at the phone center with geometry relative to it, so moving the
   phone is one position. Phone z starts at 100, leaving room for the car interior.
 - 2.1b car interior added by Erik, right after the phone frame.
-- Car interior (`car_interior.*`): roof, pillars, hood sliver, plain dashboard,
-  top of the steering wheel (rim from short pieces), non-reflecting mirror. All
-  parts rest at Transform y 0 (absolute geometry), so bobbing is setting y; it
+- Car interior (`car_interior.*`): roof, left pillar only (leans out toward the top),
+  hood sliver, plain dashboard, centered steering wheel top (rim from short
+  pieces), big non-reflecting mirror centered on the phone's left edge, partly
+  behind it. All parts rest at Transform y 0 (absolute geometry), so bobbing is setting y; it
   moves 40% of `Road::CurrentBob()`.

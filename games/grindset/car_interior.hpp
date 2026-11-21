@@ -9,11 +9,12 @@ namespace grindset {
 
 /**
  * The inside of the car around the road view, seen from the driver's seat: a
- * roof edge across the top and a pillar down each side framing the
- * windshield, a dashboard across the bottom with the edge of the hood just
- * above it, the top of the steering wheel in the lower left, and a rearview
- * mirror hanging from the roof. Everything is a plain placeholder shape. It
- * draws above the road and below the phone.
+ * roof edge across the top and the left pillar framing the windshield (the
+ * right one is out of view), a dashboard across the bottom with the edge of
+ * the hood just above it, the top of the steering wheel centered below the
+ * view, and a rearview mirror hanging from the roof, partly behind the phone.
+ * Everything is a plain placeholder shape. It draws above the road and below
+ * the phone.
  *
  * The interior bobs along with the road, but by less, so the outside moves a
  * little against the car.
