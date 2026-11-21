@@ -58,11 +58,11 @@ constexpr float kWallpaperCapExtra = 20.0F;
 constexpr svanes::Color kWallpaperTop{.red = 46, .green = 58, .blue = 112};
 constexpr svanes::Color kWallpaperBottom{.red = 148, .green = 92, .blue = 138};
 
-constexpr float kIconSize = 88.0F;
-constexpr float kIconCornerRadius = 20.0F;
-constexpr float kIconFromTop = 110.0F;
-constexpr float kFirstIconFromLeft = 80.0F;
-constexpr float kIconSpacing = 130.0F;
+constexpr float kIconColumns = 3.0F;
+constexpr float kIconColumnWidth = kScreenWidth / kIconColumns;
+constexpr float kIconSize = 80.0F;
+constexpr float kIconCornerRadius = 18.0F;
+constexpr float kIconFromTop = 100.0F;
 constexpr float kIconNameGap = 8.0F;
 constexpr float kPressedShade = 0.7F;
 
@@ -180,12 +180,13 @@ svanes::Color Shade(svanes::Color color, float amount) {
 /**
  * Finds where an app icon's center sits relative to the phone's center.
  *
- * @param index The app's position on the home screen, from the left.
+ * @param index The app's column on the home screen, from the left. The
+ * screen is split into three equal columns, so the middle column is centered.
  * @return The icon's center, relative to the phone's center.
  */
 svanes::Vector2D IconCenter(std::size_t index) {
-    return {-kScreenWidth * 0.5F + kFirstIconFromLeft +
-                kIconSpacing * static_cast<float>(index),
+    return {-kScreenWidth * 0.5F +
+                kIconColumnWidth * (static_cast<float>(index) + 0.5F),
             -kScreenHeight * 0.5F + kIconFromTop};
 }
 

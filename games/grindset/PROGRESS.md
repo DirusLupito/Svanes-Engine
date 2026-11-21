@@ -20,8 +20,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [x] 2.3 Gentle translate-only sway while held
 - [x] 2.4 Status bar (5:30am clock, balance)
 - [x] 2.5 Home screen wallpaper + two clickable app icons
-- [ ] 2.6 Home bar returns to home screen — **NEXT, awaiting approval**
-- [ ] 2.7 App-open transition (rect grows from icon, content fades in) into placeholder apps
+- [ ] 2.6 App-open transition (rect grows from icon, content fades in) into placeholder apps — **NEXT, approved**
+- [ ] 2.7 Home bar returns to home screen
 - [ ] 2.8 Remember last app when pulled out again
 
 ## Phase 3: Engine changes (flagged)
@@ -70,7 +70,7 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 
 ## Where we left off
 All work through 2.4 is committed (last: `status bar with clock and balance`).
-2.5 done (uncommitted). Next up is 2.6, proposed but not yet approved.
+2.5 done (uncommitted, icons resized onto a 3-column grid). Next up is 2.6 (app opening), approved.
 
 ## Deviations from plan
 - Emoji check dropped from 2.4 (Erik); revisit when reels need emoji (5.10), with the PNG or no-emoji fallback still open.
@@ -100,3 +100,6 @@ All work through 2.4 is committed (last: `status bar with clock and balance`).
   is a "cap" shape in the bottom color, so no clipping is needed. Icons are plain
   rounded squares (not real logos); a click darkens the icon until release, and
   only counts while the phone is fully held.
+- 2.6/2.7 swapped: app opening comes before the home bar, so the home bar has
+  something to close. Icons sit on a 3-column grid (80px icons) after the first
+  layout put Instagram right of center.
