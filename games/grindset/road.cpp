@@ -55,12 +55,21 @@ constexpr float kLampLateral = kRoadCenter + kRoadHalfWidth + 0.5F;
 constexpr float kLampPeriod = 16.0F;
 constexpr std::size_t kLampCount = 9;
 
+constexpr std::array<float, 3> kWireOffsets{-0.7F, -0.3F, 0.7F};
+constexpr float kWireHeight = 4.2F;
+constexpr float kWireSag = 0.35F;
+constexpr float kWireThickness = 0.025F;
+constexpr std::size_t kWireSegments = 8;
+constexpr std::size_t kWireCount =
+    (kTelephoneCount - 1) * kWireOffsets.size() * kWireSegments;
+
 constexpr svanes::Color kGroundColor{.red = 54, .green = 48, .blue = 58};
 constexpr svanes::Color kRoadColor{.red = 36, .green = 36, .blue = 44};
 constexpr svanes::Color kRoadLineColor{.red = 214, .green = 204, .blue = 192};
 constexpr svanes::Color kPoleColor{.red = 46, .green = 36, .blue = 40};
 constexpr svanes::Color kLampColor{.red = 66, .green = 68, .blue = 78};
 constexpr svanes::Color kLampHeadColor{.red = 92, .green = 94, .blue = 104};
+constexpr svanes::Color kWireColor{.red = 30, .green = 26, .blue = 32};
 
 /**
  * One upright rectangle of a roadside prop, facing the camera.
@@ -322,6 +331,65 @@ void PlacePropRow(svanes::Registry &world,
     }
 }
 
+float WireHalfThickness(float depth) {
+    return std::max(kWireThickness * kDepthScale / depth, 1.0F) * 0.5F;
+}
+
+/**
+ * Builds one short piece of a wire hanging between two telephone poles. The
+ * wire sags lowest halfway between the poles.
+ *
+ * @param lateral The wire's sideways distance from the camera.
+ * @param near_depth The distance ahead of the camera to the nearer pole.
+ * @param far_depth The distance ahead of the camera to the farther pole.
+ * @param start Where the piece starts, from 0 at the nearer pole to 1 at the
+ * farther pole.
+ * @param end Where the piece ends, on the same scale as start.
+ * @return The piece as a thin parallelogram.
+ */
+svanes::ConvexPolygon2D WirePiece(float lateral, float near_depth,
+                                  float far_depth, float start, float end) {
+    const float start_depth = std::lerp(near_depth, far_depth, start);
+    const float end_depth = std::lerp(near_depth, far_depth, end);
+    const svanes::Vector2D first = ProjectPoint(
+        lateral, kWireHeight - kWireSag * 4.0F * start * (1.0F - start),
+        start_depth);
+    const svanes::Vector2D second = ProjectPoint(
+        lateral, kWireHeight - kWireSag * 4.0F * end * (1.0F - end), end_depth);
+    const float first_half = WireHalfThickness(start_depth);
+    const float second_half = WireHalfThickness(end_depth);
+    return svanes::ConvexPolygon2D{{{first.x, first.y - first_half},
+                                    {second.x, second.y - second_half},
+                                    {second.x, second.y + second_half},
+                                    {first.x, first.y + first_half}}};
+}
+
+void PlaceWires(svanes::Registry &world,
+                std::span<const svanes::Entity> entities, float distance) {
+    const float row_length =
+        static_cast<float>(kTelephoneCount) * kTelephonePeriod;
+    std::size_t next = 0;
+    for (std::size_t gap = 0; gap + 1 < kTelephoneCount; ++gap) {
+        const float near_depth = SlotDepth(gap, kTelephonePeriod, distance);
+        const float far_depth = SlotDepth(gap + 1, kTelephonePeriod, distance);
+        for (const float offset : kWireOffsets) {
+            for (std::size_t segment = 0; segment < kWireSegments; ++segment) {
+                const float start = static_cast<float>(segment) /
+                                    static_cast<float>(kWireSegments);
+                const float end = static_cast<float>(segment + 1) /
+                                  static_cast<float>(kWireSegments);
+                svanes::SolidShape &shape =
+                    world.GetComponent<svanes::SolidShape>(entities[next]);
+                shape.geometry = WirePiece(kTelephoneLateral + offset,
+                                           near_depth, far_depth, start, end);
+                shape.color.alpha = FadeAlpha(
+                    std::lerp(near_depth, far_depth, end), row_length);
+                ++next;
+            }
+        }
+    }
+}
+
 void CreateGround(svanes::Registry &world) {
     const svanes::Entity entity = world.CreateEntity();
     world.AddComponent<svanes::Transform>(
@@ -366,6 +434,9 @@ void Road::Initialize(svanes::Registry &world) {
     }
     telephone_poles = CreatePropRow(world, kTelephonePole, kTelephoneCount);
     street_lamps = CreatePropRow(world, kStreetLamp, kLampCount);
+    for (std::size_t index = 0; index < kWireCount; ++index) {
+        wires.push_back(CreateMovingShape(world, kWireColor, kPropZ));
+    }
 
     Update(world, 0.0F);
 }
@@ -383,6 +454,7 @@ void Road::Update(svanes::Registry &world, float seconds) {
     PlacePropRow(world, telephone_poles, kTelephonePole, kTelephonePeriod,
                  distance);
     PlacePropRow(world, street_lamps, kStreetLamp, kLampPeriod, distance);
+    PlaceWires(world, wires, distance);
 }
 
 } // namespace grindset

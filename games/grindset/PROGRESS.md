@@ -8,7 +8,7 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [x] 1.3 Road in perspective (static)
 - [x] 1.4 Scrolling lane dashes
 - [x] 1.5 Telephone poles (left) + unlit street lamps (right)
-- [ ] 1.6 Sagging wires between telephone poles
+- [x] 1.6 Sagging wires between telephone poles
 - [ ] 1.7 Faint camera bob
 
 ## Phase 2: Phone

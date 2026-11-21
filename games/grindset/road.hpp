@@ -19,22 +19,23 @@ namespace grindset {
  * Center line dashes, telephone poles on the left, and street lamps on the
  * right scroll toward the camera in perspective, growing as they approach, and
  * start over at the horizon once they pass the camera. The lamps reach out over
- * the road and are unlit, since the sun is up. Poles and lamps fade in out of
+ * the road and are unlit, since the sun is up. Wires sag between neighboring
+ * telephone poles. Poles and lamps fade in out of
  * the distance so they don't pop into view.
  */
 class Road final {
 public:
     /**
      * Creates the sky bands, the sun and its glow, the ground, and the road
-     * with its edge lines, center line dashes, telephone poles, and street
-     * lamps.
+     * with its edge lines, center line dashes, telephone poles and their
+     * wires, and street lamps.
      * @param world The world to create them in. World coordinates are expected
      * to match screen pixels on a 1920x1080 view.
      */
     void Initialize(svanes::Registry &world);
 
     /**
-     * Moves the dashes, poles, and lamps toward the camera.
+     * Moves the dashes, poles, wires, and lamps toward the camera.
      * @param world The world holding them.
      * @param seconds The time since the previous update, in seconds.
      */
@@ -44,6 +45,7 @@ private:
     std::vector<svanes::Entity> dashes;
     std::vector<svanes::Entity> telephone_poles;
     std::vector<svanes::Entity> street_lamps;
+    std::vector<svanes::Entity> wires;
     float distance = 0.0F;
 };
 
