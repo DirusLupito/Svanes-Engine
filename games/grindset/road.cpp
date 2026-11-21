@@ -57,11 +57,11 @@ constexpr std::size_t kLampCount = 9;
 
 constexpr std::array<float, 3> kWireOffsets{-0.7F, -0.3F, 0.7F};
 constexpr float kWireHeight = 4.2F;
-constexpr float kWireSag = 0.35F;
+constexpr float kWireSag = 0.6F;
 constexpr float kWireThickness = 0.025F;
 constexpr std::size_t kWireSegments = 8;
 constexpr std::size_t kWireCount =
-    (kTelephoneCount - 1) * kWireOffsets.size() * kWireSegments;
+    kTelephoneCount * kWireOffsets.size() * kWireSegments;
 
 constexpr svanes::Color kGroundColor{.red = 54, .green = 48, .blue = 58};
 constexpr svanes::Color kRoadColor{.red = 36, .green = 36, .blue = 44};
@@ -369,15 +369,21 @@ void PlaceWires(svanes::Registry &world,
     const float row_length =
         static_cast<float>(kTelephoneCount) * kTelephonePeriod;
     std::size_t next = 0;
-    for (std::size_t gap = 0; gap + 1 < kTelephoneCount; ++gap) {
-        const float near_depth = SlotDepth(gap, kTelephonePeriod, distance);
-        const float far_depth = SlotDepth(gap + 1, kTelephonePeriod, distance);
+    for (std::size_t gap = 0; gap < kTelephoneCount; ++gap) {
+        const float far_depth = SlotDepth(gap, kTelephonePeriod, distance);
+        const float near_depth = far_depth - kTelephonePeriod;
+        const float visible_start =
+            std::max((kNearestDepth - near_depth) / kTelephonePeriod, 0.0F);
         for (const float offset : kWireOffsets) {
             for (std::size_t segment = 0; segment < kWireSegments; ++segment) {
-                const float start = static_cast<float>(segment) /
-                                    static_cast<float>(kWireSegments);
-                const float end = static_cast<float>(segment + 1) /
-                                  static_cast<float>(kWireSegments);
+                const float start =
+                    std::lerp(visible_start, 1.0F,
+                              static_cast<float>(segment) /
+                                  static_cast<float>(kWireSegments));
+                const float end =
+                    std::lerp(visible_start, 1.0F,
+                              static_cast<float>(segment + 1) /
+                                  static_cast<float>(kWireSegments));
                 svanes::SolidShape &shape =
                     world.GetComponent<svanes::SolidShape>(entities[next]);
                 shape.geometry = WirePiece(kTelephoneLateral + offset,
