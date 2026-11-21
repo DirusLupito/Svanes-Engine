@@ -19,7 +19,7 @@ public:
     void Initialize(svanes::GameContext &context) override;
 
     /**
-     * Checks whether Escape was pressed to quit.
+     * Checks whether Escape was pressed to quit, then moves the road.
      * @param frame The current frame's input and engine services.
      */
     void Update(const svanes::FrameContext &frame) override;

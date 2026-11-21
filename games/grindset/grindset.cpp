@@ -15,6 +15,10 @@ void Grindset::Update(const svanes::FrameContext &frame) {
     if (frame.input.WasPressed(svanes::Key::Escape)) {
         quit = true;
     }
+
+    const float seconds = static_cast<float>(frame.real_delta_tics) /
+                          static_cast<float>(svanes::TicsPerSecond);
+    road.Update(frame.world, seconds);
 }
 
 bool Grindset::ShouldQuit() const { return quit; }

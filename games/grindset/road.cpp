@@ -4,6 +4,7 @@
 #include <svanes/render/render_system.hpp>
 
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <utility>
@@ -30,6 +31,14 @@ constexpr float kRoadTopHalfWidth = 4.0F;
 constexpr float kRoadBottomHalfWidth = 900.0F;
 constexpr float kEdgeLineInner = 0.91F;
 constexpr float kEdgeLineOuter = 0.96F;
+
+constexpr float kDepthScale = kViewHeight - kHorizonY;
+constexpr float kNearestDepth = 0.4F;
+constexpr float kDriveSpeed = 25.0F;
+constexpr float kDashLength = 2.5F;
+constexpr float kDashPeriod = 10.0F;
+constexpr std::size_t kDashCount = 8;
+constexpr float kDashHalfWidth = 0.06F;
 
 constexpr svanes::Color kGroundColor{.red = 54, .green = 48, .blue = 58};
 constexpr svanes::Color kRoadColor{.red = 36, .green = 36, .blue = 44};
@@ -124,9 +133,9 @@ void CreateSun(svanes::Registry &world) {
     world.AddComponent<svanes::ZOrder>(sun, svanes::ZOrder{kSunZ});
 }
 
-void CreatePolygon(svanes::Registry &world,
-                   std::vector<svanes::Vector2D> vertices, svanes::Color color,
-                   std::int32_t z_order) {
+svanes::Entity CreatePolygon(svanes::Registry &world,
+                             std::vector<svanes::Vector2D> vertices,
+                             svanes::Color color, std::int32_t z_order) {
     const svanes::Entity entity = world.CreateEntity();
     world.AddComponent<svanes::Transform>(entity, svanes::Transform{});
     world.AddComponent<svanes::SolidShape>(
@@ -134,6 +143,40 @@ void CreatePolygon(svanes::Registry &world,
                     .color = color,
                     .geometry = svanes::ConvexPolygon2D{std::move(vertices)}});
     world.AddComponent<svanes::ZOrder>(entity, svanes::ZOrder{z_order});
+    return entity;
+}
+
+/**
+ * Projects a point on the road onto the screen. Distances are measured in
+ * camera heights, so a point one camera height ahead lands on the bottom edge
+ * of the view.
+ *
+ * @param lateral The sideways distance from the road's center line.
+ * @param depth The distance ahead of the camera. Must be positive.
+ * @return The point's screen position.
+ */
+svanes::Vector2D ProjectRoadPoint(float lateral, float depth) {
+    return {kVanishingX + lateral * kDepthScale / depth,
+            kHorizonY + kDepthScale / depth};
+}
+
+/**
+ * Builds the shape of one center line dash.
+ *
+ * @param near_depth The distance ahead of the camera to the dash's near end.
+ * @return The dash as a trapezoid narrowing toward the horizon.
+ */
+svanes::ConvexPolygon2D DashShape(float near_depth) {
+    const float far_depth = near_depth + kDashLength;
+    return svanes::ConvexPolygon2D{
+        {ProjectRoadPoint(-kDashHalfWidth, far_depth),
+         ProjectRoadPoint(kDashHalfWidth, far_depth),
+         ProjectRoadPoint(kDashHalfWidth, near_depth),
+         ProjectRoadPoint(-kDashHalfWidth, near_depth)}};
+}
+
+float DashNearDepth(std::size_t index, float offset) {
+    return kNearestDepth + offset + static_cast<float>(index) * kDashPeriod;
 }
 
 void CreateGround(svanes::Registry &world) {
@@ -184,6 +227,25 @@ void Road::Initialize(svanes::Registry &world) {
     CreateSun(world);
     CreateGround(world);
     CreateRoad(world);
+
+    for (std::size_t index = 0; index < kDashCount; ++index) {
+        const svanes::ConvexPolygon2D shape =
+            DashShape(DashNearDepth(index, dash_offset));
+        dashes.push_back(
+            CreatePolygon(world, shape.Vertices(), kRoadLineColor, kRoadLineZ));
+    }
+}
+
+void Road::Update(svanes::Registry &world, float seconds) {
+    dash_offset = std::fmod(dash_offset - kDriveSpeed * seconds, kDashPeriod);
+    if (dash_offset < 0.0F) {
+        dash_offset += kDashPeriod;
+    }
+
+    for (std::size_t index = 0; index < dashes.size(); ++index) {
+        world.GetComponent<svanes::SolidShape>(dashes[index]).geometry =
+            DashShape(DashNearDepth(index, dash_offset));
+    }
 }
 
 } // namespace grindset
