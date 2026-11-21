@@ -1,5 +1,7 @@
 #pragma once
 
+#include "road.hpp"
+
 #include <svanes/game.hpp>
 
 namespace grindset {
@@ -10,7 +12,8 @@ namespace grindset {
 class Grindset final : public svanes::IGame {
 public:
     /**
-     * Sets up the game's views.
+     * Centers the camera so world coordinates match screen pixels, then sets
+     * up the game's views.
      * @param context The engine services and window dimensions.
      */
     void Initialize(svanes::GameContext &context) override;
@@ -34,6 +37,7 @@ public:
     svanes::TicCount GetFrameIntervalTics() const override;
 
 private:
+    Road road;
     bool quit = false;
 };
 

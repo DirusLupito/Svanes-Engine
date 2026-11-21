@@ -4,7 +4,7 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 
 ## Phase 1: Skeleton + road
 - [x] 1.1 Build target, justfile, `main.cpp`, empty `Grindset` opening a 1920x1080 window
-- [ ] 1.2 Sunrise sky gradient + sun
+- [x] 1.2 Sunrise sky gradient + sun
 - [ ] 1.3 Road in perspective (static)
 - [ ] 1.4 Scrolling lane dashes
 - [ ] 1.5 Occasional roadside poles
