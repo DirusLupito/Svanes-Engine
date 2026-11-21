@@ -9,10 +9,12 @@ namespace grindset {
 
 /**
  * The view out the windshield: a sunrise sky with the sun just above the
- * horizon, and a road running from the bottom of the view to a vanishing point
- * at the center of the horizon. The sky is a stack of thin bands fading from
- * deep blue at the top to pale orange at the horizon, since the engine has no
- * linear gradients. The ground below the horizon hides the bottom of the sun.
+ * horizon, and a two lane road running from the bottom of the view to a
+ * vanishing point at the center of the horizon. The camera sits in the middle
+ * of the right lane, so the road's center line runs off to the left. The sky is
+ * a stack of thin bands fading from deep blue at the top to pale orange at the
+ * horizon, since the engine has no linear gradients. The ground below the
+ * horizon hides the bottom of the sun.
  *
  * Center line dashes scroll toward the camera in perspective, growing as they
  * approach, and start over at the horizon once they pass the bottom of the

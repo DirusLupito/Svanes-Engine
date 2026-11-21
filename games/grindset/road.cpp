@@ -27,14 +27,16 @@ constexpr std::int32_t kRoadLineZ = 5;
 
 constexpr float kViewHeight = 1080.0F;
 constexpr float kVanishingX = kViewWidth * 0.5F;
-constexpr float kRoadTopHalfWidth = 4.0F;
-constexpr float kRoadBottomHalfWidth = 900.0F;
-constexpr float kEdgeLineInner = 0.91F;
-constexpr float kEdgeLineOuter = 0.96F;
 
 constexpr float kDepthScale = kViewHeight - kHorizonY;
 constexpr float kNearestDepth = 0.4F;
-constexpr float kDriveSpeed = 25.0F;
+constexpr float kHorizonDepth = 150.0F;
+constexpr float kDriveSpeed = 15.0F;
+
+constexpr float kRoadHalfWidth = 2.2F;
+constexpr float kRoadCenter = -kRoadHalfWidth * 0.5F;
+constexpr float kEdgeLineInset = 0.05F;
+constexpr float kEdgeLineWidth = 0.1F;
 constexpr float kDashLength = 2.5F;
 constexpr float kDashPeriod = 10.0F;
 constexpr std::size_t kDashCount = 8;
@@ -151,7 +153,7 @@ svanes::Entity CreatePolygon(svanes::Registry &world,
  * camera heights, so a point one camera height ahead lands on the bottom edge
  * of the view.
  *
- * @param lateral The sideways distance from the road's center line.
+ * @param lateral The sideways distance from the camera, positive to the right.
  * @param depth The distance ahead of the camera. Must be positive.
  * @return The point's screen position.
  */
@@ -161,18 +163,25 @@ svanes::Vector2D ProjectRoadPoint(float lateral, float depth) {
 }
 
 /**
- * Builds the shape of one center line dash.
+ * Builds a strip lying flat on the road, seen in perspective.
  *
- * @param near_depth The distance ahead of the camera to the dash's near end.
- * @return The dash as a trapezoid narrowing toward the horizon.
+ * @param left The strip's left edge, as a sideways distance from the camera.
+ * @param right The strip's right edge, as a sideways distance from the camera.
+ * @param near_depth The distance ahead of the camera to the strip's near end.
+ * @param far_depth The distance ahead of the camera to the strip's far end.
+ * @return The strip as a trapezoid narrowing toward the horizon.
  */
+svanes::ConvexPolygon2D RoadStrip(float left, float right, float near_depth,
+                                  float far_depth) {
+    return svanes::ConvexPolygon2D{{ProjectRoadPoint(left, far_depth),
+                                    ProjectRoadPoint(right, far_depth),
+                                    ProjectRoadPoint(right, near_depth),
+                                    ProjectRoadPoint(left, near_depth)}};
+}
+
 svanes::ConvexPolygon2D DashShape(float near_depth) {
-    const float far_depth = near_depth + kDashLength;
-    return svanes::ConvexPolygon2D{
-        {ProjectRoadPoint(-kDashHalfWidth, far_depth),
-         ProjectRoadPoint(kDashHalfWidth, far_depth),
-         ProjectRoadPoint(kDashHalfWidth, near_depth),
-         ProjectRoadPoint(-kDashHalfWidth, near_depth)}};
+    return RoadStrip(kRoadCenter - kDashHalfWidth, kRoadCenter + kDashHalfWidth,
+                     near_depth, near_depth + kDashLength);
 }
 
 float DashNearDepth(std::size_t index, float offset) {
@@ -192,32 +201,22 @@ void CreateGround(svanes::Registry &world) {
     world.AddComponent<svanes::ZOrder>(entity, svanes::ZOrder{kGroundZ});
 }
 
-void CreateEdgeLine(svanes::Registry &world, float side) {
-    const float top_inner =
-        kVanishingX + side * kRoadTopHalfWidth * kEdgeLineInner;
-    const float top_outer =
-        kVanishingX + side * kRoadTopHalfWidth * kEdgeLineOuter;
-    const float bottom_inner =
-        kVanishingX + side * kRoadBottomHalfWidth * kEdgeLineInner;
-    const float bottom_outer =
-        kVanishingX + side * kRoadBottomHalfWidth * kEdgeLineOuter;
-    CreatePolygon(world,
-                  {{top_inner, kHorizonY},
-                   {top_outer, kHorizonY},
-                   {bottom_outer, kViewHeight},
-                   {bottom_inner, kViewHeight}},
-                  kRoadLineColor, kRoadLineZ);
+void CreateStrip(svanes::Registry &world, float left, float right,
+                 svanes::Color color, std::int32_t z_order) {
+    const svanes::ConvexPolygon2D shape =
+        RoadStrip(left, right, kNearestDepth, kHorizonDepth);
+    CreatePolygon(world, shape.Vertices(), color, z_order);
 }
 
 void CreateRoad(svanes::Registry &world) {
-    CreatePolygon(world,
-                  {{kVanishingX - kRoadTopHalfWidth, kHorizonY},
-                   {kVanishingX + kRoadTopHalfWidth, kHorizonY},
-                   {kVanishingX + kRoadBottomHalfWidth, kViewHeight},
-                   {kVanishingX - kRoadBottomHalfWidth, kViewHeight}},
-                  kRoadColor, kRoadZ);
-    CreateEdgeLine(world, -1.0F);
-    CreateEdgeLine(world, 1.0F);
+    const float left = kRoadCenter - kRoadHalfWidth;
+    const float right = kRoadCenter + kRoadHalfWidth;
+    CreateStrip(world, left, right, kRoadColor, kRoadZ);
+    CreateStrip(world, left + kEdgeLineInset,
+                left + kEdgeLineInset + kEdgeLineWidth, kRoadLineColor,
+                kRoadLineZ);
+    CreateStrip(world, right - kEdgeLineInset - kEdgeLineWidth,
+                right - kEdgeLineInset, kRoadLineColor, kRoadLineZ);
 }
 
 } // namespace
