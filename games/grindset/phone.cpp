@@ -1,5 +1,6 @@
 #include "phone.hpp"
 
+#include <svanes/MenuUtilities/text_label.hpp>
 #include <svanes/geometry/primitive_geometry.hpp>
 #include <svanes/render/render_system.hpp>
 
@@ -38,6 +39,10 @@ constexpr std::int32_t kCornerSegments = 8;
 constexpr std::int32_t kBodyZ = 100;
 constexpr std::int32_t kScreenZ = 101;
 constexpr std::int32_t kCameraZ = 102;
+constexpr std::int32_t kHintZ = 103;
+
+constexpr svanes::Vector2D kHintPosition{1400.0F, 1010.0F};
+constexpr svanes::Color kHintColor{.red = 232, .green = 226, .blue = 214};
 
 constexpr svanes::Color kBodyColor{.red = 20, .green = 20, .blue = 24};
 constexpr svanes::Color kScreenColor{.red = 44, .green = 52, .blue = 84};
@@ -91,7 +96,7 @@ svanes::Entity CreatePart(svanes::Registry &world, svanes::Vector2D position,
 
 } // namespace
 
-void Phone::Initialize(svanes::Registry &world) {
+void Phone::Initialize(svanes::Registry &world, svanes::FontHandle font) {
     parts.push_back(CreatePart(
         world, position,
         svanes::SolidShape{.color = kBodyColor,
@@ -114,6 +119,16 @@ void Phone::Initialize(svanes::Registry &world) {
                                  .radius = kCameraRadius}},
         kCameraZ));
     Place(world);
+
+    hint = world.CreateEntity();
+    world.AddComponent<svanes::TextLabel>(
+        hint,
+        svanes::TextLabel{.text = "Press Space to take out your phone",
+                          .position = kHintPosition,
+                          .color = kHintColor,
+                          .font = font,
+                          .alignment = svanes::TextAlignment::BottomCenter});
+    world.AddComponent<svanes::ZOrder>(hint, svanes::ZOrder{kHintZ});
 }
 
 void Phone::Toggle() { held = !held; }
@@ -126,6 +141,7 @@ void Phone::Update(svanes::Registry &world, float seconds) {
         slide = std::max(slide - step, 0.0F);
     }
     Place(world);
+    world.GetComponent<svanes::TextLabel>(hint).visible = slide == 0.0F;
 }
 
 void Phone::Place(svanes::Registry &world) {

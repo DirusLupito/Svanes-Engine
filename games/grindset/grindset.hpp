@@ -4,6 +4,7 @@
 #include "phone.hpp"
 #include "road.hpp"
 
+#include <svanes/MenuUtilities/font_manager.hpp>
 #include <svanes/game.hpp>
 
 namespace grindset {
@@ -14,8 +15,8 @@ namespace grindset {
 class Grindset final : public svanes::IGame {
 public:
     /**
-     * Centers the camera so world coordinates match screen pixels, then sets
-     * up the game's views.
+     * Centers the camera so world coordinates match screen pixels, loads the
+     * game's font, then sets up the game's views.
      * @param context The engine services and window dimensions.
      */
     void Initialize(svanes::GameContext &context) override;
@@ -44,6 +45,7 @@ private:
     Road road;
     CarInterior interior;
     Phone phone;
+    svanes::FontHandle font{};
     bool quit = false;
 };
 

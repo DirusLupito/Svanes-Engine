@@ -19,3 +19,6 @@ run *args: (_release "svanes_game_grindset")
 # Build and launch the Debug grindset.
 debug *args: (_build "svanes_game_grindset")
     {{bin-dir}}svanes_game_grindset{{exe-suffix}} {{args}}
+
+# Package the RelWithDebInfo grindset for release.
+package: (_package "grindset")
