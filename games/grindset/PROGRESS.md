@@ -9,7 +9,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [x] 1.4 Scrolling lane dashes
 - [x] 1.5 Telephone poles (left) + unlit street lamps (right)
 - [x] 1.6 Sagging wires between telephone poles
-- [ ] 1.7 Faint camera bob
+- [ ] 1.7a Refactor: `Road` records each entity's resting y and can shift them all by one vertical offset (no visual change) — **NEXT, awaiting approval**
+- [ ] 1.7b Faint camera bob (two slow sines, ~±3px) driving that offset
 
 ## Phase 2: Phone
 - [ ] 2.1 Phone frame + screen rect in held position
@@ -65,6 +66,16 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [ ] 6.4 Random replies to the player
 - [ ] 6.5 Dealer banter + chat-reply captions
 
+## Where we left off
+All work through 1.6 is committed (last: `keep wires until far pole passes`).
+Next up is 1.7a, proposed but not yet approved.
+
 ## Deviations from plan
 - Emoji check moved to 2.4 (status bar glyph) so the risk is seen early.
 - `svanes_game_package` + `GRINDSET_ASSETS_DIR` deferred to 2.4, when the first asset (fonts) exists; packaging needs an `assets/` folder.
+- 1.5 split into poles/lamps (1.5) and wires (1.6); camera bob moved to 1.7.
+- Poles and lamps use even spacing, not random gaps (wires need regular poles).
+- Road is pseudo-3D: positions are (lateral, height, depth) in camera heights,
+  projected by `ProjectPoint` in `road.cpp`; camera sits in the right lane.
+- Camera bob can't use the engine camera: text labels ignore it, so the phone
+  text would drift from the phone frame. Bob is applied inside `Road` instead.
