@@ -1,0 +1,21 @@
+# List available commands.
+default:
+    @just --justfile "{{justfile()}}" --list
+
+set working-directory := "../.."
+
+import '../../scripts/common.just'
+
+# Build grindset in Debug mode.
+build: (_build "svanes_game_grindset")
+
+# Build grindset in RelWithDebInfo mode.
+release: (_release "svanes_game_grindset")
+
+# Build and launch the RelWithDebInfo grindset.
+run *args: (_release "svanes_game_grindset")
+    {{release-bin-dir}}svanes_game_grindset{{exe-suffix}} {{args}}
+
+# Build and launch the Debug grindset.
+debug *args: (_build "svanes_game_grindset")
+    {{bin-dir}}svanes_game_grindset{{exe-suffix}} {{args}}

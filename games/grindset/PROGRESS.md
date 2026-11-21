@@ -1,0 +1,69 @@
+# Grindset — Progress
+
+One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
+
+## Phase 1: Skeleton + road
+- [x] 1.1 Build target, justfile, `main.cpp`, empty `Grindset` opening a 1920x1080 window
+- [ ] 1.2 Sunrise sky gradient + sun
+- [ ] 1.3 Road in perspective (static)
+- [ ] 1.4 Scrolling lane dashes
+- [ ] 1.5 Occasional roadside poles
+- [ ] 1.6 Faint camera bob
+
+## Phase 2: Phone
+- [ ] 2.1 Phone frame + screen rect in held position
+- [ ] 2.2 Space/Tab pocket ↔ held toggle with eased slide
+- [ ] 2.3 Gentle translate-only sway while held
+- [ ] 2.4 Fonts + status bar (5:30 clock, balance, an emoji glyph as the early emoji check)
+- [ ] 2.5 Home screen wallpaper + two clickable app icons
+- [ ] 2.6 Home bar returns to home screen
+- [ ] 2.7 App-open transition (rect grows from icon, content fades in) into placeholder apps
+- [ ] 2.8 Remember last app when pulled out again
+
+## Phase 3: Engine changes (flagged)
+- [ ] 3.1 `ClipRect` component through the render queue, honored by shapes
+- [ ] 3.2 Sprites + text labels honor clip
+- [ ] 3.3 `TextLabel::wrap_width`, part of the label cache key
+
+## Phase 4a: Blackjack rules (`blackjack.*`, no rendering)
+- [ ] 4a.1 Card + 6-deck shoe with ~75% reshuffle point
+- [ ] 4a.2 Hand value: soft/hard, blackjack, bust
+- [ ] 4a.3 Round start: bet, deal, hole-card peek, naturals pay 3:2
+- [ ] 4a.4 Hit, stand, dealer hits soft 17, settle
+- [ ] 4a.5 Double (with affordability)
+- [ ] 4a.6 Split: one max, any 10-values, split aces one card, 21 after split = blackjack
+- [ ] 4a.7 Announcement queue (callouts, round flow, reshuffle)
+
+## Phase 4b: Casino app UI
+- [ ] 4b.1 Stream view layout: placeholder dealer behind a table
+- [ ] 4b.2 Card drawing, face up / face down
+- [ ] 4b.3 Chips, bet display, Clear / All in / Deal, debit through `Grindset`
+- [ ] 4b.4 Hit / Stand / Double / Split buttons with enabled state
+- [ ] 4b.5 Dealer turn shown, payouts credited, next round
+- [ ] 4b.6 Captions from the announcement queue
+- [ ] 4b.7 Leaving mid-round freezes the round
+
+## Phase 5: Reels
+- [ ] 5.1 Reel slots stacked inside the phone screen, clipped
+- [ ] 5.2 Click-drag + Up/Down arrows move reels
+- [ ] 5.3 Release: velocity-projected rest point, change-or-snap-back, spring settle
+- [ ] 5.4 Pay rules (new reel + min watch time) + "+$0.50" popup
+- [ ] 5.5 Like / dislike (visual only)
+- [ ] 5.6 `text_lines` loader + POV gradient text format
+- [ ] 5.7 Fake facts
+- [ ] 5.8 Would you rather
+- [ ] 5.9 Brainrot split screen
+- [ ] 5.10 Emoji story
+- [ ] 5.11 Motivational guru
+- [ ] 5.12 Special reels hook
+
+## Phase 6: Chat + dealer lines
+- [ ] 6.1 Chat panel + message log
+- [ ] 6.2 Key-press typing with Shift, Enter sends, phone toggle disabled while typing
+- [ ] 6.3 Ambient messages
+- [ ] 6.4 Random replies to the player
+- [ ] 6.5 Dealer banter + chat-reply captions
+
+## Deviations from plan
+- Emoji check moved to 2.4 (status bar glyph) so the risk is seen early.
+- `svanes_game_package` + `GRINDSET_ASSETS_DIR` deferred to 2.4, when the first asset (fonts) exists; packaging needs an `assets/` folder.
