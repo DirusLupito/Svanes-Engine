@@ -7,10 +7,13 @@
 #include <svanes/MenuUtilities/font_manager.hpp>
 #include <svanes/game.hpp>
 
+#include <cstdint>
+
 namespace grindset {
 
 /**
- * The grindset game: an endless sunrise drive with a phone in hand.
+ * The grindset game: an endless sunrise drive with a phone in hand. It owns
+ * the player's balance, which starts at $100.
  */
 class Grindset final : public svanes::IGame {
 public:
@@ -24,7 +27,8 @@ public:
     /**
      * Checks whether Escape was pressed to quit and whether Space or Tab was
      * pressed to put away or take out the phone, then moves the road, bobs
-     * the car interior along with it, and slides the phone.
+     * the car interior along with it, and slides the phone, which shows the
+     * balance.
      * @param frame The current frame's input and engine services.
      */
     void Update(const svanes::FrameContext &frame) override;
@@ -46,6 +50,8 @@ private:
     CarInterior interior;
     Phone phone;
     svanes::FontHandle font{};
+    svanes::FontHandle status_font{};
+    std::int64_t balance_cents = 10'000;
     bool quit = false;
 };
 

@@ -13,6 +13,17 @@ namespace grindset {
 namespace {
 
 constexpr float kFontPoints = 28.0F;
+constexpr float kStatusFontPoints = 20.0F;
+
+svanes::FontHandle LoadFont(svanes::FontManager &fonts, const std::string &path,
+                            float points) {
+    const svanes::FontHandle font = fonts.LoadFont(path, points);
+    if (font.id == 0) {
+        throw std::runtime_error("Grindset could not load its font from " +
+                                 path + ".");
+    }
+    return font;
+}
 
 } // namespace
 
@@ -22,15 +33,12 @@ void Grindset::Initialize(svanes::GameContext &context) {
 
     const std::string font_path =
         svanes::AssetPath(GRINDSET_ASSETS_DIR) + "/fonts/consola.ttf";
-    font = context.fonts.LoadFont(font_path, kFontPoints);
-    if (font.id == 0) {
-        throw std::runtime_error("Grindset could not load its font from " +
-                                 font_path + ".");
-    }
+    font = LoadFont(context.fonts, font_path, kFontPoints);
+    status_font = LoadFont(context.fonts, font_path, kStatusFontPoints);
 
     road.Initialize(context.world);
     interior.Initialize(context.world);
-    phone.Initialize(context.world, font);
+    phone.Initialize(context.world, font, status_font);
 }
 
 void Grindset::Update(const svanes::FrameContext &frame) {
@@ -47,7 +55,7 @@ void Grindset::Update(const svanes::FrameContext &frame) {
 
     road.Update(frame.world, seconds);
     interior.Update(frame.world, road.CurrentBob());
-    phone.Update(frame.world, seconds);
+    phone.Update(frame.world, seconds, balance_cents);
 }
 
 bool Grindset::ShouldQuit() const { return quit; }

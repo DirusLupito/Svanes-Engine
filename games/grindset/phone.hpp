@@ -6,6 +6,7 @@
 #include <svanes/registry.hpp>
 #include <svanes/vector2d.hpp>
 
+#include <cstdint>
 #include <vector>
 
 namespace grindset {
@@ -13,8 +14,10 @@ namespace grindset {
 /**
  * The phone held up on the right side of the view. It is a dark body with
  * rounded corners, a screen inset inside the bezel, and a small camera hole at
- * the top of the screen. It is drawn above the road and the car interior, and
- * is large, since it is what the player interacts with.
+ * the top of the screen, with a status bar across the top of the screen showing
+ * the clock, always 5:30am, and the player's balance. It is drawn above the
+ * road and the car interior, and is large, since it is what the player
+ * interacts with.
  *
  * The phone is either held up or put away in the pocket, fully below the
  * bottom of the view, and eases between the two when toggled. It starts in the
@@ -30,13 +33,15 @@ namespace grindset {
 class Phone final {
 public:
     /**
-     * Creates the body, the screen, and the camera hole in the pocket, and
-     * the hint for taking the phone out.
+     * Creates the body, the screen, the camera hole, and the status bar in the
+     * pocket, and the hint for taking the phone out.
      * @param world The world to create them in. World coordinates are expected
      * to match screen pixels on a 1920x1080 view.
-     * @param font The font to write the hint in.
+     * @param hint_font The font to write the hint in.
+     * @param status_font The smaller font to write the status bar in.
      */
-    void Initialize(svanes::Registry &world, svanes::FontHandle font);
+    void Initialize(svanes::Registry &world, svanes::FontHandle hint_font,
+                    svanes::FontHandle status_font);
 
     /**
      * Starts moving the phone to the pocket if it is held or headed there,
@@ -46,12 +51,16 @@ public:
     void Toggle();
 
     /**
-     * Moves the phone along its slide toward the pocket or the hand, and
-     * shows the hint only while the phone is all the way in the pocket.
+     * Moves the phone along its slide toward the pocket or the hand, shows
+     * the hint only while the phone is all the way in the pocket, and shows
+     * the balance in the status bar.
      * @param world The world holding it.
      * @param seconds The time since the previous update, in seconds.
+     * @param balance_cents The player's balance, in cents. Must not be
+     * negative.
      */
-    void Update(svanes::Registry &world, float seconds);
+    void Update(svanes::Registry &world, float seconds,
+                std::int64_t balance_cents);
 
     /**
      * Returns where the phone's screen is, for apps to lay themselves out in.
@@ -62,13 +71,16 @@ public:
 private:
     /**
      * Puts the phone where its slide currently has it, eased so it starts and
-     * stops gently, plus as much of the hand's sway as the slide allows.
+     * stops gently, plus as much of the hand's sway as the slide allows. The
+     * status bar moves along with it.
      * @param world The world holding it.
      */
     void Place(svanes::Registry &world);
 
     std::vector<svanes::Entity> parts;
     svanes::Entity hint{};
+    svanes::Entity clock{};
+    svanes::Entity balance{};
     svanes::Vector2D position{};
     float slide = 0.0F;
     float elapsed = 0.0F;

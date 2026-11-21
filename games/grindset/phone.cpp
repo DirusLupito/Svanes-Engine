@@ -9,7 +9,10 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <numbers>
+#include <stdexcept>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -45,6 +48,11 @@ constexpr std::int32_t kBodyZ = 100;
 constexpr std::int32_t kScreenZ = 101;
 constexpr std::int32_t kCameraZ = 102;
 constexpr std::int32_t kHintZ = 103;
+constexpr std::int32_t kStatusZ = 103;
+
+constexpr float kStatusInset = 30.0F;
+constexpr float kStatusFromTop = 14.0F;
+constexpr svanes::Color kStatusColor{.red = 240, .green = 240, .blue = 244};
 
 constexpr svanes::Vector2D kHintPosition{1400.0F, 1010.0F};
 constexpr svanes::Color kHintColor{.red = 232, .green = 226, .blue = 214};
@@ -115,9 +123,31 @@ svanes::Vector2D SwayOffset(float elapsed) {
                 std::sin(kTau * elapsed / kSwayVerticalPeriod)};
 }
 
+std::string FormatDollars(std::int64_t cents) {
+    if (cents < 0) {
+        throw std::invalid_argument("Phone cannot show a negative balance of " +
+                                    std::to_string(cents) + " cents.");
+    }
+    return std::format("${}.{:02}", cents / 100, cents % 100);
+}
+
+svanes::Entity CreateStatusLabel(svanes::Registry &world, std::string text,
+                                 svanes::FontHandle font,
+                                 svanes::TextAlignment alignment) {
+    const svanes::Entity entity = world.CreateEntity();
+    world.AddComponent<svanes::TextLabel>(
+        entity, svanes::TextLabel{.text = std::move(text),
+                                  .color = kStatusColor,
+                                  .font = font,
+                                  .alignment = alignment});
+    world.AddComponent<svanes::ZOrder>(entity, svanes::ZOrder{kStatusZ});
+    return entity;
+}
+
 } // namespace
 
-void Phone::Initialize(svanes::Registry &world, svanes::FontHandle font) {
+void Phone::Initialize(svanes::Registry &world, svanes::FontHandle hint_font,
+                       svanes::FontHandle status_font) {
     parts.push_back(CreatePart(
         world, position,
         svanes::SolidShape{.color = kBodyColor,
@@ -139,6 +169,10 @@ void Phone::Initialize(svanes::Registry &world, svanes::FontHandle font) {
                 svanes::Circle2D{.y = -kScreenHeight * 0.5F + kCameraFromTop,
                                  .radius = kCameraRadius}},
         kCameraZ));
+    clock = CreateStatusLabel(world, "5:30am", status_font,
+                              svanes::TextAlignment::TopLeft);
+    balance = CreateStatusLabel(world, FormatDollars(0), status_font,
+                                svanes::TextAlignment::TopRight);
     Place(world);
 
     hint = world.CreateEntity();
@@ -147,14 +181,15 @@ void Phone::Initialize(svanes::Registry &world, svanes::FontHandle font) {
         svanes::TextLabel{.text = "Press Space to take out your phone",
                           .position = kHintPosition,
                           .color = kHintColor,
-                          .font = font,
+                          .font = hint_font,
                           .alignment = svanes::TextAlignment::BottomCenter});
     world.AddComponent<svanes::ZOrder>(hint, svanes::ZOrder{kHintZ});
 }
 
 void Phone::Toggle() { held = !held; }
 
-void Phone::Update(svanes::Registry &world, float seconds) {
+void Phone::Update(svanes::Registry &world, float seconds,
+                   std::int64_t balance_cents) {
     elapsed += seconds;
     const float step = seconds / kSlideSeconds;
     if (held) {
@@ -164,6 +199,8 @@ void Phone::Update(svanes::Registry &world, float seconds) {
     }
     Place(world);
     world.GetComponent<svanes::TextLabel>(hint).visible = slide == 0.0F;
+    world.GetComponent<svanes::TextLabel>(balance).text =
+        FormatDollars(balance_cents);
 }
 
 void Phone::Place(svanes::Registry &world) {
@@ -177,6 +214,13 @@ void Phone::Place(svanes::Registry &world) {
         transform.x = position.x;
         transform.y = position.y;
     }
+
+    const svanes::Rectangle2D screen = ScreenRectangle();
+    const float top = screen.y - screen.height * 0.5F + kStatusFromTop;
+    world.GetComponent<svanes::TextLabel>(clock).position = {
+        screen.x - screen.width * 0.5F + kStatusInset, top};
+    world.GetComponent<svanes::TextLabel>(balance).position = {
+        screen.x + screen.width * 0.5F - kStatusInset, top};
 }
 
 svanes::Rectangle2D Phone::ScreenRectangle() const {

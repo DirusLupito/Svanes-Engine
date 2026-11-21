@@ -18,8 +18,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [x] 2.2 Space/Tab pocket ↔ held toggle with eased slide (starts in pocket)
 - [x] 2.2b Fonts + assets setup (pulled from 2.4), hint text on screen to take out the phone
 - [x] 2.3 Gentle translate-only sway while held
-- [ ] 2.4 Status bar (5:30 clock, balance) — **NEXT, awaiting approval**
-- [ ] 2.5 Home screen wallpaper + two clickable app icons
+- [x] 2.4 Status bar (5:30am clock, balance)
+- [ ] 2.5 Home screen wallpaper + two clickable app icons — **NEXT, awaiting approval**
 - [ ] 2.6 Home bar returns to home screen
 - [ ] 2.7 App-open transition (rect grows from icon, content fades in) into placeholder apps
 - [ ] 2.8 Remember last app when pulled out again
@@ -69,8 +69,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [ ] 6.5 Dealer banter + chat-reply captions
 
 ## Where we left off
-All work through 2.2b is committed (last: `add font assets and pocket hint for taking out the phone`).
-2.3 done (uncommitted). Next up is 2.4, proposed but not yet approved.
+All work through 2.3 is committed (last: `add gentle sway to the held phone`).
+2.4 done (uncommitted). Next up is 2.5, proposed but not yet approved.
 
 ## Deviations from plan
 - Emoji check dropped from 2.4 (Erik); revisit when reels need emoji (5.10), with the PNG or no-emoji fallback still open.
@@ -92,3 +92,6 @@ All work through 2.2b is committed (last: `add font assets and pocket hint for t
   moves 40% of `Road::CurrentBob()`.
 - Phone starts in the pocket with on-screen text telling you to take it out
   (Erik). The text needs fonts, so the font/assets setup moves from 2.4 to 2.2b.
+- Status bar lives in `Phone`; `Grindset` owns `balance_cents` ($100 start) and
+  passes it to `Phone::Update` each frame, so the phone never holds the money.
+  Clock reads "5:30am" (Erik). Status font is the same Consolas at 20pt.
