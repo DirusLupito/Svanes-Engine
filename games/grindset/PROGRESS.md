@@ -10,7 +10,7 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [x] 1.5 Telephone poles (left) + unlit street lamps (right)
 - [x] 1.6 Sagging wires between telephone poles
 - [x] 1.7a Refactor: `Road` records each entity's resting y and can shift them all by one vertical offset (no visual change)
-- [x] 1.7b Faint camera bob (two slow sines, ~±3px) driving that offset
+- [x] 1.7b Faint camera bob (two slow sines, ~±6px) driving that offset
 
 ## Phase 2: Phone
 - [ ] 2.1 Phone frame + screen rect in held position

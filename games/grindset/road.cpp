@@ -22,9 +22,9 @@ constexpr float kHorizonY = 600.0F;
 constexpr std::int32_t kSkyBandCount = 60;
 constexpr float kShiftMargin = 8.0F;
 constexpr float kBobSlowPeriod = 2.3F;
-constexpr float kBobSlowAmplitude = 2.2F;
+constexpr float kBobSlowAmplitude = 4.5F;
 constexpr float kBobFastPeriod = 0.9F;
-constexpr float kBobFastAmplitude = 0.8F;
+constexpr float kBobFastAmplitude = 1.8F;
 
 constexpr std::int32_t kSkyZ = 0;
 constexpr std::int32_t kSunGlowZ = 1;
