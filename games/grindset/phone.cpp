@@ -3,6 +3,7 @@
 #include <svanes/geometry/primitive_geometry.hpp>
 #include <svanes/render/render_system.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstddef>
@@ -20,6 +21,10 @@ constexpr float kBodyHeight = 880.0F;
 constexpr float kBodyBottom = 1040.0F;
 constexpr svanes::Vector2D kHeldPosition{1400.0F,
                                          kBodyBottom - kBodyHeight * 0.5F};
+constexpr float kViewHeight = 1080.0F;
+constexpr float kPocketGap = 20.0F;
+constexpr float kPocketY = kViewHeight + kBodyHeight * 0.5F + kPocketGap;
+constexpr float kSlideSeconds = 0.35F;
 
 constexpr float kBodyCornerRadius = 50.0F;
 constexpr float kBezel = 14.0F;
@@ -87,8 +92,6 @@ svanes::Entity CreatePart(svanes::Registry &world, svanes::Vector2D position,
 } // namespace
 
 void Phone::Initialize(svanes::Registry &world) {
-    position = kHeldPosition;
-
     parts.push_back(CreatePart(
         world, position,
         svanes::SolidShape{.color = kBodyColor,
@@ -110,6 +113,30 @@ void Phone::Initialize(svanes::Registry &world) {
                 svanes::Circle2D{.y = -kScreenHeight * 0.5F + kCameraFromTop,
                                  .radius = kCameraRadius}},
         kCameraZ));
+    Place(world);
+}
+
+void Phone::Toggle() { held = !held; }
+
+void Phone::Update(svanes::Registry &world, float seconds) {
+    const float step = seconds / kSlideSeconds;
+    if (held) {
+        slide = std::min(slide + step, 1.0F);
+    } else {
+        slide = std::max(slide - step, 0.0F);
+    }
+    Place(world);
+}
+
+void Phone::Place(svanes::Registry &world) {
+    const float eased = slide * slide * (3.0F - 2.0F * slide);
+    position = {kHeldPosition.x, std::lerp(kPocketY, kHeldPosition.y, eased)};
+    for (const svanes::Entity entity : parts) {
+        svanes::Transform &transform =
+            world.GetComponent<svanes::Transform>(entity);
+        transform.x = position.x;
+        transform.y = position.y;
+    }
 }
 
 svanes::Rectangle2D Phone::ScreenRectangle() const {

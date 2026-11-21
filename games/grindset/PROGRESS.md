@@ -15,9 +15,10 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 ## Phase 2: Phone
 - [x] 2.1 Phone frame + screen rect in held position
 - [x] 2.1b First-person car interior around the road view
-- [ ] 2.2 Space/Tab pocket ↔ held toggle with eased slide — **NEXT, awaiting approval**
+- [x] 2.2 Space/Tab pocket ↔ held toggle with eased slide (starts in pocket)
+- [ ] 2.2b Fonts + assets setup (pulled from 2.4), hint text on screen to take out the phone — **NEXT, awaiting approval**
 - [ ] 2.3 Gentle translate-only sway while held
-- [ ] 2.4 Fonts + status bar (5:30 clock, balance, an emoji glyph as the early emoji check)
+- [ ] 2.4 Status bar (5:30 clock, balance, an emoji glyph as the early emoji check)
 - [ ] 2.5 Home screen wallpaper + two clickable app icons
 - [ ] 2.6 Home bar returns to home screen
 - [ ] 2.7 App-open transition (rect grows from icon, content fades in) into placeholder apps
@@ -68,8 +69,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [ ] 6.5 Dealer banter + chat-reply captions
 
 ## Where we left off
-All work through 2.1 is committed (last: `change phone size`).
-2.1b done (uncommitted). Next up is 2.2, proposed but not yet approved.
+All work through 2.1b is committed (last: `more changes to the car interior`).
+2.2 done (uncommitted). Next up is 2.2b, proposed but not yet approved.
 
 ## Deviations from plan
 - Emoji check moved to 2.4 (status bar glyph) so the risk is seen early.
@@ -89,3 +90,5 @@ All work through 2.1 is committed (last: `change phone size`).
   pieces), big non-reflecting mirror (460x140 at x=1250) overlapping the phone's left edge, partly
   behind it. All parts rest at Transform y 0 (absolute geometry), so bobbing is setting y; it
   moves 40% of `Road::CurrentBob()`.
+- Phone starts in the pocket with on-screen text telling you to take it out
+  (Erik). The text needs fonts, so the font/assets setup moves from 2.4 to 2.2b.

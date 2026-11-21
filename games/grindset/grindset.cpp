@@ -20,8 +20,14 @@ void Grindset::Update(const svanes::FrameContext &frame) {
 
     const float seconds = static_cast<float>(frame.real_delta_tics) /
                           static_cast<float>(svanes::TicsPerSecond);
+    if (frame.input.WasPressed(svanes::Key::Space) ||
+        frame.input.WasPressed(svanes::Key::Tab)) {
+        phone.Toggle();
+    }
+
     road.Update(frame.world, seconds);
     interior.Update(frame.world, road.CurrentBob());
+    phone.Update(frame.world, seconds);
 }
 
 bool Grindset::ShouldQuit() const { return quit; }

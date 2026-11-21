@@ -21,8 +21,9 @@ public:
     void Initialize(svanes::GameContext &context) override;
 
     /**
-     * Checks whether Escape was pressed to quit, then moves the road and bobs
-     * the car interior along with it.
+     * Checks whether Escape was pressed to quit and whether Space or Tab was
+     * pressed to put away or take out the phone, then moves the road, bobs
+     * the car interior along with it, and slides the phone.
      * @param frame The current frame's input and engine services.
      */
     void Update(const svanes::FrameContext &frame) override;
