@@ -55,7 +55,7 @@ void Grindset::Update(const svanes::FrameContext &frame) {
 
     road.Update(frame.world, seconds);
     interior.Update(frame.world, road.CurrentBob());
-    phone.Update(frame.world, seconds, balance_cents);
+    phone.Update(frame.world, frame.input, seconds, balance_cents);
 }
 
 bool Grindset::ShouldQuit() const { return quit; }

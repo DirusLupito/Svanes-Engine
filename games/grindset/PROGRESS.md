@@ -19,8 +19,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [x] 2.2b Fonts + assets setup (pulled from 2.4), hint text on screen to take out the phone
 - [x] 2.3 Gentle translate-only sway while held
 - [x] 2.4 Status bar (5:30am clock, balance)
-- [ ] 2.5 Home screen wallpaper + two clickable app icons — **NEXT, awaiting approval**
-- [ ] 2.6 Home bar returns to home screen
+- [x] 2.5 Home screen wallpaper + two clickable app icons
+- [ ] 2.6 Home bar returns to home screen — **NEXT, awaiting approval**
 - [ ] 2.7 App-open transition (rect grows from icon, content fades in) into placeholder apps
 - [ ] 2.8 Remember last app when pulled out again
 
@@ -69,8 +69,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [ ] 6.5 Dealer banter + chat-reply captions
 
 ## Where we left off
-All work through 2.3 is committed (last: `add gentle sway to the held phone`).
-2.4 done (uncommitted). Next up is 2.5, proposed but not yet approved.
+All work through 2.4 is committed (last: `status bar with clock and balance`).
+2.5 done (uncommitted). Next up is 2.6, proposed but not yet approved.
 
 ## Deviations from plan
 - Emoji check dropped from 2.4 (Erik); revisit when reels need emoji (5.10), with the PNG or no-emoji fallback still open.
@@ -95,3 +95,8 @@ All work through 2.3 is committed (last: `add gentle sway to the held phone`).
 - Status bar lives in `Phone`; `Grindset` owns `balance_cents` ($100 start) and
   passes it to `Phone::Update` each frame, so the phone never holds the money.
   Clock reads "5:30am" (Erik). Status font is the same Consolas at 20pt.
+- Home screen lives in `Phone` for now. Wallpaper fade = bands between the
+  rounded ends; the rounded top is the screen shape itself and the rounded bottom
+  is a "cap" shape in the bottom color, so no clipping is needed. Icons are plain
+  rounded squares (not real logos); a click darkens the icon until release, and
+  only counts while the phone is fully held.

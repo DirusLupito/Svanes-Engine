@@ -46,32 +46,67 @@ constexpr std::int32_t kCornerSegments = 8;
 
 constexpr std::int32_t kBodyZ = 100;
 constexpr std::int32_t kScreenZ = 101;
-constexpr std::int32_t kCameraZ = 102;
-constexpr std::int32_t kHintZ = 103;
-constexpr std::int32_t kStatusZ = 103;
+constexpr std::int32_t kWallpaperCapZ = 102;
+constexpr std::int32_t kWallpaperBandZ = 103;
+constexpr std::int32_t kIconZ = 104;
+constexpr std::int32_t kCameraZ = 105;
+constexpr std::int32_t kHintZ = 106;
+constexpr std::int32_t kStatusZ = 106;
+
+constexpr std::int32_t kWallpaperBandCount = 40;
+constexpr float kWallpaperCapExtra = 20.0F;
+constexpr svanes::Color kWallpaperTop{.red = 46, .green = 58, .blue = 112};
+constexpr svanes::Color kWallpaperBottom{.red = 148, .green = 92, .blue = 138};
+
+constexpr float kIconSize = 88.0F;
+constexpr float kIconCornerRadius = 20.0F;
+constexpr float kIconFromTop = 110.0F;
+constexpr float kFirstIconFromLeft = 80.0F;
+constexpr float kIconSpacing = 130.0F;
+constexpr float kIconNameGap = 8.0F;
+constexpr float kPressedShade = 0.7F;
 
 constexpr float kStatusInset = 30.0F;
 constexpr float kStatusFromTop = 14.0F;
 constexpr svanes::Color kStatusColor{.red = 240, .green = 240, .blue = 244};
 
+/**
+ * One app on the home screen.
+ *
+ * FIELDS:
+ * - name: The name written under the icon.
+ * - color: The icon's color.
+ */
+struct AppIcon {
+    const char *name;
+    svanes::Color color;
+};
+
+constexpr std::array<AppIcon, 2> kAppIcons{{
+    {.name = "Casino", .color = {.red = 34, .green = 124, .blue = 74}},
+    {.name = "Instagram", .color = {.red = 222, .green = 84, .blue = 118}},
+}};
+
 constexpr svanes::Vector2D kHintPosition{1400.0F, 1010.0F};
 constexpr svanes::Color kHintColor{.red = 232, .green = 226, .blue = 214};
 
 constexpr svanes::Color kBodyColor{.red = 20, .green = 20, .blue = 24};
-constexpr svanes::Color kScreenColor{.red = 44, .green = 52, .blue = 84};
 constexpr svanes::Color kCameraColor{.red = 6, .green = 6, .blue = 8};
 
 /**
- * Builds a rectangle with rounded corners centered on the origin, as a convex
- * polygon with a few points around each corner.
+ * Builds a rectangle with rounded corners, as a convex polygon with a few
+ * points around each corner. The straight part of each side must be longer
+ * than zero.
  *
  * @param width The full width.
  * @param height The full height.
  * @param radius The radius of each corner.
+ * @param center Where the rectangle's center is.
  * @return The rounded rectangle.
  */
 svanes::ConvexPolygon2D RoundedRectangle(float width, float height,
-                                         float radius) {
+                                         float radius,
+                                         svanes::Vector2D center = {}) {
     const float inner_x = width * 0.5F - radius;
     const float inner_y = height * 0.5F - radius;
     const float quarter_turn = std::numbers::pi_v<float> * 0.5F;
@@ -90,8 +125,9 @@ svanes::ConvexPolygon2D RoundedRectangle(float width, float height,
                                 static_cast<float>(step) /
                                     static_cast<float>(kCornerSegments));
             vertices.push_back(
-                {corner_centers[corner].x + radius * std::cos(angle),
-                 corner_centers[corner].y + radius * std::sin(angle)});
+                {center.x + corner_centers[corner].x + radius * std::cos(angle),
+                 center.y + corner_centers[corner].y +
+                     radius * std::sin(angle)});
         }
     }
     return svanes::ConvexPolygon2D{std::move(vertices)};
@@ -121,6 +157,36 @@ svanes::Vector2D SwayOffset(float elapsed) {
                 std::sin(kTau * elapsed / kSwaySidewaysPeriod),
             kSwayVerticalAmplitude *
                 std::sin(kTau * elapsed / kSwayVerticalPeriod)};
+}
+
+std::uint8_t Mix(std::uint8_t from, std::uint8_t to, float amount) {
+    const float value =
+        static_cast<float>(from) +
+        (static_cast<float>(to) - static_cast<float>(from)) * amount;
+    return static_cast<std::uint8_t>(value + 0.5F);
+}
+
+svanes::Color MixColor(svanes::Color from, svanes::Color to, float amount) {
+    return {.red = Mix(from.red, to.red, amount),
+            .green = Mix(from.green, to.green, amount),
+            .blue = Mix(from.blue, to.blue, amount),
+            .alpha = Mix(from.alpha, to.alpha, amount)};
+}
+
+svanes::Color Shade(svanes::Color color, float amount) {
+    return MixColor({.alpha = color.alpha}, color, amount);
+}
+
+/**
+ * Finds where an app icon's center sits relative to the phone's center.
+ *
+ * @param index The app's position on the home screen, from the left.
+ * @return The icon's center, relative to the phone's center.
+ */
+svanes::Vector2D IconCenter(std::size_t index) {
+    return {-kScreenWidth * 0.5F + kFirstIconFromLeft +
+                kIconSpacing * static_cast<float>(index),
+            -kScreenHeight * 0.5F + kIconFromTop};
 }
 
 std::string FormatDollars(std::int64_t cents) {
@@ -157,10 +223,12 @@ void Phone::Initialize(svanes::Registry &world, svanes::FontHandle hint_font,
     parts.push_back(
         CreatePart(world, position,
                    svanes::SolidShape{
-                       .color = kScreenColor,
+                       .color = kWallpaperTop,
                        .geometry = RoundedRectangle(kScreenWidth, kScreenHeight,
                                                     kScreenCornerRadius)},
                    kScreenZ));
+    CreateWallpaper(world);
+    CreateIcons(world, status_font);
     parts.push_back(CreatePart(
         world, position,
         svanes::SolidShape{
@@ -186,10 +254,57 @@ void Phone::Initialize(svanes::Registry &world, svanes::FontHandle hint_font,
     world.AddComponent<svanes::ZOrder>(hint, svanes::ZOrder{kHintZ});
 }
 
+void Phone::CreateWallpaper(svanes::Registry &world) {
+    const float cap_height = kScreenCornerRadius * 2.0F + kWallpaperCapExtra;
+    parts.push_back(
+        CreatePart(world, position,
+                   svanes::SolidShape{
+                       .color = kWallpaperBottom,
+                       .geometry = RoundedRectangle(
+                           kScreenWidth, cap_height, kScreenCornerRadius,
+                           {0.0F, kScreenHeight * 0.5F - cap_height * 0.5F})},
+                   kWallpaperCapZ));
+
+    const float top = -kScreenHeight * 0.5F + kScreenCornerRadius;
+    const float band_height = (kScreenHeight - kScreenCornerRadius * 2.0F) /
+                              static_cast<float>(kWallpaperBandCount);
+    for (std::int32_t band = 0; band < kWallpaperBandCount; ++band) {
+        const float amount = (static_cast<float>(band) + 0.5F) /
+                             static_cast<float>(kWallpaperBandCount);
+        parts.push_back(CreatePart(
+            world, position,
+            svanes::SolidShape{
+                .color = MixColor(kWallpaperTop, kWallpaperBottom, amount),
+                .geometry =
+                    svanes::Rectangle2D{
+                        .y = top +
+                             band_height * (static_cast<float>(band) + 0.5F),
+                        .width = kScreenWidth,
+                        .height = band_height + 1.0F}},
+            kWallpaperBandZ));
+    }
+}
+
+void Phone::CreateIcons(svanes::Registry &world, svanes::FontHandle font) {
+    for (std::size_t index = 0; index < kAppIcons.size(); ++index) {
+        icons[index] = CreatePart(
+            world, position,
+            svanes::SolidShape{.color = kAppIcons[index].color,
+                               .geometry = RoundedRectangle(
+                                   kIconSize, kIconSize, kIconCornerRadius,
+                                   IconCenter(index))},
+            kIconZ);
+        parts.push_back(icons[index]);
+        icon_names[index] =
+            CreateStatusLabel(world, kAppIcons[index].name, font,
+                              svanes::TextAlignment::TopCenter);
+    }
+}
+
 void Phone::Toggle() { held = !held; }
 
-void Phone::Update(svanes::Registry &world, float seconds,
-                   std::int64_t balance_cents) {
+void Phone::Update(svanes::Registry &world, const svanes::InputManager &input,
+                   float seconds, std::int64_t balance_cents) {
     elapsed += seconds;
     const float step = seconds / kSlideSeconds;
     if (held) {
@@ -201,6 +316,34 @@ void Phone::Update(svanes::Registry &world, float seconds,
     world.GetComponent<svanes::TextLabel>(hint).visible = slide == 0.0F;
     world.GetComponent<svanes::TextLabel>(balance).text =
         FormatDollars(balance_cents);
+
+    TrackClick(input);
+    for (std::size_t index = 0; index < icons.size(); ++index) {
+        const svanes::Color color = kAppIcons[index].color;
+        world.GetComponent<svanes::SolidShape>(icons[index]).color =
+            pressed_icon == index ? Shade(color, kPressedShade) : color;
+    }
+}
+
+void Phone::TrackClick(const svanes::InputManager &input) {
+    if (!input.IsMouseButtonDown(svanes::MouseButton::Left)) {
+        pressed_icon.reset();
+        return;
+    }
+    if (!input.WasMouseButtonPressed(svanes::MouseButton::Left) ||
+        slide != 1.0F) {
+        return;
+    }
+    const svanes::Vector2D mouse = input.MousePosition();
+    for (std::size_t index = 0; index < icons.size(); ++index) {
+        const svanes::Vector2D center = IconCenter(index);
+        const float dx = mouse.x - (position.x + center.x);
+        const float dy = mouse.y - (position.y + center.y);
+        if (std::abs(dx) <= kIconSize * 0.5F &&
+            std::abs(dy) <= kIconSize * 0.5F) {
+            pressed_icon = index;
+        }
+    }
 }
 
 void Phone::Place(svanes::Registry &world) {
@@ -221,6 +364,12 @@ void Phone::Place(svanes::Registry &world) {
         screen.x - screen.width * 0.5F + kStatusInset, top};
     world.GetComponent<svanes::TextLabel>(balance).position = {
         screen.x + screen.width * 0.5F - kStatusInset, top};
+    for (std::size_t index = 0; index < icon_names.size(); ++index) {
+        const svanes::Vector2D center = IconCenter(index);
+        world.GetComponent<svanes::TextLabel>(icon_names[index]).position = {
+            position.x + center.x,
+            position.y + center.y + kIconSize * 0.5F + kIconNameGap};
+    }
 }
 
 svanes::Rectangle2D Phone::ScreenRectangle() const {
