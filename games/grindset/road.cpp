@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <numbers>
 #include <span>
 #include <utility>
 #include <vector>
@@ -20,6 +21,10 @@ constexpr float kViewWidth = 1920.0F;
 constexpr float kHorizonY = 600.0F;
 constexpr std::int32_t kSkyBandCount = 60;
 constexpr float kShiftMargin = 8.0F;
+constexpr float kBobSlowPeriod = 2.3F;
+constexpr float kBobSlowAmplitude = 2.2F;
+constexpr float kBobFastPeriod = 0.9F;
+constexpr float kBobFastAmplitude = 0.8F;
 
 constexpr std::int32_t kSkyZ = 0;
 constexpr std::int32_t kSunGlowZ = 1;
@@ -405,6 +410,19 @@ void PlaceWires(svanes::Registry &world,
     }
 }
 
+/**
+ * Finds how far the camera has bobbed up or down. Two slow waves of different
+ * lengths are added together so the motion does not repeat in an obvious way.
+ *
+ * @param elapsed The time since the road was created, in seconds.
+ * @return The vertical shift for the road view, in pixels, positive downward.
+ */
+float BobOffset(float elapsed) {
+    constexpr float kTau = 2.0F * std::numbers::pi_v<float>;
+    return kBobSlowAmplitude * std::sin(kTau * elapsed / kBobSlowPeriod) +
+           kBobFastAmplitude * std::sin(kTau * elapsed / kBobFastPeriod);
+}
+
 svanes::Entity CreateGround(svanes::Registry &world) {
     const float bottom = kViewHeight + kShiftMargin;
     const svanes::Entity entity = world.CreateEntity();
@@ -492,7 +510,8 @@ void Road::Update(svanes::Registry &world, float seconds) {
                  distance);
     PlacePropRow(world, street_lamps, kStreetLamp, kLampPeriod, distance);
     PlaceWires(world, wires, distance);
-    ShiftVertically(world, 0.0F);
+    elapsed += seconds;
+    ShiftVertically(world, BobOffset(elapsed));
 }
 
 } // namespace grindset

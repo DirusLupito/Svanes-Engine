@@ -68,6 +68,7 @@ private:
     std::vector<svanes::Entity> street_lamps;
     std::vector<svanes::Entity> wires;
     float distance = 0.0F;
+    float elapsed = 0.0F;
 };
 
 } // namespace grindset
