@@ -34,9 +34,9 @@ constexpr float kWheelEndDegrees = 15.0F;
 constexpr std::int32_t kWheelSegments = 28;
 
 constexpr svanes::Rectangle2D kMirrorStem{
-    .x = 1189.0F, .y = 88.0F, .width = 16.0F, .height = 56.0F};
+    .x = 1250.0F, .y = 86.0F, .width = 18.0F, .height = 52.0F};
 constexpr svanes::Rectangle2D kMirrorFrame{
-    .x = 1189.0F, .y = 172.0F, .width = 380.0F, .height = 116.0F};
+    .x = 1250.0F, .y = 180.0F, .width = 460.0F, .height = 140.0F};
 constexpr float kMirrorFrameWidth = 10.0F;
 
 constexpr std::int32_t kHoodZ = 50;
@@ -125,9 +125,9 @@ void CreateWindshieldFrame(svanes::Registry &world,
                                       .geometry =
                                           svanes::ConvexPolygon2D{
                                               {{-kMargin, kRoofBottom - 10.0F},
-                                               {130.0F, kRoofBottom - 10.0F},
-                                               {280.0F, kDashEdgeY + 10.0F},
-                                               {210.0F, kDashEdgeY + 10.0F}}}},
+                                               {100.0F, kRoofBottom - 10.0F},
+                                               {480.0F, kDashEdgeY + 10.0F},
+                                               {270.0F, kDashEdgeY + 10.0F}}}},
                    kFrameZ));
 }
 
