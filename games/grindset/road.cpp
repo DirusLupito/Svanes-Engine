@@ -514,4 +514,6 @@ void Road::Update(svanes::Registry &world, float seconds) {
     ShiftVertically(world, BobOffset(elapsed));
 }
 
+float Road::CurrentBob() const { return BobOffset(elapsed); }
+
 } // namespace grindset

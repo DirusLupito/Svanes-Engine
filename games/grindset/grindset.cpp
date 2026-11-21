@@ -9,6 +9,7 @@ void Grindset::Initialize(svanes::GameContext &context) {
     context.camera.x = 960.0F;
     context.camera.y = 540.0F;
     road.Initialize(context.world);
+    interior.Initialize(context.world);
     phone.Initialize(context.world);
 }
 
@@ -20,6 +21,7 @@ void Grindset::Update(const svanes::FrameContext &frame) {
     const float seconds = static_cast<float>(frame.real_delta_tics) /
                           static_cast<float>(svanes::TicsPerSecond);
     road.Update(frame.world, seconds);
+    interior.Update(frame.world, road.CurrentBob());
 }
 
 bool Grindset::ShouldQuit() const { return quit; }

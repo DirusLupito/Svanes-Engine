@@ -14,8 +14,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 
 ## Phase 2: Phone
 - [x] 2.1 Phone frame + screen rect in held position
-- [ ] 2.1b First-person car interior around the road view — **NEXT, details to discuss**
-- [ ] 2.2 Space/Tab pocket ↔ held toggle with eased slide
+- [x] 2.1b First-person car interior around the road view
+- [ ] 2.2 Space/Tab pocket ↔ held toggle with eased slide — **NEXT, awaiting approval**
 - [ ] 2.3 Gentle translate-only sway while held
 - [ ] 2.4 Fonts + status bar (5:30 clock, balance, an emoji glyph as the early emoji check)
 - [ ] 2.5 Home screen wallpaper + two clickable app icons
@@ -68,8 +68,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [ ] 6.5 Dealer banter + chat-reply captions
 
 ## Where we left off
-All work through 1.7b is committed (last: `more bob`).
-2.1 done (uncommitted). Next up is 2.1b (car interior, added by Erik), details not yet agreed.
+All work through 2.1 is committed (last: `change phone size`).
+2.1b done (uncommitted). Next up is 2.2, proposed but not yet approved.
 
 ## Deviations from plan
 - Emoji check moved to 2.4 (status bar glyph) so the risk is seen early.
@@ -84,3 +84,7 @@ All work through 1.7b is committed (last: `more bob`).
   Transform at the phone center with geometry relative to it, so moving the
   phone is one position. Phone z starts at 100, leaving room for the car interior.
 - 2.1b car interior added by Erik, right after the phone frame.
+- Car interior (`car_interior.*`): roof, pillars, hood sliver, plain dashboard,
+  top of the steering wheel (rim from short pieces), non-reflecting mirror. All
+  parts rest at Transform y 0 (absolute geometry), so bobbing is setting y; it
+  moves 40% of `Road::CurrentBob()`.

@@ -41,6 +41,12 @@ public:
      */
     void Update(svanes::Registry &world, float seconds);
 
+    /**
+     * Returns how far the road view is currently bobbed up or down.
+     * @return The vertical shift, in pixels, positive downward.
+     */
+    float CurrentBob() const;
+
 private:
     /**
      * An entity of the road view and where it sits when the view is not

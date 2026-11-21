@@ -1,5 +1,6 @@
 #pragma once
 
+#include "car_interior.hpp"
 #include "phone.hpp"
 #include "road.hpp"
 
@@ -20,7 +21,8 @@ public:
     void Initialize(svanes::GameContext &context) override;
 
     /**
-     * Checks whether Escape was pressed to quit, then moves the road.
+     * Checks whether Escape was pressed to quit, then moves the road and bobs
+     * the car interior along with it.
      * @param frame The current frame's input and engine services.
      */
     void Update(const svanes::FrameContext &frame) override;
@@ -39,6 +41,7 @@ public:
 
 private:
     Road road;
+    CarInterior interior;
     Phone phone;
     bool quit = false;
 };
