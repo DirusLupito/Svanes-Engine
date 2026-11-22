@@ -49,9 +49,14 @@ constexpr std::int32_t kScreenZ = 101;
 constexpr std::int32_t kWallpaperCapZ = 102;
 constexpr std::int32_t kWallpaperBandZ = 103;
 constexpr std::int32_t kIconZ = 104;
-constexpr std::int32_t kCameraZ = 105;
-constexpr std::int32_t kHintZ = 106;
-constexpr std::int32_t kStatusZ = 106;
+constexpr std::int32_t kAppCoverZ = 105;
+constexpr std::int32_t kCameraZ = 106;
+constexpr std::int32_t kHintZ = 107;
+constexpr std::int32_t kStatusZ = 107;
+
+constexpr float kAppGrowSeconds = 0.3F;
+constexpr float kAppFadeSeconds = 0.25F;
+constexpr svanes::Color kAppTitleColor{.red = 250, .green = 250, .blue = 252};
 
 constexpr std::int32_t kWallpaperBandCount = 40;
 constexpr float kWallpaperCapExtra = 20.0F;
@@ -173,6 +178,10 @@ svanes::Color MixColor(svanes::Color from, svanes::Color to, float amount) {
             .alpha = Mix(from.alpha, to.alpha, amount)};
 }
 
+float SmoothStep(float amount) {
+    return amount * amount * (3.0F - 2.0F * amount);
+}
+
 svanes::Color Shade(svanes::Color color, float amount) {
     return MixColor({.alpha = color.alpha}, color, amount);
 }
@@ -213,7 +222,7 @@ svanes::Entity CreateStatusLabel(svanes::Registry &world, std::string text,
 
 } // namespace
 
-void Phone::Initialize(svanes::Registry &world, svanes::FontHandle hint_font,
+void Phone::Initialize(svanes::Registry &world, svanes::FontHandle large_font,
                        svanes::FontHandle status_font) {
     parts.push_back(CreatePart(
         world, position,
@@ -230,6 +239,13 @@ void Phone::Initialize(svanes::Registry &world, svanes::FontHandle hint_font,
                    kScreenZ));
     CreateWallpaper(world);
     CreateIcons(world, status_font);
+    app_cover = CreatePart(world, position,
+                           svanes::SolidShape{.color = {.alpha = 0},
+                                              .geometry = RoundedRectangle(
+                                                  kScreenWidth, kScreenHeight,
+                                                  kScreenCornerRadius)},
+                           kAppCoverZ);
+    parts.push_back(app_cover);
     parts.push_back(CreatePart(
         world, position,
         svanes::SolidShape{
@@ -242,6 +258,12 @@ void Phone::Initialize(svanes::Registry &world, svanes::FontHandle hint_font,
                               svanes::TextAlignment::TopLeft);
     balance = CreateStatusLabel(world, FormatDollars(0), status_font,
                                 svanes::TextAlignment::TopRight);
+    app_title = world.CreateEntity();
+    world.AddComponent<svanes::TextLabel>(
+        app_title, svanes::TextLabel{.font = large_font,
+                                     .alignment = svanes::TextAlignment::Center,
+                                     .visible = false});
+    world.AddComponent<svanes::ZOrder>(app_title, svanes::ZOrder{kStatusZ});
     Place(world);
 
     hint = world.CreateEntity();
@@ -250,7 +272,7 @@ void Phone::Initialize(svanes::Registry &world, svanes::FontHandle hint_font,
         svanes::TextLabel{.text = "Press Space to take out your phone",
                           .position = kHintPosition,
                           .color = kHintColor,
-                          .font = hint_font,
+                          .font = large_font,
                           .alignment = svanes::TextAlignment::BottomCenter});
     world.AddComponent<svanes::ZOrder>(hint, svanes::ZOrder{kHintZ});
 }
@@ -319,22 +341,30 @@ void Phone::Update(svanes::Registry &world, const svanes::InputManager &input,
         FormatDollars(balance_cents);
 
     TrackClick(input);
-    for (std::size_t index = 0; index < icons.size(); ++index) {
-        const svanes::Color color = kAppIcons[index].color;
-        world.GetComponent<svanes::SolidShape>(icons[index]).color =
-            pressed_icon == index ? Shade(color, kPressedShade) : color;
+    if (open_app.has_value()) {
+        open_seconds += seconds;
     }
+    ShowScreen(world);
 }
 
 void Phone::TrackClick(const svanes::InputManager &input) {
-    if (!input.IsMouseButtonDown(svanes::MouseButton::Left)) {
+    if (input.WasMouseButtonReleased(svanes::MouseButton::Left)) {
+        if (pressed_icon.has_value() && slide == 1.0F &&
+            IconUnderMouse(input) == pressed_icon) {
+            open_app = pressed_icon;
+            open_seconds = 0.0F;
+        }
         pressed_icon.reset();
         return;
     }
-    if (!input.WasMouseButtonPressed(svanes::MouseButton::Left) ||
-        slide != 1.0F) {
-        return;
+    if (input.WasMouseButtonPressed(svanes::MouseButton::Left) &&
+        slide == 1.0F && !open_app.has_value()) {
+        pressed_icon = IconUnderMouse(input);
     }
+}
+
+std::optional<std::size_t>
+Phone::IconUnderMouse(const svanes::InputManager &input) const {
     const svanes::Vector2D mouse = input.MousePosition();
     for (std::size_t index = 0; index < icons.size(); ++index) {
         const svanes::Vector2D center = IconCenter(index);
@@ -342,13 +372,57 @@ void Phone::TrackClick(const svanes::InputManager &input) {
         const float dy = mouse.y - (position.y + center.y);
         if (std::abs(dx) <= kIconSize * 0.5F &&
             std::abs(dy) <= kIconSize * 0.5F) {
-            pressed_icon = index;
+            return index;
         }
     }
+    return std::nullopt;
+}
+
+void Phone::ShowScreen(svanes::Registry &world) {
+    for (std::size_t index = 0; index < icons.size(); ++index) {
+        svanes::Color color = kAppIcons[index].color;
+        if (pressed_icon == index) {
+            color = Shade(color, kPressedShade);
+        }
+        if (open_app.has_value()) {
+            color.alpha = 0;
+        }
+        world.GetComponent<svanes::SolidShape>(icons[index]).color = color;
+        world.GetComponent<svanes::TextLabel>(icon_names[index]).visible =
+            !open_app.has_value();
+    }
+
+    svanes::SolidShape &cover =
+        world.GetComponent<svanes::SolidShape>(app_cover);
+    svanes::TextLabel &title = world.GetComponent<svanes::TextLabel>(app_title);
+    if (!open_app.has_value()) {
+        cover.color.alpha = 0;
+        title.visible = false;
+        return;
+    }
+
+    const AppIcon &app = kAppIcons[*open_app];
+    const float grow =
+        SmoothStep(std::min(open_seconds / kAppGrowSeconds, 1.0F));
+    const svanes::Vector2D icon = IconCenter(*open_app);
+    cover.color = app.color;
+    cover.geometry = RoundedRectangle(
+        std::lerp(kIconSize, kScreenWidth, grow),
+        std::lerp(kIconSize, kScreenHeight, grow),
+        std::lerp(kIconCornerRadius, kScreenCornerRadius, grow),
+        {std::lerp(icon.x, 0.0F, grow), std::lerp(icon.y, 0.0F, grow)});
+
+    const float fade = std::clamp(
+        (open_seconds - kAppGrowSeconds) / kAppFadeSeconds, 0.0F, 1.0F);
+    title.text = app.name;
+    title.position = position;
+    title.color = kAppTitleColor;
+    title.color.alpha = static_cast<std::uint8_t>(fade * 255.0F);
+    title.visible = fade > 0.0F;
 }
 
 void Phone::Place(svanes::Registry &world) {
-    const float eased = slide * slide * (3.0F - 2.0F * slide);
+    const float eased = SmoothStep(slide);
     const svanes::Vector2D sway = SwayOffset(elapsed);
     position = {kHeldPosition.x + sway.x * eased,
                 std::lerp(kPocketY, kHeldPosition.y, eased) + sway.y * eased};

@@ -25,7 +25,11 @@ namespace grindset {
  *
  * The screen shows the home screen: a wallpaper fading from top to bottom and
  * two app icons, Casino and Instagram, with their names below them. An icon
- * darkens while it is being clicked.
+ * darkens while it is being clicked, and opens its app when the click is
+ * released over it: a shape in the icon's color grows from the icon to fill
+ * the screen, then the app fades in. For now each app is a placeholder showing
+ * its name. While an app is open the home screen is hidden, and the status bar
+ * stays on top.
  *
  * The phone is either held up or put away in the pocket, fully below the
  * bottom of the view, and eases between the two when toggled. It starts in the
@@ -46,11 +50,12 @@ public:
      * the phone out.
      * @param world The world to create them in. World coordinates are expected
      * to match screen pixels on a 1920x1080 view.
-     * @param hint_font The font to write the hint in.
+     * @param large_font The font to write the hint and the app placeholders
+     * in.
      * @param status_font The smaller font to write the status bar and the
      * app names in.
      */
-    void Initialize(svanes::Registry &world, svanes::FontHandle hint_font,
+    void Initialize(svanes::Registry &world, svanes::FontHandle large_font,
                     svanes::FontHandle status_font);
 
     /**
@@ -63,8 +68,9 @@ public:
     /**
      * Moves the phone along its slide toward the pocket or the hand, shows
      * the hint only while the phone is all the way in the pocket, shows the
-     * balance in the status bar, and darkens an app icon while it is clicked.
-     * Clicks only count while the phone is all the way up in the hand.
+     * balance in the status bar, darkens an app icon while it is clicked, and
+     * opens and draws the app. Clicks only count while the phone is all the
+     * way up in the hand.
      * @param world The world holding it.
      * @param input The mouse state, with positions matching world
      * coordinates.
@@ -106,11 +112,28 @@ private:
     void CreateIcons(svanes::Registry &world, svanes::FontHandle font);
 
     /**
-     * Starts or ends a click on an app icon.
+     * Starts or ends a click on an app icon, opening the app if the click is
+     * released over the icon it started on.
      * @param input The mouse state, with positions matching world
      * coordinates.
      */
     void TrackClick(const svanes::InputManager &input);
+
+    /**
+     * Finds the app icon under the mouse.
+     * @param input The mouse state, with positions matching world
+     * coordinates.
+     * @return The icon's index, or nothing if the mouse is not over an icon.
+     */
+    std::optional<std::size_t>
+    IconUnderMouse(const svanes::InputManager &input) const;
+
+    /**
+     * Shows the home screen or the open app: hides the icons while an app is
+     * open, grows the app's shape from its icon, and fades the app in.
+     * @param world The world holding them.
+     */
+    void ShowScreen(svanes::Registry &world);
 
     std::vector<svanes::Entity> parts;
     svanes::Entity hint{};
@@ -119,6 +142,10 @@ private:
     std::array<svanes::Entity, 2> icons{};
     std::array<svanes::Entity, 2> icon_names{};
     std::optional<std::size_t> pressed_icon;
+    std::optional<std::size_t> open_app;
+    float open_seconds = 0.0F;
+    svanes::Entity app_cover{};
+    svanes::Entity app_title{};
     svanes::Vector2D position{};
     float slide = 0.0F;
     float elapsed = 0.0F;

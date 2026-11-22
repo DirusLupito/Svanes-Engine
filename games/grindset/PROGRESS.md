@@ -20,8 +20,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [x] 2.3 Gentle translate-only sway while held
 - [x] 2.4 Status bar (5:30am clock, balance)
 - [x] 2.5 Home screen wallpaper + two clickable app icons
-- [ ] 2.6 App-open transition (rect grows from icon, content fades in) into placeholder apps — **NEXT, approved**
-- [ ] 2.7 Home bar returns to home screen
+- [x] 2.6 App-open transition (rect grows from icon, content fades in) into placeholder apps
+- [ ] 2.7 Home bar returns to home screen — **NEXT, awaiting approval**
 - [ ] 2.8 Remember last app when pulled out again
 
 ## Phase 3: Engine changes (flagged)
@@ -69,8 +69,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [ ] 6.5 Dealer banter + chat-reply captions
 
 ## Where we left off
-All work through 2.4 is committed (last: `status bar with clock and balance`).
-2.5 done (uncommitted, icons resized onto a 3-column grid). Next up is 2.6 (app opening), approved.
+All work through 2.5 is committed (last: `fixed up app spacing`).
+2.6 done (uncommitted). Next up is 2.7 (home bar), proposed but not yet approved.
 
 ## Deviations from plan
 - Emoji check dropped from 2.4 (Erik); revisit when reels need emoji (5.10), with the PNG or no-emoji fallback still open.
@@ -103,3 +103,7 @@ All work through 2.4 is committed (last: `status bar with clock and balance`).
 - 2.6/2.7 swapped: app opening comes before the home bar, so the home bar has
   something to close. Icons sit on a 3-column grid (80px icons) after the first
   layout put Instagram right of center.
+- App opening: click = press and release on the same icon. One "cover" shape
+  in the app color is rebuilt each frame, growing (0.3s, smoothstep) from the
+  icon to the screen with its corner radius; then the placeholder title fades
+  in (0.25s). Icons are hidden by alpha 0 (shapes have no visible flag).
