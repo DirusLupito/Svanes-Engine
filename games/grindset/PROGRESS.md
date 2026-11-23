@@ -151,3 +151,6 @@ All work through the result banner is committed (last: `show the round's result 
 - Captions: every line said in one frame is joined into one caption (several
   events fire per frame, e.g. the deal), wrapped to the stream width with
   `wrap_width`, held 5s then faded over 0.3s. Lines live in code until Phase 6.
+- Row totals sit right of each card row (face up cards only, so the hole card
+  is not given away; red when bust). After a split the right hand's total can
+  run past the screen edge when soft or after several hits (clipped).

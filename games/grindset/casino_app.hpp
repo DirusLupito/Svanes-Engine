@@ -25,7 +25,8 @@ namespace grindset {
  * The casino app: a fake live dealer blackjack stream inside the phone screen.
  * The top of the screen shows the stream, with a placeholder dealer standing
  * behind the edge of a green table and a LIVE badge in the corner. Below it
- * are the dealer's cards, the player's cards, the bet, and the controls:
+ * are the dealer's cards and the player's cards, each with its total beside
+ * it, the bet, and the controls:
  * between rounds, chips for building a bet and a button to deal; during a
  * round, Hit, Stand, Double, and Split. After a split, the two hands sit side
  * by side with a marker under the one being played. The app plays a blackjack
@@ -223,16 +224,18 @@ private:
                       svanes::Rectangle2D screen) const;
 
     /**
-     * Places and fades one row of cards.
+     * Places and fades one row of cards, with the total of its face up cards
+     * written to the right of it.
      * @param world The world holding them.
      * @param cards The cards, in the order they were dealt.
+     * @param total The label to write the row's total in.
      * @param center Where the middle of the row goes.
      * @param area The area the app currently covers.
      * @param shown How much of the app is showing, from 0 to 1.
      */
     void PlaceCards(svanes::Registry &world, const std::vector<CardView> &cards,
-                    svanes::Vector2D center, svanes::Rectangle2D area,
-                    float shown) const;
+                    svanes::Entity total, svanes::Vector2D center,
+                    svanes::Rectangle2D area, float shown) const;
 
     std::vector<Part> parts;
     svanes::Entity live_label{};
@@ -240,6 +243,8 @@ private:
     std::array<Button, 11> buttons{};
     svanes::Entity hand_marker{};
     std::array<svanes::Entity, 2> result_labels{};
+    svanes::Entity dealer_total{};
+    std::array<svanes::Entity, 2> player_totals{};
     svanes::Entity banner_panel{};
     svanes::Entity banner_label{};
     std::optional<Result> banner;

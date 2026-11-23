@@ -47,6 +47,7 @@ constexpr svanes::Vector2D kCardLabelInset{6.0F, 5.0F};
 constexpr float kHandMarkerWidth = 60.0F;
 constexpr float kHandMarkerHeight = 5.0F;
 constexpr float kHandMarkerGap = 12.0F;
+constexpr float kTotalGap = 10.0F;
 
 constexpr std::int32_t kStreamZ = Phone::kAppZ;
 constexpr std::int32_t kDealerBodyZ = Phone::kAppZ + 1;
@@ -363,15 +364,18 @@ std::string TotalPhrase(const blackjack::Hand &hand) {
 }
 
 /**
- * Finds the cards on the table as a hand, to add them up.
+ * Finds the face up cards on the table as a hand, to add them up. A face down
+ * card is left out, so its value is not given away.
  *
  * @param cards The cards.
- * @return The cards as a hand.
+ * @return The face up cards as a hand.
  */
 template <typename Cards> blackjack::Hand HandOf(const Cards &cards) {
     blackjack::Hand hand;
     for (const auto &view : cards) {
-        hand.Add(view.card);
+        if (view.face_up) {
+            hand.Add(view.card);
+        }
     }
     return hand;
 }
@@ -705,6 +709,12 @@ void CasinoApp::Initialize(svanes::Registry &world,
         world, svanes::Rectangle2D{.height = kBannerHeight}, kBannerZ);
     banner_label = CreateLabel(world, "", large_font,
                                svanes::TextAlignment::Center, kBannerZ);
+    dealer_total = CreateLabel(world, "", font,
+                               svanes::TextAlignment::CenterLeft, kControlZ);
+    for (svanes::Entity &label : player_totals) {
+        label = CreateLabel(world, "", font, svanes::TextAlignment::CenterLeft,
+                            kControlZ);
+    }
     for (svanes::Entity &label : result_labels) {
         label = CreateLabel(world, "", font, svanes::TextAlignment::TopCenter,
                             kControlZ);
@@ -922,8 +932,8 @@ CasinoApp::ControlUnderMouse(const svanes::InputManager &input,
 
 void CasinoApp::PlaceCards(svanes::Registry &world,
                            const std::vector<CardView> &cards,
-                           svanes::Vector2D center, svanes::Rectangle2D area,
-                           float shown) const {
+                           svanes::Entity total, svanes::Vector2D center,
+                           svanes::Rectangle2D area, float shown) const {
     const float first =
         -kCardSpread * (static_cast<float>(cards.size()) - 1.0F) * 0.5F;
     for (std::size_t index = 0; index < cards.size(); ++index) {
@@ -944,6 +954,16 @@ void CasinoApp::PlaceCards(svanes::Registry &world,
                    IsRed(card.card.suit) ? kRedSuitColor : kBlackSuitColor,
                    area, card.face_up ? shown : 0.0F);
     }
+
+    const blackjack::Hand hand = HandOf(cards);
+    const bool has_total = !hand.Cards().empty();
+    if (has_total) {
+        world.GetComponent<svanes::TextLabel>(total).text = TotalPhrase(hand);
+    }
+    PlaceLabel(world, total,
+               {center.x - first + kCardWidth * 0.5F + kTotalGap, center.y},
+               hand.IsBust() ? kLoseColor : kWhite, area,
+               has_total ? shown : 0.0F);
 }
 
 void CasinoApp::Update(svanes::Registry &world,
@@ -1024,8 +1044,8 @@ void CasinoApp::Update(svanes::Registry &world,
                    area, control_shown);
     }
 
-    PlaceCards(world, dealer_cards, {screen.x, top + kDealerCardsFromTop}, area,
-               shown);
+    PlaceCards(world, dealer_cards, dealer_total,
+               {screen.x, top + kDealerCardsFromTop}, area, shown);
     const float hand_spacing =
         player_hands.size() > 1
             ? screen.width / static_cast<float>(player_hands.size())
@@ -1034,10 +1054,15 @@ void CasinoApp::Update(svanes::Registry &world,
         screen.x -
         hand_spacing * (static_cast<float>(player_hands.size()) - 1.0F) * 0.5F;
     for (std::size_t index = 0; index < player_hands.size(); ++index) {
-        PlaceCards(world, player_hands[index],
+        PlaceCards(world, player_hands[index], player_totals.at(index),
                    {first_hand_x + hand_spacing * static_cast<float>(index),
                     top + kPlayerCardsFromTop},
                    area, shown);
+    }
+    for (std::size_t index = player_hands.size(); index < player_totals.size();
+         ++index) {
+        world.GetComponent<svanes::TextLabel>(player_totals[index]).visible =
+            false;
     }
     const bool mark_hand = in_play && player_hands.size() > 1;
     PlaceShape(
