@@ -43,8 +43,10 @@ public:
     svanes::TicCount GetFrameIntervalTics() const override;
 
 private:
+    void ResetSnake(svanes::Registry &world);
     void UpdateBody(svanes::Registry &world);
     void InitializeEdges(svanes::GameContext &context);
+    void UpdateGameOverScreen(const svanes::FrameContext &frame);
     void HandleCollision(svanes::Registry &world,
                          const svanes::CollisionEvent &event);
 
@@ -54,8 +56,10 @@ private:
     std::vector<svanes::ObjectPool<SnakeBody>::Pointer> body;
     std::deque<svanes::Vector2D> path;
     std::array<svanes::Entity, 4> edges{};
-    svanes::Entity collision_label{};
+    std::array<svanes::Entity, 3> game_over_shapes{};
+    std::array<svanes::Entity, 3> game_over_labels{};
     svanes::EventManager *events = nullptr;
+    bool game_over = false;
     bool quit = false;
 };
 
