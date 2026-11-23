@@ -45,10 +45,10 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [x] 4b.4 Hit / Stand / Double / Split buttons with enabled state
 - [x] 4b.5 Dealer turn shown, payouts credited, next round
 - [x] 4b.6 Captions from round events
-- [ ] 4b.7 Leaving mid-round freezes the round — **NEXT, awaiting approval**
+- [x] 4b.7 Leaving mid-round freezes the round (dealer steps and caption timer pause)
 
 ## Phase 5: Reels
-- [ ] 5.1 Reel slots stacked inside the phone screen, clipped
+- [ ] 5.1 Reel slots stacked inside the phone screen, clipped — **NEXT, awaiting approval**
 - [ ] 5.2 Click-drag + Up/Down arrows move reels
 - [ ] 5.3 Release: velocity-projected rest point, change-or-snap-back, spring settle
 - [ ] 5.4 Pay rules (new reel + min watch time) + "+$0.50" popup
@@ -69,8 +69,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [ ] 6.5 Dealer banter + chat-reply captions
 
 ## Where we left off
-All work through the result banner is committed (last: `show the round's result as a banner across the table`).
-4b.6 done (uncommitted). Next up is 4b.7, proposed but not yet approved.
+All work through the row totals is committed (last: `show player and dealer totals beside their cards`).
+4b.7 done (uncommitted). Phase 4 complete. Next up is 5.1 (reels), proposed but not yet approved.
 
 ## Deviations from plan
 - Emoji check dropped from 2.4 (Erik); revisit when reels need emoji (5.10), with the PNG or no-emoji fallback still open.

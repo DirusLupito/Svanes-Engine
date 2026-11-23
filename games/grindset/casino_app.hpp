@@ -57,7 +57,8 @@ public:
     /**
      * Moves everything to where the phone's screen is, clips it to the area
      * the app covers, fades it, handles clicks on the controls, and paces the
-     * dealer's turn. The dealer only moves while the app is fully shown.
+     * dealer's turn. The dealer only moves, and captions only age, while the
+     * app is fully shown, so leaving the app mid-round freezes it.
      * @param world The world holding it.
      * @param input The mouse state, with positions matching world
      * coordinates.

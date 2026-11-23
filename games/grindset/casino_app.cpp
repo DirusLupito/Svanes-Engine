@@ -994,7 +994,7 @@ void CasinoApp::Update(svanes::Registry &world,
         caption = std::move(pending_caption);
         pending_caption.clear();
         caption_seconds = 0.0F;
-    } else {
+    } else if (shown == 1.0F) {
         caption_seconds += seconds;
     }
     const float caption_fade =
