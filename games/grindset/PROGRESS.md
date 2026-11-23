@@ -40,9 +40,9 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 
 ## Phase 4b: Casino app UI
 - [x] 4b.1 Stream view layout: placeholder dealer behind a table
-- [ ] 4b.2 Card drawing, face up / face down — **NEXT, awaiting approval**
-- [ ] 4b.3 Chips, bet display, Clear / All in / Deal, debit through `Grindset`
-- [ ] 4b.4 Hit / Stand / Double / Split buttons with enabled state
+- [x] 4b.2 Card drawing, face up / face down
+- [x] 4b.3 Chips, bet display, Clear / All in / Deal, debit through `Grindset`
+- [ ] 4b.4 Hit / Stand / Double / Split buttons with enabled state — **NEXT, awaiting approval**
 - [ ] 4b.5 Dealer turn shown, payouts credited, next round
 - [ ] 4b.6 Captions from round events
 - [ ] 4b.7 Leaving mid-round freezes the round
@@ -69,8 +69,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [ ] 6.5 Dealer banter + chat-reply captions
 
 ## Where we left off
-All work through 4a.7 is committed (last: `add hit, stand, double, split, dealer play, and settlement to blackjack rounds`).
-4b.1 done (uncommitted). Next up is 4b.2, proposed but not yet approved.
+All work through 4b.1 is committed (last: `casino app stream view with placeholder dealer`).
+4b.2 + 4b.3 done together (uncommitted). Next up is 4b.4, proposed but not yet approved.
 
 ## Deviations from plan
 - Emoji check dropped from 2.4 (Erik); revisit when reels need emoji (5.10), with the PNG or no-emoji fallback still open.
@@ -132,3 +132,9 @@ All work through 4a.7 is committed (last: `add hit, stand, double, split, dealer
   `AppShown(app)` (fade) and `AppArea()` (current cover bounds, used as the
   app's `ClipRect`), plus a z band from `Phone::kAppZ`. Instagram shows only
   its color until reels exist.
+- 4b.2 + 4b.3 combined so cards have a deal to show (Erik). `CasinoApp` owns the
+  `Round` and draws cards from its events; `Grindset` moves money on
+  `BetPlacedEvent` / `RoundFinishedEvent` and throws if a bet exceeds the
+  balance. `FormatDollars` moved to `phone.hpp` so both can use it. Suits are
+  UTF-8 byte escapes so MSVC prints them without `/utf-8`. The bet stays set
+  after a round, ready to deal again.

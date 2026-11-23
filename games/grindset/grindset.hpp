@@ -14,7 +14,8 @@ namespace grindset {
 
 /**
  * The grindset game: an endless sunrise drive with a phone in hand. It owns
- * the player's balance, which starts at $100.
+ * the player's balance, which starts at $100, taking bets out of it and adding
+ * payouts to it as the casino's blackjack rounds report them.
  */
 class Grindset final : public svanes::IGame {
 public:

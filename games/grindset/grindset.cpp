@@ -3,8 +3,10 @@
 #include <svanes/MenuUtilities/font_manager.hpp>
 #include <svanes/asset_path.hpp>
 #include <svanes/camera2d.hpp>
+#include <svanes/events/event_handler_wrapper.hpp>
 #include <svanes/input/input_manager.hpp>
 
+#include <memory>
 #include <stdexcept>
 #include <string>
 
@@ -39,7 +41,26 @@ void Grindset::Initialize(svanes::GameContext &context) {
     road.Initialize(context.world);
     interior.Initialize(context.world);
     phone.Initialize(context.world, font, status_font);
-    casino.Initialize(context.world, status_font, phone.ScreenRectangle());
+    casino.Initialize(context.world, context.events, status_font, phone);
+
+    context.events.Subscribe(
+        std::make_unique<
+            svanes::EventHandlerWrapper<blackjack::BetPlacedEvent>>(
+            [this](const blackjack::BetPlacedEvent &event) {
+                if (event.bet_cents > balance_cents) {
+                    throw std::logic_error(
+                        "A bet of " + FormatDollars(event.bet_cents) +
+                        " was placed with only " +
+                        FormatDollars(balance_cents) + " left.");
+                }
+                balance_cents -= event.bet_cents;
+            }));
+    context.events.Subscribe(
+        std::make_unique<
+            svanes::EventHandlerWrapper<blackjack::RoundFinishedEvent>>(
+            [this](const blackjack::RoundFinishedEvent &event) {
+                balance_cents += event.payout_cents;
+            }));
 }
 
 void Grindset::Update(const svanes::FrameContext &frame) {
@@ -57,8 +78,7 @@ void Grindset::Update(const svanes::FrameContext &frame) {
     road.Update(frame.world, seconds);
     interior.Update(frame.world, road.CurrentBob());
     phone.Update(frame.world, frame.input, seconds, balance_cents);
-    casino.Update(frame.world, phone.ScreenRectangle(), phone.AppArea(),
-                  phone.AppShown(Phone::App::Casino));
+    casino.Update(frame.world, frame.input, phone, balance_cents);
 }
 
 bool Grindset::ShouldQuit() const { return quit; }

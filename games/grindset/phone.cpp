@@ -216,13 +216,6 @@ svanes::Vector2D IconCenter(std::size_t index) {
             -kScreenHeight * 0.5F + kIconFromTop};
 }
 
-std::string FormatDollars(std::int64_t cents) {
-    if (cents < 0) {
-        throw std::invalid_argument("Phone cannot show a negative balance of " +
-                                    std::to_string(cents) + " cents.");
-    }
-    return std::format("${}.{:02}", cents / 100, cents % 100);
-}
 
 svanes::Entity CreateStatusLabel(svanes::Registry &world, std::string text,
                                  svanes::FontHandle font,
@@ -238,6 +231,14 @@ svanes::Entity CreateStatusLabel(svanes::Registry &world, std::string text,
 }
 
 } // namespace
+
+std::string FormatDollars(std::int64_t cents) {
+    if (cents < 0) {
+        throw std::invalid_argument("Phone cannot show a negative balance of " +
+                                    std::to_string(cents) + " cents.");
+    }
+    return std::format("${}.{:02}", cents / 100, cents % 100);
+}
 
 void Phone::Initialize(svanes::Registry &world, svanes::FontHandle hint_font,
                        svanes::FontHandle status_font) {
@@ -558,6 +559,8 @@ void Phone::Place(svanes::Registry &world) {
             position.y + center.y + kIconSize * 0.5F + kIconNameGap};
     }
 }
+
+bool Phone::IsFullyHeld() const { return slide == 1.0F; }
 
 float Phone::AppShown(App app) const {
     if (open_app != static_cast<std::size_t>(app)) {

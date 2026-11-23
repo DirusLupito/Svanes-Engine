@@ -11,9 +11,18 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace grindset {
+
+/**
+ * Writes an amount of money as dollars and cents, such as "$12.05".
+ * @param cents The amount, in cents. Must not be negative.
+ * @return The amount as text.
+ * @throws std::invalid_argument if the amount is negative.
+ */
+std::string FormatDollars(std::int64_t cents);
 
 /**
  * The phone held up on the right side of the view. It is a dark body with
@@ -116,6 +125,13 @@ public:
      * @return From 0 for hidden to 1 for fully shown.
      */
     float AppShown(App app) const;
+
+    /**
+     * Returns whether the phone is all the way up in the hand, which is the
+     * only time its screen can be clicked.
+     * @return True if the phone is fully held.
+     */
+    bool IsFullyHeld() const;
 
     /**
      * Returns the area the open app currently covers, which is smaller than
