@@ -6,8 +6,6 @@
 #include <svanes/registry.hpp>
 #include <svanes/render/render_system.hpp>
 
-#include <SDL3/SDL.h>
-
 #include <numbers>
 
 namespace nutritionally_accurate_snake {
@@ -34,9 +32,7 @@ void Snake::Initialize(svanes::GameContext &context) {
 }
 
 void Snake::Update(const svanes::FrameContext &frame) {
-    quit = frame.input.WasPressed(svanes::Key::Escape) ||
-           SDL_HasEvent(SDL_EVENT_QUIT) ||
-           SDL_HasEvent(SDL_EVENT_WINDOW_CLOSE_REQUESTED);
+    quit = frame.input.WasPressed(svanes::Key::Escape);
 }
 
 bool Snake::ShouldQuit() const { return quit; }
