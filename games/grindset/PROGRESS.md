@@ -53,12 +53,7 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [x] 5.3 Release: velocity-projected rest point, change-or-snap-back, spring settle
 - [x] 5.4 Pay rules (3s on a new reel pays) + "+$0.50" popup
 - [x] 5.5 Like / dislike (visual only)
-- [ ] 5.6 `text_lines` loader + POV gradient text format
-- [ ] 5.7 Fake facts
-- [ ] 5.8 Would you rather
-- [ ] 5.9 Brainrot split screen
-- [ ] 5.10 Emoji story
-- [ ] 5.11 Motivational guru
+- [x] 5.6 Reel formats (merged 5.6-5.11 at Erik's request): `text_lines` loader, generator, view; POV, fake facts, would you rather, brainrot, emoji story (Twemoji COLRv0 font), guru
 - [ ] 5.12 Special reels hook
 
 ## Phase 6: Chat + dealer lines
@@ -69,10 +64,10 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [ ] 6.5 Dealer banter + chat-reply captions
 
 ## Where we left off
-Phase 4 committed. Phone refactor committed (`RoundedRectangle`, `kScreenCornerRadius`, `kHomeSwipeHeight` public).
-Reels through 5.3 committed, plus square reels and the first-reel rubber band. 5.4 committed. 5.5 done (uncommitted). Next up is 5.6 (`text_lines` loader + POV gradient text).
+Reels through like/dislike committed. 5.6 (all reel formats) done (uncommitted), not yet run; emoji rendering untested. Next up is 5.12 (special reels hook).
 
 ## Deviations from plan
+- 5.6-5.11 merged into one step (Erik). Added `reel_view.*` (draws any format from a fixed pool of bands, shapes, labels). Emoji via Mozilla Twemoji (COLRv0, works with FreeType built without PNG); Noto Color Emoji would need PNG support.
 - Emoji check dropped from 2.4 (Erik); revisit when reels need emoji (5.10), with the PNG or no-emoji fallback still open.
 - `svanes_game_package` + `GRINDSET_ASSETS_DIR` added in 2.2b with the first asset (font); packaging needs an `assets/` folder. Font is goose's `consola.ttf` (28pt), loaded once in `Grindset`.
 - 1.5 split into poles/lamps (1.5) and wires (1.6); camera bob moved to 1.7.

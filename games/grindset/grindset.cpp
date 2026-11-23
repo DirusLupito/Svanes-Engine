@@ -16,6 +16,8 @@ namespace {
 
 constexpr float kFontPoints = 28.0F;
 constexpr float kStatusFontPoints = 20.0F;
+constexpr float kReelFontPoints = 36.0F;
+constexpr float kEmojiFontPoints = 64.0F;
 
 svanes::FontHandle LoadFont(svanes::FontManager &fonts, const std::string &path,
                             float points) {
@@ -37,12 +39,23 @@ void Grindset::Initialize(svanes::GameContext &context) {
         svanes::AssetPath(GRINDSET_ASSETS_DIR) + "/fonts/consola.ttf";
     font = LoadFont(context.fonts, font_path, kFontPoints);
     status_font = LoadFont(context.fonts, font_path, kStatusFontPoints);
+    const svanes::FontHandle reel_font =
+        LoadFont(context.fonts, font_path, kReelFontPoints);
+    const svanes::FontHandle emoji_font = LoadFont(
+        context.fonts,
+        svanes::AssetPath(GRINDSET_ASSETS_DIR) + "/fonts/Twemoji.Mozilla.ttf",
+        kEmojiFontPoints);
 
     road.Initialize(context.world);
     interior.Initialize(context.world);
     phone.Initialize(context.world, font, status_font);
     casino.Initialize(context.world, context.events, status_font, font, phone);
-    reels.Initialize(context.world, font, phone);
+    reels.Initialize(context.world,
+                     {.small = status_font,
+                      .medium = font,
+                      .large = reel_font,
+                      .emoji = emoji_font},
+                     svanes::AssetPath(GRINDSET_ASSETS_DIR) + "/text", phone);
 
     context.events.Subscribe(
         std::make_unique<

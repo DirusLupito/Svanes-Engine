@@ -51,7 +51,7 @@ blackjack (bet → player turn → dealer turn).
 ### Content
 - Editable text files in `assets/text/`: word lists per reel format, chat lines,
   chat replies, dealer banter, dealer reply lines. Loaded at startup.
-- Fonts in `assets/fonts/` (UI font + color emoji font).
+- Fonts in `assets/fonts/` (UI font + color emoji font: Mozilla Twemoji, COLRv0, CC-BY 4.0).
 
 ### Not in scope (for now)
 Audio, visible other players, endgame/goal, recommendation algorithm.
@@ -78,6 +78,7 @@ Audio, visible other players, endgame/goal, recommendation algorithm.
 | `chat.hpp/.cpp` | Chat log, key-based text entry, ambient + reply timers. |
 | `reels_app.hpp/.cpp` | Swipe physics, reel slot entities, pay rules, like/dislike, popup. |
 | `reel_generator.hpp/.cpp` | Formats + word lists → reel description; special reels. |
+| `reel_view.hpp/.cpp` | Draws one reel of any format from a fixed pool of background bands, shapes, and labels. |
 | `text_lines.hpp/.cpp` | Load a line-per-entry text file; random pick. |
 | `CMakeLists.txt`, `justfile` | Target `svanes_game_grindset`, `GRINDSET_ASSETS_DIR`, `svanes_game_package`. |
 

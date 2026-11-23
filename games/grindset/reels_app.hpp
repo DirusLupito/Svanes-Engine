@@ -1,6 +1,8 @@
 #pragma once
 
 #include "phone.hpp"
+#include "reel_generator.hpp"
+#include "reel_view.hpp"
 
 #include <svanes/MenuUtilities/font_manager.hpp>
 #include <svanes/entity.hpp>
@@ -12,6 +14,7 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -20,9 +23,10 @@ namespace grindset {
 
 /**
  * The reels app: an endless column of reels, each filling the phone's screen.
- * For now a reel is a placeholder, a solid color with its number written in
- * the middle. The reel being watched fills the screen, with the next reel
- * right below it and the previous one right above it, just out of view.
+ * Each reel is made up from its number by a ReelGenerator, picking one of
+ * several kinds of reel, and drawn by a ReelView. The reel being watched fills
+ * the screen, with the next reel right below it and the previous one right
+ * above it, just out of view.
  *
  * Clicking and dragging up or down anywhere on the screen, except the strip
  * at the bottom used to swipe home, moves the reels along with the mouse. On
@@ -50,14 +54,18 @@ namespace grindset {
 class ReelsApp final {
 public:
     /**
-     * Creates the previous, current, and next reels, hidden until the app is
-     * opened.
+     * Reads the text the reels are made from, and creates the previous,
+     * current, and next reels, hidden until the app is opened.
      * @param world The world to create them in.
-     * @param font The font to write the reels' numbers in.
+     * @param fonts The fonts the reels write in. The popup uses the medium
+     * font.
+     * @param text_directory The folder holding the reels' text files.
      * @param phone The phone, to size the reels by.
+     * @throws std::runtime_error if a text file cannot be read or has no
+     * lines.
      */
-    void Initialize(svanes::Registry &world, svanes::FontHandle font,
-                    const Phone &phone);
+    void Initialize(svanes::Registry &world, const ReelFonts &fonts,
+                    const std::string &text_directory, const Phone &phone);
 
     /**
      * Moves between reels by dragging or the arrow keys, springs the reels
@@ -105,14 +113,15 @@ private:
      * One of the reels on screen.
      *
      * FIELDS:
-     * - card: The reel's shape, the size of the screen.
-     * - label: The reel's number, written in the middle.
+     * - view: What draws the reel.
+     * - showing: The number of the reel the view is set up for, or nothing
+     * before it shows one.
      * - like: The reel's like button.
      * - dislike: The reel's dislike button.
      */
     struct Slot {
-        svanes::Entity card;
-        svanes::Entity label;
+        ReelView view;
+        std::optional<std::uint32_t> showing;
         svanes::Entity like;
         svanes::Entity dislike;
     };
@@ -198,6 +207,7 @@ private:
     void ShowPopup(svanes::Registry &world, svanes::Rectangle2D screen,
                    svanes::Rectangle2D area, float shown, float seconds);
 
+    std::optional<ReelGenerator> generator;
     std::array<Slot, 3> slots{};
     std::uint32_t current = 0;
     float offset = 0.0F;

@@ -8,6 +8,9 @@ add_executable(
     blackjack.cpp
     casino_app.cpp
     reels_app.cpp
+    reel_view.cpp
+    reel_generator.cpp
+    text_lines.cpp
 )
 target_link_libraries(svanes_game_grindset PRIVATE Svanes::Engine)
 target_compile_definitions(svanes_game_grindset PRIVATE
