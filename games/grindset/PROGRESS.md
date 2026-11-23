@@ -30,8 +30,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [x] 3.3 `TextLabel::wrap_width`, part of the label cache key
 
 ## Phase 4a: Blackjack rules (`blackjack.*`, no rendering)
-- [ ] 4a.1 Card + 6-deck shoe with ~75% reshuffle point — **NEXT, awaiting approval**
-- [ ] 4a.2 Hand value: soft/hard, blackjack, bust
+- [x] 4a.1 Card + 6-deck shoe with ~75% reshuffle point
+- [ ] 4a.2 Hand value: soft/hard, blackjack, bust — **NEXT, awaiting approval**
 - [ ] 4a.3 Round start: bet, deal, hole-card peek, naturals pay 3:2
 - [ ] 4a.4 Hit, stand, dealer hits soft 17, settle
 - [ ] 4a.5 Double (with affordability)
@@ -69,8 +69,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [ ] 6.5 Dealer banter + chat-reply captions
 
 ## Where we left off
-All work through 3.2 is committed (last: `honor ClipRect for sprites, tile maps, gradients, and text labels`).
-3.3 done (uncommitted engine edit). Phase 3 complete. Next up is 4a.1, proposed but not yet approved.
+All work through 3.3 is committed (last: `add wrap width to text labels`).
+4a.1 done (uncommitted). Next up is 4a.2, proposed but not yet approved.
 
 ## Deviations from plan
 - Emoji check dropped from 2.4 (Erik); revisit when reels need emoji (5.10), with the PNG or no-emoji fallback still open.
