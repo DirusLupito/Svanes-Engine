@@ -50,15 +50,14 @@ constexpr std::int32_t kWallpaperCapZ = 102;
 constexpr std::int32_t kWallpaperBandZ = 103;
 constexpr std::int32_t kIconZ = 104;
 constexpr std::int32_t kAppCoverZ = 105;
-constexpr std::int32_t kHomeBarZ = 106;
-constexpr std::int32_t kCameraZ = 107;
-constexpr std::int32_t kHintZ = 108;
-constexpr std::int32_t kStatusZ = 108;
+constexpr std::int32_t kHomeBarZ = Phone::kAppZ + 10;
+constexpr std::int32_t kCameraZ = Phone::kAppZ + 11;
+constexpr std::int32_t kHintZ = Phone::kAppZ + 12;
+constexpr std::int32_t kStatusZ = Phone::kAppZ + 12;
 
 constexpr float kAppGrowSeconds = 0.3F;
 constexpr float kAppFadeSeconds = 0.25F;
-constexpr svanes::Color kAppTitleColor{.red = 250, .green = 250, .blue = 252};
-constexpr float kAppTitleShownAbove = 0.8F;
+constexpr float kAppContentShownAbove = 0.8F;
 
 constexpr float kHomeBarWidth = 134.0F;
 constexpr float kHomeBarHeight = 7.0F;
@@ -240,7 +239,7 @@ svanes::Entity CreateStatusLabel(svanes::Registry &world, std::string text,
 
 } // namespace
 
-void Phone::Initialize(svanes::Registry &world, svanes::FontHandle large_font,
+void Phone::Initialize(svanes::Registry &world, svanes::FontHandle hint_font,
                        svanes::FontHandle status_font) {
     parts.push_back(CreatePart(
         world, position,
@@ -286,12 +285,6 @@ void Phone::Initialize(svanes::Registry &world, svanes::FontHandle large_font,
                    kHomeBarZ);
     parts.push_back(home_bar);
 
-    app_title = world.CreateEntity();
-    world.AddComponent<svanes::TextLabel>(
-        app_title, svanes::TextLabel{.font = large_font,
-                                     .alignment = svanes::TextAlignment::Center,
-                                     .visible = false});
-    world.AddComponent<svanes::ZOrder>(app_title, svanes::ZOrder{kStatusZ});
     Place(world);
 
     hint = world.CreateEntity();
@@ -300,7 +293,7 @@ void Phone::Initialize(svanes::Registry &world, svanes::FontHandle large_font,
         svanes::TextLabel{.text = "Press Space to take out your phone",
                           .position = kHintPosition,
                           .color = kHintColor,
-                          .font = large_font,
+                          .font = hint_font,
                           .alignment = svanes::TextAlignment::BottomCenter});
     world.AddComponent<svanes::ZOrder>(hint, svanes::ZOrder{kHintZ});
 }
@@ -503,38 +496,37 @@ void Phone::ShowScreen(svanes::Registry &world) {
 
     svanes::SolidShape &cover =
         world.GetComponent<svanes::SolidShape>(app_cover);
-    svanes::TextLabel &title = world.GetComponent<svanes::TextLabel>(app_title);
     svanes::SolidShape &bar = world.GetComponent<svanes::SolidShape>(home_bar);
     if (!open_app.has_value()) {
         cover.color.alpha = 0;
         bar.color.alpha = 0;
-        title.visible = false;
+        app_shown = 0.0F;
         return;
     }
 
     const AppIcon &app = kAppIcons[*open_app];
     const float amount = std::clamp(app_amount, 0.0F, 1.0F);
     const svanes::Vector2D icon = IconCenter(*open_app);
+    app_area = {.x = std::lerp(icon.x, 0.0F, amount),
+                .y = std::lerp(icon.y, 0.0F, amount),
+                .width = std::lerp(kIconSize, kScreenWidth, amount),
+                .height = std::lerp(kIconSize, kScreenHeight, amount)};
     cover.color = app.color;
     cover.geometry = RoundedRectangle(
-        std::lerp(kIconSize, kScreenWidth, amount),
-        std::lerp(kIconSize, kScreenHeight, amount),
+        app_area.width, app_area.height,
         std::lerp(kIconCornerRadius, kScreenCornerRadius, amount),
-        {std::lerp(icon.x, 0.0F, amount), std::lerp(icon.y, 0.0F, amount)});
+        {app_area.x, app_area.y});
+    app_area.x += position.x;
+    app_area.y += position.y;
 
     const float opened =
         app_motion == AppMotion::Opening
             ? std::clamp((open_seconds - kAppGrowSeconds) / kAppFadeSeconds,
                          0.0F, 1.0F)
             : 1.0F;
-    const float shown = opened * std::clamp((amount - kAppTitleShownAbove) /
-                                                (1.0F - kAppTitleShownAbove),
-                                            0.0F, 1.0F);
-    title.text = app.name;
-    title.position = position;
-    title.color = kAppTitleColor;
-    title.color.alpha = static_cast<std::uint8_t>(shown * 255.0F);
-    title.visible = shown > 0.0F;
+    app_shown = opened * std::clamp((amount - kAppContentShownAbove) /
+                                        (1.0F - kAppContentShownAbove),
+                                    0.0F, 1.0F);
 
     bar.color = kHomeBarColor;
     bar.color.alpha = static_cast<std::uint8_t>(
@@ -566,6 +558,15 @@ void Phone::Place(svanes::Registry &world) {
             position.y + center.y + kIconSize * 0.5F + kIconNameGap};
     }
 }
+
+float Phone::AppShown(App app) const {
+    if (open_app != static_cast<std::size_t>(app)) {
+        return 0.0F;
+    }
+    return app_shown;
+}
+
+svanes::Rectangle2D Phone::AppArea() const { return app_area; }
 
 svanes::Rectangle2D Phone::ScreenRectangle() const {
     return {.x = position.x,

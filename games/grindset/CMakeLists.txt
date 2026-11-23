@@ -6,6 +6,7 @@ add_executable(
     phone.cpp
     car_interior.cpp
     blackjack.cpp
+    casino_app.cpp
 )
 target_link_libraries(svanes_game_grindset PRIVATE Svanes::Engine)
 target_compile_definitions(svanes_game_grindset PRIVATE

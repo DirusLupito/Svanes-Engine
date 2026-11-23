@@ -1,6 +1,7 @@
 #pragma once
 
 #include "car_interior.hpp"
+#include "casino_app.hpp"
 #include "phone.hpp"
 #include "road.hpp"
 
@@ -27,8 +28,8 @@ public:
     /**
      * Checks whether Escape was pressed to quit and whether Space or Tab was
      * pressed to put away or take out the phone, then moves the road, bobs
-     * the car interior along with it, and slides the phone, which shows the
-     * balance.
+     * the car interior along with it, slides the phone, which shows the
+     * balance, and lays the casino app out on the phone's screen.
      * @param frame The current frame's input and engine services.
      */
     void Update(const svanes::FrameContext &frame) override;
@@ -49,6 +50,7 @@ private:
     Road road;
     CarInterior interior;
     Phone phone;
+    CasinoApp casino;
     svanes::FontHandle font{};
     svanes::FontHandle status_font{};
     std::int64_t balance_cents = 10'000;

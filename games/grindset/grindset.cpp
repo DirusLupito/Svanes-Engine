@@ -39,6 +39,7 @@ void Grindset::Initialize(svanes::GameContext &context) {
     road.Initialize(context.world);
     interior.Initialize(context.world);
     phone.Initialize(context.world, font, status_font);
+    casino.Initialize(context.world, status_font, phone.ScreenRectangle());
 }
 
 void Grindset::Update(const svanes::FrameContext &frame) {
@@ -56,6 +57,8 @@ void Grindset::Update(const svanes::FrameContext &frame) {
     road.Update(frame.world, seconds);
     interior.Update(frame.world, road.CurrentBob());
     phone.Update(frame.world, frame.input, seconds, balance_cents);
+    casino.Update(frame.world, phone.ScreenRectangle(), phone.AppArea(),
+                  phone.AppShown(Phone::App::Casino));
 }
 
 bool Grindset::ShouldQuit() const { return quit; }

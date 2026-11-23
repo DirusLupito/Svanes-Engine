@@ -39,8 +39,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [x] 4a.7 Remaining round events (bust, dealer stood, hand doubled/split/settled)
 
 ## Phase 4b: Casino app UI
-- [ ] 4b.1 Stream view layout: placeholder dealer behind a table — **NEXT, awaiting approval**
-- [ ] 4b.2 Card drawing, face up / face down
+- [x] 4b.1 Stream view layout: placeholder dealer behind a table
+- [ ] 4b.2 Card drawing, face up / face down — **NEXT, awaiting approval**
 - [ ] 4b.3 Chips, bet display, Clear / All in / Deal, debit through `Grindset`
 - [ ] 4b.4 Hit / Stand / Double / Split buttons with enabled state
 - [ ] 4b.5 Dealer turn shown, payouts credited, next round
@@ -69,8 +69,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [ ] 6.5 Dealer banter + chat-reply captions
 
 ## Where we left off
-All work through 4a.3 is committed (last: `start blackjack rounds with dealing, dealer peek, and naturals`).
-4a.4-4a.7 done together (uncommitted, rules only). Next up is 4b.1, proposed but not yet approved.
+All work through 4a.7 is committed (last: `add hit, stand, double, split, dealer play, and settlement to blackjack rounds`).
+4b.1 done (uncommitted). Next up is 4b.2, proposed but not yet approved.
 
 ## Deviations from plan
 - Emoji check dropped from 2.4 (Erik); revisit when reels need emoji (5.10), with the PNG or no-emoji fallback still open.
@@ -128,3 +128,7 @@ All work through 4a.3 is committed (last: `start blackjack rounds with dealing, 
   carries the total payout, with per-hand `HandSettledEvent`s for captions.
   Auto-stand on 21. A hand is dealt its second card after a split when it
   starts being played; split aces get one card each, then the dealer plays.
+- Apps draw their own content: `Phone` dropped the placeholder title and exposes
+  `AppShown(app)` (fade) and `AppArea()` (current cover bounds, used as the
+  app's `ClipRect`), plus a z band from `Phone::kAppZ`. Instagram shows only
+  its color until reels exist.
