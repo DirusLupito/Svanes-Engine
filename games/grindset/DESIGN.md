@@ -87,11 +87,13 @@ Audio, visible other players, endgame/goal, recommendation algorithm.
 - `Phone` exposes the current screen `Rectangle2D` so apps lay out inside it
   and set their `ClipRect` from it.
 - `blackjack::Round`: `PlaceBet(cents)`, `Hit()`, `Stand()`, `Double()`,
-  `Split()`, query `CanDouble/CanSplit(balance)`, state + hands for display,
-  and a queue of announcements (`"Player has 14"`, `"Dealer busts"`, ...) that
-  `casino_app` turns into captions.
-- Money flows through `Grindset`: apps request debit/credit, `Grindset` owns the
-  number.
+  `Split()`, query `CanDouble/CanSplit(balance)`. The round reports what
+  happens (bet placed, card dealt, dealer peek, reshuffle, player's turn, round
+  finished with payout, ...) as engine events, triggered immediately;
+  `casino_app` listens to draw cards and show captions.
+- Money flows through `Grindset`: it listens for bet-placed and round-finished
+  events to debit/credit, and owns the number. Affordability is checked before
+  a bet is placed.
 
 ## Build order
 1. Skeleton game + road view.

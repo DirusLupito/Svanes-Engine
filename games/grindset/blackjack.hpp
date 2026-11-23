@@ -1,8 +1,12 @@
 #pragma once
 
+#include <svanes/events/event.hpp>
+#include <svanes/events/event_manager.hpp>
+
 #include <cstddef>
 #include <cstdint>
 #include <random>
+#include <string_view>
 #include <vector>
 
 namespace grindset::blackjack {
@@ -171,6 +175,220 @@ public:
 private:
     std::vector<Card> cards;
     bool from_split;
+};
+
+/**
+ * Who a card is dealt to.
+ *
+ * VALUES:
+ * - Player: The player.
+ * - Dealer: The dealer.
+ */
+enum class Seat : std::uint8_t {
+    Player,
+    Dealer,
+};
+
+/**
+ * How a finished round turned out for the player.
+ *
+ * VALUES:
+ * - Blackjack: The player had a blackjack and the dealer did not; pays 3:2.
+ * - Push: A tie; the bet is returned.
+ * - Lose: The player lost the bet.
+ */
+enum class Outcome : std::uint8_t {
+    Blackjack,
+    Push,
+    Lose,
+};
+
+/**
+ * A bet being placed, starting a round. Raised by the round, and handled by
+ * whatever takes the bet from the player's balance.
+ *
+ * FIELDS:
+ * - bet_cents: The bet, in cents.
+ */
+class BetPlacedEvent final : public svanes::EventOf<BetPlacedEvent> {
+public:
+    static constexpr std::string_view EventName = "blackjack.bet_placed";
+
+    /**
+     * @param bet_cents The bet, in cents.
+     */
+    explicit BetPlacedEvent(std::int64_t bet_cents);
+
+    std::int64_t bet_cents;
+};
+
+/**
+ * The shoe being reshuffled before a round is dealt, because the cut card was
+ * reached in an earlier round. Raised by the round.
+ */
+class ShoeReshuffledEvent final : public svanes::EventOf<ShoeReshuffledEvent> {
+public:
+    static constexpr std::string_view EventName = "blackjack.shoe_reshuffled";
+};
+
+/**
+ * A card being dealt. Raised by the round, and handled by whatever shows the
+ * table.
+ *
+ * FIELDS:
+ * - seat: Who the card is dealt to.
+ * - card: The card.
+ * - face_up: Whether the card is dealt face up. Only the dealer's hole card
+ * is dealt face down.
+ */
+class CardDealtEvent final : public svanes::EventOf<CardDealtEvent> {
+public:
+    static constexpr std::string_view EventName = "blackjack.card_dealt";
+
+    /**
+     * @param seat Who the card is dealt to.
+     * @param card The card.
+     * @param face_up Whether the card is dealt face up.
+     */
+    CardDealtEvent(Seat seat, Card card, bool face_up);
+
+    Seat seat;
+    Card card;
+    bool face_up;
+};
+
+/**
+ * The dealer checking the hole card for a blackjack, which happens when the
+ * dealer's face up card is an ace or worth 10. Raised by the round.
+ *
+ * FIELDS:
+ * - has_blackjack: Whether the dealer has a blackjack.
+ */
+class DealerPeekedEvent final : public svanes::EventOf<DealerPeekedEvent> {
+public:
+    static constexpr std::string_view EventName = "blackjack.dealer_peeked";
+
+    /**
+     * @param has_blackjack Whether the dealer has a blackjack.
+     */
+    explicit DealerPeekedEvent(bool has_blackjack);
+
+    bool has_blackjack;
+};
+
+/**
+ * The dealer turning the hole card face up. Raised by the round.
+ *
+ * FIELDS:
+ * - card: The hole card.
+ */
+class HoleCardRevealedEvent final
+    : public svanes::EventOf<HoleCardRevealedEvent> {
+public:
+    static constexpr std::string_view EventName =
+        "blackjack.hole_card_revealed";
+
+    /**
+     * @param card The hole card.
+     */
+    explicit HoleCardRevealedEvent(Card card);
+
+    Card card;
+};
+
+/**
+ * The player's turn starting, after the deal when neither side has a
+ * blackjack. Raised by the round.
+ */
+class PlayerTurnEvent final : public svanes::EventOf<PlayerTurnEvent> {
+public:
+    static constexpr std::string_view EventName = "blackjack.player_turn";
+};
+
+/**
+ * A round finishing. Raised by the round, and handled by whatever gives the
+ * payout to the player's balance and whatever shows the result.
+ *
+ * FIELDS:
+ * - outcome: How the round turned out for the player.
+ * - payout_cents: How much is given back to the player, in cents, including
+ * the bet itself. 0 when the player loses.
+ */
+class RoundFinishedEvent final : public svanes::EventOf<RoundFinishedEvent> {
+public:
+    static constexpr std::string_view EventName = "blackjack.round_finished";
+
+    /**
+     * @param outcome How the round turned out for the player.
+     * @param payout_cents How much is given back to the player, in cents.
+     */
+    RoundFinishedEvent(Outcome outcome, std::int64_t payout_cents);
+
+    Outcome outcome;
+    std::int64_t payout_cents;
+};
+
+/**
+ * One round of blackjack against the dealer, played with a shoe that lasts
+ * across rounds. The round does not hold the player's money; it reports what
+ * happens, including bets and payouts, as events.
+ */
+class Round final {
+public:
+    /**
+     * Creates a round waiting for a bet, with a freshly shuffled shoe.
+     * @param events Where the round reports what happens.
+     */
+    explicit Round(svanes::EventManager &events);
+
+    /**
+     * Places a bet and deals a new round: reshuffles first if the cut card
+     * was reached, deals two cards each with the dealer's second face down,
+     * and lets the dealer peek for a blackjack when showing an ace or a 10. A
+     * blackjack on either side finishes the round right away; otherwise the
+     * player's turn starts. The caller must already have checked that the
+     * player can afford the bet.
+     * @param bet The bet, in cents. Must be at least $1.
+     * @throws std::invalid_argument if the bet is under $1.
+     * @throws std::logic_error if a round is still being played.
+     */
+    void PlaceBet(std::int64_t bet);
+
+private:
+    /**
+     * Where the round is.
+     *
+     * VALUES:
+     * - Betting: Waiting for the first bet.
+     * - PlayerTurn: Waiting for the player to act.
+     * - Finished: Over, and waiting for the next bet.
+     */
+    enum class Stage : std::uint8_t {
+        Betting,
+        PlayerTurn,
+        Finished,
+    };
+
+    /**
+     * Draws a card from the shoe into a hand and reports it.
+     * @param seat Who the card is dealt to.
+     * @param face_up Whether the card is dealt face up.
+     */
+    void Deal(Seat seat, bool face_up);
+
+    /**
+     * Ends the round: turns the hole card face up and reports the result.
+     * @param outcome How the round turned out for the player.
+     * @param payout_cents How much is given back to the player, in cents.
+     */
+    void Finish(Outcome outcome, std::int64_t payout_cents);
+
+    svanes::EventManager &events;
+    Shoe shoe;
+    Hand player;
+    Hand dealer;
+    std::int64_t bet_cents = 0;
+    Stage stage = Stage::Betting;
 };
 
 } // namespace grindset::blackjack

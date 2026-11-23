@@ -32,11 +32,11 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 ## Phase 4a: Blackjack rules (`blackjack.*`, no rendering)
 - [x] 4a.1 Card + 6-deck shoe with ~75% reshuffle point
 - [x] 4a.2 Hand value: soft/hard, blackjack, bust
-- [ ] 4a.3 Round start: bet, deal, hole-card peek, naturals pay 3:2 — **NEXT, awaiting approval**
-- [ ] 4a.4 Hit, stand, dealer hits soft 17, settle
+- [x] 4a.3 Round start: bet, deal, hole-card peek, naturals pay 3:2 (reported as events)
+- [ ] 4a.4 Hit, stand, dealer hits soft 17, settle — **NEXT, awaiting approval**
 - [ ] 4a.5 Double (with affordability)
 - [ ] 4a.6 Split: one max, any 10-values, split aces one card, 21 after split pays 1:1
-- [ ] 4a.7 Announcement queue (callouts, round flow, reshuffle)
+- [ ] 4a.7 Remaining round events not yet added (folded in from the old announcement queue)
 
 ## Phase 4b: Casino app UI
 - [ ] 4b.1 Stream view layout: placeholder dealer behind a table
@@ -44,7 +44,7 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [ ] 4b.3 Chips, bet display, Clear / All in / Deal, debit through `Grindset`
 - [ ] 4b.4 Hit / Stand / Double / Split buttons with enabled state
 - [ ] 4b.5 Dealer turn shown, payouts credited, next round
-- [ ] 4b.6 Captions from the announcement queue
+- [ ] 4b.6 Captions from round events
 - [ ] 4b.7 Leaving mid-round freezes the round
 
 ## Phase 5: Reels
@@ -69,8 +69,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [ ] 6.5 Dealer banter + chat-reply captions
 
 ## Where we left off
-All work through 4a.1 is committed (last: `blackjack cards and six-deck shoe`).
-4a.2 done (uncommitted). Next up is 4a.3, proposed but not yet approved.
+All work through 4a.2 is committed (last: `blackjack hand totals, soft hands, busts, and blackjacks`).
+4a.3 done (uncommitted). Next up is 4a.4, proposed but not yet approved.
 
 ## Deviations from plan
 - Emoji check dropped from 2.4 (Erik); revisit when reels need emoji (5.10), with the PNG or no-emoji fallback still open.
@@ -119,3 +119,6 @@ All work through 4a.1 is committed (last: `blackjack cards and six-deck shoe`).
   world coordinates and goes through the camera like shapes.
 - 21 after a split is a normal 21 (1:1), not blackjack: Erik chose normal casino
   rules when asked, replacing the earlier house rule.
+- Rounds report through engine events (triggered immediately) instead of an
+  announcement queue (Erik); 4a.7 shrinks to whatever events are still missing.
+  `Grindset` will debit/credit from bet-placed / round-finished events.

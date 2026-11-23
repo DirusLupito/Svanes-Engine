@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <random>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 namespace grindset::blackjack {
@@ -14,6 +15,7 @@ namespace {
 
 constexpr std::int32_t kDeckCount = 6;
 constexpr std::size_t kCutCardPosition = 52 * kDeckCount * 3 / 4;
+constexpr std::int64_t kMinimumBetCents = 100;
 
 constexpr std::array<Rank, 13> kRanks{
     Rank::Ace,  Rank::Two,   Rank::Three, Rank::Four, Rank::Five,
@@ -136,6 +138,81 @@ bool Hand::IsBust() const { return Total() > 21; }
 
 bool Hand::IsBlackjack() const {
     return !from_split && cards.size() == 2 && Total() == 21;
+}
+
+BetPlacedEvent::BetPlacedEvent(std::int64_t bet_cents) : bet_cents(bet_cents) {}
+
+CardDealtEvent::CardDealtEvent(Seat seat, Card card, bool face_up)
+    : seat(seat), card(card), face_up(face_up) {}
+
+DealerPeekedEvent::DealerPeekedEvent(bool has_blackjack)
+    : has_blackjack(has_blackjack) {}
+
+HoleCardRevealedEvent::HoleCardRevealedEvent(Card card) : card(card) {}
+
+RoundFinishedEvent::RoundFinishedEvent(Outcome outcome,
+                                       std::int64_t payout_cents)
+    : outcome(outcome), payout_cents(payout_cents) {}
+
+Round::Round(svanes::EventManager &events) : events(events) {}
+
+void Round::PlaceBet(std::int64_t bet) {
+    if (stage == Stage::PlayerTurn) {
+        throw std::logic_error(
+            "A bet cannot be placed while a round is being played.");
+    }
+    if (bet < kMinimumBetCents) {
+        throw std::invalid_argument("A bet must be at least $1, but was " +
+                                    std::to_string(bet) + " cents.");
+    }
+
+    bet_cents = bet;
+    player = Hand{};
+    dealer = Hand{};
+    events.TriggerEvent(BetPlacedEvent{bet_cents});
+    if (shoe.NeedsReshuffle()) {
+        shoe.Reshuffle();
+        events.TriggerEvent(ShoeReshuffledEvent{});
+    }
+
+    Deal(Seat::Player, true);
+    Deal(Seat::Dealer, true);
+    Deal(Seat::Player, true);
+    Deal(Seat::Dealer, false);
+
+    if (CardValue(dealer.Cards().front()) >= 10) {
+        events.TriggerEvent(DealerPeekedEvent{dealer.IsBlackjack()});
+    }
+    if (dealer.IsBlackjack()) {
+        if (player.IsBlackjack()) {
+            Finish(Outcome::Push, bet_cents);
+        } else {
+            Finish(Outcome::Lose, 0);
+        }
+        return;
+    }
+    if (player.IsBlackjack()) {
+        Finish(Outcome::Blackjack, bet_cents + bet_cents * 3 / 2);
+        return;
+    }
+    stage = Stage::PlayerTurn;
+    events.TriggerEvent(PlayerTurnEvent{});
+}
+
+void Round::Deal(Seat seat, bool face_up) {
+    const Card card = shoe.Draw();
+    if (seat == Seat::Player) {
+        player.Add(card);
+    } else {
+        dealer.Add(card);
+    }
+    events.TriggerEvent(CardDealtEvent{seat, card, face_up});
+}
+
+void Round::Finish(Outcome outcome, std::int64_t payout_cents) {
+    events.TriggerEvent(HoleCardRevealedEvent{dealer.Cards()[1]});
+    stage = Stage::Finished;
+    events.TriggerEvent(RoundFinishedEvent{outcome, payout_cents});
 }
 
 } // namespace grindset::blackjack
