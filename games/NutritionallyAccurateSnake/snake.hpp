@@ -28,10 +28,12 @@ public:
     explicit SnakeHead(svanes::Registry &world);
     void PhysicsUpdate(const svanes::PhysicsContext &physics);
     void SetRadius(svanes::Registry &world, float radius);
+    void AdjustTurnSpeed(float adjustment);
     svanes::Entity GetEntity() const;
 
 private:
     svanes::Entity entity;
+    float turn_speed;
 };
 
 class SnakeBody final {

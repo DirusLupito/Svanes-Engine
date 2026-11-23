@@ -25,7 +25,9 @@
 namespace nutritionally_accurate_snake {
 
 constexpr float kMoveSpeed = 180.0F;
-constexpr float kTurnRate = std::numbers::pi_v<float>;
+constexpr float kMaxTurnSpeed = std::numbers::pi_v<float>;
+constexpr float kMinTurnSpeed = kMaxTurnSpeed / 6.0F;
+constexpr float kTurnSpeedStep = kMaxTurnSpeed / 12.0F;
 constexpr float kRadius = 16.0F;
 constexpr float kBodySpacing = 16.0F;
 constexpr std::size_t kInitialBodyCount = 3;
@@ -64,7 +66,8 @@ static void SetSnakeRadius(svanes::Registry &world, svanes::Entity entity,
 
 // Object representing the snake's head. This is what will collide with objects to pick them up,
 // or with the edges and body segments to trigger a game over.
-SnakeHead::SnakeHead(svanes::Registry &world) : entity(world.CreateEntity()) {
+SnakeHead::SnakeHead(svanes::Registry &world)
+    : entity(world.CreateEntity()), turn_speed(kMaxTurnSpeed) {
     constexpr float heading = std::numbers::pi_v<float> / 6.0F;
     const float speed = svanes::PerSecondToPerTic(kMoveSpeed);
     auto geometry = SnakeGeometry(kRadius);
@@ -103,7 +106,7 @@ void SnakeHead::PhysicsUpdate(const svanes::PhysicsContext &physics) {
     const float difference = std::remainder(target - transform.rotation,
                                             2.0F * std::numbers::pi_v<float>);
     const float max_turn =
-        svanes::PerSecondToPerTic(kTurnRate) * static_cast<float>(delta_tics);
+        svanes::PerSecondToPerTic(turn_speed) * static_cast<float>(delta_tics);
     transform.rotation = std::remainder(
         transform.rotation + std::clamp(difference, -max_turn, max_turn),
         2.0F * std::numbers::pi_v<float>);
@@ -116,6 +119,11 @@ void SnakeHead::PhysicsUpdate(const svanes::PhysicsContext &physics) {
 
 void SnakeHead::SetRadius(svanes::Registry &world, float radius) {
     SetSnakeRadius(world, entity, radius);
+}
+
+void SnakeHead::AdjustTurnSpeed(float adjustment) {
+    turn_speed =
+        std::clamp(turn_speed + adjustment, kMinTurnSpeed, kMaxTurnSpeed);
 }
 
 svanes::Entity SnakeHead::GetEntity() const { return entity; }
@@ -371,6 +379,7 @@ void Snake::HandleCollision(svanes::Registry &world,
             break;
         case PelletType::Red:
             score += 25;
+            head->AdjustTurnSpeed(-kTurnSpeedStep);
             break;
         case PelletType::LightBlue:
             score += 10;
@@ -380,6 +389,7 @@ void Snake::HandleCollision(svanes::Registry &world,
             break;
         case PelletType::DarkBlue:
             score += 10;
+            head->AdjustTurnSpeed(kTurnSpeedStep);
             break;
         }
         world.DestroyEntity(other);
