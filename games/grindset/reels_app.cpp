@@ -24,8 +24,7 @@ constexpr float kButtonFromRight = 44.0F;
 constexpr float kLikeFromBottom = 144.0F;
 constexpr float kDislikeFromBottom = 64.0F;
 constexpr float kButtonHitSize = 64.0F;
-constexpr svanes::Color kButtonColor{
-    .red = 255, .green = 255, .blue = 255, .alpha = 230};
+constexpr svanes::Color kButtonColor{.red = 255, .green = 255, .blue = 255};
 constexpr svanes::Color kLikedColor{.red = 236, .green = 64, .blue = 90};
 constexpr svanes::Color kDislikedColor{.red = 70, .green = 140, .blue = 240};
 
