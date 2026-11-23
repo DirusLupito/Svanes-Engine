@@ -31,11 +31,11 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 
 ## Phase 4a: Blackjack rules (`blackjack.*`, no rendering)
 - [x] 4a.1 Card + 6-deck shoe with ~75% reshuffle point
-- [ ] 4a.2 Hand value: soft/hard, blackjack, bust — **NEXT, awaiting approval**
-- [ ] 4a.3 Round start: bet, deal, hole-card peek, naturals pay 3:2
+- [x] 4a.2 Hand value: soft/hard, blackjack, bust
+- [ ] 4a.3 Round start: bet, deal, hole-card peek, naturals pay 3:2 — **NEXT, awaiting approval**
 - [ ] 4a.4 Hit, stand, dealer hits soft 17, settle
 - [ ] 4a.5 Double (with affordability)
-- [ ] 4a.6 Split: one max, any 10-values, split aces one card, 21 after split = blackjack
+- [ ] 4a.6 Split: one max, any 10-values, split aces one card, 21 after split pays 1:1
 - [ ] 4a.7 Announcement queue (callouts, round flow, reshuffle)
 
 ## Phase 4b: Casino app UI
@@ -69,8 +69,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [ ] 6.5 Dealer banter + chat-reply captions
 
 ## Where we left off
-All work through 3.3 is committed (last: `add wrap width to text labels`).
-4a.1 done (uncommitted). Next up is 4a.2, proposed but not yet approved.
+All work through 4a.1 is committed (last: `blackjack cards and six-deck shoe`).
+4a.2 done (uncommitted). Next up is 4a.3, proposed but not yet approved.
 
 ## Deviations from plan
 - Emoji check dropped from 2.4 (Erik); revisit when reels need emoji (5.10), with the PNG or no-emoji fallback still open.
@@ -117,3 +117,5 @@ All work through 3.3 is committed (last: `add wrap width to text labels`).
   with its clip; the executor overlaps it with the pass clip, only calls SDL
   when it changes, and skips commands whose overlap is empty. `ClipRect` is in
   world coordinates and goes through the camera like shapes.
+- 21 after a split is a normal 21 (1:1), not blackjack: Erik chose normal casino
+  rules when asked, replacing the earlier house rule.

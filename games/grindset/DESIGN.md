@@ -28,8 +28,8 @@ blackjack (bet → player turn → dealer turn).
 - Rules: 6-deck shoe, reshuffle at ~75% (announced); dealer hits soft 17;
   US hole-card peek on Ace/10; natural pays 3:2; double on any first two cards;
   one split max; any two 10-value cards may split; double after split;
-  split aces get one card each; **21 after split counts as blackjack (3:2)**
-  (nonstandard, intentional); double/split disabled when unaffordable.
+  split aces get one card each; 21 after a split is a normal 21 (pays 1:1);
+  double/split disabled when unaffordable.
 - Betting: $1 minimum, cents allowed. Chips $1/$5/$25/$100 + All in + Clear, Deal.
 - Player-paced. Leaving mid-round freezes the round.
 - Stream view: placeholder dealer behind a table (image swap later), cards shown.

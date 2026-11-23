@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <random>
 #include <stdexcept>
+#include <vector>
 
 namespace grindset::blackjack {
 
@@ -26,6 +27,42 @@ constexpr std::array<Suit, 4> kSuits{
     Suit::Hearts,
     Suit::Spades,
 };
+
+/**
+ * What a hand adds up to.
+ *
+ * FIELDS:
+ * - total: The best total, with as many aces counting 11 as can without going
+ * over 21.
+ * - soft: Whether an ace is still counting 11 in that total.
+ */
+struct Count {
+    std::int32_t total;
+    bool soft;
+};
+
+/**
+ * Adds up a hand's cards, counting each ace as 11 and then dropping aces to 1,
+ * one at a time, while the total is over 21.
+ *
+ * @param cards The hand's cards.
+ * @return The total and whether an ace still counts 11 in it.
+ */
+Count CountCards(const std::vector<Card> &cards) {
+    std::int32_t total = 0;
+    std::int32_t high_aces = 0;
+    for (const Card card : cards) {
+        total += CardValue(card);
+        if (card.rank == Rank::Ace) {
+            ++high_aces;
+        }
+    }
+    while (total > 21 && high_aces > 0) {
+        total -= 10;
+        --high_aces;
+    }
+    return {.total = total, .soft = high_aces > 0};
+}
 
 } // namespace
 
@@ -83,6 +120,22 @@ bool Shoe::NeedsReshuffle() const { return next > kCutCardPosition; }
 void Shoe::Reshuffle() {
     std::shuffle(cards.begin(), cards.end(), random);
     next = 0;
+}
+
+Hand::Hand(bool from_split) : from_split(from_split) {}
+
+void Hand::Add(Card card) { cards.push_back(card); }
+
+const std::vector<Card> &Hand::Cards() const { return cards; }
+
+std::int32_t Hand::Total() const { return CountCards(cards).total; }
+
+bool Hand::IsSoft() const { return CountCards(cards).soft; }
+
+bool Hand::IsBust() const { return Total() > 21; }
+
+bool Hand::IsBlackjack() const {
+    return !from_split && cards.size() == 2 && Total() == 21;
 }
 
 } // namespace grindset::blackjack

@@ -116,4 +116,61 @@ private:
     std::mt19937 random;
 };
 
+/**
+ * The cards dealt to the player or the dealer for one round, and what they
+ * add up to. Aces count 11 unless that would put the hand over 21, in which
+ * case they drop to 1 one at a time.
+ */
+class Hand final {
+public:
+    /**
+     * Creates a hand with no cards.
+     * @param from_split Whether the hand is one of the two hands made by
+     * splitting a pair. A hand made by splitting can never be a blackjack.
+     */
+    explicit Hand(bool from_split = false);
+
+    /**
+     * Adds a card to the hand.
+     * @param card The card.
+     */
+    void Add(Card card);
+
+    /**
+     * Returns the hand's cards, in the order they were dealt.
+     * @return The cards.
+     */
+    const std::vector<Card> &Cards() const;
+
+    /**
+     * Finds the hand's best total, with as many aces counting 11 as can
+     * without going over 21.
+     * @return The total.
+     */
+    std::int32_t Total() const;
+
+    /**
+     * Returns whether an ace in the hand is still counting 11.
+     * @return True if the hand is soft.
+     */
+    bool IsSoft() const;
+
+    /**
+     * Returns whether the hand is over 21.
+     * @return True if the hand has bust.
+     */
+    bool IsBust() const;
+
+    /**
+     * Returns whether the hand is a blackjack: exactly two cards making 21,
+     * in a hand that was not made by splitting.
+     * @return True if the hand is a blackjack.
+     */
+    bool IsBlackjack() const;
+
+private:
+    std::vector<Card> cards;
+    bool from_split;
+};
+
 } // namespace grindset::blackjack
