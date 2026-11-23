@@ -6,6 +6,7 @@
 #include <svanes/geometry/primitive_geometry.hpp>
 #include <svanes/render/render_system.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <numbers>
 #include <stdexcept>
@@ -89,6 +90,29 @@ svanes::Color Mix(svanes::Color from, svanes::Color to, float amount) {
  * @param color The piece's color.
  */
 void Hide(svanes::Color &color) { color.alpha = 0; }
+
+/**
+ * Finds where two rectangles overlap.
+ *
+ * @param first One rectangle.
+ * @param second The other rectangle.
+ * @return The overlap, with no width or height if they do not overlap.
+ */
+svanes::Rectangle2D Overlap(svanes::Rectangle2D first,
+                            svanes::Rectangle2D second) {
+    const float left =
+        std::max(first.x - first.width * 0.5F, second.x - second.width * 0.5F);
+    const float right =
+        std::min(first.x + first.width * 0.5F, second.x + second.width * 0.5F);
+    const float top = std::max(first.y - first.height * 0.5F,
+                               second.y - second.height * 0.5F);
+    const float bottom = std::min(first.y + first.height * 0.5F,
+                                  second.y + second.height * 0.5F);
+    return {.x = (left + right) * 0.5F,
+            .y = (top + bottom) * 0.5F,
+            .width = std::max(right - left, 0.0F),
+            .height = std::max(bottom - top, 0.0F)};
+}
 
 } // namespace
 
@@ -291,6 +315,8 @@ svanes::Vector2D ReelView::Motion(bool label, std::size_t index,
 void ReelView::Place(svanes::Registry &world, svanes::Vector2D center,
                      svanes::Rectangle2D area, float shown,
                      float seconds) const {
+    const svanes::Rectangle2D clip = Overlap(
+        area, {.x = center.x, .y = center.y, .width = width, .height = height});
     const auto place_shape = [&](const Piece &piece, svanes::Vector2D motion) {
         svanes::Transform &transform =
             world.GetComponent<svanes::Transform>(piece.entity);
@@ -300,7 +326,7 @@ void ReelView::Place(svanes::Registry &world, svanes::Vector2D center,
             world.GetComponent<svanes::SolidShape>(piece.entity);
         shape.color = piece.color;
         shape.color.alpha = Faded(piece.color.alpha, shown);
-        world.GetComponent<svanes::ClipRect>(piece.entity).area = area;
+        world.GetComponent<svanes::ClipRect>(piece.entity).area = clip;
     };
     for (const Piece &band : bands) {
         place_shape(band, {});
@@ -318,7 +344,7 @@ void ReelView::Place(svanes::Registry &world, svanes::Vector2D center,
         label.color = piece.color;
         label.color.alpha = Faded(piece.color.alpha, shown);
         label.visible = label.color.alpha > 0;
-        world.GetComponent<svanes::ClipRect>(piece.entity).area = area;
+        world.GetComponent<svanes::ClipRect>(piece.entity).area = clip;
     }
 }
 

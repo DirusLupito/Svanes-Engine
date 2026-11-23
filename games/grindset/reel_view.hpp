@@ -61,7 +61,9 @@ public:
 
     /**
      * Moves the reel to where it is on the screen, moves its moving parts,
-     * clips it to the area the app covers, and fades it.
+     * clips it to where the area the app covers overlaps the reel itself, so
+     * nothing reaching past the reel's edges shows on the reels beside it,
+     * and fades it.
      * @param world The world holding it.
      * @param center Where the reel's center is.
      * @param area The area the app currently covers.
