@@ -28,6 +28,8 @@ constexpr float kRadius = 16.0F;
 constexpr float kBodySpacing = 16.0F;
 constexpr std::size_t kInitialBodyCount = 3;
 constexpr std::size_t kNeckSegmentCount = 2;
+constexpr float kFoodRadius = 6.0F;
+constexpr svanes::TicCount kFoodSpawnInterval = 5 * svanes::TicsPerSecond;
 
 // Object representing the snake's head. This is what will collide with objects to pick them up,
 // or with the edges and body segments to trigger a game over.
@@ -130,6 +132,11 @@ void Snake::ResetSnake(svanes::Registry &world) {
     }
     body.clear();
     path.clear();
+    for (const auto pellet : pellets) {
+        world.DestroyEntity(pellet);
+    }
+    pellets.clear();
+    food_spawn_tics = 0;
     // Create the snake with initial position and heading
     head = head_pool.Make(world);
     const auto &transform =
@@ -237,8 +244,7 @@ void Snake::UpdateBody(svanes::Registry &world) {
             ++point;
         }
         if (point + 1 == path.size()) {
-            throw std::logic_error(
-                "Snake body extends beyond its recorded path.");
+            body[index]->SetPosition(world, path.back());
         }
     }
     while (path.size() > point + 2) {
@@ -253,6 +259,12 @@ void Snake::InitializeEdges(svanes::GameContext &context) {
     const auto bounds = context.camera.ScreenToWorld(
         {width * 0.5F, height * 0.5F, width, height});
     constexpr float thickness = 32.0F;
+    food_spawn_area = {bounds.x, bounds.y,
+                       bounds.width - 2.0F * (thickness + kFoodRadius),
+                       bounds.height - 2.0F * (thickness + kFoodRadius)};
+    if (food_spawn_area.width <= 0.0F || food_spawn_area.height <= 0.0F) {
+        throw std::runtime_error("Snake arena is too small to spawn food.");
+    }
     const float x_offset = (bounds.width - thickness) * 0.5F;
     const float y_offset = (bounds.height - thickness) * 0.5F;
     const std::array<svanes::Rectangle2D, 4> rectangles{
@@ -275,6 +287,25 @@ void Snake::InitializeEdges(svanes::GameContext &context) {
     }
 }
 
+void Snake::SpawnFood(svanes::Registry &world) {
+    std::uniform_real_distribution<float> x{
+        food_spawn_area.x - food_spawn_area.width * 0.5F,
+        food_spawn_area.x + food_spawn_area.width * 0.5F};
+    std::uniform_real_distribution<float> y{
+        food_spawn_area.y - food_spawn_area.height * 0.5F,
+        food_spawn_area.y + food_spawn_area.height * 0.5F};
+    const auto entity = world.CreateEntity();
+    world.AddComponent<svanes::Transform>(
+        entity, svanes::Transform{.x = x(random), .y = y(random)});
+    const svanes::Circle2D geometry{.radius = kFoodRadius};
+    world.AddComponent<svanes::SolidShape>(
+        entity,
+        svanes::SolidShape{.color = {240, 160, 50, 255}, .geometry = geometry});
+    world.AddComponent<svanes::Collider2D>(entity,
+                                           svanes::Collider2D{geometry});
+    pellets.push_back(entity);
+}
+
 // Collision handler for game over and food pickup
 void Snake::HandleCollision(svanes::Registry &world,
                             const svanes::CollisionEvent &event) {
@@ -288,6 +319,13 @@ void Snake::HandleCollision(svanes::Registry &world,
         return;
     }
     const auto other = a == head_entity ? b : a;
+    const auto pellet = std::find(pellets.begin(), pellets.end(), other);
+    if (pellet != pellets.end()) {
+        world.DestroyEntity(other);
+        pellets.erase(pellet);
+        body.push_back(body_pool.Make(world, path.back()));
+        return;
+    }
     if (std::find(edges.begin(), edges.end(), other) != edges.end() ||
         std::any_of(body.begin(), body.end(), [&](const auto &segment) {
             return segment->GetEntity() == other;
@@ -353,6 +391,13 @@ void Snake::UpdateGameOverScreen(const svanes::FrameContext &frame) {
 
 void Snake::Update(const svanes::FrameContext &frame) {
     quit = frame.input.WasPressed(svanes::Key::Escape);
+    if (!game_over) {
+        food_spawn_tics += frame.real_delta_tics;
+        if (food_spawn_tics >= kFoodSpawnInterval) {
+            food_spawn_tics %= kFoodSpawnInterval;
+            SpawnFood(frame.world);
+        }
+    }
     UpdateGameOverScreen(frame);
 }
 
