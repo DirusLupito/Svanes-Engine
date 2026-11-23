@@ -81,8 +81,10 @@ constexpr svanes::Color kWireColor{.red = 30, .green = 26, .blue = 32};
  * One upright rectangle of a roadside prop, facing the camera.
  *
  * FIELDS:
- * - left: The left edge, as a sideways distance from the camera.
- * - right: The right edge, as a sideways distance from the camera.
+ * - left: The left edge, as a sideways distance from the middle of the right
+ * lane.
+ * - right: The right edge, as a sideways distance from the middle of the
+ * right lane.
  * - bottom: The bottom edge, as a height above the road.
  * - top: The top edge, as a height above the road.
  * - color: The color the rectangle is drawn in.
@@ -223,19 +225,6 @@ std::array<svanes::Entity, 2> CreateSun(svanes::Registry &world) {
     return {glow, sun};
 }
 
-svanes::Entity CreatePolygon(svanes::Registry &world,
-                             std::vector<svanes::Vector2D> vertices,
-                             svanes::Color color, std::int32_t z_order) {
-    const svanes::Entity entity = world.CreateEntity();
-    world.AddComponent<svanes::Transform>(entity, svanes::Transform{});
-    world.AddComponent<svanes::SolidShape>(
-        entity, svanes::SolidShape{
-                    .color = color,
-                    .geometry = svanes::ConvexPolygon2D{std::move(vertices)}});
-    world.AddComponent<svanes::ZOrder>(entity, svanes::ZOrder{z_order});
-    return entity;
-}
-
 svanes::Entity CreateMovingShape(svanes::Registry &world, svanes::Color color,
                                  std::int32_t z_order) {
     const svanes::Entity entity = world.CreateEntity();
@@ -251,31 +240,40 @@ svanes::Entity CreateMovingShape(svanes::Registry &world, svanes::Color color,
  * measured in camera heights, so a point on the road one camera height ahead
  * lands on the bottom edge of the view.
  *
- * @param lateral The sideways distance from the camera, positive to the right.
+ * @param lateral The sideways distance from the middle of the right lane,
+ * positive to the right.
  * @param height The height above the road.
  * @param depth The distance ahead of the camera. Must be positive.
+ * @param camera_lateral The camera's sideways distance from the middle of the
+ * right lane.
  * @return The point's screen position.
  */
-svanes::Vector2D ProjectPoint(float lateral, float height, float depth) {
-    return {kVanishingX + lateral * kDepthScale / depth,
+svanes::Vector2D ProjectPoint(float lateral, float height, float depth,
+                              float camera_lateral) {
+    return {kVanishingX + (lateral - camera_lateral) * kDepthScale / depth,
             kHorizonY + (kCameraHeight - height) * kDepthScale / depth};
 }
 
 /**
  * Builds a strip lying flat on the road, seen in perspective.
  *
- * @param left The strip's left edge, as a sideways distance from the camera.
- * @param right The strip's right edge, as a sideways distance from the camera.
+ * @param left The strip's left edge, as a sideways distance from the middle
+ * of the right lane.
+ * @param right The strip's right edge, as a sideways distance from the middle
+ * of the right lane.
  * @param near_depth The distance ahead of the camera to the strip's near end.
  * @param far_depth The distance ahead of the camera to the strip's far end.
+ * @param camera_lateral The camera's sideways distance from the middle of the
+ * right lane.
  * @return The strip as a trapezoid narrowing toward the horizon.
  */
 svanes::ConvexPolygon2D RoadStrip(float left, float right, float near_depth,
-                                  float far_depth) {
-    return svanes::ConvexPolygon2D{{ProjectPoint(left, 0.0F, far_depth),
-                                    ProjectPoint(right, 0.0F, far_depth),
-                                    ProjectPoint(right, 0.0F, near_depth),
-                                    ProjectPoint(left, 0.0F, near_depth)}};
+                                  float far_depth, float camera_lateral) {
+    return svanes::ConvexPolygon2D{
+        {ProjectPoint(left, 0.0F, far_depth, camera_lateral),
+         ProjectPoint(right, 0.0F, far_depth, camera_lateral),
+         ProjectPoint(right, 0.0F, near_depth, camera_lateral),
+         ProjectPoint(left, 0.0F, near_depth, camera_lateral)}};
 }
 
 /**
@@ -292,10 +290,12 @@ float SlotDepth(std::size_t index, float period, float distance) {
     return kNearestDepth + offset + static_cast<float>(index) * period;
 }
 
-svanes::Rectangle2D BoxRectangle(const PropBox &box, float depth) {
-    const svanes::Vector2D top_left = ProjectPoint(box.left, box.top, depth);
+svanes::Rectangle2D BoxRectangle(const PropBox &box, float depth,
+                                 float camera_lateral) {
+    const svanes::Vector2D top_left =
+        ProjectPoint(box.left, box.top, depth, camera_lateral);
     const svanes::Vector2D bottom_right =
-        ProjectPoint(box.right, box.bottom, depth);
+        ProjectPoint(box.right, box.bottom, depth, camera_lateral);
     return {.x = (top_left.x + bottom_right.x) * 0.5F,
             .y = (top_left.y + bottom_right.y) * 0.5F,
             .width = bottom_right.x - top_left.x,
@@ -329,8 +329,8 @@ std::vector<svanes::Entity> CreatePropRow(svanes::Registry &world,
 
 void PlacePropRow(svanes::Registry &world,
                   std::span<const svanes::Entity> entities,
-                  std::span<const PropBox> boxes, float period,
-                  float distance) {
+                  std::span<const PropBox> boxes, float period, float distance,
+                  float camera_lateral) {
     const std::size_t count = entities.size() / boxes.size();
     for (std::size_t slot = 0; slot < count; ++slot) {
         const float depth = SlotDepth(slot, period, distance);
@@ -339,7 +339,7 @@ void PlacePropRow(svanes::Registry &world,
         for (std::size_t part = 0; part < boxes.size(); ++part) {
             svanes::SolidShape &shape = world.GetComponent<svanes::SolidShape>(
                 entities[slot * boxes.size() + part]);
-            shape.geometry = BoxRectangle(boxes[part], depth);
+            shape.geometry = BoxRectangle(boxes[part], depth, camera_lateral);
             shape.color.alpha = alpha;
         }
     }
@@ -353,23 +353,28 @@ float WireHalfThickness(float depth) {
  * Builds one short piece of a wire hanging between two telephone poles. The
  * wire sags lowest halfway between the poles.
  *
- * @param lateral The wire's sideways distance from the camera.
+ * @param lateral The wire's sideways distance from the middle of the right
+ * lane.
  * @param near_depth The distance ahead of the camera to the nearer pole.
  * @param far_depth The distance ahead of the camera to the farther pole.
  * @param start Where the piece starts, from 0 at the nearer pole to 1 at the
  * farther pole.
  * @param end Where the piece ends, on the same scale as start.
+ * @param camera_lateral The camera's sideways distance from the middle of the
+ * right lane.
  * @return The piece as a thin parallelogram.
  */
 svanes::ConvexPolygon2D WirePiece(float lateral, float near_depth,
-                                  float far_depth, float start, float end) {
+                                  float far_depth, float start, float end,
+                                  float camera_lateral) {
     const float start_depth = std::lerp(near_depth, far_depth, start);
     const float end_depth = std::lerp(near_depth, far_depth, end);
     const svanes::Vector2D first = ProjectPoint(
         lateral, kWireHeight - kWireSag * 4.0F * start * (1.0F - start),
-        start_depth);
+        start_depth, camera_lateral);
     const svanes::Vector2D second = ProjectPoint(
-        lateral, kWireHeight - kWireSag * 4.0F * end * (1.0F - end), end_depth);
+        lateral, kWireHeight - kWireSag * 4.0F * end * (1.0F - end), end_depth,
+        camera_lateral);
     const float first_half = WireHalfThickness(start_depth);
     const float second_half = WireHalfThickness(end_depth);
     return svanes::ConvexPolygon2D{{{first.x, first.y - first_half},
@@ -379,7 +384,8 @@ svanes::ConvexPolygon2D WirePiece(float lateral, float near_depth,
 }
 
 void PlaceWires(svanes::Registry &world,
-                std::span<const svanes::Entity> entities, float distance) {
+                std::span<const svanes::Entity> entities, float distance,
+                float camera_lateral) {
     const float row_length =
         static_cast<float>(kTelephoneCount) * kTelephonePeriod;
     std::size_t next = 0;
@@ -400,8 +406,9 @@ void PlaceWires(svanes::Registry &world,
                                   static_cast<float>(kWireSegments));
                 svanes::SolidShape &shape =
                     world.GetComponent<svanes::SolidShape>(entities[next]);
-                shape.geometry = WirePiece(kTelephoneLateral + offset,
-                                           near_depth, far_depth, start, end);
+                shape.geometry =
+                    WirePiece(kTelephoneLateral + offset, near_depth, far_depth,
+                              start, end, camera_lateral);
                 shape.color.alpha = FadeAlpha(
                     std::lerp(near_depth, far_depth, end), row_length);
                 ++next;
@@ -438,22 +445,30 @@ svanes::Entity CreateGround(svanes::Registry &world) {
     return entity;
 }
 
-svanes::Entity CreateStrip(svanes::Registry &world, float left, float right,
-                           svanes::Color color, std::int32_t z_order) {
-    const svanes::ConvexPolygon2D shape =
-        RoadStrip(left, right, kNearestDepth, kHorizonDepth);
-    return CreatePolygon(world, shape.Vertices(), color, z_order);
-}
-
-std::array<svanes::Entity, 3> CreateRoad(svanes::Registry &world) {
+/**
+ * Lays the road and its two edge lines flat on the ground as seen from where
+ * the camera is.
+ *
+ * @param world The world holding them.
+ * @param strips The road, then its left edge line, then its right edge line.
+ * @param camera_lateral The camera's sideways distance from the middle of the
+ * right lane.
+ */
+void PlaceRoad(svanes::Registry &world,
+               const std::array<svanes::Entity, 3> &strips,
+               float camera_lateral) {
     const float left = kRoadCenter - kRoadHalfWidth;
     const float right = kRoadCenter + kRoadHalfWidth;
-    return {CreateStrip(world, left, right, kRoadColor, kRoadZ),
-            CreateStrip(world, left + kEdgeLineInset,
-                        left + kEdgeLineInset + kEdgeLineWidth, kRoadLineColor,
-                        kRoadLineZ),
-            CreateStrip(world, right - kEdgeLineInset - kEdgeLineWidth,
-                        right - kEdgeLineInset, kRoadLineColor, kRoadLineZ)};
+    const std::array<std::array<float, 2>, 3> edges{{
+        {left, right},
+        {left + kEdgeLineInset, left + kEdgeLineInset + kEdgeLineWidth},
+        {right - kEdgeLineInset - kEdgeLineWidth, right - kEdgeLineInset},
+    }};
+    for (std::size_t index = 0; index < strips.size(); ++index) {
+        world.GetComponent<svanes::SolidShape>(strips[index]).geometry =
+            RoadStrip(edges[index][0], edges[index][1], kNearestDepth,
+                      kHorizonDepth, camera_lateral);
+    }
 }
 
 } // namespace
@@ -463,8 +478,10 @@ void Road::Initialize(svanes::Registry &world) {
     const std::array<svanes::Entity, 2> sun = CreateSun(world);
     created.insert(created.end(), sun.begin(), sun.end());
     created.push_back(CreateGround(world));
-    const std::array<svanes::Entity, 3> road = CreateRoad(world);
-    created.insert(created.end(), road.begin(), road.end());
+    road_strips = {CreateMovingShape(world, kRoadColor, kRoadZ),
+                   CreateMovingShape(world, kRoadLineColor, kRoadLineZ),
+                   CreateMovingShape(world, kRoadLineColor, kRoadLineZ)};
+    created.insert(created.end(), road_strips.begin(), road_strips.end());
 
     for (std::size_t index = 0; index < kDashCount; ++index) {
         dashes.push_back(CreateMovingShape(world, kRoadLineColor, kRoadLineZ));
@@ -499,17 +516,19 @@ void Road::ShiftVertically(svanes::Registry &world, float offset) {
 void Road::Update(svanes::Registry &world, float seconds) {
     distance = std::fmod(distance + kDriveSpeed * seconds, kPatternLength);
 
+    PlaceRoad(world, road_strips, camera_lateral);
     for (std::size_t index = 0; index < dashes.size(); ++index) {
         const float near_depth = SlotDepth(index, kDashPeriod, distance);
         world.GetComponent<svanes::SolidShape>(dashes[index]).geometry =
             RoadStrip(kRoadCenter - kDashHalfWidth,
                       kRoadCenter + kDashHalfWidth, near_depth,
-                      near_depth + kDashLength);
+                      near_depth + kDashLength, camera_lateral);
     }
     PlacePropRow(world, telephone_poles, kTelephonePole, kTelephonePeriod,
-                 distance);
-    PlacePropRow(world, street_lamps, kStreetLamp, kLampPeriod, distance);
-    PlaceWires(world, wires, distance);
+                 distance, camera_lateral);
+    PlacePropRow(world, street_lamps, kStreetLamp, kLampPeriod, distance,
+                 camera_lateral);
+    PlaceWires(world, wires, distance, camera_lateral);
     elapsed += seconds;
     ShiftVertically(world, BobOffset(elapsed));
 }

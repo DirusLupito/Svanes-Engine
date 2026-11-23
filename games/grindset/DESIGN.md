@@ -46,7 +46,6 @@ blackjack (bet → player turn → dealer turn).
 - Generated formats (animated where it fits): POV gradient text, fake facts,
   would-you-rather split, brainrot split screen (fake scrolling gameplay strip),
   emoji story (bouncing color emoji), motivational guru silhouette.
-- Hook for hand-made special reels, mixed in at some rate; content supplied later.
 
 ### Content
 - Editable text files in `assets/text/`: word lists per reel format, chat lines,
@@ -77,7 +76,7 @@ Audio, visible other players, endgame/goal, recommendation algorithm.
 | `casino_app.hpp/.cpp` | Renders the table/dealer/cards/captions/chips/buttons; drives `blackjack` from input. |
 | `chat.hpp/.cpp` | Chat log, key-based text entry, ambient + reply timers. |
 | `reels_app.hpp/.cpp` | Swipe physics, reel slot entities, pay rules, like/dislike, popup. |
-| `reel_generator.hpp/.cpp` | Formats + word lists → reel description; special reels. |
+| `reel_generator.hpp/.cpp` | Formats + word lists → reel description. |
 | `reel_view.hpp/.cpp` | Draws one reel of any format from a fixed pool of background bands, shapes, and labels. |
 | `text_lines.hpp/.cpp` | Load a line-per-entry text file; random pick. |
 | `CMakeLists.txt`, `justfile` | Target `svanes_game_grindset`, `GRINDSET_ASSETS_DIR`, `svanes_game_package`. |

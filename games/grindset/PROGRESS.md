@@ -54,7 +54,6 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [x] 5.4 Pay rules (3s on a new reel pays) + "+$0.50" popup
 - [x] 5.5 Like / dislike (visual only)
 - [x] 5.6 Reel formats (merged 5.6-5.11 at Erik's request): `text_lines` loader, generator, view; POV, fake facts, would you rather, brainrot, emoji story (Twemoji COLRv0 font), guru
-- [ ] 5.12 Special reels hook
 
 ## Phase 6: Chat + dealer lines
 - [ ] 6.1 Chat panel + message log
@@ -64,9 +63,10 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [ ] 6.5 Dealer banter + chat-reply captions
 
 ## Where we left off
-Reels through like/dislike committed. 5.6 (all reel formats) done (uncommitted), not yet run; emoji rendering untested. Next up is 5.12 (special reels hook).
+Reels through like/dislike committed. 5.6 (all reel formats) done (uncommitted), not yet run; emoji rendering untested. Special reels dropped. Next up: lane changes with A/D (proposed), then Phase 6 (chat).
 
 ## Deviations from plan
+- 5.12 special reels dropped (Erik).
 - 5.6-5.11 merged into one step (Erik). Added `reel_view.*` (draws any format from a fixed pool of bands, shapes, labels). Emoji via Mozilla Twemoji (COLRv0, works with FreeType built without PNG); Noto Color Emoji would need PNG support.
 - Emoji check dropped from 2.4 (Erik); revisit when reels need emoji (5.10), with the PNG or no-emoji fallback still open.
 - `svanes_game_package` + `GRINDSET_ASSETS_DIR` added in 2.2b with the first asset (font); packaging needs an `assets/` folder. Font is goose's `consola.ttf` (28pt), loaded once in `Grindset`.

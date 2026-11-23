@@ -3,6 +3,7 @@
 #include <svanes/entity.hpp>
 #include <svanes/registry.hpp>
 
+#include <array>
 #include <vector>
 
 namespace grindset {
@@ -22,6 +23,10 @@ namespace grindset {
  * the road and are unlit, since the sun is up. Wires sag between neighboring
  * telephone poles. Poles and lamps fade in out of
  * the distance so they don't pop into view.
+ *
+ * Sideways positions on the road are measured from the middle of the right
+ * lane, and everything is seen from the camera's sideways position, so the
+ * whole view is projected again every update.
  */
 class Road final {
 public:
@@ -35,7 +40,8 @@ public:
     void Initialize(svanes::Registry &world);
 
     /**
-     * Moves the dashes, poles, wires, and lamps toward the camera.
+     * Moves the dashes, poles, wires, and lamps toward the camera, and lays
+     * out the whole road as seen from where the camera is.
      * @param world The world holding them.
      * @param seconds The time since the previous update, in seconds.
      */
@@ -69,12 +75,14 @@ private:
     void ShiftVertically(svanes::Registry &world, float offset);
 
     std::vector<RestingShape> shapes;
+    std::array<svanes::Entity, 3> road_strips{};
     std::vector<svanes::Entity> dashes;
     std::vector<svanes::Entity> telephone_poles;
     std::vector<svanes::Entity> street_lamps;
     std::vector<svanes::Entity> wires;
     float distance = 0.0F;
     float elapsed = 0.0F;
+    float camera_lateral = 0.0F;
 };
 
 } // namespace grindset
