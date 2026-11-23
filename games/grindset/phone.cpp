@@ -1,6 +1,7 @@
 #include "phone.hpp"
 
 #include <svanes/MenuUtilities/text_label.hpp>
+#include <svanes/geometry/composite_geometry.hpp>
 #include <svanes/geometry/primitive_geometry.hpp>
 #include <svanes/render/render_system.hpp>
 
@@ -49,6 +50,7 @@ constexpr std::int32_t kWallpaperCapZ = 102;
 constexpr std::int32_t kWallpaperBandZ = 103;
 constexpr std::int32_t kIconZ = 104;
 constexpr std::int32_t kAppCoverZ = 105;
+constexpr std::int32_t kScreenCornerZ = Phone::kAppZ + 100;
 constexpr std::int32_t kHomeBarZ = Phone::kAppZ + 100;
 constexpr std::int32_t kCameraZ = Phone::kAppZ + 101;
 constexpr std::int32_t kHintZ = Phone::kAppZ + 102;
@@ -112,6 +114,50 @@ constexpr svanes::Color kHintColor{.red = 232, .green = 226, .blue = 214};
 
 constexpr svanes::Color kBodyColor{.red = 20, .green = 20, .blue = 24};
 constexpr svanes::Color kCameraColor{.red = 6, .green = 6, .blue = 8};
+
+/**
+ * Builds the four corners of the screen's bounds that lie outside its rounded
+ * corners. Each corner is a fan of thin triangles from the corner of the
+ * bounds to the points along the screen's rounded corner.
+ *
+ * @return The corners, centered on the screen's center.
+ */
+svanes::CompositeShape2D ScreenCorners() {
+    const float inner_x = kScreenWidth * 0.5F - Phone::kScreenCornerRadius;
+    const float inner_y = kScreenHeight * 0.5F - Phone::kScreenCornerRadius;
+    const float quarter_turn = std::numbers::pi_v<float> * 0.5F;
+    const std::array<svanes::Vector2D, 4> directions{{
+        {1.0F, 1.0F},
+        {-1.0F, 1.0F},
+        {-1.0F, -1.0F},
+        {1.0F, -1.0F},
+    }};
+
+    svanes::CompositeShape2D corners;
+    for (std::size_t corner = 0; corner < directions.size(); ++corner) {
+        const svanes::Vector2D direction = directions[corner];
+        const svanes::Vector2D tip{direction.x * kScreenWidth * 0.5F,
+                                   direction.y * kScreenHeight * 0.5F};
+        const auto arc_point = [&](std::int32_t step) {
+            const float angle =
+                quarter_turn * (static_cast<float>(corner) +
+                                static_cast<float>(step) /
+                                    static_cast<float>(kCornerSegments));
+            return svanes::Vector2D{
+                direction.x * inner_x +
+                    Phone::kScreenCornerRadius * std::cos(angle),
+                direction.y * inner_y +
+                    Phone::kScreenCornerRadius * std::sin(angle)};
+        };
+        for (std::int32_t step = 0; step < kCornerSegments; ++step) {
+            corners.parts.push_back(
+                {.shape = svanes::Triangle2D{.vertices = {tip, arc_point(step),
+                                                          arc_point(step + 1)}},
+                 .transform = {}});
+        }
+    }
+    return corners;
+}
 
 svanes::Entity CreatePart(svanes::Registry &world, svanes::Vector2D position,
                           svanes::SolidShape shape, std::int32_t z_order) {
@@ -259,6 +305,10 @@ void Phone::Initialize(svanes::Registry &world, svanes::FontHandle hint_font,
                 svanes::Circle2D{.y = -kScreenHeight * 0.5F + kCameraFromTop,
                                  .radius = kCameraRadius}},
         kCameraZ));
+    parts.push_back(CreatePart(
+        world, position,
+        svanes::SolidShape{.color = kBodyColor, .geometry = ScreenCorners()},
+        kScreenCornerZ));
     clock = CreateStatusLabel(world, "5:30am", status_font,
                               svanes::TextAlignment::TopLeft);
     balance = CreateStatusLabel(world, FormatDollars(0), status_font,

@@ -54,9 +54,9 @@ void ReelsApp::Initialize(svanes::Registry &world, svanes::FontHandle font,
         world.AddComponent<svanes::Transform>(slot.card, svanes::Transform{});
         world.AddComponent<svanes::SolidShape>(
             slot.card, svanes::SolidShape{.color = {.alpha = 0},
-                                          .geometry = RoundedRectangle(
-                                              screen.width, screen.height,
-                                              Phone::kScreenCornerRadius)});
+                                          .geometry = svanes::Rectangle2D{
+                                              .width = screen.width,
+                                              .height = screen.height}});
         world.AddComponent<svanes::ZOrder>(slot.card, svanes::ZOrder{kCardZ});
         world.AddComponent<svanes::ClipRect>(slot.card, svanes::ClipRect{});
 

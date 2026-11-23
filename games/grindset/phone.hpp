@@ -65,6 +65,10 @@ svanes::ConvexPolygon2D RoundedRectangle(float width, float height,
  * unsteady hand, without tilting, since text on it cannot rotate. The sway
  * fades in and out with the slide.
  *
+ * The parts of the screen's bounds outside its rounded corners are covered in
+ * the body's color, above the apps, so an app can fill the whole screen with
+ * square corners and still look rounded.
+ *
  * Every part of the phone shares one Transform at the phone's center, with its
  * geometry placed relative to that center, so the whole phone moves by moving
  * that one position.
