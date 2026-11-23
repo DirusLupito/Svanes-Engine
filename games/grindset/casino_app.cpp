@@ -42,6 +42,9 @@ constexpr float kCardHeight = 80.0F;
 constexpr float kCardSpread = 40.0F;
 constexpr float kCardBorder = 2.0F;
 constexpr svanes::Vector2D kCardLabelInset{6.0F, 5.0F};
+constexpr float kHandMarkerWidth = 60.0F;
+constexpr float kHandMarkerHeight = 5.0F;
+constexpr float kHandMarkerGap = 12.0F;
 
 constexpr std::int32_t kStreamZ = Phone::kAppZ;
 constexpr std::int32_t kDealerBodyZ = Phone::kAppZ + 1;
@@ -68,6 +71,7 @@ constexpr svanes::Color kCardBorderColor{.red = 20, .green = 20, .blue = 24};
 constexpr svanes::Color kBlackSuitColor{.red = 20, .green = 20, .blue = 24};
 constexpr svanes::Color kRedSuitColor{.red = 200, .green = 30, .blue = 40};
 constexpr float kDisabledShade = 0.45F;
+constexpr svanes::Color kHandMarkerColor{.red = 240, .green = 200, .blue = 80};
 
 /**
  * How one of the app's controls looks and where it sits.
@@ -83,6 +87,8 @@ constexpr float kDisabledShade = 0.45F;
  * - text_color: The color of the control's text.
  * - chip_cents: How much the control adds to the bet, or 0 if it is not a
  * chip.
+ * - during_round: Whether the control is shown while a round is being played,
+ * rather than between rounds.
  */
 struct ControlSpec {
     const char *text;
@@ -94,6 +100,7 @@ struct ControlSpec {
     svanes::Color color;
     svanes::Color text_color;
     std::int64_t chip_cents;
+    bool during_round;
 };
 
 constexpr float kChipsFromTop = 672.0F;
@@ -102,11 +109,19 @@ constexpr float kChipSize = 56.0F;
 constexpr float kActionWidth = 110.0F;
 constexpr float kActionHeight = 44.0F;
 
+constexpr float kPlayWidth = 160.0F;
+constexpr float kPlayHeight = 48.0F;
+constexpr float kPlayX = 86.0F;
+
 constexpr std::size_t kClear = 4;
 constexpr std::size_t kAllIn = 5;
 constexpr std::size_t kDeal = 6;
+constexpr std::size_t kHit = 7;
+constexpr std::size_t kStand = 8;
+constexpr std::size_t kDouble = 9;
+constexpr std::size_t kSplit = 10;
 
-constexpr std::array<ControlSpec, 7> kControls{{
+constexpr std::array<ControlSpec, 11> kControls{{
     {.text = "$1",
      .x = -135.0F,
      .from_top = kChipsFromTop,
@@ -170,6 +185,46 @@ constexpr std::array<ControlSpec, 7> kControls{{
      .color = {.red = 30, .green = 110, .blue = 200},
      .text_color = kWhite,
      .chip_cents = 0},
+    {.text = "Hit",
+     .x = -kPlayX,
+     .from_top = kChipsFromTop,
+     .width = kPlayWidth,
+     .height = kPlayHeight,
+     .chip = false,
+     .color = {.red = 30, .green = 140, .blue = 70},
+     .text_color = kWhite,
+     .chip_cents = 0,
+     .during_round = true},
+    {.text = "Stand",
+     .x = kPlayX,
+     .from_top = kChipsFromTop,
+     .width = kPlayWidth,
+     .height = kPlayHeight,
+     .chip = false,
+     .color = {.red = 196, .green = 40, .blue = 44},
+     .text_color = kWhite,
+     .chip_cents = 0,
+     .during_round = true},
+    {.text = "Double",
+     .x = -kPlayX,
+     .from_top = kActionsFromTop,
+     .width = kPlayWidth,
+     .height = kPlayHeight,
+     .chip = false,
+     .color = {.red = 160, .green = 116, .blue = 28},
+     .text_color = kWhite,
+     .chip_cents = 0,
+     .during_round = true},
+    {.text = "Split",
+     .x = kPlayX,
+     .from_top = kActionsFromTop,
+     .width = kPlayWidth,
+     .height = kPlayHeight,
+     .chip = false,
+     .color = {.red = 30, .green = 110, .blue = 200},
+     .text_color = kWhite,
+     .chip_cents = 0,
+     .during_round = true},
 }};
 
 /**
@@ -425,6 +480,11 @@ void CasinoApp::Initialize(svanes::Registry &world,
                                  svanes::TextAlignment::Center, kControlZ)};
     }
 
+    hand_marker = CreateShape(world,
+                              svanes::Rectangle2D{.width = kHandMarkerWidth,
+                                                  .height = kHandMarkerHeight},
+                              kControlZ);
+
     round.emplace(events);
     events.Subscribe(std::make_unique<
                      svanes::EventHandlerWrapper<blackjack::BetPlacedEvent>>(
@@ -434,6 +494,19 @@ void CasinoApp::Initialize(svanes::Registry &world,
             }
             ClearCards(world);
             in_play = true;
+            active_hand = 0;
+        }));
+    events.Subscribe(std::make_unique<
+                     svanes::EventHandlerWrapper<blackjack::HandSplitEvent>>(
+        [this](const blackjack::HandSplitEvent &) {
+            const CardView second = player_hands.at(0).at(1);
+            player_hands.at(0).pop_back();
+            player_hands.push_back({second});
+        }));
+    events.Subscribe(std::make_unique<
+                     svanes::EventHandlerWrapper<blackjack::PlayerTurnEvent>>(
+        [this](const blackjack::PlayerTurnEvent &event) {
+            active_hand = event.hand_index;
         }));
     events.Subscribe(std::make_unique<
                      svanes::EventHandlerWrapper<blackjack::CardDealtEvent>>(
@@ -500,9 +573,22 @@ void CasinoApp::ClearCards(svanes::Registry &world) {
     player_hands.clear();
 }
 
+bool CasinoApp::IsVisible(std::size_t index) const {
+    return kControls[index].during_round == in_play;
+}
+
 bool CasinoApp::IsEnabled(std::size_t index, std::int64_t balance_cents) const {
-    if (in_play) {
+    if (!IsVisible(index)) {
         return false;
+    }
+    if (index == kHit || index == kStand) {
+        return true;
+    }
+    if (index == kDouble) {
+        return round->CanDouble(balance_cents);
+    }
+    if (index == kSplit) {
+        return round->CanSplit(balance_cents);
     }
     const ControlSpec &spec = kControls[index];
     if (spec.chip_cents > 0) {
@@ -527,6 +613,14 @@ void CasinoApp::Activate(std::size_t index, std::int64_t balance_cents) {
         bet_cents = balance_cents;
     } else if (index == kDeal) {
         round->PlaceBet(bet_cents);
+    } else if (index == kHit) {
+        round->Hit();
+    } else if (index == kStand) {
+        round->Stand();
+    } else if (index == kDouble) {
+        round->Double();
+    } else if (index == kSplit) {
+        round->Split();
     }
 }
 
@@ -559,7 +653,8 @@ CasinoApp::ControlUnderMouse(const svanes::InputManager &input,
     for (std::size_t index = 0; index < kControls.size(); ++index) {
         const ControlSpec &spec = kControls[index];
         const svanes::Vector2D center = ControlCenter(spec, screen);
-        if (std::abs(mouse.x - center.x) <= spec.width * 0.5F &&
+        if (IsVisible(index) &&
+            std::abs(mouse.x - center.x) <= spec.width * 0.5F &&
             std::abs(mouse.y - center.y) <= spec.height * 0.5F) {
             return index;
         }
@@ -631,19 +726,36 @@ void CasinoApp::Update(svanes::Registry &world,
             color = Shade(color, 0.8F);
         }
         const svanes::Vector2D center = ControlCenter(spec, screen);
-        PlaceShape(world, buttons[index].shape, center, color, area, shown);
+        const float control_shown = IsVisible(index) ? shown : 0.0F;
+        PlaceShape(world, buttons[index].shape, center, color, area,
+                   control_shown);
         PlaceLabel(world, buttons[index].label, center,
                    enabled ? spec.text_color
                            : Shade(spec.text_color, kDisabledShade),
-                   area, shown);
+                   area, control_shown);
     }
 
     PlaceCards(world, dealer_cards, {screen.x, top + kDealerCardsFromTop}, area,
                shown);
-    for (const std::vector<CardView> &hand : player_hands) {
-        PlaceCards(world, hand, {screen.x, top + kPlayerCardsFromTop}, area,
-                   shown);
+    const float hand_spacing =
+        player_hands.size() > 1
+            ? screen.width / static_cast<float>(player_hands.size())
+            : 0.0F;
+    const float first_hand_x =
+        screen.x -
+        hand_spacing * (static_cast<float>(player_hands.size()) - 1.0F) * 0.5F;
+    for (std::size_t index = 0; index < player_hands.size(); ++index) {
+        PlaceCards(world, player_hands[index],
+                   {first_hand_x + hand_spacing * static_cast<float>(index),
+                    top + kPlayerCardsFromTop},
+                   area, shown);
     }
+    const bool mark_hand = in_play && player_hands.size() > 1;
+    PlaceShape(
+        world, hand_marker,
+        {first_hand_x + hand_spacing * static_cast<float>(active_hand),
+         top + kPlayerCardsFromTop + kCardHeight * 0.5F + kHandMarkerGap},
+        kHandMarkerColor, area, mark_hand ? shown : 0.0F);
 }
 
 } // namespace grindset

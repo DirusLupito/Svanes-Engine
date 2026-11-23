@@ -42,8 +42,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [x] 4b.1 Stream view layout: placeholder dealer behind a table
 - [x] 4b.2 Card drawing, face up / face down
 - [x] 4b.3 Chips, bet display, Clear / All in / Deal, debit through `Grindset`
-- [ ] 4b.4 Hit / Stand / Double / Split buttons with enabled state — **NEXT, awaiting approval**
-- [ ] 4b.5 Dealer turn shown, payouts credited, next round
+- [x] 4b.4 Hit / Stand / Double / Split buttons with enabled state
+- [ ] 4b.5 Dealer turn shown, payouts credited, next round — **NEXT, awaiting approval**
 - [ ] 4b.6 Captions from round events
 - [ ] 4b.7 Leaving mid-round freezes the round
 
@@ -69,8 +69,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [ ] 6.5 Dealer banter + chat-reply captions
 
 ## Where we left off
-All work through 4b.1 is committed (last: `casino app stream view with placeholder dealer`).
-4b.2 + 4b.3 done together (uncommitted). Next up is 4b.4, proposed but not yet approved.
+All work through 4b.3 is committed (last: `fixing card drawing bug`).
+4b.4 done (uncommitted). Next up is 4b.5, proposed but not yet approved.
 
 ## Deviations from plan
 - Emoji check dropped from 2.4 (Erik); revisit when reels need emoji (5.10), with the PNG or no-emoji fallback still open.

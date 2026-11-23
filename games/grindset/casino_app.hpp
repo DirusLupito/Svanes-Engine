@@ -24,11 +24,13 @@ namespace grindset {
  * The casino app: a fake live dealer blackjack stream inside the phone screen.
  * The top of the screen shows the stream, with a placeholder dealer standing
  * behind the edge of a green table and a LIVE badge in the corner. Below it
- * are the dealer's cards, the player's cards, the bet, and the controls for
- * building a bet from chips and dealing. The app plays a blackjack round and
- * draws the cards as the round reports them. Everything is laid out against
- * the phone's screen, clipped to the area the app currently covers, and faded
- * in and out with the app.
+ * are the dealer's cards, the player's cards, the bet, and the controls:
+ * between rounds, chips for building a bet and a button to deal; during a
+ * round, Hit, Stand, Double, and Split. After a split, the two hands sit side
+ * by side with a marker under the one being played. The app plays a blackjack
+ * round and draws the cards as the round reports them. Everything is laid out
+ * against the phone's screen, clipped to the area the app currently covers, and
+ * faded in and out with the app.
  */
 class CasinoApp final {
 public:
@@ -116,6 +118,14 @@ private:
     void ClearCards(svanes::Registry &world);
 
     /**
+     * Returns whether a control is shown right now: the betting controls
+     * between rounds, and the playing controls during one.
+     * @param index The control's index.
+     * @return True if the control is shown.
+     */
+    bool IsVisible(std::size_t index) const;
+
+    /**
      * Returns whether a control can be clicked right now.
      * @param index The control's index.
      * @param balance_cents The player's balance, in cents.
@@ -167,7 +177,8 @@ private:
     std::vector<Part> parts;
     svanes::Entity live_label{};
     svanes::Entity bet_label{};
-    std::array<Button, 7> buttons{};
+    std::array<Button, 11> buttons{};
+    svanes::Entity hand_marker{};
     std::optional<std::size_t> pressed_button;
     svanes::FontHandle font{};
 
@@ -176,6 +187,7 @@ private:
     std::vector<std::vector<CardView>> player_hands;
     std::int64_t bet_cents = 0;
     bool in_play = false;
+    std::size_t active_hand = 0;
 };
 
 } // namespace grindset
