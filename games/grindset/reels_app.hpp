@@ -7,10 +7,12 @@
 #include <svanes/geometry/rectangle_geometry.hpp>
 #include <svanes/input/input_manager.hpp>
 #include <svanes/registry.hpp>
+#include <svanes/vector2d.hpp>
 
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -31,6 +33,11 @@ namespace grindset {
  * reels are still springing grabs them where they are. There is always
  * another reel below. The first reel has nothing above it: pulling down on it
  * moves it less the further it is pulled, and it always springs back.
+ *
+ * Each reel has a like button, a heart, and a dislike button, a downward
+ * arrow, on its right edge. Clicking one lights it up, clicking it again turns
+ * it off, and choosing one clears the other. Each reel remembers its choice.
+ * They do nothing else for now.
  *
  * Staying on a reel for a few seconds pays $0.50 the first time, and a "+$0.50"
  * popup rises and fades near the top of the screen, above where reels write
@@ -73,15 +80,31 @@ public:
 
 private:
     /**
+     * What the player thought of a reel.
+     *
+     * VALUES:
+     * - Like: The player liked it.
+     * - Dislike: The player disliked it.
+     */
+    enum class Reaction : std::uint8_t {
+        Like,
+        Dislike,
+    };
+
+    /**
      * One of the reels on screen.
      *
      * FIELDS:
      * - card: The reel's shape, the size of the screen.
      * - label: The reel's number, written in the middle.
+     * - like: The reel's like button.
+     * - dislike: The reel's dislike button.
      */
     struct Slot {
         svanes::Entity card;
         svanes::Entity label;
+        svanes::Entity like;
+        svanes::Entity dislike;
     };
 
     /**
@@ -107,6 +130,27 @@ private:
      */
     void TrackInput(const svanes::InputManager &input,
                     svanes::Rectangle2D screen);
+
+    /**
+     * Starts or ends a click on the current reel's like or dislike button,
+     * toggling it if the click is released over the button it started on.
+     * @param input The mouse state, with positions matching world
+     * coordinates.
+     * @param screen Where the phone's screen is.
+     * @return True if the mouse was pressed or released for a button, so it
+     * must not start a drag.
+     */
+    bool TrackButtons(const svanes::InputManager &input,
+                      svanes::Rectangle2D screen);
+
+    /**
+     * Finds the current reel's like or dislike button under the mouse.
+     * @param mouse The mouse position, in world coordinates.
+     * @param screen Where the phone's screen is.
+     * @return The button's reaction, or nothing if the mouse is not over one.
+     */
+    std::optional<Reaction> ButtonUnderMouse(svanes::Vector2D mouse,
+                                             svanes::Rectangle2D screen) const;
 
     /**
      * Ends a drag, moving on to the next or previous reel if the reels would
@@ -153,6 +197,8 @@ private:
     std::vector<DragSample> drag_samples;
     std::uint32_t watched_reel = 0;
     std::unordered_set<std::uint32_t> paid_reels;
+    std::unordered_map<std::uint32_t, Reaction> reactions;
+    std::optional<Reaction> pressed_button;
     float watch_seconds = 0.0F;
     svanes::Entity popup_panel{};
     svanes::Entity popup_label{};

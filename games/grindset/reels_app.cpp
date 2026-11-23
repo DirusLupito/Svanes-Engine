@@ -1,6 +1,7 @@
 #include "reels_app.hpp"
 
 #include <svanes/MenuUtilities/text_label.hpp>
+#include <svanes/geometry/composite_geometry.hpp>
 #include <svanes/geometry/primitive_geometry.hpp>
 #include <svanes/render/render_system.hpp>
 
@@ -8,6 +9,7 @@
 #include <cmath>
 #include <cstddef>
 #include <string>
+#include <utility>
 
 namespace grindset {
 
@@ -15,7 +17,17 @@ namespace {
 
 constexpr std::int32_t kCardZ = Phone::kAppZ;
 constexpr std::int32_t kLabelZ = Phone::kAppZ + 1;
+constexpr std::int32_t kButtonZ = Phone::kAppZ + 2;
 constexpr std::int32_t kPopupZ = Phone::kAppZ + 90;
+
+constexpr float kButtonFromRight = 44.0F;
+constexpr float kLikeFromBottom = 300.0F;
+constexpr float kDislikeFromBottom = 220.0F;
+constexpr float kButtonHitSize = 64.0F;
+constexpr svanes::Color kButtonColor{
+    .red = 255, .green = 255, .blue = 255, .alpha = 230};
+constexpr svanes::Color kLikedColor{.red = 236, .green = 64, .blue = 90};
+constexpr svanes::Color kDislikedColor{.red = 70, .green = 140, .blue = 240};
 
 constexpr std::int64_t kPayCents = 50;
 constexpr float kMinWatchSeconds = 3.0F;
@@ -77,6 +89,81 @@ float RubberBandPull(float moved, float screen_height) {
 }
 
 /**
+ * Builds a heart from two circles and a triangle, about 44 pixels across.
+ *
+ * @return The heart, centered on its middle.
+ */
+svanes::CompositeShape2D Heart() {
+    svanes::CompositeShape2D heart;
+    heart.parts.push_back(
+        {.shape = svanes::Circle2D{.x = -10.0F, .y = -6.0F, .radius = 12.0F},
+         .transform = {}});
+    heart.parts.push_back(
+        {.shape = svanes::Circle2D{.x = 10.0F, .y = -6.0F, .radius = 12.0F},
+         .transform = {}});
+    heart.parts.push_back(
+        {.shape = svanes::Triangle2D{.vertices = {{{-21.5F, -3.0F},
+                                                   {21.5F, -3.0F},
+                                                   {0.0F, 20.0F}}}},
+         .transform = {}});
+    return heart;
+}
+
+/**
+ * Builds an arrow pointing down from a shaft and a triangular head, about 40
+ * pixels tall.
+ *
+ * @return The arrow, centered on its middle.
+ */
+svanes::CompositeShape2D DownArrow() {
+    svanes::CompositeShape2D arrow;
+    arrow.parts.push_back(
+        {.shape =
+             svanes::Rectangle2D{.y = -8.0F, .width = 12.0F, .height = 22.0F},
+         .transform = {}});
+    arrow.parts.push_back(
+        {.shape =
+             svanes::Triangle2D{
+                 .vertices = {{{-16.0F, 1.0F}, {16.0F, 1.0F}, {0.0F, 20.0F}}}},
+         .transform = {}});
+    return arrow;
+}
+
+/**
+ * Finds where one of a reel's buttons is.
+ *
+ * @param reel_center Where the reel's center is.
+ * @param screen Where the phone's screen is.
+ * @param like True for the like button, false for the dislike button.
+ * @return The button's center, in world coordinates.
+ */
+svanes::Vector2D ButtonCenter(svanes::Vector2D reel_center,
+                              svanes::Rectangle2D screen, bool like) {
+    return {reel_center.x + screen.width * 0.5F - kButtonFromRight,
+            reel_center.y + screen.height * 0.5F -
+                (like ? kLikeFromBottom : kDislikeFromBottom)};
+}
+
+/**
+ * Creates one of a reel's buttons, hidden and clipped until it is placed.
+ *
+ * @param world The world to create it in.
+ * @param shape The button's shape, centered on its middle.
+ * @return The button's entity.
+ */
+svanes::Entity CreateButton(svanes::Registry &world,
+                            svanes::CompositeShape2D shape) {
+    const svanes::Entity entity = world.CreateEntity();
+    world.AddComponent<svanes::Transform>(entity, svanes::Transform{});
+    world.AddComponent<svanes::SolidShape>(
+        entity, svanes::SolidShape{.color = {.alpha = 0},
+                                   .geometry = std::move(shape)});
+    world.AddComponent<svanes::ZOrder>(entity, svanes::ZOrder{kButtonZ});
+    world.AddComponent<svanes::ClipRect>(entity, svanes::ClipRect{});
+    return entity;
+}
+
+/**
  * Fades an alpha by how much of the app is showing.
  *
  * @param alpha The alpha when the app is fully shown.
@@ -85,6 +172,29 @@ float RubberBandPull(float moved, float screen_height) {
  */
 std::uint8_t Faded(std::uint8_t alpha, float shown) {
     return static_cast<std::uint8_t>(static_cast<float>(alpha) * shown);
+}
+
+/**
+ * Moves, colors, fades, and clips one of a reel's buttons.
+ *
+ * @param world The world holding it.
+ * @param entity The button's entity.
+ * @param position Where the button's center goes, in world coordinates.
+ * @param color The button's color when the app is fully shown.
+ * @param area The area the app currently covers.
+ * @param shown How much of the reel is showing, from 0 to 1.
+ */
+void PlaceButton(svanes::Registry &world, svanes::Entity entity,
+                 svanes::Vector2D position, svanes::Color color,
+                 svanes::Rectangle2D area, float shown) {
+    svanes::Transform &transform =
+        world.GetComponent<svanes::Transform>(entity);
+    transform.x = position.x;
+    transform.y = position.y;
+    svanes::SolidShape &shape = world.GetComponent<svanes::SolidShape>(entity);
+    shape.color = color;
+    shape.color.alpha = Faded(color.alpha, shown);
+    world.GetComponent<svanes::ClipRect>(entity).area = area;
 }
 
 } // namespace
@@ -111,6 +221,9 @@ void ReelsApp::Initialize(svanes::Registry &world, svanes::FontHandle font,
                               .visible = false});
         world.AddComponent<svanes::ZOrder>(slot.label, svanes::ZOrder{kLabelZ});
         world.AddComponent<svanes::ClipRect>(slot.label, svanes::ClipRect{});
+
+        slot.like = CreateButton(world, Heart());
+        slot.dislike = CreateButton(world, DownArrow());
     }
 
     popup_panel = world.CreateEntity();
@@ -238,6 +351,10 @@ void ReelsApp::TrackInput(const svanes::InputManager &input,
         return;
     }
 
+    if (TrackButtons(input, screen)) {
+        return;
+    }
+
     if (input.WasPressed(svanes::Key::Up) && current > 0) {
         --current;
         offset = std::max(offset - screen.height, -screen.height);
@@ -265,6 +382,46 @@ void ReelsApp::TrackInput(const svanes::InputManager &input,
     }
 }
 
+bool ReelsApp::TrackButtons(const svanes::InputManager &input,
+                            svanes::Rectangle2D screen) {
+    const svanes::Vector2D mouse = input.MousePosition();
+    if (input.WasMouseButtonReleased(svanes::MouseButton::Left) &&
+        pressed_button.has_value()) {
+        const Reaction pressed = *pressed_button;
+        pressed_button.reset();
+        if (ButtonUnderMouse(mouse, screen) != pressed) {
+            return true;
+        }
+        const auto found = reactions.find(current);
+        if (found != reactions.end() && found->second == pressed) {
+            reactions.erase(found);
+        } else {
+            reactions[current] = pressed;
+        }
+        return true;
+    }
+    if (input.WasMouseButtonPressed(svanes::MouseButton::Left)) {
+        pressed_button = ButtonUnderMouse(mouse, screen);
+        return pressed_button.has_value();
+    }
+    return false;
+}
+
+std::optional<ReelsApp::Reaction>
+ReelsApp::ButtonUnderMouse(svanes::Vector2D mouse,
+                           svanes::Rectangle2D screen) const {
+    const svanes::Vector2D reel_center{screen.x, screen.y + offset};
+    for (const Reaction reaction : {Reaction::Like, Reaction::Dislike}) {
+        const svanes::Vector2D center =
+            ButtonCenter(reel_center, screen, reaction == Reaction::Like);
+        if (std::abs(mouse.x - center.x) <= kButtonHitSize * 0.5F &&
+            std::abs(mouse.y - center.y) <= kButtonHitSize * 0.5F) {
+            return reaction;
+        }
+    }
+    return std::nullopt;
+}
+
 std::int64_t ReelsApp::Update(svanes::Registry &world,
                               const svanes::InputManager &input,
                               const Phone &phone, float seconds) {
@@ -276,8 +433,11 @@ std::int64_t ReelsApp::Update(svanes::Registry &world,
     const bool watching = shown == 1.0F && phone.IsFullyHeld();
     if (watching) {
         TrackInput(input, screen);
-    } else if (drag_anchor_y.has_value()) {
-        Release(screen.height);
+    } else {
+        pressed_button.reset();
+        if (drag_anchor_y.has_value()) {
+            Release(screen.height);
+        }
     }
     Settle(seconds);
     const std::int64_t earned_cents = Watch(seconds, watching);
@@ -310,6 +470,16 @@ std::int64_t ReelsApp::Update(svanes::Registry &world,
         label.color.alpha = Faded(kLabelColor.alpha, slot_shown);
         label.visible = slot_shown > 0.0F;
         world.GetComponent<svanes::ClipRect>(slot.label).area = area;
+
+        const auto reaction = reactions.find(reel);
+        const bool liked =
+            reaction != reactions.end() && reaction->second == Reaction::Like;
+        const bool disliked = reaction != reactions.end() &&
+                              reaction->second == Reaction::Dislike;
+        PlaceButton(world, slot.like, ButtonCenter(center, screen, true),
+                    liked ? kLikedColor : kButtonColor, area, slot_shown);
+        PlaceButton(world, slot.dislike, ButtonCenter(center, screen, false),
+                    disliked ? kDislikedColor : kButtonColor, area, slot_shown);
     }
 
     ShowPopup(world, screen, area, shown, seconds);
