@@ -216,6 +216,13 @@ void Snake::Initialize(svanes::GameContext &context) {
                                  font_path);
     }
 
+    score_label = context.world.CreateEntity();
+    context.world.AddComponent<svanes::TextLabel>(
+        score_label, svanes::TextLabel{.text = "Score: 0",
+                                       .position = {16.0F, 16.0F},
+                                       .color = {255, 255, 255, 255},
+                                       .font = font});
+
     const std::array<const char *, 3> captions{"Game Over", "Restart", "Quit"};
     for (std::size_t index = 0; index < captions.size(); ++index) {
         game_over_shapes[index] = context.world.CreateEntity();
@@ -496,6 +503,8 @@ void Snake::Update(const svanes::FrameContext &frame) {
         }
     }
     UpdateGameOverScreen(frame);
+    frame.world.GetComponent<svanes::TextLabel>(score_label).text =
+        "Score: " + std::to_string(score);
 }
 
 bool Snake::ShouldQuit() const { return quit; }

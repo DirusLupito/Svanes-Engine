@@ -78,6 +78,7 @@ private:
     std::uint32_t diet_balance = 0;
     std::mt19937 random{std::random_device{}()};
     std::array<svanes::Entity, 4> edges{};
+    svanes::Entity score_label{};
     std::array<svanes::Entity, 3> game_over_shapes{};
     std::array<svanes::Entity, 3> game_over_labels{};
     svanes::EventManager *events = nullptr;
