@@ -1,0 +1,16 @@
+default:
+    @just --justfile "{{justfile()}}" --list
+
+set working-directory := "../.."
+
+import '../../scripts/common.just'
+
+build: (_build "svanes_game_nutritionally_accurate_snake")
+
+release: (_release "svanes_game_nutritionally_accurate_snake")
+
+run *args: (_release "svanes_game_nutritionally_accurate_snake")
+    {{release-bin-dir}}svanes_game_nutritionally_accurate_snake{{exe-suffix}} {{args}}
+
+debug *args: (_build "svanes_game_nutritionally_accurate_snake")
+    {{bin-dir}}svanes_game_nutritionally_accurate_snake{{exe-suffix}} {{args}}
