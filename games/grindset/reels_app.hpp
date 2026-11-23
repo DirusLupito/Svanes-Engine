@@ -28,7 +28,8 @@ namespace grindset {
  * reel they started on otherwise, springing into place either way. The Up and
  * Down arrow keys spring to the previous or next reel. Clicking while the
  * reels are still springing grabs them where they are. There is always
- * another reel below, and the first reel has nothing above it.
+ * another reel below. The first reel has nothing above it: pulling down on it
+ * moves it less the further it is pulled, and it always springs back.
  *
  * Everything is laid out against the phone's screen, clipped to the area the
  * app currently covers, and faded in and out with the app.
@@ -74,16 +75,16 @@ private:
     };
 
     /**
-     * Where the mouse was at one moment of a drag, used to measure how fast
-     * the drag is moving.
+     * Where the reels were at one moment of a drag, used to measure how fast
+     * the drag is moving them.
      *
      * FIELDS:
      * - seconds: When the position was recorded, as the app's elapsed time.
-     * - y: The mouse's height on the screen.
+     * - offset: How far the reels were from resting on the current reel.
      */
     struct DragSample {
         float seconds;
-        float y;
+        float offset;
     };
 
     /**

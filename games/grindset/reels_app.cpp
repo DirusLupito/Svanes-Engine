@@ -22,6 +22,7 @@ constexpr float kSpringStiffness = 300.0F;
 constexpr float kSpringDamping = 35.0F;
 constexpr float kSpringRestDistance = 0.5F;
 constexpr float kSpringRestSpeed = 5.0F;
+constexpr float kRubberBandStiffness = 0.55F;
 
 constexpr svanes::Color kLabelColor{.red = 255, .green = 255, .blue = 255};
 
@@ -32,6 +33,34 @@ constexpr std::array<svanes::Color, 5> kReelColors{{
     {.red = 170, .green = 118, .blue = 40},
     {.red = 112, .green = 72, .blue = 170},
 }};
+
+/**
+ * Finds how far the reels move when pulled past the first reel, which is less
+ * the further they are pulled, so they never reach a full screen.
+ *
+ * @param pulled How far the mouse has pulled the reels, in pixels.
+ * @param screen_height The height of the phone's screen.
+ * @return How far the reels move, in pixels.
+ */
+float RubberBand(float pulled, float screen_height) {
+    return (1.0F -
+            1.0F / (pulled * kRubberBandStiffness / screen_height + 1.0F)) *
+           screen_height;
+}
+
+/**
+ * Finds how far the mouse must have pulled the reels past the first reel for
+ * them to have moved a given distance, undoing RubberBand.
+ *
+ * @param moved How far the reels have moved, in pixels. Must be less than
+ * the screen's height.
+ * @param screen_height The height of the phone's screen.
+ * @return How far the mouse pulled them, in pixels.
+ */
+float RubberBandPull(float moved, float screen_height) {
+    return screen_height / kRubberBandStiffness *
+           (1.0F / (1.0F - moved / screen_height) - 1.0F);
+}
 
 /**
  * Fades an alpha by how much of the app is showing.
@@ -75,8 +104,9 @@ void ReelsApp::Release(float screen_height) {
     const DragSample &oldest = drag_samples.front();
     const DragSample &newest = drag_samples.back();
     const float sample_seconds = newest.seconds - oldest.seconds;
-    speed =
-        sample_seconds > 0.0F ? (newest.y - oldest.y) / sample_seconds : 0.0F;
+    speed = sample_seconds > 0.0F
+                ? (newest.offset - oldest.offset) / sample_seconds
+                : 0.0F;
     const float reach = offset + speed * kFlickLookaheadSeconds;
     if (reach > screen_height * 0.5F && current > 0) {
         --current;
@@ -106,12 +136,16 @@ void ReelsApp::TrackInput(const svanes::InputManager &input,
                           svanes::Rectangle2D screen) {
     const svanes::Vector2D mouse = input.MousePosition();
     if (drag_anchor_y.has_value()) {
-        drag_samples.push_back({.seconds = elapsed, .y = mouse.y});
+        const float pulled = mouse.y - *drag_anchor_y;
+        if (current == 0 && pulled > 0.0F) {
+            offset = RubberBand(pulled, screen.height);
+        } else {
+            offset = std::clamp(pulled, -screen.height, screen.height);
+        }
+        drag_samples.push_back({.seconds = elapsed, .offset = offset});
         std::erase_if(drag_samples, [this](const DragSample &sample) {
             return sample.seconds < elapsed - kDragSampleSeconds;
         });
-        const float lowest = current > 0 ? screen.height : 0.0F;
-        offset = std::clamp(mouse.y - *drag_anchor_y, -screen.height, lowest);
         if (!input.IsMouseButtonDown(svanes::MouseButton::Left)) {
             Release(screen.height);
         }
@@ -136,9 +170,12 @@ void ReelsApp::TrackInput(const svanes::InputManager &input,
     const float swipe_strip = top + screen.height - Phone::kHomeSwipeHeight;
     if (std::abs(mouse.x - screen.x) <= screen.width * 0.5F && mouse.y >= top &&
         mouse.y < swipe_strip) {
-        drag_anchor_y = mouse.y - offset;
+        const bool past_first = current == 0 && offset > 0.0F;
+        drag_anchor_y =
+            mouse.y -
+            (past_first ? RubberBandPull(offset, screen.height) : offset);
         speed = 0.0F;
-        drag_samples = {{.seconds = elapsed, .y = mouse.y}};
+        drag_samples = {{.seconds = elapsed, .offset = offset}};
     }
 }
 
