@@ -50,7 +50,7 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 ## Phase 5: Reels
 - [x] 5.1 Reel slots stacked inside the phone screen, clipped
 - [x] 5.2 Click-drag + Up/Down arrows move reels
-- [ ] 5.3 Release: velocity-projected rest point, change-or-snap-back, spring settle
+- [x] 5.3 Release: velocity-projected rest point, change-or-snap-back, spring settle
 - [ ] 5.4 Pay rules (new reel + min watch time) + "+$0.50" popup
 - [ ] 5.5 Like / dislike (visual only)
 - [ ] 5.6 `text_lines` loader + POV gradient text format
@@ -70,7 +70,7 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 
 ## Where we left off
 Phase 4 committed. Phone refactor committed (`RoundedRectangle`, `kScreenCornerRadius`, `kHomeSwipeHeight` public).
-5.1 + 5.2 done together (uncommitted). Next up is 5.3 (swipe release feel).
+5.1 + 5.2 committed. 5.3 done (uncommitted). Next up is 5.4 (pay rules + popup).
 
 ## Deviations from plan
 - Emoji check dropped from 2.4 (Erik); revisit when reels need emoji (5.10), with the PNG or no-emoji fallback still open.

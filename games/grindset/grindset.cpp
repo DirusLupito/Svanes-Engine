@@ -80,7 +80,7 @@ void Grindset::Update(const svanes::FrameContext &frame) {
     interior.Update(frame.world, road.CurrentBob());
     phone.Update(frame.world, frame.input, seconds, balance_cents);
     casino.Update(frame.world, frame.input, phone, seconds, balance_cents);
-    reels.Update(frame.world, frame.input, phone);
+    reels.Update(frame.world, frame.input, phone, seconds);
 }
 
 bool Grindset::ShouldQuit() const { return quit; }

@@ -16,6 +16,13 @@ namespace {
 constexpr std::int32_t kCardZ = Phone::kAppZ;
 constexpr std::int32_t kLabelZ = Phone::kAppZ + 1;
 
+constexpr float kDragSampleSeconds = 0.06F;
+constexpr float kFlickLookaheadSeconds = 0.3F;
+constexpr float kSpringStiffness = 300.0F;
+constexpr float kSpringDamping = 35.0F;
+constexpr float kSpringRestDistance = 0.5F;
+constexpr float kSpringRestSpeed = 5.0F;
+
 constexpr svanes::Color kLabelColor{.red = 255, .green = 255, .blue = 255};
 
 constexpr std::array<svanes::Color, 5> kReelColors{{
@@ -64,34 +71,61 @@ void ReelsApp::Initialize(svanes::Registry &world, svanes::FontHandle font,
     }
 }
 
-void ReelsApp::Snap(float screen_height) {
-    if (offset > screen_height * 0.5F) {
+void ReelsApp::Release(float screen_height) {
+    const DragSample &oldest = drag_samples.front();
+    const DragSample &newest = drag_samples.back();
+    const float sample_seconds = newest.seconds - oldest.seconds;
+    speed =
+        sample_seconds > 0.0F ? (newest.y - oldest.y) / sample_seconds : 0.0F;
+    const float reach = offset + speed * kFlickLookaheadSeconds;
+    if (reach > screen_height * 0.5F && current > 0) {
         --current;
-    } else if (offset < -screen_height * 0.5F) {
+        offset -= screen_height;
+    } else if (reach < -screen_height * 0.5F) {
         ++current;
+        offset += screen_height;
     }
-    offset = 0.0F;
-    drag_start_y.reset();
+    drag_anchor_y.reset();
+}
+
+void ReelsApp::Settle(float seconds) {
+    if (drag_anchor_y.has_value()) {
+        return;
+    }
+    const float pull = -kSpringStiffness * offset - kSpringDamping * speed;
+    speed += pull * seconds;
+    offset += speed * seconds;
+    if (std::abs(offset) < kSpringRestDistance &&
+        std::abs(speed) < kSpringRestSpeed) {
+        offset = 0.0F;
+        speed = 0.0F;
+    }
 }
 
 void ReelsApp::TrackInput(const svanes::InputManager &input,
                           svanes::Rectangle2D screen) {
     const svanes::Vector2D mouse = input.MousePosition();
-    if (drag_start_y.has_value()) {
+    if (drag_anchor_y.has_value()) {
+        drag_samples.push_back({.seconds = elapsed, .y = mouse.y});
+        std::erase_if(drag_samples, [this](const DragSample &sample) {
+            return sample.seconds < elapsed - kDragSampleSeconds;
+        });
         const float lowest = current > 0 ? screen.height : 0.0F;
-        offset = std::clamp(mouse.y - *drag_start_y, -screen.height, lowest);
+        offset = std::clamp(mouse.y - *drag_anchor_y, -screen.height, lowest);
         if (!input.IsMouseButtonDown(svanes::MouseButton::Left)) {
-            Snap(screen.height);
+            Release(screen.height);
         }
         return;
     }
 
     if (input.WasPressed(svanes::Key::Up) && current > 0) {
         --current;
+        offset = std::max(offset - screen.height, -screen.height);
         return;
     }
     if (input.WasPressed(svanes::Key::Down)) {
         ++current;
+        offset = std::min(offset + screen.height, screen.height);
         return;
     }
 
@@ -102,21 +136,26 @@ void ReelsApp::TrackInput(const svanes::InputManager &input,
     const float swipe_strip = top + screen.height - Phone::kHomeSwipeHeight;
     if (std::abs(mouse.x - screen.x) <= screen.width * 0.5F && mouse.y >= top &&
         mouse.y < swipe_strip) {
-        drag_start_y = mouse.y;
+        drag_anchor_y = mouse.y - offset;
+        speed = 0.0F;
+        drag_samples = {{.seconds = elapsed, .y = mouse.y}};
     }
 }
 
 void ReelsApp::Update(svanes::Registry &world,
-                      const svanes::InputManager &input, const Phone &phone) {
+                      const svanes::InputManager &input, const Phone &phone,
+                      float seconds) {
     const svanes::Rectangle2D screen = phone.ScreenRectangle();
     const svanes::Rectangle2D area = phone.AppArea();
     const float shown = phone.AppShown(Phone::App::Instagram);
 
+    elapsed += seconds;
     if (shown == 1.0F && phone.IsFullyHeld()) {
         TrackInput(input, screen);
-    } else if (drag_start_y.has_value()) {
-        Snap(screen.height);
+    } else if (drag_anchor_y.has_value()) {
+        Release(screen.height);
     }
+    Settle(seconds);
 
     for (std::size_t index = 0; index < slots.size(); ++index) {
         const Slot &slot = slots[index];
