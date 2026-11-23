@@ -73,12 +73,14 @@ private:
      * A card on the table.
      *
      * FIELDS:
+     * - border: The dark outline around the card.
      * - body: The card's shape.
      * - label: The card's rank and suit, written in its corner.
      * - card: The card.
      * - face_up: Whether the card is showing its face.
      */
     struct CardView {
+        svanes::Entity border;
         svanes::Entity body;
         svanes::Entity label;
         blackjack::Card card;

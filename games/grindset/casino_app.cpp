@@ -40,6 +40,7 @@ constexpr float kBetFromTop = 612.0F;
 constexpr float kCardWidth = 56.0F;
 constexpr float kCardHeight = 80.0F;
 constexpr float kCardSpread = 40.0F;
+constexpr float kCardBorder = 2.0F;
 constexpr svanes::Vector2D kCardLabelInset{6.0F, 5.0F};
 
 constexpr std::int32_t kStreamZ = Phone::kAppZ;
@@ -63,6 +64,7 @@ constexpr svanes::Color kBadgeColor{.red = 214, .green = 40, .blue = 52};
 constexpr svanes::Color kWhite{.red = 255, .green = 255, .blue = 255};
 constexpr svanes::Color kCardFaceColor{.red = 246, .green = 246, .blue = 242};
 constexpr svanes::Color kCardBackColor{.red = 44, .green = 70, .blue = 160};
+constexpr svanes::Color kCardBorderColor{.red = 20, .green = 20, .blue = 24};
 constexpr svanes::Color kBlackSuitColor{.red = 20, .green = 20, .blue = 24};
 constexpr svanes::Color kRedSuitColor{.red = 200, .green = 30, .blue = 40};
 constexpr float kDisabledShade = 0.45F;
@@ -463,24 +465,33 @@ void CasinoApp::Initialize(svanes::Registry &world,
 CasinoApp::CardView CasinoApp::CreateCard(svanes::Registry &world,
                                           blackjack::Card card,
                                           bool face_up) const {
-    return {.body = CreateShape(
-                world,
-                svanes::Rectangle2D{.width = kCardWidth, .height = kCardHeight},
-                kCardZ),
-            .label =
-                CreateLabel(world, RankText(card.rank) + SuitText(card.suit),
-                            font, svanes::TextAlignment::TopLeft, kCardZ),
+    const svanes::Entity border = CreateShape(
+        world,
+        svanes::Rectangle2D{.width = kCardWidth + kCardBorder * 2.0F,
+                            .height = kCardHeight + kCardBorder * 2.0F},
+        kCardZ);
+    const svanes::Entity body = CreateShape(
+        world, svanes::Rectangle2D{.width = kCardWidth, .height = kCardHeight},
+        kCardZ);
+    const svanes::Entity label =
+        CreateLabel(world, RankText(card.rank) + SuitText(card.suit), font,
+                    svanes::TextAlignment::TopLeft, kCardZ);
+    return {.border = border,
+            .body = body,
+            .label = label,
             .card = card,
             .face_up = face_up};
 }
 
 void CasinoApp::ClearCards(svanes::Registry &world) {
     for (const CardView &card : dealer_cards) {
+        world.DestroyEntity(card.border);
         world.DestroyEntity(card.body);
         world.DestroyEntity(card.label);
     }
     for (const std::vector<CardView> &hand : player_hands) {
         for (const CardView &card : hand) {
+            world.DestroyEntity(card.border);
             world.DestroyEntity(card.body);
             world.DestroyEntity(card.label);
         }
@@ -567,6 +578,7 @@ void CasinoApp::PlaceCards(svanes::Registry &world,
         const svanes::Vector2D position{
             center.x + first + kCardSpread * static_cast<float>(index),
             center.y};
+        PlaceShape(world, card.border, position, kCardBorderColor, area, shown);
         PlaceShape(world, card.body, position,
                    card.face_up ? kCardFaceColor : kCardBackColor, area, shown);
         PlaceLabel(world, card.label,
