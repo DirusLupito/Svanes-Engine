@@ -288,6 +288,11 @@ void Snake::InitializeEdges(svanes::GameContext &context) {
 }
 
 void Snake::SpawnFood(svanes::Registry &world) {
+    constexpr std::array<svanes::Color, 4> colors{
+        svanes::Color{240, 160, 50, 255}, svanes::Color{230, 60, 60, 255},
+        svanes::Color{120, 210, 255, 255}, svanes::Color{40, 70, 180, 255}};
+    std::uniform_int_distribution<std::size_t> color_index{0,
+                                                           colors.size() - 1};
     std::uniform_real_distribution<float> x{
         food_spawn_area.x - food_spawn_area.width * 0.5F,
         food_spawn_area.x + food_spawn_area.width * 0.5F};
@@ -299,8 +304,8 @@ void Snake::SpawnFood(svanes::Registry &world) {
         entity, svanes::Transform{.x = x(random), .y = y(random)});
     const svanes::Circle2D geometry{.radius = kFoodRadius};
     world.AddComponent<svanes::SolidShape>(
-        entity,
-        svanes::SolidShape{.color = {240, 160, 50, 255}, .geometry = geometry});
+        entity, svanes::SolidShape{.color = colors[color_index(random)],
+                                   .geometry = geometry});
     world.AddComponent<svanes::Collider2D>(entity,
                                            svanes::Collider2D{geometry});
     pellets.push_back(entity);
