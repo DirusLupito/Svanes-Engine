@@ -11,6 +11,7 @@
 
 #include <cmath>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <utility>
 
@@ -143,12 +144,21 @@ void TextLabelRenderer::Submit(const Registry &world, RenderQueue &queue,
         // Subtracting xAlignment times the width and yAlignment times the
         // height accounts for how far the anchor is from the text's top-left
         // corner. Rectangle2D still receives the resulting center position.
+        const float viewport_left = viewport.x - viewport.width * 0.5F;
+        const float viewport_top = viewport.y - viewport.height * 0.5F;
         const Rectangle2D destination{
-            viewport.x - viewport.width * 0.5F + label.position.x +
-                (0.5F - xAlignment) * width,
-            viewport.y - viewport.height * 0.5F + label.position.y +
-                (0.5F - yAlignment) * height,
+            viewport_left + label.position.x + (0.5F - xAlignment) * width,
+            viewport_top + label.position.y + (0.5F - yAlignment) * height,
             width, height};
+
+        if (world.HasComponent<ClipRect>(entity)) {
+            Rectangle2D area = world.GetComponent<ClipRect>(entity).area;
+            area.x += viewport_left;
+            area.y += viewport_top;
+            queue.SetClip(area);
+        } else {
+            queue.SetClip(std::nullopt);
+        }
 
         const std::int32_t z_order =
             world.HasComponent<ZOrder>(entity)
@@ -158,6 +168,7 @@ void TextLabelRenderer::Submit(const Registry &world, RenderQueue &queue,
         queue.DrawTexture(cached.texture.GetHandle(), destination, 0.0F,
                           z_order, BlendMode::Alpha, label.color);
     });
+    queue.SetClip(std::nullopt);
 }
 
 } // namespace svanes::internal

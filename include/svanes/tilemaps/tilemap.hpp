@@ -97,7 +97,7 @@ DetectTileMapCollisions(const Geometry2D &geometry, const Transform &transform,
 
 /**
  * Submits all entities with Transform and TileMap components to the render
- * queue for rendering.
+ * queue for rendering. An entity with a ClipRect is drawn only within it.
  *
  * @param world The registry containing all tilemaps.
  * @param render_queue The render queue to which the rendering commands will be

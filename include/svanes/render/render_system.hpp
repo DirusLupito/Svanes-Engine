@@ -74,8 +74,11 @@ struct SolidShape {
 
 /**
  * Optional component that limits where an entity is drawn to a rectangle.
- * Any part of the entity outside the rectangle is not drawn. The rectangle is
- * in world coordinates, like the entity itself, and cannot be rotated. An
+ * Any part of the entity outside the rectangle is not drawn. It applies to
+ * shapes, radial gradients, sprites, tile maps, and text labels. The rectangle
+ * is in the same coordinates as the entity's position: world coordinates for
+ * everything except text labels, which ignore the camera and place the
+ * rectangle the same way they place themselves. It cannot be rotated. An
  * entity without this component is drawn normally.
  *
  * FIELDS:
@@ -116,7 +119,8 @@ void SubmitShapes(const Registry &world, RenderQueue &render_queue,
 
 /**
  * Submits all entities with Transform and RadialGradient2D components to the
- * render queue for rendering.
+ * render queue for rendering. An entity with a ClipRect is drawn only within
+ * it.
  *
  * @param world The registry containing all entities and their components.
  * @param render_queue The render queue to which the rendering commands will be
@@ -129,7 +133,7 @@ void SubmitRadialGradients(const Registry &world, RenderQueue &render_queue,
 
 /**
  * Submits all entities with Transform and Sprite components to the render queue
- * for rendering.
+ * for rendering. An entity with a ClipRect is drawn only within it.
  *
  * @param world The registry containing all entities and their components.
  * @param render_queue The render queue to which the rendering commands will be

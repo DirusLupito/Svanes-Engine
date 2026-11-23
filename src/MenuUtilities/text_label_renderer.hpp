@@ -59,7 +59,8 @@ public:
 
     /**
      * Submits all visible TextLabel components from the given Registry to the
-     * provided RenderQueue for rendering.
+     * provided RenderQueue for rendering. A label with a ClipRect is drawn
+     * only within it, placed relative to the viewport like the label itself.
      *
      * @param world The Registry containing entities and their components.
      * @param queue The RenderQueue to which the text labels will be submitted.

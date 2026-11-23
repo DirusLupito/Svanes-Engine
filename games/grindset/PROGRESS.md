@@ -26,8 +26,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 
 ## Phase 3: Engine changes (flagged)
 - [x] 3.1 `ClipRect` component through the render queue, honored by shapes
-- [ ] 3.2 Sprites + text labels honor clip — **NEXT, awaiting approval**
-- [ ] 3.3 `TextLabel::wrap_width`, part of the label cache key
+- [x] 3.2 Sprites, tile maps, radial gradients + text labels honor clip
+- [ ] 3.3 `TextLabel::wrap_width`, part of the label cache key — **NEXT, awaiting approval**
 
 ## Phase 4a: Blackjack rules (`blackjack.*`, no rendering)
 - [ ] 4a.1 Card + 6-deck shoe with ~75% reshuffle point
@@ -69,8 +69,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [ ] 6.5 Dealer banter + chat-reply captions
 
 ## Where we left off
-All work through 2.8 is committed (last: `swipe up from the home bar to close apps`).
-3.1 done (uncommitted engine edit). Next up is 3.2, proposed but not yet approved.
+All work through 3.1 is committed (last: `add ClipRect component and its use`).
+3.2 done (uncommitted engine edit). Next up is 3.3, proposed but not yet approved.
 
 ## Deviations from plan
 - Emoji check dropped from 2.4 (Erik); revisit when reels need emoji (5.10), with the PNG or no-emoji fallback still open.

@@ -239,6 +239,9 @@ void SubmitRadialGradients(const Registry &world, RenderQueue &render_queue,
     world.ForEach<Transform, RadialGradient2D>(
         [&](Entity entity, const Transform &transform,
             const RadialGradient2D &gradient) {
+            if (!SetClipFor(world, entity, render_queue, camera)) {
+                return;
+            }
             const auto destination =
                 camera.PrepareForRendering(transform, gradient.geometry);
             if (!destination) {
@@ -249,12 +252,16 @@ void SubmitRadialGradients(const Registry &world, RenderQueue &render_queue,
                 *destination, gradient.center_color, gradient.edge_color,
                 ZOrderOf(world, entity), gradient.blend_mode);
         });
+    render_queue.SetClip(std::nullopt);
 }
 
 void SubmitSprites(const Registry &world, RenderQueue &render_queue,
                    const Camera2D &camera) {
     world.ForEach<Transform, Sprite>(
         [&](Entity entity, const Transform &transform, const Sprite &sprite) {
+            if (!SetClipFor(world, entity, render_queue, camera)) {
+                return;
+            }
             const auto destination =
                 camera.PrepareForRendering(transform, sprite.geometry);
             if (!destination) {
@@ -272,6 +279,7 @@ void SubmitSprites(const Registry &world, RenderQueue &render_queue,
                                          sprite.blend_mode);
             }
         });
+    render_queue.SetClip(std::nullopt);
 }
 
 void SubmitTileMaps(const Registry &world, RenderQueue &render_queue,
@@ -297,6 +305,9 @@ void SubmitTileMaps(const Registry &world, RenderQueue &render_queue,
         const std::uint64_t atlas_tile_count =
             static_cast<std::uint64_t>(tile_map.atlas_columns) *
             tile_map.atlas_rows;
+        if (!SetClipFor(world, entity, render_queue, camera)) {
+            return;
+        }
         const std::int32_t z_order = ZOrderOf(world, entity);
 
         // Loop through and render each tile in the tilemap
@@ -352,6 +363,7 @@ void SubmitTileMaps(const Registry &world, RenderQueue &render_queue,
             }
         }
     });
+    render_queue.SetClip(std::nullopt);
 }
 
 } // namespace svanes
