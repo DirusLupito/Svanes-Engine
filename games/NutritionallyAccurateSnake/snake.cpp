@@ -34,6 +34,7 @@ constexpr std::size_t kInitialBodyCount = 3;
 constexpr std::size_t kNeckSegmentCount = 2;
 constexpr float kFoodRadius = 18.0F;
 constexpr svanes::TicCount kFoodSpawnInterval = 5 * svanes::TicsPerSecond;
+constexpr svanes::TicCount kDeathSegmentInterval = svanes::TicsPerSecond / 10;
 constexpr float kWeightRadiusStep = 2.4F;
 constexpr std::uint32_t kMaxDietBalance = 10;
 
@@ -174,6 +175,7 @@ void Snake::ResetSnake(svanes::Registry &world) {
     }
     pellets.clear();
     food_spawn_tics = 0;
+    death_animation_tics = 0;
     score = 0;
     weight = 0.0F;
     diet_balance = 0;
@@ -433,6 +435,7 @@ void Snake::HandleCollision(svanes::Registry &world,
             return segment->GetEntity() == other;
         })) {
         game_over = true;
+        death_animation_tics = 0;
         world.GetComponent<svanes::TextLabel>(game_over_labels[0]).text =
             "Game Over\nScore: " + std::to_string(score);
         world.GetComponent<svanes::Timeline>(head_entity).Pause();
@@ -475,7 +478,7 @@ void Snake::UpdateGameOverScreen(const svanes::FrameContext &frame) {
             game_over_shapes[index]);
         shape.geometry =
             svanes::Rectangle2D{.width = area.width, .height = area.height};
-        shape.color = index == 0 ? svanes::Color{0, 0, 0, 255}
+        shape.color = index == 0 ? svanes::Color{0, 0, 0, 96}
                                  : svanes::Color{70, 70, 70, 255};
         if (!game_over) {
             shape.color.alpha = 0;
@@ -495,6 +498,20 @@ void Snake::UpdateGameOverScreen(const svanes::FrameContext &frame) {
 
 void Snake::Update(const svanes::FrameContext &frame) {
     quit = frame.input.WasPressed(svanes::Key::Escape);
+    if (game_over && head) {
+        death_animation_tics += frame.real_delta_tics;
+        while (death_animation_tics >= kDeathSegmentInterval && head) {
+            death_animation_tics -= kDeathSegmentInterval;
+            if (!body.empty()) {
+                frame.world.DestroyEntity(body.back()->GetEntity());
+                body.pop_back();
+            } else {
+                frame.world.DestroyEntity(head->GetEntity());
+                head.reset();
+                path.clear();
+            }
+        }
+    }
     if (!game_over) {
         food_spawn_tics += frame.real_delta_tics;
         if (food_spawn_tics >= kFoodSpawnInterval) {

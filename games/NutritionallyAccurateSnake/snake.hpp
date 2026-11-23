@@ -73,6 +73,7 @@ private:
     std::vector<svanes::Entity> pellets;
     svanes::Rectangle2D food_spawn_area{};
     svanes::TicCount food_spawn_tics = 0;
+    svanes::TicCount death_animation_tics = 0;
     std::uint64_t score = 0;
     float weight = 0.0F;
     std::uint32_t diet_balance = 0;
