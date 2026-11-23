@@ -36,7 +36,7 @@ constexpr float kBadgeInset = 16.0F;
 
 constexpr float kDealerCardsFromTop = 426.0F;
 constexpr float kPlayerCardsFromTop = 540.0F;
-constexpr float kBetFromTop = 612.0F;
+constexpr float kBetFromTop = 628.0F;
 constexpr float kCardWidth = 56.0F;
 constexpr float kCardHeight = 80.0F;
 constexpr float kCardSpread = 40.0F;
@@ -72,7 +72,7 @@ constexpr svanes::Color kBlackSuitColor{.red = 20, .green = 20, .blue = 24};
 constexpr svanes::Color kRedSuitColor{.red = 200, .green = 30, .blue = 40};
 constexpr float kDisabledShade = 0.45F;
 constexpr float kDealerStepSeconds = 0.6F;
-constexpr float kResultGap = 28.0F;
+constexpr float kResultGap = 4.0F;
 constexpr svanes::Color kWinColor{.red = 240, .green = 200, .blue = 80};
 constexpr svanes::Color kLoseColor{.red = 236, .green = 120, .blue = 120};
 constexpr svanes::Color kHandMarkerColor{.red = 240, .green = 200, .blue = 80};
