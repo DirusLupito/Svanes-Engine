@@ -50,10 +50,10 @@ constexpr std::int32_t kWallpaperCapZ = 102;
 constexpr std::int32_t kWallpaperBandZ = 103;
 constexpr std::int32_t kIconZ = 104;
 constexpr std::int32_t kAppCoverZ = 105;
-constexpr std::int32_t kHomeBarZ = Phone::kAppZ + 10;
-constexpr std::int32_t kCameraZ = Phone::kAppZ + 11;
-constexpr std::int32_t kHintZ = Phone::kAppZ + 12;
-constexpr std::int32_t kStatusZ = Phone::kAppZ + 12;
+constexpr std::int32_t kHomeBarZ = Phone::kAppZ + 100;
+constexpr std::int32_t kCameraZ = Phone::kAppZ + 101;
+constexpr std::int32_t kHintZ = Phone::kAppZ + 102;
+constexpr std::int32_t kStatusZ = Phone::kAppZ + 102;
 
 constexpr float kAppGrowSeconds = 0.3F;
 constexpr float kAppFadeSeconds = 0.25F;

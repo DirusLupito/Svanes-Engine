@@ -138,3 +138,7 @@ All work through 4b.1 is committed (last: `casino app stream view with placehold
   balance. `FormatDollars` moved to `phone.hpp` so both can use it. Suits are
   UTF-8 byte escapes so MSVC prints them without `/utf-8`. The bet stays set
   after a round, ready to deal again.
+- Engine issue (not fixed, Erik to decide): `ZOrder` docs promise same-z draws in
+  creation order, but `Registry` stores entities in an `std::unordered_map`, so
+  same-z order can change. Showed up as a fully black card (border over face).
+  Grindset now never relies on same-z order for overlapping shapes.

@@ -70,7 +70,7 @@ public:
 
     /**
      * The lowest z order an app draws its content at. Apps use z orders from
-     * this up to 9 above it, which draw above the app's background color and
+     * this up to 99 above it, which draw above the app's background color and
      * below the home bar and the status bar.
      */
     static constexpr std::int32_t kAppZ = 110;

@@ -50,8 +50,8 @@ constexpr std::int32_t kDealerHeadZ = Phone::kAppZ + 3;
 constexpr std::int32_t kTableZ = Phone::kAppZ + 4;
 constexpr std::int32_t kRailZ = Phone::kAppZ + 5;
 constexpr std::int32_t kBadgeZ = Phone::kAppZ + 6;
-constexpr std::int32_t kCardZ = Phone::kAppZ + 7;
 constexpr std::int32_t kControlZ = Phone::kAppZ + 7;
+constexpr std::int32_t kCardZ = Phone::kAppZ + 8;
 
 constexpr svanes::Color kStreamColor{.red = 14, .green = 14, .blue = 20};
 constexpr svanes::Color kDealerHeadColor{.red = 206, .green = 170, .blue = 140};
@@ -578,6 +578,10 @@ void CasinoApp::PlaceCards(svanes::Registry &world,
         const svanes::Vector2D position{
             center.x + first + kCardSpread * static_cast<float>(index),
             center.y};
+        const std::int32_t z_order =
+            kCardZ + 2 * static_cast<std::int32_t>(index);
+        world.GetComponent<svanes::ZOrder>(card.border).value = z_order;
+        world.GetComponent<svanes::ZOrder>(card.body).value = z_order + 1;
         PlaceShape(world, card.border, position, kCardBorderColor, area, shown);
         PlaceShape(world, card.body, position,
                    card.face_up ? kCardFaceColor : kCardBackColor, area, shown);
