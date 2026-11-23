@@ -11,6 +11,7 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <unordered_set>
 #include <vector>
 
 namespace grindset {
@@ -31,10 +32,10 @@ namespace grindset {
  * another reel below. The first reel has nothing above it: pulling down on it
  * moves it less the further it is pulled, and it always springs back.
  *
- * Staying on a reel for a few seconds pays $0.50 if no reel this far down
- * has paid yet, and a "+$0.50" popup rises and fades near the top of the
- * screen, above where reels write their text. Time only counts as watching
- * while the app is fully shown and the phone is fully held.
+ * Staying on a reel for a few seconds pays $0.50 the first time, and a "+$0.50"
+ * popup rises and fades near the top of the screen, above where reels write
+ * their text. Time only counts as watching while the app is fully shown and the
+ * phone is fully held.
  *
  * Everything is laid out against the phone's screen, clipped to the area the
  * app currently covers, and faded in and out with the app.
@@ -125,7 +126,7 @@ private:
     /**
      * Times how long the current reel has been watched, starting over when the
      * current reel changes, and pays once it has been watched long enough if
-     * no reel this far down has paid yet, starting the popup.
+     * it has not paid before, starting the popup.
      * @param seconds The time since the previous update, in seconds.
      * @param watching Whether the reels can be watched right now.
      * @return How much was earned, in cents.
@@ -151,7 +152,7 @@ private:
     std::optional<float> drag_anchor_y;
     std::vector<DragSample> drag_samples;
     std::uint32_t watched_reel = 0;
-    std::uint32_t first_unpaid_reel = 0;
+    std::unordered_set<std::uint32_t> paid_reels;
     float watch_seconds = 0.0F;
     svanes::Entity popup_panel{};
     svanes::Entity popup_label{};

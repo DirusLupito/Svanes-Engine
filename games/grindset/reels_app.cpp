@@ -143,10 +143,10 @@ std::int64_t ReelsApp::Watch(float seconds, bool watching) {
         return 0;
     }
     watch_seconds += seconds;
-    if (current < first_unpaid_reel || watch_seconds < kMinWatchSeconds) {
+    if (paid_reels.contains(current) || watch_seconds < kMinWatchSeconds) {
         return 0;
     }
-    first_unpaid_reel = current + 1;
+    paid_reels.insert(current);
     popup_seconds = 0.0F;
     return kPayCents;
 }
