@@ -30,7 +30,8 @@ namespace grindset {
  * round, Hit, Stand, Double, and Split. After a split, the two hands sit side
  * by side with a marker under the one being played. The app plays a blackjack
  * round and draws the cards as the round reports them, takes the dealer's
- * turn one card at a time, and shows each hand's result until the next deal.
+ * turn one card at a time, and shows the round's result in a banner across the
+ * middle of the table until the next deal.
  * Everything is laid out against the phone's screen, clipped to the area the
  * app currently covers, and faded in and out with the app.
  */
@@ -43,10 +44,12 @@ public:
      * @param world The world to create them in.
      * @param events Where the round reports what happens.
      * @param font The font to write the badge, the cards, and the controls in.
+     * @param large_font The font to write the round's result in.
      * @param phone The phone, to size the layout by.
      */
     void Initialize(svanes::Registry &world, svanes::EventManager &events,
-                    svanes::FontHandle font, const Phone &phone);
+                    svanes::FontHandle font, svanes::FontHandle large_font,
+                    const Phone &phone);
 
     /**
      * Moves everything to where the phone's screen is, clips it to the area
@@ -106,7 +109,8 @@ private:
     };
 
     /**
-     * The result shown under one of the player's hands after a round.
+     * A result shown after a round: the net result in the banner, or what
+     * happened to one hand after a split.
      *
      * FIELDS:
      * - text: What happened, such as "Win +$10.00" or "Bust".
@@ -118,16 +122,21 @@ private:
     };
 
     /**
-     * Writes how a hand turned out, with the money won.
+     * Writes how a hand turned out in one word, such as "Win" or "Bust".
      * @param outcome How the hand turned out.
-     * @param payout_cents How much the hand gave back, including its bet.
-     * @param bet_cents The money bet on the hand.
      * @param bust Whether the hand went over 21.
      * @return The result to show.
      */
-    static Result ResultText(blackjack::Outcome outcome,
-                             std::int64_t payout_cents, std::int64_t bet_cents,
-                             bool bust);
+    static Result HandResult(blackjack::Outcome outcome, bool bust);
+
+    /**
+     * Writes the net result of the whole round for the banner: what happened
+     * and how much money was won or lost across every hand.
+     * @param payout_cents How much every hand gave back together, including
+     * their bets.
+     * @return The result to show.
+     */
+    Result RoundResult(std::int64_t payout_cents) const;
 
     /**
      * Creates a card for the table, hidden until the next update places it.
@@ -208,6 +217,9 @@ private:
     std::array<Button, 11> buttons{};
     svanes::Entity hand_marker{};
     std::array<svanes::Entity, 2> result_labels{};
+    svanes::Entity banner_panel{};
+    svanes::Entity banner_label{};
+    std::optional<Result> banner;
     std::optional<std::size_t> pressed_button;
     svanes::FontHandle font{};
 

@@ -69,8 +69,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [ ] 6.5 Dealer banter + chat-reply captions
 
 ## Where we left off
-All work through 4b.4 is committed (last: `add hit, stand, double, and split controls`).
-4b.5 done (uncommitted). Next up is 4b.6, proposed but not yet approved.
+All work through 4b.5 is committed (last: `keep hand results clear of the bet line`).
+Result banner done (uncommitted, 4b.5 polish). Next up is 4b.6 captions, approved (subtitle strip at stream bottom, 5s then quick fade).
 
 ## Deviations from plan
 - Emoji check dropped from 2.4 (Erik); revisit when reels need emoji (5.10), with the PNG or no-emoji fallback still open.
@@ -145,3 +145,6 @@ All work through 4b.4 is committed (last: `add hit, stand, double, and split con
 - Dealer pacing: `Round` has a `DealerTurn` stage; `DealerStep()` draws one card
   or settles. The casino steps it every 0.6s, only while the app is fully
   shown, so payouts land after the last dealer card is seen.
+- Round result is a big banner (28pt, dark translucent panel sized from the
+  text length) between the dealer and player rows, with the net across all
+  hands. Per-hand words under the hands only appear after a split.

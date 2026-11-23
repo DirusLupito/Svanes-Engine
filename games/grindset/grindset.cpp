@@ -41,7 +41,7 @@ void Grindset::Initialize(svanes::GameContext &context) {
     road.Initialize(context.world);
     interior.Initialize(context.world);
     phone.Initialize(context.world, font, status_font);
-    casino.Initialize(context.world, context.events, status_font, phone);
+    casino.Initialize(context.world, context.events, status_font, font, phone);
 
     context.events.Subscribe(
         std::make_unique<

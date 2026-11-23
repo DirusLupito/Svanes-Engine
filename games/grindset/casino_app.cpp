@@ -11,6 +11,7 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <variant>
 
 namespace grindset {
 
@@ -55,6 +56,7 @@ constexpr std::int32_t kRailZ = Phone::kAppZ + 5;
 constexpr std::int32_t kBadgeZ = Phone::kAppZ + 6;
 constexpr std::int32_t kControlZ = Phone::kAppZ + 7;
 constexpr std::int32_t kCardZ = Phone::kAppZ + 8;
+constexpr std::int32_t kBannerZ = Phone::kAppZ + 90;
 
 constexpr svanes::Color kStreamColor{.red = 14, .green = 14, .blue = 20};
 constexpr svanes::Color kDealerHeadColor{.red = 206, .green = 170, .blue = 140};
@@ -73,6 +75,12 @@ constexpr svanes::Color kRedSuitColor{.red = 200, .green = 30, .blue = 40};
 constexpr float kDisabledShade = 0.45F;
 constexpr float kDealerStepSeconds = 0.6F;
 constexpr float kResultGap = 4.0F;
+constexpr float kBannerFromTop = 483.0F;
+constexpr float kBannerHeight = 44.0F;
+constexpr float kBannerCharWidth = 16.0F;
+constexpr float kBannerPadding = 18.0F;
+constexpr svanes::Color kBannerPanelColor{
+    .red = 0, .green = 0, .blue = 0, .alpha = 170};
 constexpr svanes::Color kWinColor{.red = 240, .green = 200, .blue = 80};
 constexpr svanes::Color kLoseColor{.red = 236, .green = 120, .blue = 120};
 constexpr svanes::Color kHandMarkerColor{.red = 240, .green = 200, .blue = 80};
@@ -413,16 +421,12 @@ svanes::Entity CreateLabel(svanes::Registry &world, std::string text,
 
 } // namespace
 
-CasinoApp::Result CasinoApp::ResultText(blackjack::Outcome outcome,
-                                        std::int64_t payout_cents,
-                                        std::int64_t bet_cents, bool bust) {
+CasinoApp::Result CasinoApp::HandResult(blackjack::Outcome outcome, bool bust) {
     switch (outcome) {
     case blackjack::Outcome::Blackjack:
-        return {.text = "Blackjack +" + FormatDollars(payout_cents - bet_cents),
-                .color = kWinColor};
+        return {.text = "Blackjack!", .color = kWinColor};
     case blackjack::Outcome::Win:
-        return {.text = "Win +" + FormatDollars(payout_cents - bet_cents),
-                .color = kWinColor};
+        return {.text = "Win", .color = kWinColor};
     case blackjack::Outcome::Push:
         return {.text = "Push", .color = kWhite};
     case blackjack::Outcome::Lose:
@@ -431,9 +435,35 @@ CasinoApp::Result CasinoApp::ResultText(blackjack::Outcome outcome,
     throw std::invalid_argument("Hand has an unknown outcome.");
 }
 
+CasinoApp::Result CasinoApp::RoundResult(std::int64_t payout_cents) const {
+    std::int64_t bet_total = 0;
+    for (const std::int64_t bet : hand_bets) {
+        bet_total += bet;
+    }
+    const std::int64_t net = payout_cents - bet_total;
+    std::string word;
+    if (results.size() == 1) {
+        word = results.front().text;
+    } else if (net > 0) {
+        word = "Win";
+    } else if (net < 0) {
+        word = "Lose";
+    } else {
+        word = "Even";
+    }
+    if (net > 0) {
+        return {.text = word + " +" + FormatDollars(net), .color = kWinColor};
+    }
+    if (net < 0) {
+        return {.text = word + " -" + FormatDollars(-net), .color = kLoseColor};
+    }
+    return {.text = word, .color = kWhite};
+}
+
 void CasinoApp::Initialize(svanes::Registry &world,
                            svanes::EventManager &events,
-                           svanes::FontHandle label_font, const Phone &phone) {
+                           svanes::FontHandle label_font,
+                           svanes::FontHandle large_font, const Phone &phone) {
     font = label_font;
     const svanes::Rectangle2D screen = phone.ScreenRectangle();
     const float top = -screen.height * 0.5F + kStreamTop;
@@ -502,6 +532,10 @@ void CasinoApp::Initialize(svanes::Registry &world,
                                  svanes::TextAlignment::Center, kControlZ)};
     }
 
+    banner_panel = CreateShape(
+        world, svanes::Rectangle2D{.height = kBannerHeight}, kBannerZ);
+    banner_label = CreateLabel(world, "", large_font,
+                               svanes::TextAlignment::Center, kBannerZ);
     for (svanes::Entity &label : result_labels) {
         label = CreateLabel(world, "", font, svanes::TextAlignment::TopCenter,
                             kControlZ);
@@ -524,6 +558,7 @@ void CasinoApp::Initialize(svanes::Registry &world,
             hand_bets = {event.bet_cents};
             busted = {false};
             results.clear();
+            banner.reset();
         }));
     events.Subscribe(std::make_unique<
                      svanes::EventHandlerWrapper<blackjack::HandDoubledEvent>>(
@@ -540,9 +575,8 @@ void CasinoApp::Initialize(svanes::Registry &world,
     events.Subscribe(std::make_unique<
                      svanes::EventHandlerWrapper<blackjack::HandSettledEvent>>(
         [this](const blackjack::HandSettledEvent &event) {
-            results.push_back(ResultText(event.outcome, event.payout_cents,
-                                         hand_bets.at(event.hand_index),
-                                         busted.at(event.hand_index)));
+            results.push_back(
+                HandResult(event.outcome, busted.at(event.hand_index)));
         }));
     events.Subscribe(std::make_unique<
                      svanes::EventHandlerWrapper<blackjack::HandSplitEvent>>(
@@ -580,7 +614,8 @@ void CasinoApp::Initialize(svanes::Registry &world,
     events.Subscribe(
         std::make_unique<
             svanes::EventHandlerWrapper<blackjack::RoundFinishedEvent>>(
-            [this](const blackjack::RoundFinishedEvent &) {
+            [this](const blackjack::RoundFinishedEvent &event) {
+                banner = RoundResult(event.payout_cents);
                 in_play = false;
             }));
 }
@@ -820,8 +855,25 @@ void CasinoApp::Update(svanes::Registry &world,
          top + kPlayerCardsFromTop + kCardHeight * 0.5F + kHandMarkerGap},
         kHandMarkerColor, area, mark_hand ? shown : 0.0F);
 
+    const bool show_banner = !in_play && banner.has_value();
+    const svanes::Vector2D banner_center{screen.x, top + kBannerFromTop};
+    if (show_banner) {
+        world.GetComponent<svanes::TextLabel>(banner_label).text = banner->text;
+        std::get<svanes::Rectangle2D>(
+            world.GetComponent<svanes::SolidShape>(banner_panel).geometry)
+            .width =
+            static_cast<float>(banner->text.size()) * kBannerCharWidth +
+            kBannerPadding * 2.0F;
+    }
+    PlaceShape(world, banner_panel, banner_center, kBannerPanelColor, area,
+               show_banner ? shown : 0.0F);
+    PlaceLabel(world, banner_label, banner_center,
+               show_banner ? banner->color : kWhite, area,
+               show_banner ? shown : 0.0F);
+
     for (std::size_t index = 0; index < result_labels.size(); ++index) {
-        const bool has_result = !in_play && index < results.size();
+        const bool has_result =
+            !in_play && results.size() > 1 && index < results.size();
         if (has_result) {
             world.GetComponent<svanes::TextLabel>(result_labels[index]).text =
                 results[index].text;
