@@ -8,6 +8,7 @@
 #include <svanes/events/collision_event.hpp>
 #include <svanes/events/event_handler_wrapper.hpp>
 #include <svanes/events/event_manager.hpp>
+#include <svanes/geometry/convex_polygon_geometry.hpp>
 #include <svanes/input/input_manager.hpp>
 #include <svanes/kinematic_system.hpp>
 #include <svanes/registry.hpp>
@@ -19,6 +20,7 @@
 #include <numbers>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 namespace nutritionally_accurate_snake {
 
@@ -30,22 +32,51 @@ constexpr std::size_t kInitialBodyCount = 3;
 constexpr std::size_t kNeckSegmentCount = 2;
 constexpr float kFoodRadius = 6.0F;
 constexpr svanes::TicCount kFoodSpawnInterval = 5 * svanes::TicsPerSecond;
+constexpr float kWeightRadiusStep = 2.0F;
+
+static svanes::ConvexPolygon2D SnakeGeometry(float radius) {
+    if (!std::isfinite(radius) || radius <= 0.0F) {
+        throw std::invalid_argument(
+            "Snake radius must be finite and positive.");
+    }
+    constexpr std::size_t vertex_count = 32;
+    std::vector<svanes::Vector2D> vertices;
+    vertices.reserve(vertex_count);
+    for (std::size_t index = 0; index < vertex_count; ++index) {
+        const float angle = 2.0F * std::numbers::pi_v<float> *
+                            static_cast<float>(index) /
+                            static_cast<float>(vertex_count);
+        vertices.push_back(
+            {kRadius * svanes::Cos(angle), radius * svanes::Sin(angle)});
+    }
+    return svanes::ConvexPolygon2D{std::move(vertices)};
+}
+
+static void SetSnakeRadius(svanes::Registry &world, svanes::Entity entity,
+                           float radius) {
+    auto geometry = SnakeGeometry(radius);
+    world.GetComponent<svanes::SolidShape>(entity).geometry = geometry;
+    if (world.HasComponent<svanes::Collider2D>(entity)) {
+        world.GetComponent<svanes::Collider2D>(entity).geometry =
+            std::move(geometry);
+    }
+}
 
 // Object representing the snake's head. This is what will collide with objects to pick them up,
 // or with the edges and body segments to trigger a game over.
 SnakeHead::SnakeHead(svanes::Registry &world) : entity(world.CreateEntity()) {
     constexpr float heading = std::numbers::pi_v<float> / 6.0F;
     const float speed = svanes::PerSecondToPerTic(kMoveSpeed);
+    auto geometry = SnakeGeometry(kRadius);
 
     world.AddComponent<svanes::Transform>(
         entity, svanes::Transform{.rotation = heading});
     world.AddComponent<svanes::SolidShape>(
         entity,
-        svanes::SolidShape{.color = {80, 200, 100, 255},
-                           .geometry = svanes::Circle2D{.radius = kRadius}});
+        svanes::SolidShape{.color = {80, 200, 100, 255}, .geometry = geometry});
     world.AddComponent<svanes::ZOrder>(entity, svanes::ZOrder{1});
     world.AddComponent<svanes::Collider2D>(
-        entity, svanes::Collider2D{svanes::Circle2D{.radius = kRadius}});
+        entity, svanes::Collider2D{std::move(geometry)});
     world.AddComponent<svanes::Timeline>(entity);
     world.AddComponent<svanes::Kinematic2D>(
         entity,
@@ -83,41 +114,38 @@ void SnakeHead::PhysicsUpdate(const svanes::PhysicsContext &physics) {
     motion.velocity_y = svanes::Sin(transform.rotation) * speed;
 }
 
+void SnakeHead::SetRadius(svanes::Registry &world, float radius) {
+    SetSnakeRadius(world, entity, radius);
+}
+
 svanes::Entity SnakeHead::GetEntity() const { return entity; }
 
 // Object for a segment of the snake's body, with adjustable size
-SnakeBody::SnakeBody(svanes::Registry &world, svanes::Vector2D position)
+SnakeBody::SnakeBody(svanes::Registry &world, svanes::Vector2D position,
+                     float radius)
     : entity(world.CreateEntity()) {
+    auto geometry = SnakeGeometry(radius);
     world.AddComponent<svanes::Transform>(
         entity, svanes::Transform{.x = position.x, .y = position.y});
     world.AddComponent<svanes::SolidShape>(
         entity,
-        svanes::SolidShape{.color = {60, 160, 80, 255},
-                           .geometry = svanes::Circle2D{.radius = kRadius}});
+        svanes::SolidShape{.color = {60, 160, 80, 255}, .geometry = geometry});
     world.AddComponent<svanes::Collider2D>(
-        entity, svanes::Collider2D{svanes::Circle2D{.radius = kRadius}});
+        entity, svanes::Collider2D{std::move(geometry)});
 }
 
 // Helper for updating segment position to follow the head's path
-void SnakeBody::SetPosition(svanes::Registry &world,
-                            svanes::Vector2D position) {
+void SnakeBody::SetPosition(svanes::Registry &world, svanes::Vector2D position,
+                            float heading) {
     auto &transform = world.GetComponent<svanes::Transform>(entity);
     transform.x = position.x;
     transform.y = position.y;
+    transform.rotation = heading;
 }
 
 // Updates the radius of a body segment
 void SnakeBody::SetRadius(svanes::Registry &world, float radius) {
-    if (!std::isfinite(radius) || radius <= 0.0F) {
-        throw std::invalid_argument(
-            "Snake body radius must be finite and positive.");
-    }
-    auto &shape = world.GetComponent<svanes::SolidShape>(entity);
-    std::get<svanes::Circle2D>(shape.geometry).radius = radius;
-    if (world.HasComponent<svanes::Collider2D>(entity)) {
-        auto &collider = world.GetComponent<svanes::Collider2D>(entity);
-        std::get<svanes::Circle2D>(collider.geometry).radius = radius;
-    }
+    SetSnakeRadius(world, entity, radius);
 }
 
 svanes::Entity SnakeBody::GetEntity() const { return entity; }
@@ -138,6 +166,7 @@ void Snake::ResetSnake(svanes::Registry &world) {
     pellets.clear();
     food_spawn_tics = 0;
     score = 0;
+    weight = 0;
     // Create the snake with initial position and heading
     head = head_pool.Make(world);
     const auto &transform =
@@ -153,12 +182,14 @@ void Snake::ResetSnake(svanes::Registry &world) {
     // Add on initial body segments
     for (std::size_t index = 0; index < kInitialBodyCount; ++index) {
         body.push_back(body_pool.Make(
-            world, position - forward * (kBodySpacing *
-                                         static_cast<float>(index + 1))));
+            world,
+            position - forward * (kBodySpacing * static_cast<float>(index + 1)),
+            kRadius));
         if (index < kNeckSegmentCount) {
             world.RemoveComponent<svanes::Collider2D>(body.back()->GetEntity());
         }
     }
+    UpdateBody(world);
     game_over = false;
 }
 
@@ -238,14 +269,17 @@ void Snake::UpdateBody(svanes::Registry &world) {
             if (distance + length >= target) {
                 body[index]->SetPosition(
                     world,
-                    path[point] + direction * ((target - distance) / length));
+                    path[point] + direction * ((target - distance) / length),
+                    std::atan2(-direction.y, -direction.x));
                 break;
             }
             distance += length;
             ++point;
         }
         if (point + 1 == path.size()) {
-            body[index]->SetPosition(world, path.back());
+            const auto direction = path[path.size() - 2] - path.back();
+            body[index]->SetPosition(world, path.back(),
+                                     std::atan2(direction.y, direction.x));
         }
     }
     while (path.size() > point + 2) {
@@ -329,19 +363,37 @@ void Snake::HandleCollision(svanes::Registry &world,
     const auto other = a == head_entity ? b : a;
     const auto pellet = std::find(pellets.begin(), pellets.end(), other);
     if (pellet != pellets.end()) {
+        const auto previous_weight = weight;
         switch (world.GetComponent<PelletType>(other)) {
         case PelletType::Orange:
+            score += 25;
+            ++weight;
+            break;
         case PelletType::Red:
             score += 25;
             break;
         case PelletType::LightBlue:
+            score += 10;
+            if (weight > 0) {
+                --weight;
+            }
+            break;
         case PelletType::DarkBlue:
             score += 10;
             break;
         }
         world.DestroyEntity(other);
         pellets.erase(pellet);
-        body.push_back(body_pool.Make(world, path.back()));
+        const float radius =
+            kRadius + static_cast<float>(weight) * kWeightRadiusStep;
+        if (weight != previous_weight) {
+            head->SetRadius(world, radius);
+            for (const auto &segment : body) {
+                segment->SetRadius(world, radius);
+            }
+        }
+        body.push_back(body_pool.Make(world, path.back(), radius));
+        UpdateBody(world);
         return;
     }
     if (std::find(edges.begin(), edges.end(), other) != edges.end() ||

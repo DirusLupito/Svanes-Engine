@@ -27,6 +27,7 @@ class SnakeHead final {
 public:
     explicit SnakeHead(svanes::Registry &world);
     void PhysicsUpdate(const svanes::PhysicsContext &physics);
+    void SetRadius(svanes::Registry &world, float radius);
     svanes::Entity GetEntity() const;
 
 private:
@@ -35,8 +36,9 @@ private:
 
 class SnakeBody final {
 public:
-    SnakeBody(svanes::Registry &world, svanes::Vector2D position);
-    void SetPosition(svanes::Registry &world, svanes::Vector2D position);
+    SnakeBody(svanes::Registry &world, svanes::Vector2D position, float radius);
+    void SetPosition(svanes::Registry &world, svanes::Vector2D position,
+                     float heading);
     void SetRadius(svanes::Registry &world, float radius);
     svanes::Entity GetEntity() const;
 
@@ -70,6 +72,7 @@ private:
     svanes::Rectangle2D food_spawn_area{};
     svanes::TicCount food_spawn_tics = 0;
     std::uint64_t score = 0;
+    std::uint32_t weight = 0;
     std::mt19937 random{std::random_device{}()};
     std::array<svanes::Entity, 4> edges{};
     std::array<svanes::Entity, 3> game_over_shapes{};
