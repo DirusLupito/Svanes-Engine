@@ -423,8 +423,17 @@ void Snake::InitializeEdges(svanes::GameContext &context) {
 }
 
 void Snake::SpawnFood(svanes::Registry &world) {
-    std::uniform_int_distribution<std::size_t> type_index{
-        0, pellet_definitions.size() - 1};
+    std::array<std::size_t, 4> counts{};
+    for (const auto pellet : pellets) {
+        ++counts[static_cast<std::size_t>(
+            world.GetComponent<PelletType>(pellet))];
+    }
+    std::array<double, 4> weights{};
+    for (std::size_t index = 0; index < counts.size(); ++index) {
+        weights[index] = 1.0 / (1.0 + static_cast<double>(counts[index]));
+    }
+    std::discrete_distribution<std::size_t> type_index{weights.begin(),
+                                                       weights.end()};
     const auto type = static_cast<PelletType>(type_index(random));
     std::uniform_real_distribution<float> x{
         food_spawn_area.x - food_spawn_area.width * 0.5F,
@@ -621,7 +630,9 @@ void Snake::Update(const svanes::FrameContext &frame) {
         food_spawn_tics += frame.real_delta_tics;
         if (food_spawn_tics >= kFoodSpawnInterval) {
             food_spawn_tics %= kFoodSpawnInterval;
-            SpawnFood(frame.world);
+            for (std::size_t index = 0; index < 2; ++index) {
+                SpawnFood(frame.world);
+            }
         }
     }
     UpdateMenuScreen(frame);
