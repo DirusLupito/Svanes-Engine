@@ -61,7 +61,7 @@ private:
     void UpdateBody(svanes::Registry &world);
     void InitializeEdges(svanes::GameContext &context);
     void SpawnFood(svanes::Registry &world);
-    void UpdateGameOverScreen(const svanes::FrameContext &frame);
+    void UpdateMenuScreen(const svanes::FrameContext &frame);
     void HandleCollision(svanes::Registry &world,
                          const svanes::CollisionEvent &event);
 
@@ -80,9 +80,11 @@ private:
     std::mt19937 random{std::random_device{}()};
     std::array<svanes::Entity, 4> edges{};
     svanes::Entity score_label{};
-    std::array<svanes::Entity, 3> game_over_shapes{};
-    std::array<svanes::Entity, 3> game_over_labels{};
+    std::array<svanes::Entity, 3> menu_shapes{};
+    std::array<svanes::Entity, 3> menu_labels{};
+    svanes::Entity explanation_label{};
     svanes::EventManager *events = nullptr;
+    bool starting = true;
     bool game_over = false;
     bool quit = false;
 };

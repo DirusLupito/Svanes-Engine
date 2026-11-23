@@ -202,12 +202,12 @@ void Snake::ResetSnake(svanes::Registry &world) {
         }
     }
     UpdateBody(world);
+    starting = false;
     game_over = false;
 }
 
 void Snake::Initialize(svanes::GameContext &context) {
     events = &context.events;
-    ResetSnake(context.world);
     // Create colllidable reagions for edges
     InitializeEdges(context);
     const std::string font_path = svanes::AssetPath(
@@ -223,22 +223,40 @@ void Snake::Initialize(svanes::GameContext &context) {
         score_label, svanes::TextLabel{.text = "Score: 0",
                                        .position = {16.0F, 16.0F},
                                        .color = {255, 255, 255, 255},
-                                       .font = font});
+                                       .font = font,
+                                       .visible = false});
 
-    const std::array<const char *, 3> captions{"Game Over", "Restart", "Quit"};
+    explanation_label = context.world.CreateEntity();
+    context.world.AddComponent<svanes::TextLabel>(
+        explanation_label,
+        svanes::TextLabel{
+            .text = "Burgers and pizza give you more points, but will cause "
+                    "you to get wider and turn slower. Healthy salads and "
+                    "apples will remedy these effects.\n\nThe unhealthier you "
+                    "eat, the more points you get from unhealthy food, but the "
+                    "harder it is to mitigate the negative effects of your "
+                    "gluttonous habits.\n\nGood luck!",
+            .color = {255, 255, 255, 255},
+            .font = font,
+            .alignment = svanes::TextAlignment::TopCenter,
+            .visible = false});
+    context.world.AddComponent<svanes::ClipRect>(explanation_label);
+
+    const std::array<const char *, 3> captions{"Nutritionally Accurate Snake",
+                                               "Start", "Quit"};
     for (std::size_t index = 0; index < captions.size(); ++index) {
-        game_over_shapes[index] = context.world.CreateEntity();
-        context.world.AddComponent<svanes::Transform>(game_over_shapes[index]);
+        menu_shapes[index] = context.world.CreateEntity();
+        context.world.AddComponent<svanes::Transform>(menu_shapes[index]);
         context.world.AddComponent<svanes::SolidShape>(
-            game_over_shapes[index],
+            menu_shapes[index],
             svanes::SolidShape{.color = {0, 0, 0, 0},
                                .geometry = svanes::Rectangle2D{
                                    .width = 1.0F, .height = 1.0F}});
         context.world.AddComponent<svanes::ZOrder>(
-            game_over_shapes[index], svanes::ZOrder{index == 0 ? 10 : 11});
-        game_over_labels[index] = context.world.CreateEntity();
+            menu_shapes[index], svanes::ZOrder{index == 0 ? 10 : 11});
+        menu_labels[index] = context.world.CreateEntity();
         context.world.AddComponent<svanes::TextLabel>(
-            game_over_labels[index],
+            menu_labels[index],
             svanes::TextLabel{.text = captions[index],
                               .color = {255, 255, 255, 255},
                               .font = font,
@@ -254,7 +272,7 @@ void Snake::Initialize(svanes::GameContext &context) {
 }
 
 void Snake::PhysicsUpdate(const svanes::PhysicsContext &physics) {
-    if (game_over) {
+    if (starting || game_over) {
         return;
     }
     head->PhysicsUpdate(physics);
@@ -370,7 +388,7 @@ void Snake::SpawnFood(svanes::Registry &world) {
 // Collision handler for game over and food pickup
 void Snake::HandleCollision(svanes::Registry &world,
                             const svanes::CollisionEvent &event) {
-    if (game_over) {
+    if (starting || game_over) {
         return;
     }
     const auto a = event.collision.a;
@@ -436,21 +454,23 @@ void Snake::HandleCollision(svanes::Registry &world,
         })) {
         game_over = true;
         death_animation_tics = 0;
-        world.GetComponent<svanes::TextLabel>(game_over_labels[0]).text =
+        world.GetComponent<svanes::TextLabel>(menu_labels[0]).text =
             "Game Over\nScore: " + std::to_string(score);
+        world.GetComponent<svanes::TextLabel>(menu_labels[1]).text = "Restart";
         world.GetComponent<svanes::Timeline>(head_entity).Pause();
     }
 }
 
-void Snake::UpdateGameOverScreen(const svanes::FrameContext &frame) {
+void Snake::UpdateMenuScreen(const svanes::FrameContext &frame) {
     const auto viewport = frame.camera.Viewport();
+    const float button_y = starting
+                               ? viewport.y + viewport.height * 0.5F - 64.0F
+                               : viewport.y + 40.0F;
     const std::array<svanes::Rectangle2D, 3> areas{
         viewport,
-        svanes::Rectangle2D{viewport.x - 130.0F, viewport.y + 40.0F, 220.0F,
-                            64.0F},
-        svanes::Rectangle2D{viewport.x + 130.0F, viewport.y + 40.0F, 220.0F,
-                            64.0F}};
-    if (game_over &&
+        svanes::Rectangle2D{viewport.x - 130.0F, button_y, 220.0F, 64.0F},
+        svanes::Rectangle2D{viewport.x + 130.0F, button_y, 220.0F, 64.0F}};
+    if ((starting || game_over) &&
         frame.input.WasMouseButtonPressed(svanes::MouseButton::Left)) {
         const auto mouse = frame.input.MousePosition();
         for (std::size_t index = 1; index < areas.size(); ++index) {
@@ -470,30 +490,47 @@ void Snake::UpdateGameOverScreen(const svanes::FrameContext &frame) {
     }
     for (std::size_t index = 0; index < areas.size(); ++index) {
         const auto area = frame.camera.ScreenToWorld(areas[index]);
-        auto &transform = frame.world.GetComponent<svanes::Transform>(
-            game_over_shapes[index]);
+        auto &transform =
+            frame.world.GetComponent<svanes::Transform>(menu_shapes[index]);
         transform.x = area.x;
         transform.y = area.y;
-        auto &shape = frame.world.GetComponent<svanes::SolidShape>(
-            game_over_shapes[index]);
+        auto &shape =
+            frame.world.GetComponent<svanes::SolidShape>(menu_shapes[index]);
         shape.geometry =
             svanes::Rectangle2D{.width = area.width, .height = area.height};
         shape.color = index == 0 ? svanes::Color{0, 0, 0, 96}
                                  : svanes::Color{70, 70, 70, 255};
-        if (!game_over) {
+        if (index == 0 && starting) {
+            shape.color.alpha = 255;
+        }
+        if (!starting && !game_over) {
             shape.color.alpha = 0;
         }
-        auto &label = frame.world.GetComponent<svanes::TextLabel>(
-            game_over_labels[index]);
+        auto &label =
+            frame.world.GetComponent<svanes::TextLabel>(menu_labels[index]);
         label.position =
             index == 0
                 ? svanes::Vector2D{viewport.width * 0.5F,
-                                   viewport.height * 0.5F - 80.0F}
+                                   starting ? viewport.height * 0.15F
+                                            : viewport.height * 0.5F - 80.0F}
                 : svanes::Vector2D{
                       areas[index].x - viewport.x + viewport.width * 0.5F,
                       areas[index].y - viewport.y + viewport.height * 0.5F};
-        label.visible = game_over;
+        label.visible = starting || game_over;
     }
+    auto &explanation =
+        frame.world.GetComponent<svanes::TextLabel>(explanation_label);
+    explanation.position = {viewport.width * 0.5F, viewport.height * 0.25F};
+    explanation.wrap_width = static_cast<std::int32_t>(
+        std::clamp(viewport.width - 64.0F, 1.0F, 800.0F));
+    const float explanation_height =
+        std::max(0.0F, viewport.height - 120.0F - explanation.position.y);
+    frame.world.GetComponent<svanes::ClipRect>(explanation_label).area =
+        svanes::Rectangle2D{explanation.position.x,
+                            explanation.position.y + explanation_height * 0.5F,
+                            static_cast<float>(explanation.wrap_width),
+                            explanation_height};
+    explanation.visible = starting;
 }
 
 void Snake::Update(const svanes::FrameContext &frame) {
@@ -512,16 +549,18 @@ void Snake::Update(const svanes::FrameContext &frame) {
             }
         }
     }
-    if (!game_over) {
+    if (!starting && !game_over) {
         food_spawn_tics += frame.real_delta_tics;
         if (food_spawn_tics >= kFoodSpawnInterval) {
             food_spawn_tics %= kFoodSpawnInterval;
             SpawnFood(frame.world);
         }
     }
-    UpdateGameOverScreen(frame);
-    frame.world.GetComponent<svanes::TextLabel>(score_label).text =
-        "Score: " + std::to_string(score);
+    UpdateMenuScreen(frame);
+    auto &score_display =
+        frame.world.GetComponent<svanes::TextLabel>(score_label);
+    score_display.text = "Score: " + std::to_string(score);
+    score_display.visible = !starting;
 }
 
 bool Snake::ShouldQuit() const { return quit; }
