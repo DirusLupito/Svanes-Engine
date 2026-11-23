@@ -143,7 +143,7 @@ All work through the result banner is committed (last: `show the round's result 
   same-z order can change. Showed up as a fully black card (border over face).
   Grindset now never relies on same-z order for overlapping shapes.
 - Dealer pacing: `Round` has a `DealerTurn` stage; `DealerStep()` draws one card
-  or settles. The casino steps it every 0.6s, only while the app is fully
+  or settles. The casino steps it every 4s (first tried 0.6s, too fast), only while the app is fully
   shown, so payouts land after the last dealer card is seen.
 - Round result is a big banner (28pt, dark translucent panel sized from the
   text length) between the dealer and player rows, with the net across all
