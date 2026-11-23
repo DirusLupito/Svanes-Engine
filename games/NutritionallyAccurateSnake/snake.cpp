@@ -33,15 +33,15 @@ constexpr float kMoveSpeed = 180.0F;
 constexpr float kMaxTurnSpeed = std::numbers::pi_v<float>;
 constexpr float kMinTurnSpeed = kMaxTurnSpeed / 6.0F;
 constexpr float kTurnSpeedStep = kMaxTurnSpeed / 12.0F;
-constexpr float kRadius = 19.2F;
-constexpr float kBodySpacing = 19.2F;
+constexpr float kRadius = 24.0F;
+constexpr float kBodySpacing = 24.0F;
 constexpr std::size_t kInitialBodyCount = 3;
 constexpr std::size_t kNeckSegmentCount = 2;
-constexpr float kFoodRadius = 18.0F;
+constexpr float kFoodRadius = 22.5F;
 constexpr float kFoodSpriteSize = 2.0F * kFoodRadius * 1.25F;
 constexpr svanes::TicCount kFoodSpawnInterval = 5 * svanes::TicsPerSecond;
 constexpr svanes::TicCount kDeathSegmentInterval = svanes::TicsPerSecond / 10;
-constexpr float kWeightRadiusStep = 2.4F;
+constexpr float kWeightRadiusStep = 3.0F;
 constexpr std::uint32_t kMaxDietBalance = 10;
 
 static svanes::ConvexPolygon2D SnakeGeometry(float radius) {
@@ -510,7 +510,9 @@ void Snake::HandleCollision(svanes::Registry &world,
                 segment->SetRadius(world, radius);
             }
         }
-        body.push_back(body_pool.Make(world, path.back(), radius));
+        for (std::size_t index = 0; index < 2; ++index) {
+            body.push_back(body_pool.Make(world, path.back(), radius));
+        }
         UpdateBody(world);
         return;
     }
