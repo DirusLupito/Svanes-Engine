@@ -71,6 +71,10 @@ constexpr svanes::Color kCardBorderColor{.red = 20, .green = 20, .blue = 24};
 constexpr svanes::Color kBlackSuitColor{.red = 20, .green = 20, .blue = 24};
 constexpr svanes::Color kRedSuitColor{.red = 200, .green = 30, .blue = 40};
 constexpr float kDisabledShade = 0.45F;
+constexpr float kDealerStepSeconds = 0.6F;
+constexpr float kResultGap = 28.0F;
+constexpr svanes::Color kWinColor{.red = 240, .green = 200, .blue = 80};
+constexpr svanes::Color kLoseColor{.red = 236, .green = 120, .blue = 120};
 constexpr svanes::Color kHandMarkerColor{.red = 240, .green = 200, .blue = 80};
 
 /**
@@ -409,6 +413,24 @@ svanes::Entity CreateLabel(svanes::Registry &world, std::string text,
 
 } // namespace
 
+CasinoApp::Result CasinoApp::ResultText(blackjack::Outcome outcome,
+                                        std::int64_t payout_cents,
+                                        std::int64_t bet_cents, bool bust) {
+    switch (outcome) {
+    case blackjack::Outcome::Blackjack:
+        return {.text = "Blackjack +" + FormatDollars(payout_cents - bet_cents),
+                .color = kWinColor};
+    case blackjack::Outcome::Win:
+        return {.text = "Win +" + FormatDollars(payout_cents - bet_cents),
+                .color = kWinColor};
+    case blackjack::Outcome::Push:
+        return {.text = "Push", .color = kWhite};
+    case blackjack::Outcome::Lose:
+        return {.text = bust ? "Bust" : "Lose", .color = kLoseColor};
+    }
+    throw std::invalid_argument("Hand has an unknown outcome.");
+}
+
 void CasinoApp::Initialize(svanes::Registry &world,
                            svanes::EventManager &events,
                            svanes::FontHandle label_font, const Phone &phone) {
@@ -480,6 +502,10 @@ void CasinoApp::Initialize(svanes::Registry &world,
                                  svanes::TextAlignment::Center, kControlZ)};
     }
 
+    for (svanes::Entity &label : result_labels) {
+        label = CreateLabel(world, "", font, svanes::TextAlignment::TopCenter,
+                            kControlZ);
+    }
     hand_marker = CreateShape(world,
                               svanes::Rectangle2D{.width = kHandMarkerWidth,
                                                   .height = kHandMarkerHeight},
@@ -488,13 +514,35 @@ void CasinoApp::Initialize(svanes::Registry &world,
     round.emplace(events);
     events.Subscribe(std::make_unique<
                      svanes::EventHandlerWrapper<blackjack::BetPlacedEvent>>(
-        [this, &world](const blackjack::BetPlacedEvent &) {
+        [this, &world](const blackjack::BetPlacedEvent &event) {
             if (in_play) {
                 return;
             }
             ClearCards(world);
             in_play = true;
             active_hand = 0;
+            hand_bets = {event.bet_cents};
+            busted = {false};
+            results.clear();
+        }));
+    events.Subscribe(std::make_unique<
+                     svanes::EventHandlerWrapper<blackjack::HandDoubledEvent>>(
+        [this](const blackjack::HandDoubledEvent &event) {
+            hand_bets.at(event.hand_index) *= 2;
+        }));
+    events.Subscribe(
+        std::make_unique<svanes::EventHandlerWrapper<blackjack::HandBustEvent>>(
+            [this](const blackjack::HandBustEvent &event) {
+                if (event.seat == blackjack::Seat::Player) {
+                    busted.at(event.hand_index) = true;
+                }
+            }));
+    events.Subscribe(std::make_unique<
+                     svanes::EventHandlerWrapper<blackjack::HandSettledEvent>>(
+        [this](const blackjack::HandSettledEvent &event) {
+            results.push_back(ResultText(event.outcome, event.payout_cents,
+                                         hand_bets.at(event.hand_index),
+                                         busted.at(event.hand_index)));
         }));
     events.Subscribe(std::make_unique<
                      svanes::EventHandlerWrapper<blackjack::HandSplitEvent>>(
@@ -502,6 +550,8 @@ void CasinoApp::Initialize(svanes::Registry &world,
             const CardView second = player_hands.at(0).at(1);
             player_hands.at(0).pop_back();
             player_hands.push_back({second});
+            hand_bets.push_back(hand_bets.at(0));
+            busted.push_back(false);
         }));
     events.Subscribe(std::make_unique<
                      svanes::EventHandlerWrapper<blackjack::PlayerTurnEvent>>(
@@ -574,6 +624,9 @@ void CasinoApp::ClearCards(svanes::Registry &world) {
 }
 
 bool CasinoApp::IsVisible(std::size_t index) const {
+    if (round->IsDealerTurn()) {
+        return false;
+    }
     return kControls[index].during_round == in_play;
 }
 
@@ -690,11 +743,21 @@ void CasinoApp::PlaceCards(svanes::Registry &world,
 
 void CasinoApp::Update(svanes::Registry &world,
                        const svanes::InputManager &input, const Phone &phone,
-                       std::int64_t balance_cents) {
+                       float seconds, std::int64_t balance_cents) {
     const svanes::Rectangle2D screen = phone.ScreenRectangle();
     const svanes::Rectangle2D area = phone.AppArea();
     const float shown = phone.AppShown(Phone::App::Casino);
     const float top = screen.y - screen.height * 0.5F;
+
+    if (round->IsDealerTurn() && shown == 1.0F) {
+        dealer_seconds += seconds;
+        if (dealer_seconds >= kDealerStepSeconds) {
+            dealer_seconds = 0.0F;
+            round->DealerStep();
+        }
+    } else {
+        dealer_seconds = 0.0F;
+    }
 
     if (shown == 1.0F && phone.IsFullyHeld()) {
         TrackClick(input, screen, balance_cents);
@@ -756,6 +819,20 @@ void CasinoApp::Update(svanes::Registry &world,
         {first_hand_x + hand_spacing * static_cast<float>(active_hand),
          top + kPlayerCardsFromTop + kCardHeight * 0.5F + kHandMarkerGap},
         kHandMarkerColor, area, mark_hand ? shown : 0.0F);
+
+    for (std::size_t index = 0; index < result_labels.size(); ++index) {
+        const bool has_result = !in_play && index < results.size();
+        if (has_result) {
+            world.GetComponent<svanes::TextLabel>(result_labels[index]).text =
+                results[index].text;
+        }
+        PlaceLabel(
+            world, result_labels[index],
+            {first_hand_x + hand_spacing * static_cast<float>(index),
+             top + kPlayerCardsFromTop + kCardHeight * 0.5F + kResultGap},
+            has_result ? results[index].color : kWhite, area,
+            has_result ? shown : 0.0F);
+    }
 }
 
 } // namespace grindset

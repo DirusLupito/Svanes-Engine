@@ -43,8 +43,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [x] 4b.2 Card drawing, face up / face down
 - [x] 4b.3 Chips, bet display, Clear / All in / Deal, debit through `Grindset`
 - [x] 4b.4 Hit / Stand / Double / Split buttons with enabled state
-- [ ] 4b.5 Dealer turn shown, payouts credited, next round — **NEXT, awaiting approval**
-- [ ] 4b.6 Captions from round events
+- [x] 4b.5 Dealer turn shown, payouts credited, next round
+- [ ] 4b.6 Captions from round events — **NEXT, awaiting approval**
 - [ ] 4b.7 Leaving mid-round freezes the round
 
 ## Phase 5: Reels
@@ -69,8 +69,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [ ] 6.5 Dealer banter + chat-reply captions
 
 ## Where we left off
-All work through 4b.3 is committed (last: `fixing card drawing bug`).
-4b.4 done (uncommitted). Next up is 4b.5, proposed but not yet approved.
+All work through 4b.4 is committed (last: `add hit, stand, double, and split controls`).
+4b.5 done (uncommitted). Next up is 4b.6, proposed but not yet approved.
 
 ## Deviations from plan
 - Emoji check dropped from 2.4 (Erik); revisit when reels need emoji (5.10), with the PNG or no-emoji fallback still open.
@@ -142,3 +142,6 @@ All work through 4b.3 is committed (last: `fixing card drawing bug`).
   creation order, but `Registry` stores entities in an `std::unordered_map`, so
   same-z order can change. Showed up as a fully black card (border over face).
   Grindset now never relies on same-z order for overlapping shapes.
+- Dealer pacing: `Round` has a `DealerTurn` stage; `DealerStep()` draws one card
+  or settles. The casino steps it every 0.6s, only while the app is fully
+  shown, so payouts land after the last dealer card is seen.

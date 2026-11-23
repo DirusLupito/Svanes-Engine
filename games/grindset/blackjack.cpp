@@ -200,7 +200,7 @@ std::int64_t Payout(Outcome outcome, std::int64_t bet_cents) {
 Round::Round(svanes::EventManager &events) : events(events) {}
 
 void Round::PlaceBet(std::int64_t bet) {
-    if (stage == Stage::PlayerTurn) {
+    if (stage == Stage::PlayerTurn || stage == Stage::DealerTurn) {
         throw std::logic_error(
             "A bet cannot be placed while a round is being played.");
     }
@@ -303,7 +303,7 @@ void Round::Split() {
         DealPlayer(0);
         DealPlayer(1);
         active = hands.size();
-        PlayDealer();
+        StartDealerTurn();
         return;
     }
     DealPlayer(0);
@@ -344,7 +344,7 @@ void Round::EndHand() {
         StartHand();
         return;
     }
-    PlayDealer();
+    StartDealerTurn();
 }
 
 void Round::StartHand() {
@@ -363,23 +363,38 @@ void Round::RevealHoleCard() {
     events.TriggerEvent(HoleCardRevealedEvent{dealer.Cards()[1]});
 }
 
-void Round::PlayDealer() {
+void Round::StartDealerTurn() {
     RevealHoleCard();
     const bool any_standing =
         std::any_of(hands.begin(), hands.end(),
                     [](const PlayerHand &hand) { return !hand.hand.IsBust(); });
-    if (any_standing) {
-        while (dealer.Total() < 17 ||
-               (dealer.Total() == 17 && dealer.IsSoft())) {
-            DealDealer(true);
-        }
-        if (dealer.IsBust()) {
-            events.TriggerEvent(HandBustEvent{Seat::Dealer, 0});
-        } else {
-            events.TriggerEvent(DealerStoodEvent{dealer.Total()});
-        }
+    if (!any_standing) {
+        Settle();
+        return;
     }
+    stage = Stage::DealerTurn;
+}
 
+bool Round::IsDealerTurn() const { return stage == Stage::DealerTurn; }
+
+void Round::DealerStep() {
+    if (stage != Stage::DealerTurn) {
+        throw std::logic_error(
+            "The dealer cannot take a step outside of their turn.");
+    }
+    if (dealer.Total() < 17 || (dealer.Total() == 17 && dealer.IsSoft())) {
+        DealDealer(true);
+        return;
+    }
+    if (dealer.IsBust()) {
+        events.TriggerEvent(HandBustEvent{Seat::Dealer, 0});
+    } else {
+        events.TriggerEvent(DealerStoodEvent{dealer.Total()});
+    }
+    Settle();
+}
+
+void Round::Settle() {
     std::vector<Outcome> outcomes;
     for (const PlayerHand &hand : hands) {
         outcomes.push_back(Judge(hand));

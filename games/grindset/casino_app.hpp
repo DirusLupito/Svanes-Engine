@@ -16,6 +16,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace grindset {
@@ -28,9 +29,10 @@ namespace grindset {
  * between rounds, chips for building a bet and a button to deal; during a
  * round, Hit, Stand, Double, and Split. After a split, the two hands sit side
  * by side with a marker under the one being played. The app plays a blackjack
- * round and draws the cards as the round reports them. Everything is laid out
- * against the phone's screen, clipped to the area the app currently covers, and
- * faded in and out with the app.
+ * round and draws the cards as the round reports them, takes the dealer's
+ * turn one card at a time, and shows each hand's result until the next deal.
+ * Everything is laid out against the phone's screen, clipped to the area the
+ * app currently covers, and faded in and out with the app.
  */
 class CasinoApp final {
 public:
@@ -48,15 +50,17 @@ public:
 
     /**
      * Moves everything to where the phone's screen is, clips it to the area
-     * the app covers, fades it, and handles clicks on the controls.
+     * the app covers, fades it, handles clicks on the controls, and paces the
+     * dealer's turn. The dealer only moves while the app is fully shown.
      * @param world The world holding it.
      * @param input The mouse state, with positions matching world
      * coordinates.
      * @param phone The phone the app is on.
+     * @param seconds The time since the previous update, in seconds.
      * @param balance_cents The player's balance, in cents.
      */
     void Update(svanes::Registry &world, const svanes::InputManager &input,
-                const Phone &phone, std::int64_t balance_cents);
+                const Phone &phone, float seconds, std::int64_t balance_cents);
 
 private:
     /**
@@ -100,6 +104,30 @@ private:
         svanes::Entity shape;
         svanes::Entity label;
     };
+
+    /**
+     * The result shown under one of the player's hands after a round.
+     *
+     * FIELDS:
+     * - text: What happened, such as "Win +$10.00" or "Bust".
+     * - color: The color to write it in.
+     */
+    struct Result {
+        std::string text;
+        svanes::Color color;
+    };
+
+    /**
+     * Writes how a hand turned out, with the money won.
+     * @param outcome How the hand turned out.
+     * @param payout_cents How much the hand gave back, including its bet.
+     * @param bet_cents The money bet on the hand.
+     * @param bust Whether the hand went over 21.
+     * @return The result to show.
+     */
+    static Result ResultText(blackjack::Outcome outcome,
+                             std::int64_t payout_cents, std::int64_t bet_cents,
+                             bool bust);
 
     /**
      * Creates a card for the table, hidden until the next update places it.
@@ -179,6 +207,7 @@ private:
     svanes::Entity bet_label{};
     std::array<Button, 11> buttons{};
     svanes::Entity hand_marker{};
+    std::array<svanes::Entity, 2> result_labels{};
     std::optional<std::size_t> pressed_button;
     svanes::FontHandle font{};
 
@@ -188,6 +217,10 @@ private:
     std::int64_t bet_cents = 0;
     bool in_play = false;
     std::size_t active_hand = 0;
+    float dealer_seconds = 0.0F;
+    std::vector<std::int64_t> hand_bets;
+    std::vector<bool> busted;
+    std::vector<Result> results;
 };
 
 } // namespace grindset

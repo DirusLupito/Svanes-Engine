@@ -442,9 +442,10 @@ public:
  * across rounds. The dealer hits soft 17 and peeks for a blackjack when
  * showing an ace or a 10. The player may double down on any first two cards,
  * including after a split, and may split one pair per round, including any two
- * cards worth 10; split aces get one card each. The round does not hold the
- * player's money; it reports what happens, including every bet and payout, as
- * events.
+ * cards worth 10; split aces get one card each. The dealer's turn is taken one
+ * step at a time with DealerStep, so it can be shown at a readable pace. The
+ * round does not hold the player's money; it reports what happens, including
+ * every bet and payout, as events.
  */
 class Round final {
 public:
@@ -475,11 +476,26 @@ public:
     void Hit();
 
     /**
-     * Ends the hand being played. Once every hand is done, the dealer plays
-     * and the round is settled.
+     * Ends the hand being played. Once every hand is done, the dealer's turn
+     * starts.
      * @throws std::logic_error if it is not the player's turn.
      */
     void Stand();
+
+    /**
+     * Returns whether the dealer is taking their turn, waiting for DealerStep.
+     * @return True during the dealer's turn.
+     */
+    bool IsDealerTurn() const;
+
+    /**
+     * Takes the next step of the dealer's turn: draws one card while the
+     * dealer is under 17 or on a soft 17, and otherwise stands or reports the
+     * bust and settles the round. Calling this one step at a time lets the
+     * dealer's turn be shown at a readable pace.
+     * @throws std::logic_error if it is not the dealer's turn.
+     */
+    void DealerStep();
 
     /**
      * Returns whether the hand being played can be doubled down on: it has
@@ -509,8 +525,8 @@ public:
     /**
      * Splits the pair into two hands with a bet each. Each hand is dealt its
      * second card when it starts being played. Split aces are each dealt one
-     * card, and then the dealer plays. The caller must already have checked
-     * CanSplit.
+     * card, and then the dealer's turn starts. The caller must already have
+     * checked CanSplit.
      * @throws std::logic_error if the hand cannot be split, ignoring the
      * player's balance.
      */
@@ -523,11 +539,13 @@ private:
      * VALUES:
      * - Betting: Waiting for the first bet.
      * - PlayerTurn: Waiting for the player to act on a hand.
+     * - DealerTurn: Waiting for the dealer to take each step of their turn.
      * - Finished: Over, and waiting for the next bet.
      */
     enum class Stage : std::uint8_t {
         Betting,
         PlayerTurn,
+        DealerTurn,
         Finished,
     };
 
@@ -572,7 +590,8 @@ private:
 
     /**
      * Ends the hand being played and moves on: the next hand is dealt its
-     * second card and starts, or once every hand is done, the dealer plays.
+     * second card and starts, or once every hand is done, the dealer's
+     * turn starts.
      */
     void EndHand();
 
@@ -588,10 +607,16 @@ private:
     void RevealHoleCard();
 
     /**
-     * Plays the dealer's hand, unless every player hand bust, then settles
-     * every player hand and finishes the round.
+     * Starts the dealer's turn by turning the hole card face up, or settles
+     * the round right away if every player hand bust.
      */
-    void PlayDealer();
+    void StartDealerTurn();
+
+    /**
+     * Settles every player hand against the dealer's final hand and finishes
+     * the round.
+     */
+    void Settle();
 
     /**
      * Finds how a player hand that was played out does against the dealer.
