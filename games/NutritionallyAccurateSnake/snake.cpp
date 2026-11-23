@@ -28,13 +28,13 @@ constexpr float kMoveSpeed = 180.0F;
 constexpr float kMaxTurnSpeed = std::numbers::pi_v<float>;
 constexpr float kMinTurnSpeed = kMaxTurnSpeed / 6.0F;
 constexpr float kTurnSpeedStep = kMaxTurnSpeed / 12.0F;
-constexpr float kRadius = 16.0F;
-constexpr float kBodySpacing = 16.0F;
+constexpr float kRadius = 19.2F;
+constexpr float kBodySpacing = 19.2F;
 constexpr std::size_t kInitialBodyCount = 3;
 constexpr std::size_t kNeckSegmentCount = 2;
-constexpr float kFoodRadius = 6.0F;
+constexpr float kFoodRadius = 18.0F;
 constexpr svanes::TicCount kFoodSpawnInterval = 5 * svanes::TicsPerSecond;
-constexpr float kWeightRadiusStep = 2.0F;
+constexpr float kWeightRadiusStep = 2.4F;
 
 static svanes::ConvexPolygon2D SnakeGeometry(float radius) {
     if (!std::isfinite(radius) || radius <= 0.0F) {
