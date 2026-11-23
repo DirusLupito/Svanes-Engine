@@ -59,7 +59,10 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [x] L.1 Refactor: road projected from a sideways camera position, road surface rebuilt every frame (no visual change)
 - [x] L.2 A/D ease the camera between lanes (0.5s), steering wheel slides toward the turn
 
-## Phase 6: Chat + dealer lines
+## Road obstacles (next, not designed yet)
+- [ ] O.1 Obstacles sitting in one lane, scrolling toward the camera, dodged by changing lanes with A/D
+
+## Phase 6: Chat + dealer lines (on hold, Erik)
 - [ ] 6.1 Chat panel + message log
 - [ ] 6.2 Key-press typing with Shift, Enter sends, phone toggle disabled while typing
 - [ ] 6.3 Ambient messages
@@ -67,7 +70,7 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [ ] 6.5 Dealer banter + chat-reply captions
 
 ## Where we left off
-Reels through like/dislike committed. 5.6 (all reel formats) done (uncommitted), not yet run; emoji rendering untested. Special reels dropped. Lane changes done (L.2 uncommitted). Next up is Phase 6 (chat). Remember to ignore A/D while typing (6.2).
+Reels (all formats) committed. Special reels dropped. Lane changes committed. Chat (Phase 6) is on hold. Next up is road obstacles (O.1), not designed yet. If chat comes back, A/D must be ignored while typing (6.2).
 
 ## Deviations from plan
 - 5.12 special reels dropped (Erik).
