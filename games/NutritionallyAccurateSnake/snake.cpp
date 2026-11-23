@@ -42,7 +42,8 @@ constexpr float kFoodSpriteSize = 2.0F * kFoodRadius * 1.25F;
 constexpr svanes::TicCount kFoodSpawnInterval = 5 * svanes::TicsPerSecond;
 constexpr svanes::TicCount kDeathSegmentInterval = svanes::TicsPerSecond / 10;
 constexpr float kWeightRadiusStep = 3.0F;
-constexpr std::uint32_t kMaxDietBalance = 10;
+constexpr std::uint32_t kMinDietBalance = 1;
+constexpr std::uint32_t kMaxDietBalance = 20;
 
 static svanes::ConvexPolygon2D SnakeGeometry(float radius) {
     if (!std::isfinite(radius) || radius <= 0.0F) {
@@ -184,7 +185,7 @@ void Snake::ResetSnake(svanes::Registry &world) {
     death_animation_tics = 0;
     score = 0;
     weight = 0.0F;
-    diet_balance = 0;
+    diet_balance = kMinDietBalance;
     // Create the snake with initial position and heading
     head = head_pool.Make(world);
     const auto &transform =
@@ -477,16 +478,19 @@ void Snake::HandleCollision(svanes::Registry &world,
         const auto type = world.GetComponent<PelletType>(other);
         const bool unhealthy =
             type == PelletType::Pizza || type == PelletType::Burger;
-        float balance = 0.5F;
-        if (diet_balance <= 2) {
-            balance = 0.0F;
-        } else if (diet_balance >= 8) {
-            balance = 1.0F;
-        }
+        constexpr std::array<float, 5> unhealthy_scores{1.0F, 1.75F, 2.5F,
+                                                        3.25F, 4.0F};
+        constexpr std::array<float, 5> healthy_scores{1.0F, 0.8F, 0.6F, 0.4F,
+                                                      0.25F};
+        constexpr std::array<float, 5> penalties{0.75F, 1.0F, 1.25F, 1.5F,
+                                                 2.0F};
+        constexpr std::array<float, 5> recoveries{1.25F, 1.1F, 1.0F, 0.75F,
+                                                  0.5F};
+        const std::size_t bracket = (diet_balance - kMinDietBalance) / 4;
         const float score_multiplier =
-            unhealthy ? 1.0F + balance : 1.0F - 0.5F * balance;
-        const float penalty_multiplier = 0.75F + 1.25F * balance;
-        const float recovery_multiplier = 1.25F - 0.75F * balance;
+            unhealthy ? unhealthy_scores[bracket] : healthy_scores[bracket];
+        const float penalty_multiplier = penalties[bracket];
+        const float recovery_multiplier = recoveries[bracket];
         const auto base_score =
             pellet_definitions[static_cast<std::size_t>(type)].base_score;
         score += static_cast<std::uint64_t>(
@@ -506,8 +510,8 @@ void Snake::HandleCollision(svanes::Registry &world,
             break;
         }
         if (unhealthy) {
-            diet_balance = std::min(diet_balance + 1, kMaxDietBalance);
-        } else if (diet_balance > 0) {
+            diet_balance = std::min(diet_balance + 2, kMaxDietBalance);
+        } else if (diet_balance > kMinDietBalance) {
             --diet_balance;
         }
         world.DestroyEntity(other);

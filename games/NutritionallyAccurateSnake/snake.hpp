@@ -84,7 +84,7 @@ private:
     svanes::TicCount death_animation_tics = 0;
     std::uint64_t score = 0;
     float weight = 0.0F;
-    std::uint32_t diet_balance = 0;
+    std::uint32_t diet_balance = 1;
     std::mt19937 random{std::random_device{}()};
     std::array<svanes::Entity, 4> edges{};
     svanes::Entity score_label{};
