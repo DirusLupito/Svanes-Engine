@@ -137,6 +137,7 @@ void Snake::ResetSnake(svanes::Registry &world) {
     }
     pellets.clear();
     food_spawn_tics = 0;
+    score = 0;
     // Create the snake with initial position and heading
     head = head_pool.Make(world);
     const auto &transform =
@@ -291,8 +292,8 @@ void Snake::SpawnFood(svanes::Registry &world) {
     constexpr std::array<svanes::Color, 4> colors{
         svanes::Color{240, 160, 50, 255}, svanes::Color{230, 60, 60, 255},
         svanes::Color{120, 210, 255, 255}, svanes::Color{40, 70, 180, 255}};
-    std::uniform_int_distribution<std::size_t> color_index{0,
-                                                           colors.size() - 1};
+    std::uniform_int_distribution<std::size_t> type_index{0, colors.size() - 1};
+    const auto type = static_cast<PelletType>(type_index(random));
     std::uniform_real_distribution<float> x{
         food_spawn_area.x - food_spawn_area.width * 0.5F,
         food_spawn_area.x + food_spawn_area.width * 0.5F};
@@ -300,12 +301,14 @@ void Snake::SpawnFood(svanes::Registry &world) {
         food_spawn_area.y - food_spawn_area.height * 0.5F,
         food_spawn_area.y + food_spawn_area.height * 0.5F};
     const auto entity = world.CreateEntity();
+    world.AddComponent<PelletType>(entity, type);
     world.AddComponent<svanes::Transform>(
         entity, svanes::Transform{.x = x(random), .y = y(random)});
     const svanes::Circle2D geometry{.radius = kFoodRadius};
     world.AddComponent<svanes::SolidShape>(
-        entity, svanes::SolidShape{.color = colors[color_index(random)],
-                                   .geometry = geometry});
+        entity,
+        svanes::SolidShape{.color = colors[static_cast<std::size_t>(type)],
+                           .geometry = geometry});
     world.AddComponent<svanes::Collider2D>(entity,
                                            svanes::Collider2D{geometry});
     pellets.push_back(entity);
@@ -326,6 +329,16 @@ void Snake::HandleCollision(svanes::Registry &world,
     const auto other = a == head_entity ? b : a;
     const auto pellet = std::find(pellets.begin(), pellets.end(), other);
     if (pellet != pellets.end()) {
+        switch (world.GetComponent<PelletType>(other)) {
+        case PelletType::Orange:
+        case PelletType::Red:
+            score += 25;
+            break;
+        case PelletType::LightBlue:
+        case PelletType::DarkBlue:
+            score += 10;
+            break;
+        }
         world.DestroyEntity(other);
         pellets.erase(pellet);
         body.push_back(body_pool.Make(world, path.back()));
@@ -336,6 +349,8 @@ void Snake::HandleCollision(svanes::Registry &world,
             return segment->GetEntity() == other;
         })) {
         game_over = true;
+        world.GetComponent<svanes::TextLabel>(game_over_labels[0]).text =
+            "Game Over\nScore: " + std::to_string(score);
         world.GetComponent<svanes::Timeline>(head_entity).Pause();
     }
 }

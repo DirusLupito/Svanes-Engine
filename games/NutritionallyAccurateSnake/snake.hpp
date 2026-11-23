@@ -5,6 +5,7 @@
 #include <svanes/memory/object_pool.hpp>
 
 #include <array>
+#include <cstdint>
 #include <deque>
 #include <random>
 #include <vector>
@@ -14,6 +15,13 @@ class CollisionEvent;
 }
 
 namespace nutritionally_accurate_snake {
+
+enum class PelletType : std::uint8_t {
+    Orange,
+    Red,
+    LightBlue,
+    DarkBlue,
+};
 
 class SnakeHead final {
 public:
@@ -61,6 +69,7 @@ private:
     std::vector<svanes::Entity> pellets;
     svanes::Rectangle2D food_spawn_area{};
     svanes::TicCount food_spawn_tics = 0;
+    std::uint64_t score = 0;
     std::mt19937 random{std::random_device{}()};
     std::array<svanes::Entity, 4> edges{};
     std::array<svanes::Entity, 3> game_over_shapes{};
