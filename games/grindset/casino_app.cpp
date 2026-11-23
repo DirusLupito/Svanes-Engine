@@ -75,7 +75,7 @@ constexpr svanes::Color kCardBorderColor{.red = 20, .green = 20, .blue = 24};
 constexpr svanes::Color kBlackSuitColor{.red = 20, .green = 20, .blue = 24};
 constexpr svanes::Color kRedSuitColor{.red = 200, .green = 30, .blue = 40};
 constexpr float kDisabledShade = 0.45F;
-constexpr float kDealerStepSeconds = 0.6F;
+constexpr float kDealerStepSeconds = 2.5F;
 constexpr float kResultGap = 4.0F;
 constexpr float kCaptionFromStreamBottom = 34.0F;
 constexpr float kCaptionHeight = 52.0F;
