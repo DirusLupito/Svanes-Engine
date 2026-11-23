@@ -8,6 +8,7 @@ namespace nutritionally_accurate_snake {
 class SnakeHead final {
 public:
     explicit SnakeHead(svanes::Registry &world);
+    void PhysicsUpdate(const svanes::PhysicsContext &physics);
 
 private:
     svanes::Entity entity;
@@ -16,6 +17,7 @@ private:
 class Snake final : public svanes::IGame {
 public:
     void Initialize(svanes::GameContext &context) override;
+    void PhysicsUpdate(const svanes::PhysicsContext &physics) override;
     void Update(const svanes::FrameContext &frame) override;
     bool ShouldQuit() const override;
     svanes::TicCount GetFrameIntervalTics() const override;
