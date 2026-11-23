@@ -88,9 +88,15 @@ void Grindset::Update(const svanes::FrameContext &frame) {
         frame.input.WasPressed(svanes::Key::Tab)) {
         phone.Toggle();
     }
+    if (frame.input.WasPressed(svanes::Key::A)) {
+        road.SteerLeft();
+    }
+    if (frame.input.WasPressed(svanes::Key::D)) {
+        road.SteerRight();
+    }
 
     road.Update(frame.world, seconds);
-    interior.Update(frame.world, road.CurrentBob());
+    interior.Update(frame.world, road.CurrentBob(), road.Steering());
     phone.Update(frame.world, frame.input, seconds, balance_cents,
                  reels.IsOverButton(frame.input.MousePosition(), phone));
     casino.Update(frame.world, frame.input, phone, seconds, balance_cents);

@@ -17,7 +17,8 @@ namespace grindset {
  * the phone.
  *
  * The interior bobs along with the road, but by less, so the outside moves a
- * little against the car.
+ * little against the car. The steering wheel slides a little toward the side
+ * the car is steering to.
  */
 class CarInterior final {
 public:
@@ -29,15 +30,19 @@ public:
     void Initialize(svanes::Registry &world);
 
     /**
-     * Moves the interior up or down along with the road's bob.
+     * Moves the interior up or down along with the road's bob, and slides the
+     * steering wheel toward the side the car is steering to.
      * @param world The world holding it.
      * @param road_bob How far the road view is currently bobbed, in pixels,
      * positive downward.
+     * @param steering How hard the car is steering, from -1 for hardest to the
+     * left to 1 for hardest to the right.
      */
-    void Update(svanes::Registry &world, float road_bob);
+    void Update(svanes::Registry &world, float road_bob, float steering);
 
 private:
     std::vector<svanes::Entity> parts;
+    std::vector<svanes::Entity> wheel;
 };
 
 } // namespace grindset

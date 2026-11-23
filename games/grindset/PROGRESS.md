@@ -55,6 +55,10 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [x] 5.5 Like / dislike (visual only)
 - [x] 5.6 Reel formats (merged 5.6-5.11 at Erik's request): `text_lines` loader, generator, view; POV, fake facts, would you rather, brainrot, emoji story (Twemoji COLRv0 font), guru
 
+## Lane changes (added)
+- [x] L.1 Refactor: road projected from a sideways camera position, road surface rebuilt every frame (no visual change)
+- [x] L.2 A/D ease the camera between lanes (0.5s), steering wheel slides toward the turn
+
 ## Phase 6: Chat + dealer lines
 - [ ] 6.1 Chat panel + message log
 - [ ] 6.2 Key-press typing with Shift, Enter sends, phone toggle disabled while typing
@@ -63,7 +67,7 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [ ] 6.5 Dealer banter + chat-reply captions
 
 ## Where we left off
-Reels through like/dislike committed. 5.6 (all reel formats) done (uncommitted), not yet run; emoji rendering untested. Special reels dropped. Next up: lane changes with A/D (proposed), then Phase 6 (chat).
+Reels through like/dislike committed. 5.6 (all reel formats) done (uncommitted), not yet run; emoji rendering untested. Special reels dropped. Lane changes done (L.2 uncommitted). Next up is Phase 6 (chat). Remember to ignore A/D while typing (6.2).
 
 ## Deviations from plan
 - 5.12 special reels dropped (Erik).

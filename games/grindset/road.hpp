@@ -26,7 +26,9 @@ namespace grindset {
  *
  * Sideways positions on the road are measured from the middle of the right
  * lane, and everything is seen from the camera's sideways position, so the
- * whole view is projected again every update.
+ * whole view is projected again every update. The camera starts in the right
+ * lane and can change to the left lane and back, easing sideways so it starts
+ * and stops gently.
  */
 class Road final {
 public:
@@ -46,6 +48,26 @@ public:
      * @param seconds The time since the previous update, in seconds.
      */
     void Update(svanes::Registry &world, float seconds);
+
+    /**
+     * Starts moving the camera to the left lane. A change already underway
+     * turns around from where it is.
+     */
+    void SteerLeft();
+
+    /**
+     * Starts moving the camera to the right lane. A change already underway
+     * turns around from where it is.
+     */
+    void SteerRight();
+
+    /**
+     * Returns how hard the car is steering, which is strongest halfway through
+     * a lane change.
+     * @return From -1 for steering hardest to the left to 1 for steering
+     * hardest to the right, and 0 while staying in a lane.
+     */
+    float Steering() const;
 
     /**
      * Returns how far the road view is currently bobbed up or down.
@@ -83,6 +105,8 @@ private:
     float distance = 0.0F;
     float elapsed = 0.0F;
     float camera_lateral = 0.0F;
+    float lane = 0.0F;
+    bool heading_left = false;
 };
 
 } // namespace grindset

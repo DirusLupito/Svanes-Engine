@@ -30,10 +30,11 @@ public:
 
     /**
      * Checks whether Escape was pressed to quit and whether Space or Tab was
-     * pressed to put away or take out the phone, then moves the road, bobs
-     * the car interior along with it, slides the phone, which shows the
-     * balance, and lays the casino and reels apps out on the phone's screen,
-     * adding what the reels earned to the balance.
+     * pressed to put away or take out the phone and whether A or D was pressed
+     * to change lanes, then moves the road, bobs the car interior along with
+     * it and slides its steering wheel while changing lanes, slides the phone,
+     * which shows the balance, and lays the casino and reels apps out on the
+     * phone's screen, adding what the reels earned to the balance.
      * @param frame The current frame's input and engine services.
      */
     void Update(const svanes::FrameContext &frame) override;

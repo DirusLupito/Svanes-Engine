@@ -32,6 +32,7 @@ constexpr float kWheelThickness = 44.0F;
 constexpr float kWheelStartDegrees = -195.0F;
 constexpr float kWheelEndDegrees = 15.0F;
 constexpr std::int32_t kWheelSegments = 28;
+constexpr float kWheelSteerShift = 40.0F;
 
 constexpr svanes::Rectangle2D kMirrorStem{
     .x = 1250.0F, .y = 86.0F, .width = 18.0F, .height = 52.0F};
@@ -192,13 +193,19 @@ void CreateMirror(svanes::Registry &world, std::vector<svanes::Entity> &parts) {
 void CarInterior::Initialize(svanes::Registry &world) {
     CreateWindshieldFrame(world, parts);
     CreateDashboard(world, parts);
-    CreateSteeringWheel(world, parts);
+    CreateSteeringWheel(world, wheel);
     CreateMirror(world, parts);
 }
 
 void CarInterior::Update(svanes::Registry &world, float road_bob) {
     for (const svanes::Entity entity : parts) {
         world.GetComponent<svanes::Transform>(entity).y = road_bob * kBobShare;
+    }
+    for (const svanes::Entity entity : wheel) {
+        svanes::Transform &transform =
+            world.GetComponent<svanes::Transform>(entity);
+        transform.x = steering * kWheelSteerShift;
+        transform.y = road_bob * kBobShare;
     }
 }
 

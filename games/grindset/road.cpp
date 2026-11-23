@@ -47,6 +47,8 @@ constexpr float kPropFadeDepth = 40.0F;
 
 constexpr float kRoadHalfWidth = 2.2F;
 constexpr float kRoadCenter = -kRoadHalfWidth * 0.5F;
+constexpr float kLaneWidth = kRoadHalfWidth;
+constexpr float kLaneChangeSeconds = 0.5F;
 constexpr float kEdgeLineInset = 0.05F;
 constexpr float kEdgeLineWidth = 0.1F;
 constexpr float kDashLength = 2.5F;
@@ -424,6 +426,16 @@ void PlaceWires(svanes::Registry &world,
  * @param elapsed The time since the road was created, in seconds.
  * @return The vertical shift for the road view, in pixels, positive downward.
  */
+/**
+ * Eases a value so it starts and stops gently.
+ *
+ * @param amount The value, from 0 to 1.
+ * @return The eased value, from 0 to 1.
+ */
+float SmoothStep(float amount) {
+    return amount * amount * (3.0F - 2.0F * amount);
+}
+
 float BobOffset(float elapsed) {
     constexpr float kTau = 2.0F * std::numbers::pi_v<float>;
     return kBobSlowAmplitude * std::sin(kTau * elapsed / kBobSlowPeriod) +
@@ -515,6 +527,10 @@ void Road::ShiftVertically(svanes::Registry &world, float offset) {
 
 void Road::Update(svanes::Registry &world, float seconds) {
     distance = std::fmod(distance + kDriveSpeed * seconds, kPatternLength);
+    const float step = seconds / kLaneChangeSeconds;
+    lane = heading_left ? std::min(lane + step, 1.0F)
+                        : std::max(lane - step, 0.0F);
+    camera_lateral = -kLaneWidth * SmoothStep(lane);
 
     PlaceRoad(world, road_strips, camera_lateral);
     for (std::size_t index = 0; index < dashes.size(); ++index) {
@@ -534,5 +550,18 @@ void Road::Update(svanes::Registry &world, float seconds) {
 }
 
 float Road::CurrentBob() const { return BobOffset(elapsed); }
+
+void Road::SteerLeft() { heading_left = true; }
+
+void Road::SteerRight() { heading_left = false; }
+
+float Road::Steering() const {
+    const bool changing = heading_left ? lane < 1.0F : lane > 0.0F;
+    if (!changing) {
+        return 0.0F;
+    }
+    const float strength = 4.0F * lane * (1.0F - lane);
+    return heading_left ? -strength : strength;
+}
 
 } // namespace grindset
