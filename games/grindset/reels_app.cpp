@@ -25,6 +25,7 @@ constexpr float kPopupFromTop = 100.0F;
 constexpr float kPopupRise = 40.0F;
 constexpr float kPopupWidth = 120.0F;
 constexpr float kPopupHeight = 44.0F;
+constexpr float kPopupCornerRadius = 18.0F;
 constexpr svanes::Color kPopupPanelColor{
     .red = 0, .green = 0, .blue = 0, .alpha = 150};
 constexpr svanes::Color kPopupTextColor{.red = 240, .green = 200, .blue = 80};
@@ -115,10 +116,10 @@ void ReelsApp::Initialize(svanes::Registry &world, svanes::FontHandle font,
     popup_panel = world.CreateEntity();
     world.AddComponent<svanes::Transform>(popup_panel, svanes::Transform{});
     world.AddComponent<svanes::SolidShape>(
-        popup_panel, svanes::SolidShape{
-                         .color = {.alpha = 0},
-                         .geometry = RoundedRectangle(kPopupWidth, kPopupHeight,
-                                                      kPopupHeight * 0.5F)});
+        popup_panel,
+        svanes::SolidShape{.color = {.alpha = 0},
+                           .geometry = RoundedRectangle(
+                               kPopupWidth, kPopupHeight, kPopupCornerRadius)});
     world.AddComponent<svanes::ZOrder>(popup_panel, svanes::ZOrder{kPopupZ});
     world.AddComponent<svanes::ClipRect>(popup_panel, svanes::ClipRect{});
 
