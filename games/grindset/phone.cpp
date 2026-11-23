@@ -388,7 +388,8 @@ void Phone::CreateIcons(svanes::Registry &world, svanes::FontHandle font) {
 void Phone::Toggle() { held = !held; }
 
 void Phone::Update(svanes::Registry &world, const svanes::InputManager &input,
-                   float seconds, std::int64_t balance_cents) {
+                   float seconds, std::int64_t balance_cents,
+                   bool swipe_blocked) {
     elapsed += seconds;
     const float step = seconds / kSlideSeconds;
     if (held) {
@@ -402,7 +403,7 @@ void Phone::Update(svanes::Registry &world, const svanes::InputManager &input,
         FormatDollars(balance_cents);
 
     TrackClick(input);
-    TrackSwipe(input);
+    TrackSwipe(input, swipe_blocked);
     MoveApp(seconds);
     ShowScreen(world);
 }
@@ -440,7 +441,7 @@ Phone::IconUnderMouse(const svanes::InputManager &input) const {
     return std::nullopt;
 }
 
-void Phone::TrackSwipe(const svanes::InputManager &input) {
+void Phone::TrackSwipe(const svanes::InputManager &input, bool swipe_blocked) {
     if (!open_app.has_value()) {
         return;
     }
@@ -469,7 +470,7 @@ void Phone::TrackSwipe(const svanes::InputManager &input) {
         return;
     }
 
-    if (app_motion != AppMotion::Open || slide != 1.0F ||
+    if (app_motion != AppMotion::Open || slide != 1.0F || swipe_blocked ||
         !input.WasMouseButtonPressed(svanes::MouseButton::Left)) {
         return;
     }

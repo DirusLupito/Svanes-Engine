@@ -101,9 +101,10 @@ public:
 
     /**
      * How far up from the bottom of the screen a swipe to close an open app
-     * can start. Apps leave this strip alone.
+     * can start. Apps leave this strip alone, except for controls they want
+     * pressed before a swipe, which they report to Update.
      */
-    static constexpr float kHomeSwipeHeight = 70.0F;
+    static constexpr float kHomeSwipeHeight = 56.0F;
 
     /**
      * Creates the body, the screen with its wallpaper and app icons, the
@@ -137,9 +138,11 @@ public:
      * @param seconds The time since the previous update, in seconds.
      * @param balance_cents The player's balance, in cents. Must not be
      * negative.
+     * @param swipe_blocked True if the mouse is over something in the open
+     * app that takes a press before a swipe home does.
      */
     void Update(svanes::Registry &world, const svanes::InputManager &input,
-                float seconds, std::int64_t balance_cents);
+                float seconds, std::int64_t balance_cents, bool swipe_blocked);
 
     /**
      * Returns where the phone's screen is, for apps to lay themselves out in.
@@ -248,8 +251,10 @@ private:
      * the screen soon at the speed it was moving, and springs back otherwise.
      * @param input The mouse state, with positions matching world
      * coordinates.
+     * @param swipe_blocked True if the mouse is over something in the open
+     * app that takes a press before a swipe home does.
      */
-    void TrackSwipe(const svanes::InputManager &input);
+    void TrackSwipe(const svanes::InputManager &input, bool swipe_blocked);
 
     /**
      * Moves the open app along its opening or its spring after a swipe, and

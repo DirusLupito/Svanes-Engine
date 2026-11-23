@@ -78,6 +78,16 @@ public:
                         const svanes::InputManager &input, const Phone &phone,
                         float seconds);
 
+    /**
+     * Returns whether the mouse is over the current reel's like or dislike
+     * button while the app is fully shown, so a press there goes to the
+     * button rather than a swipe home.
+     * @param mouse The mouse position, in world coordinates.
+     * @param phone The phone the app is on.
+     * @return True if the mouse is over a button.
+     */
+    bool IsOverButton(svanes::Vector2D mouse, const Phone &phone) const;
+
 private:
     /**
      * What the player thought of a reel.

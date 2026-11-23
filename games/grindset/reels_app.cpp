@@ -21,8 +21,8 @@ constexpr std::int32_t kButtonZ = Phone::kAppZ + 2;
 constexpr std::int32_t kPopupZ = Phone::kAppZ + 90;
 
 constexpr float kButtonFromRight = 44.0F;
-constexpr float kLikeFromBottom = 300.0F;
-constexpr float kDislikeFromBottom = 220.0F;
+constexpr float kLikeFromBottom = 144.0F;
+constexpr float kDislikeFromBottom = 64.0F;
 constexpr float kButtonHitSize = 64.0F;
 constexpr svanes::Color kButtonColor{
     .red = 255, .green = 255, .blue = 255, .alpha = 230};
@@ -89,22 +89,23 @@ float RubberBandPull(float moved, float screen_height) {
 }
 
 /**
- * Builds a heart from two circles and a triangle, about 44 pixels across.
+ * Builds a heart from two circles and a triangle, about 40 pixels across,
+ * with the triangle's sides running along the circles' outer edges.
  *
  * @return The heart, centered on its middle.
  */
 svanes::CompositeShape2D Heart() {
     svanes::CompositeShape2D heart;
     heart.parts.push_back(
-        {.shape = svanes::Circle2D{.x = -10.0F, .y = -6.0F, .radius = 12.0F},
+        {.shape = svanes::Circle2D{.x = -8.0F, .y = -6.0F, .radius = 12.0F},
          .transform = {}});
     heart.parts.push_back(
-        {.shape = svanes::Circle2D{.x = 10.0F, .y = -6.0F, .radius = 12.0F},
+        {.shape = svanes::Circle2D{.x = 8.0F, .y = -6.0F, .radius = 12.0F},
          .transform = {}});
     heart.parts.push_back(
-        {.shape = svanes::Triangle2D{.vertices = {{{-21.5F, -3.0F},
-                                                   {21.5F, -3.0F},
-                                                   {0.0F, 20.0F}}}},
+        {.shape =
+             svanes::Triangle2D{
+                 .vertices = {{{-16.5F, 2.0F}, {16.5F, 2.0F}, {0.0F, 20.0F}}}},
          .transform = {}});
     return heart;
 }
@@ -420,6 +421,11 @@ ReelsApp::ButtonUnderMouse(svanes::Vector2D mouse,
         }
     }
     return std::nullopt;
+}
+
+bool ReelsApp::IsOverButton(svanes::Vector2D mouse, const Phone &phone) const {
+    return phone.AppShown(Phone::App::Instagram) == 1.0F &&
+           ButtonUnderMouse(mouse, phone.ScreenRectangle()).has_value();
 }
 
 std::int64_t ReelsApp::Update(svanes::Registry &world,
