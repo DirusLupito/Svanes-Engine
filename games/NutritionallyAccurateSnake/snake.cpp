@@ -9,11 +9,15 @@
 #include <algorithm>
 #include <cmath>
 #include <numbers>
+#include <stdexcept>
 
 namespace nutritionally_accurate_snake {
 
 constexpr float kMoveSpeed = 180.0F;
 constexpr float kTurnRate = std::numbers::pi_v<float>;
+constexpr float kRadius = 16.0F;
+constexpr float kBodySpacing = 16.0F;
+constexpr std::size_t kInitialBodyCount = 3;
 
 SnakeHead::SnakeHead(svanes::Registry &world) : entity(world.CreateEntity()) {
     constexpr float heading = std::numbers::pi_v<float> / 6.0F;
@@ -24,7 +28,8 @@ SnakeHead::SnakeHead(svanes::Registry &world) : entity(world.CreateEntity()) {
     world.AddComponent<svanes::SolidShape>(
         entity,
         svanes::SolidShape{.color = {80, 200, 100, 255},
-                           .geometry = svanes::Circle2D{.radius = 16.0F}});
+                           .geometry = svanes::Circle2D{.radius = kRadius}});
+    world.AddComponent<svanes::ZOrder>(entity, svanes::ZOrder{1});
     world.AddComponent<svanes::Timeline>(entity);
     world.AddComponent<svanes::Kinematic2D>(
         entity,
@@ -61,12 +66,91 @@ void SnakeHead::PhysicsUpdate(const svanes::PhysicsContext &physics) {
     motion.velocity_y = svanes::Sin(transform.rotation) * speed;
 }
 
+svanes::Entity SnakeHead::GetEntity() const { return entity; }
+
+SnakeBody::SnakeBody(svanes::Registry &world, svanes::Vector2D position)
+    : entity(world.CreateEntity()) {
+    world.AddComponent<svanes::Transform>(
+        entity, svanes::Transform{.x = position.x, .y = position.y});
+    world.AddComponent<svanes::SolidShape>(
+        entity,
+        svanes::SolidShape{.color = {60, 160, 80, 255},
+                           .geometry = svanes::Circle2D{.radius = kRadius}});
+}
+
+void SnakeBody::SetPosition(svanes::Registry &world,
+                            svanes::Vector2D position) {
+    auto &transform = world.GetComponent<svanes::Transform>(entity);
+    transform.x = position.x;
+    transform.y = position.y;
+}
+
+void SnakeBody::SetRadius(svanes::Registry &world, float radius) {
+    if (!std::isfinite(radius) || radius <= 0.0F) {
+        throw std::invalid_argument(
+            "Snake body radius must be finite and positive.");
+    }
+    auto &shape = world.GetComponent<svanes::SolidShape>(entity);
+    std::get<svanes::Circle2D>(shape.geometry).radius = radius;
+}
+
 void Snake::Initialize(svanes::GameContext &context) {
     head = head_pool.Make(context.world);
+    const auto &transform =
+        context.world.GetComponent<svanes::Transform>(head->GetEntity());
+    const svanes::Vector2D position{transform.x, transform.y};
+    const svanes::Vector2D forward{svanes::Cos(transform.rotation),
+                                   svanes::Sin(transform.rotation)};
+    path.push_back(position);
+    path.push_back(
+        position -
+        forward * (kBodySpacing * static_cast<float>(kInitialBodyCount + 1)));
+    body.reserve(kInitialBodyCount);
+    for (std::size_t index = 0; index < kInitialBodyCount; ++index) {
+        body.push_back(body_pool.Make(
+            context.world,
+            position -
+                forward * (kBodySpacing * static_cast<float>(index + 1))));
+    }
 }
 
 void Snake::PhysicsUpdate(const svanes::PhysicsContext &physics) {
     head->PhysicsUpdate(physics);
+    UpdateBody(physics.world);
+}
+
+void Snake::UpdateBody(svanes::Registry &world) {
+    const auto &transform =
+        world.GetComponent<svanes::Transform>(head->GetEntity());
+    const svanes::Vector2D position{transform.x, transform.y};
+    if (position.x != path.front().x || position.y != path.front().y) {
+        path.push_front(position);
+    }
+
+    std::size_t point = 0;
+    float distance = 0.0F;
+    for (std::size_t index = 0; index < body.size(); ++index) {
+        const float target = kBodySpacing * static_cast<float>(index + 1);
+        while (point + 1 < path.size()) {
+            const auto direction = path[point + 1] - path[point];
+            const float length = svanes::Length(direction.x, direction.y);
+            if (distance + length >= target) {
+                body[index]->SetPosition(
+                    world,
+                    path[point] + direction * ((target - distance) / length));
+                break;
+            }
+            distance += length;
+            ++point;
+        }
+        if (point + 1 == path.size()) {
+            throw std::logic_error(
+                "Snake body extends beyond its recorded path.");
+        }
+    }
+    while (path.size() > point + 2) {
+        path.pop_back();
+    }
 }
 
 void Snake::Update(const svanes::FrameContext &frame) {
