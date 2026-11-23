@@ -48,8 +48,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [x] 4b.7 Leaving mid-round freezes the round (dealer steps and caption timer pause)
 
 ## Phase 5: Reels
-- [ ] 5.1 Reel slots stacked inside the phone screen, clipped — **NEXT, awaiting approval**
-- [ ] 5.2 Click-drag + Up/Down arrows move reels
+- [x] 5.1 Reel slots stacked inside the phone screen, clipped
+- [x] 5.2 Click-drag + Up/Down arrows move reels
 - [ ] 5.3 Release: velocity-projected rest point, change-or-snap-back, spring settle
 - [ ] 5.4 Pay rules (new reel + min watch time) + "+$0.50" popup
 - [ ] 5.5 Like / dislike (visual only)
@@ -69,8 +69,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [ ] 6.5 Dealer banter + chat-reply captions
 
 ## Where we left off
-All work through the row totals is committed (last: `show player and dealer totals beside their cards`).
-4b.7 done (uncommitted). Phase 4 complete. Next up is 5.1 (reels), proposed but not yet approved.
+Phase 4 committed. Phone refactor committed (`RoundedRectangle`, `kScreenCornerRadius`, `kHomeSwipeHeight` public).
+5.1 + 5.2 done together (uncommitted). Next up is 5.3 (swipe release feel).
 
 ## Deviations from plan
 - Emoji check dropped from 2.4 (Erik); revisit when reels need emoji (5.10), with the PNG or no-emoji fallback still open.

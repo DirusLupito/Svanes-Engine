@@ -42,6 +42,7 @@ void Grindset::Initialize(svanes::GameContext &context) {
     interior.Initialize(context.world);
     phone.Initialize(context.world, font, status_font);
     casino.Initialize(context.world, context.events, status_font, font, phone);
+    reels.Initialize(context.world, font, phone);
 
     context.events.Subscribe(
         std::make_unique<
@@ -79,6 +80,7 @@ void Grindset::Update(const svanes::FrameContext &frame) {
     interior.Update(frame.world, road.CurrentBob());
     phone.Update(frame.world, frame.input, seconds, balance_cents);
     casino.Update(frame.world, frame.input, phone, seconds, balance_cents);
+    reels.Update(frame.world, frame.input, phone);
 }
 
 bool Grindset::ShouldQuit() const { return quit; }
