@@ -127,9 +127,20 @@ public:
                      Color tint = {255, 255, 255, 255});
 
     /**
-     * Resets the render queue by clearing all commands.
+     * Resets the render queue by clearing all commands and removing the clip
+     * rectangle.
      */
     void Reset() noexcept;
+
+    /**
+     * Sets the clip rectangle for the draw commands added after this call.
+     * Nothing those commands draw outside the rectangle appears on screen.
+     * The clip stays in effect until it is set again or the queue is reset.
+     *
+     * @param clip The rectangle to draw within, in screen coordinates, or
+     * std::nullopt to draw without a clip rectangle.
+     */
+    void SetClip(std::optional<Rectangle2D> clip);
 
     /**
      * Adds a command to draw a convex polygon to the render queue.
@@ -287,6 +298,26 @@ private:
                      CircleCommand, ConvexPolygonCommand, TextureCommand>;
 
     /**
+     * A command together with the clip rectangle that was set when it was
+     * added.
+     *
+     * FIELDS:
+     * - command: The command to execute.
+     * - clip: The rectangle the command draws within, in screen coordinates,
+     * or std::nullopt if it has no clip rectangle.
+     */
+    struct QueuedCommand {
+        Command command;
+        std::optional<Rectangle2D> clip;
+    };
+
+    /**
+     * Adds a command to the queue with the current clip rectangle.
+     * @param command The command to add.
+     */
+    void Add(Command command);
+
+    /**
      * Stably sorts the queued commands into ascending z order, so that commands
      * sharing a z order stay in the order they were submitted. A ClearCommand
      * carries no z order of its own and always sorts ahead of every draw.
@@ -294,7 +325,9 @@ private:
     void SortByZOrder();
 
     // The backend data structure for storing the rendering commands.
-    std::vector<Command> commands;
+    std::vector<QueuedCommand> commands;
+
+    std::optional<Rectangle2D> current_clip;
 
     // Expose the private members to the RenderQueueExecutor class for execution
     // of the commands.

@@ -73,6 +73,19 @@ struct SolidShape {
 };
 
 /**
+ * Optional component that limits where an entity is drawn to a rectangle.
+ * Any part of the entity outside the rectangle is not drawn. The rectangle is
+ * in world coordinates, like the entity itself, and cannot be rotated. An
+ * entity without this component is drawn normally.
+ *
+ * FIELDS:
+ * - area: The rectangle the entity is drawn within.
+ */
+struct ClipRect {
+    Rectangle2D area;
+};
+
+/**
  * Optional render ordering component. Entities are drawn in ascending order of
  * their z order, so an entity with a lower z order appears behind an entity
  * with a higher one, regardless of which geometry either of them uses.
@@ -90,7 +103,7 @@ struct ZOrder {
 
 /**
  * Submits all entities with Transform and SolidShape components to the render
- * queue for rendering.
+ * queue for rendering. An entity with a ClipRect is drawn only within it.
  *
  * @param world The registry containing all entities and their components.
  * @param render_queue The render queue to which the rendering commands will be

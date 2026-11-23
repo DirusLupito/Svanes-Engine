@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <optional>
 #include <stdexcept>
 #include <variant>
 
@@ -29,6 +30,35 @@ static std::int32_t ZOrderOf(const Registry &world, Entity entity) {
     }
 
     return world.GetComponent<ZOrder>(entity).value;
+}
+
+/**
+ * Sets the render queue's clip rectangle to an entity's ClipRect, converted to
+ * screen coordinates. The ClipRect component is optional, so an entity without
+ * one is drawn without a clip rectangle.
+ *
+ * @param world The registry containing all entities and their components.
+ * @param entity The entity about to be submitted.
+ * @param render_queue The render queue whose clip rectangle is set.
+ * @param camera The camera used to convert world coordinates to screen
+ * coordinates.
+ *
+ * @return False if the entity's ClipRect is entirely outside the rendering
+ * output, so nothing of the entity can be seen, and true otherwise.
+ */
+static bool SetClipFor(const Registry &world, Entity entity,
+                       RenderQueue &render_queue, const Camera2D &camera) {
+    if (!world.HasComponent<ClipRect>(entity)) {
+        render_queue.SetClip(std::nullopt);
+        return true;
+    }
+    const auto area = camera.PrepareForRendering(
+        Transform{}, world.GetComponent<ClipRect>(entity).area);
+    if (!area) {
+        return false;
+    }
+    render_queue.SetClip(*area);
+    return true;
 }
 
 /**
@@ -185,6 +215,9 @@ void SubmitShapes(const Registry &world, RenderQueue &render_queue,
     world.ForEach<Transform, SolidShape>([&](Entity entity,
                                              const Transform &transform,
                                              const SolidShape &visual) {
+        if (!SetClipFor(world, entity, render_queue, camera)) {
+            return;
+        }
         const std::int32_t z_order = ZOrderOf(world, entity);
 
         // std::visit calls a function with whichever value a std::variant
@@ -198,6 +231,7 @@ void SubmitShapes(const Registry &world, RenderQueue &render_queue,
             },
             visual.geometry);
     });
+    render_queue.SetClip(std::nullopt);
 }
 
 void SubmitRadialGradients(const Registry &world, RenderQueue &render_queue,

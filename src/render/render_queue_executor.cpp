@@ -13,12 +13,14 @@
 
 #include <SDL3/SDL.h>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <numbers>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -42,6 +44,80 @@ static SDL_BlendMode ToSDLBlendMode(BlendMode mode) {
     throw std::invalid_argument("Unknown blend mode.");
 }
 
+/**
+ * Finds the region two clip rectangles share.
+ *
+ * @param pass The clip rectangle for the whole render pass, if any.
+ * @param own The clip rectangle of a single command, if any.
+ * @return The region inside both clip rectangles, which may have no area, or
+ * the one clip rectangle given, or std::nullopt if neither is given.
+ */
+static std::optional<Rectangle2D> CombineClips(std::optional<Rectangle2D> pass,
+                                               std::optional<Rectangle2D> own) {
+    if (!pass) {
+        return own;
+    }
+    if (!own) {
+        return pass;
+    }
+    const float left =
+        std::max(pass->x - pass->width * 0.5F, own->x - own->width * 0.5F);
+    const float right =
+        std::min(pass->x + pass->width * 0.5F, own->x + own->width * 0.5F);
+    const float top =
+        std::max(pass->y - pass->height * 0.5F, own->y - own->height * 0.5F);
+    const float bottom =
+        std::min(pass->y + pass->height * 0.5F, own->y + own->height * 0.5F);
+    return Rectangle2D{.x = (left + right) * 0.5F,
+                       .y = (top + bottom) * 0.5F,
+                       .width = std::max(right - left, 0.0F),
+                       .height = std::max(bottom - top, 0.0F)};
+}
+
+/**
+ * Converts a center-based clip rectangle to SDL's top-left-based rectangle,
+ * rounding its edges to whole pixels.
+ *
+ * @param clip The clip rectangle, if any.
+ * @return The SDL rectangle, or std::nullopt if there is no clip rectangle.
+ */
+static std::optional<SDL_Rect> ToSDLClip(std::optional<Rectangle2D> clip) {
+    if (!clip) {
+        return std::nullopt;
+    }
+    SDL_Rect clip_rect{};
+    clip_rect.x =
+        static_cast<std::int32_t>(std::round(clip->x - clip->width * 0.5F));
+
+    clip_rect.y =
+        static_cast<std::int32_t>(std::round(clip->y - clip->height * 0.5F));
+
+    clip_rect.w =
+        static_cast<std::int32_t>(std::round(clip->x + clip->width * 0.5F)) -
+        clip_rect.x;
+
+    clip_rect.h =
+        static_cast<std::int32_t>(std::round(clip->y + clip->height * 0.5F)) -
+        clip_rect.y;
+    return clip_rect;
+}
+
+/**
+ * Checks whether two clip rectangles would clip the same way.
+ *
+ * @param left One clip rectangle, if any.
+ * @param right The other clip rectangle, if any.
+ * @return True if both are missing or both cover the same pixels.
+ */
+static bool SameClip(const std::optional<SDL_Rect> &left,
+                     const std::optional<SDL_Rect> &right) {
+    if (!left || !right) {
+        return !left && !right;
+    }
+    return left->x == right->x && left->y == right->y && left->w == right->w &&
+           left->h == right->h;
+}
+
 RenderQueueExecutor::RenderQueueExecutor(SDL_Renderer *renderer,
                                          const TextureManager &texture_manager)
     : renderer(renderer), texture_manager(texture_manager) {
@@ -53,33 +129,25 @@ RenderQueueExecutor::RenderQueueExecutor(SDL_Renderer *renderer,
 
 void RenderQueueExecutor::Execute(RenderQueue &render_queue,
                                   std::optional<Rectangle2D> clip) const {
-    SDL_Rect clip_rect{};
-    if (clip) {
-        clip_rect.x =
-            static_cast<std::int32_t>(std::round(clip->x - clip->width * 0.5F));
-
-        clip_rect.y = static_cast<std::int32_t>(
-            std::round(clip->y - clip->height * 0.5F));
-
-        clip_rect.w = static_cast<std::int32_t>(
-                          std::round(clip->x + clip->width * 0.5F)) -
-                      clip_rect.x;
-
-        clip_rect.h = static_cast<std::int32_t>(
-                          std::round(clip->y + clip->height * 0.5F)) -
-                      clip_rect.y;
-    }
-
-    if (!SDL_SetRenderClipRect(renderer, clip ? &clip_rect : nullptr)) {
-        throw std::runtime_error("Could not set rendering clip rectangle: " +
-                                 std::string{SDL_GetError()});
-    }
+    std::optional<SDL_Rect> applied = ToSDLClip(clip);
+    ApplyClip(applied ? &*applied : nullptr);
 
     render_queue.SortByZOrder();
 
     // Iterate through each command and cast it to the appropriate type, then
     // execute it.
-    for (const auto &command : render_queue.commands) {
+    for (const auto &queued : render_queue.commands) {
+        const std::optional<SDL_Rect> wanted =
+            ToSDLClip(CombineClips(clip, queued.clip));
+        if (wanted && (wanted->w <= 0 || wanted->h <= 0)) {
+            continue;
+        }
+        if (!SameClip(wanted, applied)) {
+            ApplyClip(wanted ? &*wanted : nullptr);
+            applied = wanted;
+        }
+
+        const RenderQueue::Command &command = queued.command;
         if (const auto *clear =
                 std::get_if<RenderQueue::ClearCommand>(&command)) {
             Execute(*clear);
@@ -111,6 +179,13 @@ void RenderQueueExecutor::Execute(RenderQueue &render_queue,
         }
 
         Execute(std::get<RenderQueue::TextureCommand>(command));
+    }
+}
+
+void RenderQueueExecutor::ApplyClip(const SDL_Rect *clip) const {
+    if (!SDL_SetRenderClipRect(renderer, clip)) {
+        throw std::runtime_error("Could not set rendering clip rectangle: " +
+                                 std::string{SDL_GetError()});
     }
 }
 

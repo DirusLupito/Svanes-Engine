@@ -9,6 +9,7 @@
 #include <svanes/render/render_queue.hpp>
 #include <svanes/render/texture_manager.hpp>
 
+struct SDL_Rect;
 struct SDL_Renderer;
 
 namespace svanes::internal {
@@ -31,7 +32,11 @@ public:
     /**
      * Execute the rendering commands stored in the provided RenderQueue.
      * The queue is sorted into z order before any of its commands are executed.
+     * A command with its own clip rectangle draws only where that rectangle
+     * and the clip for the whole queue overlap.
      * @param render_queue The RenderQueue containing the commands to execute.
+     * @param clip The clip rectangle for every command in the queue, in screen
+     * coordinates, or std::nullopt for none.
      * @throws std::runtime_error if any command fails to execute.
      */
     void Execute(RenderQueue &render_queue,
@@ -92,6 +97,13 @@ private:
      * std::invalid_argument if the blend mode is unknown.
      */
     void Execute(const RenderQueue::TextureCommand &command) const;
+
+    /**
+     * Sets the SDL_Renderer's clip rectangle.
+     * @param clip The clip rectangle, or nullptr to draw without one.
+     * @throws std::runtime_error if the clip rectangle cannot be set.
+     */
+    void ApplyClip(const SDL_Rect *clip) const;
 
     /**
      * Sets the draw color for the SDL_Renderer based on the provided Color.
