@@ -35,11 +35,10 @@ constexpr float kSwaySidewaysAmplitude = 5.0F;
 constexpr float kSwayVerticalPeriod = 2.6F;
 constexpr float kSwayVerticalAmplitude = 4.0F;
 
-constexpr float kBodyCornerRadius = 50.0F;
 constexpr float kBezel = 14.0F;
+constexpr float kBodyCornerRadius = Phone::kScreenCornerRadius + kBezel;
 constexpr float kScreenWidth = kBodyWidth - kBezel * 2.0F;
 constexpr float kScreenHeight = kBodyHeight - kBezel * 2.0F;
-constexpr float kScreenCornerRadius = kBodyCornerRadius - kBezel;
 constexpr float kCameraRadius = 9.0F;
 constexpr float kCameraFromTop = 26.0F;
 constexpr std::int32_t kCornerSegments = 8;
@@ -66,7 +65,6 @@ constexpr float kHomeBarFromBottom = 14.0F;
 constexpr svanes::Color kHomeBarColor{
     .red = 255, .green = 255, .blue = 255, .alpha = 210};
 
-constexpr float kSwipeZoneHeight = 70.0F;
 constexpr float kSwipeSampleSeconds = 0.06F;
 constexpr float kCloseFraction = 0.75F;
 constexpr float kCloseLookaheadSeconds = 0.5F;
@@ -114,46 +112,6 @@ constexpr svanes::Color kHintColor{.red = 232, .green = 226, .blue = 214};
 
 constexpr svanes::Color kBodyColor{.red = 20, .green = 20, .blue = 24};
 constexpr svanes::Color kCameraColor{.red = 6, .green = 6, .blue = 8};
-
-/**
- * Builds a rectangle with rounded corners, as a convex polygon with a few
- * points around each corner. The straight part of each side must be longer
- * than zero.
- *
- * @param width The full width.
- * @param height The full height.
- * @param radius The radius of each corner.
- * @param center Where the rectangle's center is.
- * @return The rounded rectangle.
- */
-svanes::ConvexPolygon2D RoundedRectangle(float width, float height,
-                                         float radius,
-                                         svanes::Vector2D center = {}) {
-    const float inner_x = width * 0.5F - radius;
-    const float inner_y = height * 0.5F - radius;
-    const float quarter_turn = std::numbers::pi_v<float> * 0.5F;
-    const std::array<svanes::Vector2D, 4> corner_centers{{
-        {inner_x, inner_y},
-        {-inner_x, inner_y},
-        {-inner_x, -inner_y},
-        {inner_x, -inner_y},
-    }};
-
-    std::vector<svanes::Vector2D> vertices;
-    for (std::size_t corner = 0; corner < corner_centers.size(); ++corner) {
-        for (std::int32_t step = 0; step <= kCornerSegments; ++step) {
-            const float angle =
-                quarter_turn * (static_cast<float>(corner) +
-                                static_cast<float>(step) /
-                                    static_cast<float>(kCornerSegments));
-            vertices.push_back(
-                {center.x + corner_centers[corner].x + radius * std::cos(angle),
-                 center.y + corner_centers[corner].y +
-                     radius * std::sin(angle)});
-        }
-    }
-    return svanes::ConvexPolygon2D{std::move(vertices)};
-}
 
 svanes::Entity CreatePart(svanes::Registry &world, svanes::Vector2D position,
                           svanes::SolidShape shape, std::int32_t z_order) {
@@ -232,6 +190,35 @@ svanes::Entity CreateStatusLabel(svanes::Registry &world, std::string text,
 
 } // namespace
 
+svanes::ConvexPolygon2D RoundedRectangle(float width, float height,
+                                         float radius,
+                                         svanes::Vector2D center) {
+    const float inner_x = width * 0.5F - radius;
+    const float inner_y = height * 0.5F - radius;
+    const float quarter_turn = std::numbers::pi_v<float> * 0.5F;
+    const std::array<svanes::Vector2D, 4> corner_centers{{
+        {inner_x, inner_y},
+        {-inner_x, inner_y},
+        {-inner_x, -inner_y},
+        {inner_x, -inner_y},
+    }};
+
+    std::vector<svanes::Vector2D> vertices;
+    for (std::size_t corner = 0; corner < corner_centers.size(); ++corner) {
+        for (std::int32_t step = 0; step <= kCornerSegments; ++step) {
+            const float angle =
+                quarter_turn * (static_cast<float>(corner) +
+                                static_cast<float>(step) /
+                                    static_cast<float>(kCornerSegments));
+            vertices.push_back(
+                {center.x + corner_centers[corner].x + radius * std::cos(angle),
+                 center.y + corner_centers[corner].y +
+                     radius * std::sin(angle)});
+        }
+    }
+    return svanes::ConvexPolygon2D{std::move(vertices)};
+}
+
 std::string FormatDollars(std::int64_t cents) {
     if (cents < 0) {
         throw std::invalid_argument("Phone cannot show a negative balance of " +
@@ -248,20 +235,20 @@ void Phone::Initialize(svanes::Registry &world, svanes::FontHandle hint_font,
                            .geometry = RoundedRectangle(kBodyWidth, kBodyHeight,
                                                         kBodyCornerRadius)},
         kBodyZ));
-    parts.push_back(
-        CreatePart(world, position,
-                   svanes::SolidShape{
-                       .color = kWallpaperTop,
-                       .geometry = RoundedRectangle(kScreenWidth, kScreenHeight,
-                                                    kScreenCornerRadius)},
-                   kScreenZ));
+    parts.push_back(CreatePart(
+        world, position,
+        svanes::SolidShape{.color = kWallpaperTop,
+                           .geometry =
+                               RoundedRectangle(kScreenWidth, kScreenHeight,
+                                                Phone::kScreenCornerRadius)},
+        kScreenZ));
     CreateWallpaper(world);
     CreateIcons(world, status_font);
     app_cover = CreatePart(world, position,
                            svanes::SolidShape{.color = {.alpha = 0},
                                               .geometry = RoundedRectangle(
                                                   kScreenWidth, kScreenHeight,
-                                                  kScreenCornerRadius)},
+                                                  Phone::kScreenCornerRadius)},
                            kAppCoverZ);
     parts.push_back(app_cover);
     parts.push_back(CreatePart(
@@ -300,19 +287,21 @@ void Phone::Initialize(svanes::Registry &world, svanes::FontHandle hint_font,
 }
 
 void Phone::CreateWallpaper(svanes::Registry &world) {
-    const float cap_height = kScreenCornerRadius * 2.0F + kWallpaperCapExtra;
+    const float cap_height =
+        Phone::kScreenCornerRadius * 2.0F + kWallpaperCapExtra;
     parts.push_back(
         CreatePart(world, position,
                    svanes::SolidShape{
                        .color = kWallpaperBottom,
                        .geometry = RoundedRectangle(
-                           kScreenWidth, cap_height, kScreenCornerRadius,
+                           kScreenWidth, cap_height, Phone::kScreenCornerRadius,
                            {0.0F, kScreenHeight * 0.5F - cap_height * 0.5F})},
                    kWallpaperCapZ));
 
-    const float top = -kScreenHeight * 0.5F + kScreenCornerRadius;
-    const float band_height = (kScreenHeight - kScreenCornerRadius * 2.0F) /
-                              static_cast<float>(kWallpaperBandCount);
+    const float top = -kScreenHeight * 0.5F + Phone::kScreenCornerRadius;
+    const float band_height =
+        (kScreenHeight - Phone::kScreenCornerRadius * 2.0F) /
+        static_cast<float>(kWallpaperBandCount);
     for (std::int32_t band = 0; band < kWallpaperBandCount; ++band) {
         const float amount = (static_cast<float>(band) + 0.5F) /
                              static_cast<float>(kWallpaperBandCount);
@@ -437,7 +426,7 @@ void Phone::TrackSwipe(const svanes::InputManager &input) {
     const svanes::Rectangle2D screen = ScreenRectangle();
     const float bottom = screen.y + screen.height * 0.5F;
     if (std::abs(mouse.x - screen.x) <= screen.width * 0.5F &&
-        mouse.y <= bottom && mouse.y >= bottom - kSwipeZoneHeight) {
+        mouse.y <= bottom && mouse.y >= bottom - Phone::kHomeSwipeHeight) {
         app_motion = AppMotion::Dragging;
         swipe_start_y = mouse.y;
         swipe_samples = {{.seconds = elapsed, .y = mouse.y}};
@@ -515,7 +504,7 @@ void Phone::ShowScreen(svanes::Registry &world) {
     cover.color = app.color;
     cover.geometry = RoundedRectangle(
         app_area.width, app_area.height,
-        std::lerp(kIconCornerRadius, kScreenCornerRadius, amount),
+        std::lerp(kIconCornerRadius, Phone::kScreenCornerRadius, amount),
         {app_area.x, app_area.y});
     app_area.x += position.x;
     app_area.y += position.y;

@@ -2,6 +2,7 @@
 
 #include <svanes/MenuUtilities/font_manager.hpp>
 #include <svanes/entity.hpp>
+#include <svanes/geometry/convex_polygon_geometry.hpp>
 #include <svanes/geometry/rectangle_geometry.hpp>
 #include <svanes/input/input_manager.hpp>
 #include <svanes/registry.hpp>
@@ -23,6 +24,20 @@ namespace grindset {
  * @throws std::invalid_argument if the amount is negative.
  */
 std::string FormatDollars(std::int64_t cents);
+
+/**
+ * Builds a rectangle with rounded corners, as a convex polygon with a few
+ * points around each corner. The straight part of each side must be longer
+ * than zero.
+ * @param width The full width.
+ * @param height The full height.
+ * @param radius The radius of each corner.
+ * @param center Where the rectangle's center is.
+ * @return The rounded rectangle.
+ */
+svanes::ConvexPolygon2D RoundedRectangle(float width, float height,
+                                         float radius,
+                                         svanes::Vector2D center = {});
 
 /**
  * The phone held up on the right side of the view. It is a dark body with
@@ -74,6 +89,17 @@ public:
      * below the home bar and the status bar.
      */
     static constexpr std::int32_t kAppZ = 110;
+
+    /**
+     * The radius of each of the screen's rounded corners.
+     */
+    static constexpr float kScreenCornerRadius = 36.0F;
+
+    /**
+     * How far up from the bottom of the screen a swipe to close an open app
+     * can start. Apps leave this strip alone.
+     */
+    static constexpr float kHomeSwipeHeight = 70.0F;
 
     /**
      * Creates the body, the screen with its wallpaper and app icons, the
