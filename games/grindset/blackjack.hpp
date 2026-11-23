@@ -190,32 +190,35 @@ enum class Seat : std::uint8_t {
 };
 
 /**
- * How a finished round turned out for the player.
+ * How one of the player's hands turned out.
  *
  * VALUES:
- * - Blackjack: The player had a blackjack and the dealer did not; pays 3:2.
+ * - Blackjack: The hand was a blackjack and the dealer's was not; pays 3:2.
+ * - Win: The hand beat the dealer, or the dealer bust; pays 1:1.
  * - Push: A tie; the bet is returned.
- * - Lose: The player lost the bet.
+ * - Lose: The hand lost its bet.
  */
 enum class Outcome : std::uint8_t {
     Blackjack,
+    Win,
     Push,
     Lose,
 };
 
 /**
- * A bet being placed, starting a round. Raised by the round, and handled by
- * whatever takes the bet from the player's balance.
+ * Money being bet: the first bet of a round, or the extra bet for doubling
+ * down or splitting. Raised by the round, and handled by whatever takes the
+ * money from the player's balance.
  *
  * FIELDS:
- * - bet_cents: The bet, in cents.
+ * - bet_cents: The money bet, in cents.
  */
 class BetPlacedEvent final : public svanes::EventOf<BetPlacedEvent> {
 public:
     static constexpr std::string_view EventName = "blackjack.bet_placed";
 
     /**
-     * @param bet_cents The bet, in cents.
+     * @param bet_cents The money bet, in cents.
      */
     explicit BetPlacedEvent(std::int64_t bet_cents);
 
@@ -237,6 +240,8 @@ public:
  *
  * FIELDS:
  * - seat: Who the card is dealt to.
+ * - hand_index: Which of the player's hands the card goes to, from 0. Always
+ * 0 for the dealer.
  * - card: The card.
  * - face_up: Whether the card is dealt face up. Only the dealer's hole card
  * is dealt face down.
@@ -247,12 +252,14 @@ public:
 
     /**
      * @param seat Who the card is dealt to.
+     * @param hand_index Which of the player's hands the card goes to.
      * @param card The card.
      * @param face_up Whether the card is dealt face up.
      */
-    CardDealtEvent(Seat seat, Card card, bool face_up);
+    CardDealtEvent(Seat seat, std::size_t hand_index, Card card, bool face_up);
 
     Seat seat;
+    std::size_t hand_index;
     Card card;
     bool face_up;
 };
@@ -297,41 +304,147 @@ public:
 };
 
 /**
- * The player's turn starting, after the deal when neither side has a
- * blackjack. Raised by the round.
+ * One of the player's hands becoming the one to act on. Raised by the round.
+ *
+ * FIELDS:
+ * - hand_index: Which of the player's hands is being played, from 0.
  */
 class PlayerTurnEvent final : public svanes::EventOf<PlayerTurnEvent> {
 public:
     static constexpr std::string_view EventName = "blackjack.player_turn";
+
+    /**
+     * @param hand_index Which of the player's hands is being played.
+     */
+    explicit PlayerTurnEvent(std::size_t hand_index);
+
+    std::size_t hand_index;
 };
 
 /**
- * A round finishing. Raised by the round, and handled by whatever gives the
- * payout to the player's balance and whatever shows the result.
+ * The player doubling down on a hand: its bet doubles, and it gets exactly one
+ * more card. Raised by the round.
  *
  * FIELDS:
- * - outcome: How the round turned out for the player.
- * - payout_cents: How much is given back to the player, in cents, including
- * the bet itself. 0 when the player loses.
+ * - hand_index: Which of the player's hands was doubled, from 0.
+ */
+class HandDoubledEvent final : public svanes::EventOf<HandDoubledEvent> {
+public:
+    static constexpr std::string_view EventName = "blackjack.hand_doubled";
+
+    /**
+     * @param hand_index Which of the player's hands was doubled.
+     */
+    explicit HandDoubledEvent(std::size_t hand_index);
+
+    std::size_t hand_index;
+};
+
+/**
+ * The player splitting a pair into two hands, each with one of the pair and
+ * its own bet: hand 0 keeps the first card of the pair and hand 1 the second.
+ * Raised by the round, before the new hands are dealt to.
+ */
+class HandSplitEvent final : public svanes::EventOf<HandSplitEvent> {
+public:
+    static constexpr std::string_view EventName = "blackjack.hand_split";
+};
+
+/**
+ * A hand going over 21. Raised by the round.
+ *
+ * FIELDS:
+ * - seat: Whose hand bust.
+ * - hand_index: Which of the player's hands bust, from 0. Always 0 for the
+ * dealer.
+ */
+class HandBustEvent final : public svanes::EventOf<HandBustEvent> {
+public:
+    static constexpr std::string_view EventName = "blackjack.hand_bust";
+
+    /**
+     * @param seat Whose hand bust.
+     * @param hand_index Which of the player's hands bust.
+     */
+    HandBustEvent(Seat seat, std::size_t hand_index);
+
+    Seat seat;
+    std::size_t hand_index;
+};
+
+/**
+ * The dealer stopping drawing without going over 21. Raised by the round.
+ *
+ * FIELDS:
+ * - total: The dealer's final total.
+ */
+class DealerStoodEvent final : public svanes::EventOf<DealerStoodEvent> {
+public:
+    static constexpr std::string_view EventName = "blackjack.dealer_stood";
+
+    /**
+     * @param total The dealer's final total.
+     */
+    explicit DealerStoodEvent(std::int32_t total);
+
+    std::int32_t total;
+};
+
+/**
+ * One of the player's hands being settled against the dealer. Raised by the
+ * round, once for each hand, before the round finishes.
+ *
+ * FIELDS:
+ * - hand_index: Which of the player's hands was settled, from 0.
+ * - outcome: How the hand turned out.
+ * - payout_cents: How much the hand gives back to the player, in cents,
+ * including its bet. 0 when the hand loses.
+ */
+class HandSettledEvent final : public svanes::EventOf<HandSettledEvent> {
+public:
+    static constexpr std::string_view EventName = "blackjack.hand_settled";
+
+    /**
+     * @param hand_index Which of the player's hands was settled.
+     * @param outcome How the hand turned out.
+     * @param payout_cents How much the hand gives back, in cents.
+     */
+    HandSettledEvent(std::size_t hand_index, Outcome outcome,
+                     std::int64_t payout_cents);
+
+    std::size_t hand_index;
+    Outcome outcome;
+    std::int64_t payout_cents;
+};
+
+/**
+ * A round finishing, after every hand is settled. Raised by the round, and
+ * handled by whatever gives the payout to the player's balance.
+ *
+ * FIELDS:
+ * - payout_cents: How much all of the player's hands give back together, in
+ * cents, including their bets.
  */
 class RoundFinishedEvent final : public svanes::EventOf<RoundFinishedEvent> {
 public:
     static constexpr std::string_view EventName = "blackjack.round_finished";
 
     /**
-     * @param outcome How the round turned out for the player.
-     * @param payout_cents How much is given back to the player, in cents.
+     * @param payout_cents How much all of the player's hands give back.
      */
-    RoundFinishedEvent(Outcome outcome, std::int64_t payout_cents);
+    explicit RoundFinishedEvent(std::int64_t payout_cents);
 
-    Outcome outcome;
     std::int64_t payout_cents;
 };
 
 /**
  * One round of blackjack against the dealer, played with a shoe that lasts
- * across rounds. The round does not hold the player's money; it reports what
- * happens, including bets and payouts, as events.
+ * across rounds. The dealer hits soft 17 and peeks for a blackjack when
+ * showing an ace or a 10. The player may double down on any first two cards,
+ * including after a split, and may split one pair per round, including any two
+ * cards worth 10; split aces get one card each. The round does not hold the
+ * player's money; it reports what happens, including every bet and payout, as
+ * events.
  */
 class Round final {
 public:
@@ -354,13 +467,62 @@ public:
      */
     void PlaceBet(std::int64_t bet);
 
+    /**
+     * Deals the hand being played another card. If that takes it over 21 or
+     * to exactly 21, the hand is done and play moves on.
+     * @throws std::logic_error if it is not the player's turn.
+     */
+    void Hit();
+
+    /**
+     * Ends the hand being played. Once every hand is done, the dealer plays
+     * and the round is settled.
+     * @throws std::logic_error if it is not the player's turn.
+     */
+    void Stand();
+
+    /**
+     * Returns whether the hand being played can be doubled down on: it has
+     * only its first two cards, and the player can afford to match its bet.
+     * @param balance_cents The player's balance, in cents.
+     * @return True if the hand can be doubled.
+     */
+    bool CanDouble(std::int64_t balance_cents) const;
+
+    /**
+     * Doubles the bet on the hand being played, deals it exactly one more
+     * card, and ends it. The caller must already have checked CanDouble.
+     * @throws std::logic_error if it is not the player's turn or the hand has
+     * more than two cards.
+     */
+    void Double();
+
+    /**
+     * Returns whether the player can split: it is the first hand of the round,
+     * it holds only two cards of equal value, and the player can afford a
+     * second bet.
+     * @param balance_cents The player's balance, in cents.
+     * @return True if the hand can be split.
+     */
+    bool CanSplit(std::int64_t balance_cents) const;
+
+    /**
+     * Splits the pair into two hands with a bet each. Each hand is dealt its
+     * second card when it starts being played. Split aces are each dealt one
+     * card, and then the dealer plays. The caller must already have checked
+     * CanSplit.
+     * @throws std::logic_error if the hand cannot be split, ignoring the
+     * player's balance.
+     */
+    void Split();
+
 private:
     /**
      * Where the round is.
      *
      * VALUES:
      * - Betting: Waiting for the first bet.
-     * - PlayerTurn: Waiting for the player to act.
+     * - PlayerTurn: Waiting for the player to act on a hand.
      * - Finished: Over, and waiting for the next bet.
      */
     enum class Stage : std::uint8_t {
@@ -370,24 +532,87 @@ private:
     };
 
     /**
-     * Draws a card from the shoe into a hand and reports it.
-     * @param seat Who the card is dealt to.
-     * @param face_up Whether the card is dealt face up.
+     * One of the player's hands and the money bet on it.
+     *
+     * FIELDS:
+     * - hand: The hand's cards.
+     * - bet_cents: The money bet on the hand, in cents.
      */
-    void Deal(Seat seat, bool face_up);
+    struct PlayerHand {
+        Hand hand;
+        std::int64_t bet_cents;
+    };
 
     /**
-     * Ends the round: turns the hole card face up and reports the result.
-     * @param outcome How the round turned out for the player.
-     * @param payout_cents How much is given back to the player, in cents.
+     * Throws unless the player is acting on a hand.
+     * @param action The action being attempted, for the error message.
+     * @throws std::logic_error if it is not the player's turn.
      */
-    void Finish(Outcome outcome, std::int64_t payout_cents);
+    void RequirePlayerTurn(std::string_view action) const;
+
+    /**
+     * Returns whether the hand being played holds a pair that can be split,
+     * ignoring the player's balance.
+     * @return True if the rules allow splitting.
+     */
+    bool SplitAllowed() const;
+
+    /**
+     * Draws a card from the shoe into one of the player's hands and reports
+     * it.
+     * @param hand_index Which of the player's hands gets the card.
+     */
+    void DealPlayer(std::size_t hand_index);
+
+    /**
+     * Draws a card from the shoe into the dealer's hand and reports it.
+     * @param face_up Whether the card is dealt face up.
+     */
+    void DealDealer(bool face_up);
+
+    /**
+     * Ends the hand being played and moves on: the next hand is dealt its
+     * second card and starts, or once every hand is done, the dealer plays.
+     */
+    void EndHand();
+
+    /**
+     * Starts the hand being played, or ends it right away if it is already at
+     * 21.
+     */
+    void StartHand();
+
+    /**
+     * Turns the dealer's hole card face up, unless it already is.
+     */
+    void RevealHoleCard();
+
+    /**
+     * Plays the dealer's hand, unless every player hand bust, then settles
+     * every player hand and finishes the round.
+     */
+    void PlayDealer();
+
+    /**
+     * Finds how a player hand that was played out does against the dealer.
+     * @param player_hand The hand.
+     * @return How the hand turned out.
+     */
+    Outcome Judge(const PlayerHand &player_hand) const;
+
+    /**
+     * Settles every player hand with the outcome given for each, then finishes
+     * the round.
+     * @param outcomes How each of the player's hands turned out, in order.
+     */
+    void Finish(const std::vector<Outcome> &outcomes);
 
     svanes::EventManager &events;
     Shoe shoe;
-    Hand player;
+    std::vector<PlayerHand> hands;
+    std::size_t active = 0;
     Hand dealer;
-    std::int64_t bet_cents = 0;
+    bool hole_card_shown = false;
     Stage stage = Stage::Betting;
 };
 

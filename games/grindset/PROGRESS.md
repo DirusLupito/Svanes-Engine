@@ -33,13 +33,13 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [x] 4a.1 Card + 6-deck shoe with ~75% reshuffle point
 - [x] 4a.2 Hand value: soft/hard, blackjack, bust
 - [x] 4a.3 Round start: bet, deal, hole-card peek, naturals pay 3:2 (reported as events)
-- [ ] 4a.4 Hit, stand, dealer hits soft 17, settle — **NEXT, awaiting approval**
-- [ ] 4a.5 Double (with affordability)
-- [ ] 4a.6 Split: one max, any 10-values, split aces one card, 21 after split pays 1:1
-- [ ] 4a.7 Remaining round events not yet added (folded in from the old announcement queue)
+- [x] 4a.4 Hit, stand, dealer hits soft 17, settle
+- [x] 4a.5 Double (with affordability)
+- [x] 4a.6 Split: one max, any 10-values, split aces one card, 21 after split pays 1:1
+- [x] 4a.7 Remaining round events (bust, dealer stood, hand doubled/split/settled)
 
 ## Phase 4b: Casino app UI
-- [ ] 4b.1 Stream view layout: placeholder dealer behind a table
+- [ ] 4b.1 Stream view layout: placeholder dealer behind a table — **NEXT, awaiting approval**
 - [ ] 4b.2 Card drawing, face up / face down
 - [ ] 4b.3 Chips, bet display, Clear / All in / Deal, debit through `Grindset`
 - [ ] 4b.4 Hit / Stand / Double / Split buttons with enabled state
@@ -69,8 +69,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [ ] 6.5 Dealer banter + chat-reply captions
 
 ## Where we left off
-All work through 4a.2 is committed (last: `blackjack hand totals, soft hands, busts, and blackjacks`).
-4a.3 done (uncommitted). Next up is 4a.4, proposed but not yet approved.
+All work through 4a.3 is committed (last: `start blackjack rounds with dealing, dealer peek, and naturals`).
+4a.4-4a.7 done together (uncommitted, rules only). Next up is 4b.1, proposed but not yet approved.
 
 ## Deviations from plan
 - Emoji check dropped from 2.4 (Erik); revisit when reels need emoji (5.10), with the PNG or no-emoji fallback still open.
@@ -122,3 +122,9 @@ All work through 4a.2 is committed (last: `blackjack hand totals, soft hands, bu
 - Rounds report through engine events (triggered immediately) instead of an
   announcement queue (Erik); 4a.7 shrinks to whatever events are still missing.
   `Grindset` will debit/credit from bet-placed / round-finished events.
+- 4a.4-4a.7 built in one go (Erik, no visuals to check). The round keeps a list
+  of player hands from the start so splitting needs no rework. Money events:
+  every bet (first, double, split) is a `BetPlacedEvent`; `RoundFinishedEvent`
+  carries the total payout, with per-hand `HandSettledEvent`s for captions.
+  Auto-stand on 21. A hand is dealt its second card after a split when it
+  starts being played; split aces get one card each, then the dealer plays.
