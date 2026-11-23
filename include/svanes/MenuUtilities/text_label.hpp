@@ -48,6 +48,8 @@ enum class TextAlignment : std::uint8_t {
  * - font: A handle to the font used for rendering the text.
  * - alignment: The horizontal and vertical alignment relative to position.
  * - visible: A flag indicating whether the label should be rendered.
+ * - wrap_width: The width in pixels at which long lines wrap onto the next
+ *   line, or 0 to break lines only at newlines. Must not be negative.
  */
 struct TextLabel {
     std::string text;
@@ -56,6 +58,7 @@ struct TextLabel {
     FontHandle font{};
     TextAlignment alignment = TextAlignment::TopLeft;
     bool visible = true;
+    std::int32_t wrap_width = 0;
 };
 
 } // namespace svanes

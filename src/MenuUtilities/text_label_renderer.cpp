@@ -13,6 +13,7 @@
 #include <memory>
 #include <optional>
 #include <stdexcept>
+#include <string>
 #include <utility>
 
 namespace svanes::internal {
@@ -30,10 +31,18 @@ TextLabelRenderer::Prepare(Entity entity, const TextLabel &label) {
         const auto &cached = found->second;
 
         // Sure we found the label according to the entity, but is it the same
-        // label? If the text or font has changed, we need to redo it.
-        if (cached.text == label.text && cached.font.id == label.font.id) {
+        // label? If the text, font, or wrap width has changed, we need to redo
+        // it.
+        if (cached.text == label.text && cached.font.id == label.font.id &&
+            cached.wrap_width == label.wrap_width) {
             return cached;
         }
+    }
+
+    if (label.wrap_width < 0) {
+        throw std::invalid_argument("Text label wrap width must not be "
+                                    "negative, but was " +
+                                    std::to_string(label.wrap_width) + ".");
     }
 
     // We use white text because we can tint it to any color we want when
@@ -47,7 +56,7 @@ TextLabelRenderer::Prepare(Entity entity, const TextLabel &label) {
     std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> surface{
         TTF_RenderText_Blended_Wrapped(
             FontManagerInternal::Resolve(fonts, label.font), label.text.c_str(),
-            label.text.size(), color, 0),
+            label.text.size(), color, label.wrap_width),
         SDL_DestroySurface};
 
     if (!surface) {
@@ -56,10 +65,13 @@ TextLabelRenderer::Prepare(Entity entity, const TextLabel &label) {
     }
 
     CachedLabel replacementOrNewLabel{
-        label.text, label.font,
+        label.text,
+        label.font,
+        label.wrap_width,
         OwnedTexture{textures, TextureManagerInternal::CreateFromSurface(
                                    textures, surface.get())},
-        surface->w, surface->h};
+        surface->w,
+        surface->h};
 
     return labels.insert_or_assign(entity, std::move(replacementOrNewLabel))
         .first->second;
