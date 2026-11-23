@@ -197,7 +197,8 @@ void CarInterior::Initialize(svanes::Registry &world) {
     CreateMirror(world, parts);
 }
 
-void CarInterior::Update(svanes::Registry &world, float road_bob) {
+void CarInterior::Update(svanes::Registry &world, float road_bob,
+                         float steering) {
     for (const svanes::Entity entity : parts) {
         world.GetComponent<svanes::Transform>(entity).y = road_bob * kBobShare;
     }
