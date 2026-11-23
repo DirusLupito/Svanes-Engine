@@ -50,13 +50,31 @@ constexpr std::int32_t kWallpaperCapZ = 102;
 constexpr std::int32_t kWallpaperBandZ = 103;
 constexpr std::int32_t kIconZ = 104;
 constexpr std::int32_t kAppCoverZ = 105;
-constexpr std::int32_t kCameraZ = 106;
-constexpr std::int32_t kHintZ = 107;
-constexpr std::int32_t kStatusZ = 107;
+constexpr std::int32_t kHomeBarZ = 106;
+constexpr std::int32_t kCameraZ = 107;
+constexpr std::int32_t kHintZ = 108;
+constexpr std::int32_t kStatusZ = 108;
 
 constexpr float kAppGrowSeconds = 0.3F;
 constexpr float kAppFadeSeconds = 0.25F;
 constexpr svanes::Color kAppTitleColor{.red = 250, .green = 250, .blue = 252};
+constexpr float kAppTitleShownAbove = 0.8F;
+
+constexpr float kHomeBarWidth = 134.0F;
+constexpr float kHomeBarHeight = 7.0F;
+constexpr float kHomeBarRadius = 3.0F;
+constexpr float kHomeBarFromBottom = 14.0F;
+constexpr svanes::Color kHomeBarColor{
+    .red = 255, .green = 255, .blue = 255, .alpha = 210};
+
+constexpr float kSwipeZoneHeight = 70.0F;
+constexpr float kSwipeSampleSeconds = 0.06F;
+constexpr float kCloseFraction = 0.75F;
+constexpr float kCloseLookaheadSeconds = 0.5F;
+constexpr float kSpringStiffness = 300.0F;
+constexpr float kSpringDamping = 35.0F;
+constexpr float kSpringRestDistance = 0.001F;
+constexpr float kSpringRestSpeed = 0.01F;
 
 constexpr std::int32_t kWallpaperBandCount = 40;
 constexpr float kWallpaperCapExtra = 20.0F;
@@ -258,6 +276,16 @@ void Phone::Initialize(svanes::Registry &world, svanes::FontHandle large_font,
                               svanes::TextAlignment::TopLeft);
     balance = CreateStatusLabel(world, FormatDollars(0), status_font,
                                 svanes::TextAlignment::TopRight);
+    home_bar =
+        CreatePart(world, position,
+                   svanes::SolidShape{
+                       .color = {.alpha = 0},
+                       .geometry = RoundedRectangle(
+                           kHomeBarWidth, kHomeBarHeight, kHomeBarRadius,
+                           {0.0F, kScreenHeight * 0.5F - kHomeBarFromBottom})},
+                   kHomeBarZ);
+    parts.push_back(home_bar);
+
     app_title = world.CreateEntity();
     world.AddComponent<svanes::TextLabel>(
         app_title, svanes::TextLabel{.font = large_font,
@@ -341,9 +369,8 @@ void Phone::Update(svanes::Registry &world, const svanes::InputManager &input,
         FormatDollars(balance_cents);
 
     TrackClick(input);
-    if (open_app.has_value()) {
-        open_seconds += seconds;
-    }
+    TrackSwipe(input);
+    MoveApp(seconds);
     ShowScreen(world);
 }
 
@@ -353,6 +380,8 @@ void Phone::TrackClick(const svanes::InputManager &input) {
             IconUnderMouse(input) == pressed_icon) {
             open_app = pressed_icon;
             open_seconds = 0.0F;
+            app_motion = AppMotion::Opening;
+            app_amount = 0.0F;
         }
         pressed_icon.reset();
         return;
@@ -378,6 +407,86 @@ Phone::IconUnderMouse(const svanes::InputManager &input) const {
     return std::nullopt;
 }
 
+void Phone::TrackSwipe(const svanes::InputManager &input) {
+    if (!open_app.has_value()) {
+        return;
+    }
+    const svanes::Vector2D mouse = input.MousePosition();
+    if (app_motion == AppMotion::Dragging) {
+        swipe_samples.push_back({.seconds = elapsed, .y = mouse.y});
+        std::erase_if(swipe_samples, [this](const SwipeSample &sample) {
+            return sample.seconds < elapsed - kSwipeSampleSeconds;
+        });
+        const float dragged = std::max(swipe_start_y - mouse.y, 0.0F);
+        app_amount = 1.0F - std::min(dragged / kScreenHeight, 1.0F);
+        if (input.IsMouseButtonDown(svanes::MouseButton::Left)) {
+            return;
+        }
+
+        const SwipeSample &oldest = swipe_samples.front();
+        const SwipeSample &newest = swipe_samples.back();
+        const float sample_seconds = newest.seconds - oldest.seconds;
+        const float upward_speed = sample_seconds > 0.0F
+                                       ? (oldest.y - newest.y) / sample_seconds
+                                       : 0.0F;
+        const float reach = dragged + upward_speed * kCloseLookaheadSeconds;
+        app_target = reach >= kCloseFraction * kScreenHeight ? 0.0F : 1.0F;
+        app_speed = -upward_speed / kScreenHeight;
+        app_motion = AppMotion::Settling;
+        return;
+    }
+
+    if (app_motion != AppMotion::Open || slide != 1.0F ||
+        !input.WasMouseButtonPressed(svanes::MouseButton::Left)) {
+        return;
+    }
+    const svanes::Rectangle2D screen = ScreenRectangle();
+    const float bottom = screen.y + screen.height * 0.5F;
+    if (std::abs(mouse.x - screen.x) <= screen.width * 0.5F &&
+        mouse.y <= bottom && mouse.y >= bottom - kSwipeZoneHeight) {
+        app_motion = AppMotion::Dragging;
+        swipe_start_y = mouse.y;
+        swipe_samples = {{.seconds = elapsed, .y = mouse.y}};
+    }
+}
+
+void Phone::MoveApp(float seconds) {
+    if (!open_app.has_value()) {
+        return;
+    }
+    if (app_motion == AppMotion::Opening) {
+        open_seconds += seconds;
+        app_amount = SmoothStep(std::min(open_seconds / kAppGrowSeconds, 1.0F));
+        if (open_seconds >= kAppGrowSeconds + kAppFadeSeconds) {
+            app_motion = AppMotion::Open;
+        }
+        return;
+    }
+    if (app_motion != AppMotion::Settling) {
+        return;
+    }
+
+    const float pull = kSpringStiffness * (app_target - app_amount) -
+                       kSpringDamping * app_speed;
+    app_speed += pull * seconds;
+    app_amount += app_speed * seconds;
+    const bool passed_target =
+        app_target == 0.0F ? app_amount <= 0.0F : app_amount >= 1.0F;
+    const bool at_rest =
+        std::abs(app_target - app_amount) < kSpringRestDistance &&
+        std::abs(app_speed) < kSpringRestSpeed;
+    if (!passed_target && !at_rest) {
+        return;
+    }
+    app_amount = app_target;
+    app_speed = 0.0F;
+    if (app_target == 0.0F) {
+        open_app.reset();
+    } else {
+        app_motion = AppMotion::Open;
+    }
+}
+
 void Phone::ShowScreen(svanes::Registry &world) {
     for (std::size_t index = 0; index < icons.size(); ++index) {
         svanes::Color color = kAppIcons[index].color;
@@ -395,30 +504,41 @@ void Phone::ShowScreen(svanes::Registry &world) {
     svanes::SolidShape &cover =
         world.GetComponent<svanes::SolidShape>(app_cover);
     svanes::TextLabel &title = world.GetComponent<svanes::TextLabel>(app_title);
+    svanes::SolidShape &bar = world.GetComponent<svanes::SolidShape>(home_bar);
     if (!open_app.has_value()) {
         cover.color.alpha = 0;
+        bar.color.alpha = 0;
         title.visible = false;
         return;
     }
 
     const AppIcon &app = kAppIcons[*open_app];
-    const float grow =
-        SmoothStep(std::min(open_seconds / kAppGrowSeconds, 1.0F));
+    const float amount = std::clamp(app_amount, 0.0F, 1.0F);
     const svanes::Vector2D icon = IconCenter(*open_app);
     cover.color = app.color;
     cover.geometry = RoundedRectangle(
-        std::lerp(kIconSize, kScreenWidth, grow),
-        std::lerp(kIconSize, kScreenHeight, grow),
-        std::lerp(kIconCornerRadius, kScreenCornerRadius, grow),
-        {std::lerp(icon.x, 0.0F, grow), std::lerp(icon.y, 0.0F, grow)});
+        std::lerp(kIconSize, kScreenWidth, amount),
+        std::lerp(kIconSize, kScreenHeight, amount),
+        std::lerp(kIconCornerRadius, kScreenCornerRadius, amount),
+        {std::lerp(icon.x, 0.0F, amount), std::lerp(icon.y, 0.0F, amount)});
 
-    const float fade = std::clamp(
-        (open_seconds - kAppGrowSeconds) / kAppFadeSeconds, 0.0F, 1.0F);
+    const float opened =
+        app_motion == AppMotion::Opening
+            ? std::clamp((open_seconds - kAppGrowSeconds) / kAppFadeSeconds,
+                         0.0F, 1.0F)
+            : 1.0F;
+    const float shown = opened * std::clamp((amount - kAppTitleShownAbove) /
+                                                (1.0F - kAppTitleShownAbove),
+                                            0.0F, 1.0F);
     title.text = app.name;
     title.position = position;
     title.color = kAppTitleColor;
-    title.color.alpha = static_cast<std::uint8_t>(fade * 255.0F);
-    title.visible = fade > 0.0F;
+    title.color.alpha = static_cast<std::uint8_t>(shown * 255.0F);
+    title.visible = shown > 0.0F;
+
+    bar.color = kHomeBarColor;
+    bar.color.alpha = static_cast<std::uint8_t>(
+        static_cast<float>(kHomeBarColor.alpha) * opened);
 }
 
 void Phone::Place(svanes::Registry &world) {

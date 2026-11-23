@@ -21,8 +21,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [x] 2.4 Status bar (5:30am clock, balance)
 - [x] 2.5 Home screen wallpaper + two clickable app icons
 - [x] 2.6 App-open transition (rect grows from icon, content fades in) into placeholder apps
-- [ ] 2.7 Home bar returns to home screen — **NEXT, awaiting approval**
-- [ ] 2.8 Remember last app when pulled out again
+- [x] 2.7 Home bar: swipe up from the bottom to close an app
+- [ ] 2.8 Remember last app when pulled out again — **NEXT, awaiting approval**
 
 ## Phase 3: Engine changes (flagged)
 - [ ] 3.1 `ClipRect` component through the render queue, honored by shapes
@@ -69,8 +69,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [ ] 6.5 Dealer banter + chat-reply captions
 
 ## Where we left off
-All work through 2.5 is committed (last: `fixed up app spacing`).
-2.6 done (uncommitted). Next up is 2.7 (home bar), proposed but not yet approved.
+All work through 2.6 is committed (last: `open apps from the home screen`).
+2.7 done (uncommitted). Next up is 2.8, proposed but not yet approved.
 
 ## Deviations from plan
 - Emoji check dropped from 2.4 (Erik); revisit when reels need emoji (5.10), with the PNG or no-emoji fallback still open.
@@ -107,3 +107,8 @@ All work through 2.5 is committed (last: `fixed up app spacing`).
   in the app color is rebuilt each frame, growing (0.3s, smoothstep) from the
   icon to the screen with its corner radius; then the placeholder title fades
   in (0.25s). Icons are hidden by alpha 0 (shapes have no visible flag).
+- Going home is a swipe up from a 70px strip at the bottom of an open app (no
+  click, no button; Erik). The app follows the drag. On release: close if
+  dragged + speed x 0.5s >= 75% of screen height, else spring back; speed is
+  measured over the last 60ms of samples. A critically damped spring settles
+  it, starting at the release speed.

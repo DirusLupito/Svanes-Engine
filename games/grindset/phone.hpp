@@ -29,7 +29,10 @@ namespace grindset {
  * released over it: a shape in the icon's color grows from the icon to fill
  * the screen, then the app fades in. For now each app is a placeholder showing
  * its name. While an app is open the home screen is hidden, and the status bar
- * stays on top.
+ * stays on top. A home bar along the bottom of an open app shows where to
+ * swipe up to close it: the app follows the swipe, shrinking back toward its
+ * icon, and on release either closes or springs back to full screen depending
+ * on how far and how fast it was swiped.
  *
  * The phone is either held up or put away in the pocket, fully below the
  * bottom of the view, and eases between the two when toggled. It starts in the
@@ -69,8 +72,8 @@ public:
      * Moves the phone along its slide toward the pocket or the hand, shows
      * the hint only while the phone is all the way in the pocket, shows the
      * balance in the status bar, darkens an app icon while it is clicked, and
-     * opens and draws the app. Clicks only count while the phone is all the
-     * way up in the hand.
+     * opens, swipes, and draws the app. Clicks and swipes only start while the
+     * phone is all the way up in the hand.
      * @param world The world holding it.
      * @param input The mouse state, with positions matching world
      * coordinates.
@@ -88,6 +91,36 @@ public:
     svanes::Rectangle2D ScreenRectangle() const;
 
 private:
+    /**
+     * What the open app is doing.
+     *
+     * VALUES:
+     * - Opening: Growing out of its icon, then fading in.
+     * - Open: Filling the screen, waiting for a swipe.
+     * - Dragging: Following a swipe up from the bottom of the screen.
+     * - Settling: Springing to full screen or back into its icon after a
+     * swipe is released.
+     */
+    enum class AppMotion : std::uint8_t {
+        Opening,
+        Open,
+        Dragging,
+        Settling,
+    };
+
+    /**
+     * Where the mouse was at one moment of a swipe, used to measure how fast
+     * the swipe is moving.
+     *
+     * FIELDS:
+     * - seconds: When the position was recorded, as the phone's elapsed time.
+     * - y: The mouse's height on the screen.
+     */
+    struct SwipeSample {
+        float seconds;
+        float y;
+    };
+
     /**
      * Puts the phone where its slide currently has it, eased so it starts and
      * stops gently, plus as much of the hand's sway as the slide allows. The
@@ -129,8 +162,25 @@ private:
     IconUnderMouse(const svanes::InputManager &input) const;
 
     /**
+     * Starts, follows, and releases a swipe up from the bottom of an open
+     * app. On release, the app closes if the swipe would reach far enough up
+     * the screen soon at the speed it was moving, and springs back otherwise.
+     * @param input The mouse state, with positions matching world
+     * coordinates.
+     */
+    void TrackSwipe(const svanes::InputManager &input);
+
+    /**
+     * Moves the open app along its opening or its spring after a swipe, and
+     * closes it once it has sprung back into its icon.
+     * @param seconds The time since the previous update, in seconds.
+     */
+    void MoveApp(float seconds);
+
+    /**
      * Shows the home screen or the open app: hides the icons while an app is
-     * open, grows the app's shape from its icon, and fades the app in.
+     * open, sizes the app's shape between its icon and the full screen, and
+     * fades the app and its home bar in and out.
      * @param world The world holding them.
      */
     void ShowScreen(svanes::Registry &world);
@@ -144,8 +194,15 @@ private:
     std::optional<std::size_t> pressed_icon;
     std::optional<std::size_t> open_app;
     float open_seconds = 0.0F;
+    AppMotion app_motion = AppMotion::Opening;
+    float app_amount = 0.0F;
+    float app_speed = 0.0F;
+    float app_target = 1.0F;
+    float swipe_start_y = 0.0F;
+    std::vector<SwipeSample> swipe_samples;
     svanes::Entity app_cover{};
     svanes::Entity app_title{};
+    svanes::Entity home_bar{};
     svanes::Vector2D position{};
     float slide = 0.0F;
     float elapsed = 0.0F;
