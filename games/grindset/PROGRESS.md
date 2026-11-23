@@ -44,8 +44,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [x] 4b.3 Chips, bet display, Clear / All in / Deal, debit through `Grindset`
 - [x] 4b.4 Hit / Stand / Double / Split buttons with enabled state
 - [x] 4b.5 Dealer turn shown, payouts credited, next round
-- [ ] 4b.6 Captions from round events — **NEXT, awaiting approval**
-- [ ] 4b.7 Leaving mid-round freezes the round
+- [x] 4b.6 Captions from round events
+- [ ] 4b.7 Leaving mid-round freezes the round — **NEXT, awaiting approval**
 
 ## Phase 5: Reels
 - [ ] 5.1 Reel slots stacked inside the phone screen, clipped
@@ -69,8 +69,8 @@ One checkbox per commit (~100 lines each). See `DESIGN.md` for the spec.
 - [ ] 6.5 Dealer banter + chat-reply captions
 
 ## Where we left off
-All work through 4b.5 is committed (last: `keep hand results clear of the bet line`).
-Result banner done (uncommitted, 4b.5 polish). Next up is 4b.6 captions, approved (subtitle strip at stream bottom, 5s then quick fade).
+All work through the result banner is committed (last: `show the round's result as a banner across the table`).
+4b.6 done (uncommitted). Next up is 4b.7, proposed but not yet approved.
 
 ## Deviations from plan
 - Emoji check dropped from 2.4 (Erik); revisit when reels need emoji (5.10), with the PNG or no-emoji fallback still open.
@@ -148,3 +148,6 @@ Result banner done (uncommitted, 4b.5 polish). Next up is 4b.6 captions, approve
 - Round result is a big banner (28pt, dark translucent panel sized from the
   text length) between the dealer and player rows, with the net across all
   hands. Per-hand words under the hands only appear after a split.
+- Captions: every line said in one frame is joined into one caption (several
+  events fire per frame, e.g. the deal), wrapped to the stream width with
+  `wrap_width`, held 5s then faded over 0.3s. Lines live in code until Phase 6.

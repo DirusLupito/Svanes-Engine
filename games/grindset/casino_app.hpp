@@ -31,7 +31,9 @@ namespace grindset {
  * by side with a marker under the one being played. The app plays a blackjack
  * round and draws the cards as the round reports them, takes the dealer's
  * turn one card at a time, and shows the round's result in a banner across the
- * middle of the table until the next deal.
+ * middle of the table until the next deal. The dealer narrates the round in
+ * captions along the bottom of the stream, which fade out after a few seconds
+ * with nothing new to say.
  * Everything is laid out against the phone's screen, clipped to the area the
  * app currently covers, and faded in and out with the app.
  */
@@ -120,6 +122,27 @@ private:
         std::string text;
         svanes::Color color;
     };
+
+    /**
+     * Starts listening to the round to write the dealer's captions.
+     * @param events Where the round reports what happens.
+     */
+    void SubscribeCaptions(svanes::EventManager &events);
+
+    /**
+     * Adds a line to the caption being written this frame. Every line said
+     * during one frame is shown together as one caption.
+     * @param line The line.
+     */
+    void Say(const std::string &line);
+
+    /**
+     * Writes what the player's hand being played adds up to, such as "You
+     * have soft 17." or, after a split, "Hand 2: you have 12.".
+     * @param hand_index Which of the player's hands to describe.
+     * @return The line.
+     */
+    std::string PlayerTotalLine(std::size_t hand_index) const;
 
     /**
      * Writes how a hand turned out in one word, such as "Win" or "Bust".
@@ -220,6 +243,11 @@ private:
     svanes::Entity banner_panel{};
     svanes::Entity banner_label{};
     std::optional<Result> banner;
+    svanes::Entity caption_strip{};
+    svanes::Entity caption_label{};
+    std::string caption;
+    std::string pending_caption;
+    float caption_seconds = 0.0F;
     std::optional<std::size_t> pressed_button;
     svanes::FontHandle font{};
 

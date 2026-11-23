@@ -5,6 +5,7 @@
 #include <svanes/geometry/primitive_geometry.hpp>
 #include <svanes/render/render_system.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <memory>
@@ -54,6 +55,7 @@ constexpr std::int32_t kDealerHeadZ = Phone::kAppZ + 3;
 constexpr std::int32_t kTableZ = Phone::kAppZ + 4;
 constexpr std::int32_t kRailZ = Phone::kAppZ + 5;
 constexpr std::int32_t kBadgeZ = Phone::kAppZ + 6;
+constexpr std::int32_t kCaptionZ = Phone::kAppZ + 6;
 constexpr std::int32_t kControlZ = Phone::kAppZ + 7;
 constexpr std::int32_t kCardZ = Phone::kAppZ + 8;
 constexpr std::int32_t kBannerZ = Phone::kAppZ + 90;
@@ -75,6 +77,13 @@ constexpr svanes::Color kRedSuitColor{.red = 200, .green = 30, .blue = 40};
 constexpr float kDisabledShade = 0.45F;
 constexpr float kDealerStepSeconds = 0.6F;
 constexpr float kResultGap = 4.0F;
+constexpr float kCaptionFromStreamBottom = 34.0F;
+constexpr float kCaptionHeight = 52.0F;
+constexpr float kCaptionInset = 12.0F;
+constexpr float kCaptionHoldSeconds = 5.0F;
+constexpr float kCaptionFadeSeconds = 0.3F;
+constexpr svanes::Color kCaptionStripColor{
+    .red = 0, .green = 0, .blue = 0, .alpha = 150};
 constexpr float kBannerFromTop = 483.0F;
 constexpr float kBannerHeight = 44.0F;
 constexpr float kBannerCharWidth = 16.0F;
@@ -319,6 +328,55 @@ bool IsRed(blackjack::Suit suit) {
 }
 
 /**
+ * Writes a card the way the dealer says it, with its article, such as "an
+ * Ace", "a King", or "an 8".
+ *
+ * @param card The card.
+ * @return The card as spoken.
+ */
+std::string CardPhrase(blackjack::Card card) {
+    switch (card.rank) {
+    case blackjack::Rank::Ace:
+        return "an Ace";
+    case blackjack::Rank::Jack:
+        return "a Jack";
+    case blackjack::Rank::Queen:
+        return "a Queen";
+    case blackjack::Rank::King:
+        return "a King";
+    case blackjack::Rank::Eight:
+        return "an 8";
+    default:
+        return "a " + std::to_string(blackjack::CardValue(card));
+    }
+}
+
+/**
+ * Writes a total the way the dealer says it, such as "17" or "soft 17".
+ *
+ * @param hand The hand.
+ * @return The total as spoken.
+ */
+std::string TotalPhrase(const blackjack::Hand &hand) {
+    const std::string total = std::to_string(hand.Total());
+    return hand.IsSoft() && hand.Total() < 21 ? "soft " + total : total;
+}
+
+/**
+ * Finds the cards on the table as a hand, to add them up.
+ *
+ * @param cards The cards.
+ * @return The cards as a hand.
+ */
+template <typename Cards> blackjack::Hand HandOf(const Cards &cards) {
+    blackjack::Hand hand;
+    for (const auto &view : cards) {
+        hand.Add(view.card);
+    }
+    return hand;
+}
+
+/**
  * Finds where a control's center is on the phone's screen.
  *
  * @param spec The control.
@@ -420,6 +478,108 @@ svanes::Entity CreateLabel(svanes::Registry &world, std::string text,
 }
 
 } // namespace
+
+void CasinoApp::Say(const std::string &line) {
+    if (!pending_caption.empty()) {
+        pending_caption += ' ';
+    }
+    pending_caption += line;
+}
+
+std::string CasinoApp::PlayerTotalLine(std::size_t hand_index) const {
+    const std::string total = TotalPhrase(HandOf(player_hands.at(hand_index)));
+    if (player_hands.size() > 1) {
+        return "Hand " + std::to_string(hand_index + 1) + ": you have " +
+               total + ".";
+    }
+    return "You have " + total + ".";
+}
+
+void CasinoApp::SubscribeCaptions(svanes::EventManager &events) {
+    events.Subscribe(
+        std::make_unique<
+            svanes::EventHandlerWrapper<blackjack::ShoeReshuffledEvent>>(
+            [this](const blackjack::ShoeReshuffledEvent &) {
+                Say("Shuffling the shoe.");
+            }));
+    events.Subscribe(std::make_unique<
+                     svanes::EventHandlerWrapper<blackjack::CardDealtEvent>>(
+        [this](const blackjack::CardDealtEvent &event) {
+            if (event.seat == blackjack::Seat::Dealer) {
+                if (!event.face_up) {
+                    return;
+                }
+                if (dealer_cards.size() == 1) {
+                    Say("Dealer shows " + CardPhrase(event.card) + ".");
+                    return;
+                }
+                Say("Dealer draws " + CardPhrase(event.card) + ".");
+                const blackjack::Hand dealer = HandOf(dealer_cards);
+                if (!dealer.IsBust()) {
+                    Say("Dealer has " + TotalPhrase(dealer) + ".");
+                }
+                return;
+            }
+            const auto &hand = player_hands.at(event.hand_index);
+            if (hand.size() < 3) {
+                return;
+            }
+            Say("You draw " + CardPhrase(event.card) + ".");
+            if (!HandOf(hand).IsBust()) {
+                Say(PlayerTotalLine(event.hand_index));
+            }
+        }));
+    events.Subscribe(std::make_unique<
+                     svanes::EventHandlerWrapper<blackjack::DealerPeekedEvent>>(
+        [this](const blackjack::DealerPeekedEvent &event) {
+            Say(event.has_blackjack ? "Dealer has blackjack."
+                                    : "No blackjack.");
+        }));
+    events.Subscribe(
+        std::make_unique<
+            svanes::EventHandlerWrapper<blackjack::HoleCardRevealedEvent>>(
+            [this](const blackjack::HoleCardRevealedEvent &event) {
+                Say("Dealer turns over " + CardPhrase(event.card) +
+                    ". Dealer has " + TotalPhrase(HandOf(dealer_cards)) + ".");
+            }));
+    events.Subscribe(std::make_unique<
+                     svanes::EventHandlerWrapper<blackjack::PlayerTurnEvent>>(
+        [this](const blackjack::PlayerTurnEvent &event) {
+            Say(PlayerTotalLine(event.hand_index));
+        }));
+    events.Subscribe(std::make_unique<
+                     svanes::EventHandlerWrapper<blackjack::HandDoubledEvent>>(
+        [this](const blackjack::HandDoubledEvent &) {
+            Say("Doubling down.");
+        }));
+    events.Subscribe(std::make_unique<
+                     svanes::EventHandlerWrapper<blackjack::HandSplitEvent>>(
+        [this](const blackjack::HandSplitEvent &) { Say("Splitting."); }));
+    events.Subscribe(
+        std::make_unique<svanes::EventHandlerWrapper<blackjack::HandBustEvent>>(
+            [this](const blackjack::HandBustEvent &event) {
+                if (event.seat == blackjack::Seat::Dealer) {
+                    Say("Dealer busts!");
+                } else if (player_hands.size() > 1) {
+                    Say("Hand " + std::to_string(event.hand_index + 1) +
+                        " busts.");
+                } else {
+                    Say("Bust!");
+                }
+            }));
+    events.Subscribe(std::make_unique<
+                     svanes::EventHandlerWrapper<blackjack::DealerStoodEvent>>(
+        [this](const blackjack::DealerStoodEvent &event) {
+            Say("Dealer stands on " + std::to_string(event.total) + ".");
+        }));
+    events.Subscribe(std::make_unique<
+                     svanes::EventHandlerWrapper<blackjack::HandSettledEvent>>(
+        [this](const blackjack::HandSettledEvent &event) {
+            if (event.outcome == blackjack::Outcome::Blackjack) {
+                Say("Blackjack! Pays 3 to 2.");
+            }
+        }));
+}
 
 CasinoApp::Result CasinoApp::HandResult(blackjack::Outcome outcome, bool bust) {
     switch (outcome) {
@@ -532,6 +692,15 @@ void CasinoApp::Initialize(svanes::Registry &world,
                                  svanes::TextAlignment::Center, kControlZ)};
     }
 
+    caption_strip = CreateShape(
+        world,
+        svanes::Rectangle2D{.width = screen.width - kCaptionInset * 2.0F,
+                            .height = kCaptionHeight},
+        kCaptionZ);
+    caption_label =
+        CreateLabel(world, "", font, svanes::TextAlignment::Center, kCaptionZ);
+    world.GetComponent<svanes::TextLabel>(caption_label).wrap_width =
+        static_cast<std::int32_t>(screen.width - kCaptionInset * 4.0F);
     banner_panel = CreateShape(
         world, svanes::Rectangle2D{.height = kBannerHeight}, kBannerZ);
     banner_label = CreateLabel(world, "", large_font,
@@ -618,6 +787,7 @@ void CasinoApp::Initialize(svanes::Registry &world,
                 banner = RoundResult(event.payout_cents);
                 in_play = false;
             }));
+    SubscribeCaptions(events);
 }
 
 CasinoApp::CardView CasinoApp::CreateCard(svanes::Registry &world,
@@ -799,6 +969,27 @@ void CasinoApp::Update(svanes::Registry &world,
     } else {
         pressed_button.reset();
     }
+
+    if (!pending_caption.empty()) {
+        caption = std::move(pending_caption);
+        pending_caption.clear();
+        caption_seconds = 0.0F;
+    } else {
+        caption_seconds += seconds;
+    }
+    const float caption_fade =
+        caption.empty()
+            ? 0.0F
+            : std::clamp(1.0F - (caption_seconds - kCaptionHoldSeconds) /
+                                    kCaptionFadeSeconds,
+                         0.0F, 1.0F);
+    const svanes::Vector2D caption_center{
+        screen.x, top + kStreamTop + kStreamHeight - kCaptionFromStreamBottom};
+    world.GetComponent<svanes::TextLabel>(caption_label).text = caption;
+    PlaceShape(world, caption_strip, caption_center, kCaptionStripColor, area,
+               shown * caption_fade);
+    PlaceLabel(world, caption_label, caption_center, kWhite, area,
+               shown * caption_fade);
 
     for (const Part &part : parts) {
         PlaceShape(world, part.entity, {screen.x, screen.y}, part.color, area,
