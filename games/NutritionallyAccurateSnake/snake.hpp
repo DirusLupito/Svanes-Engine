@@ -3,6 +3,7 @@
 #include <svanes/game.hpp>
 #include <svanes/geometry/rectangle_geometry.hpp>
 #include <svanes/memory/object_pool.hpp>
+#include <svanes/render/basic_render_types.hpp>
 
 #include <array>
 #include <cstdint>
@@ -17,10 +18,10 @@ class CollisionEvent;
 namespace nutritionally_accurate_snake {
 
 enum class PelletType : std::uint8_t {
-    Orange,
-    Red,
-    LightBlue,
-    DarkBlue,
+    Pizza,
+    Burger,
+    Apple,
+    Carrot,
 };
 
 class SnakeHead final {
@@ -57,6 +58,12 @@ public:
     svanes::TicCount GetFrameIntervalTics() const override;
 
 private:
+    struct PelletDefinition {
+        std::uint32_t base_score = 0;
+        svanes::TextureHandle texture{};
+    };
+
+    void LoadFoodDefinitions(svanes::GameContext &context);
     void ResetSnake(svanes::Registry &world);
     void UpdateBody(svanes::Registry &world);
     void InitializeEdges(svanes::GameContext &context);
@@ -71,6 +78,7 @@ private:
     std::vector<svanes::ObjectPool<SnakeBody>::Pointer> body;
     std::deque<svanes::Vector2D> path;
     std::vector<svanes::Entity> pellets;
+    std::array<PelletDefinition, 4> pellet_definitions{};
     svanes::Rectangle2D food_spawn_area{};
     svanes::TicCount food_spawn_tics = 0;
     svanes::TicCount death_animation_tics = 0;

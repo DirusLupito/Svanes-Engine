@@ -1,0 +1,5 @@
+type,base_score,sprite_path
+pizza,25,sprites/pizza.png
+burger,25,sprites/burger.png
+apple,10,sprites/apple.png
+carrot,10,sprites/carrot.png

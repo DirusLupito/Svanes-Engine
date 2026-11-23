@@ -13,13 +13,18 @@
 #include <svanes/kinematic_system.hpp>
 #include <svanes/registry.hpp>
 #include <svanes/render/render_system.hpp>
+#include <svanes/render/texture_manager.hpp>
 
 #include <algorithm>
+#include <charconv>
 #include <cmath>
+#include <fstream>
 #include <memory>
 #include <numbers>
+#include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace nutritionally_accurate_snake {
@@ -33,6 +38,7 @@ constexpr float kBodySpacing = 19.2F;
 constexpr std::size_t kInitialBodyCount = 3;
 constexpr std::size_t kNeckSegmentCount = 2;
 constexpr float kFoodRadius = 18.0F;
+constexpr float kFoodSpriteSize = 2.0F * kFoodRadius * 1.25F;
 constexpr svanes::TicCount kFoodSpawnInterval = 5 * svanes::TicsPerSecond;
 constexpr svanes::TicCount kDeathSegmentInterval = svanes::TicsPerSecond / 10;
 constexpr float kWeightRadiusStep = 2.4F;
@@ -206,8 +212,65 @@ void Snake::ResetSnake(svanes::Registry &world) {
     game_over = false;
 }
 
+void Snake::LoadFoodDefinitions(svanes::GameContext &context) {
+    const auto assets = svanes::AssetPath("assets/nutritionallyAccurateSnake/");
+    const auto path = assets + "food.csv";
+    std::ifstream file(path);
+    std::string line;
+    if (!std::getline(file, line)) {
+        throw std::runtime_error("Could not read food definitions from " +
+                                 path);
+    }
+    if (!line.empty() && line.back() == '\r') {
+        line.pop_back();
+    }
+    if (line != "type,base_score,sprite_path") {
+        throw std::runtime_error("Invalid food definition header in " + path);
+    }
+    constexpr std::array<std::string_view, 4> names{"pizza", "burger", "apple",
+                                                    "carrot"};
+    std::array<bool, 4> loaded{};
+    while (std::getline(file >> std::ws, line)) {
+        if (!line.empty() && line.back() == '\r') {
+            line.pop_back();
+        }
+        std::istringstream row(line);
+        std::string name;
+        std::string score_text;
+        std::string sprite_path;
+        if (!std::getline(row, name, ',') ||
+            !std::getline(row, score_text, ',') ||
+            !std::getline(row, sprite_path) || sprite_path.empty() ||
+            sprite_path.find(',') != std::string::npos) {
+            throw std::runtime_error("Invalid food definition in " + path +
+                                     ": " + line);
+        }
+        std::uint32_t base_score = 0;
+        const auto score_result =
+            std::from_chars(score_text.data(),
+                            score_text.data() + score_text.size(), base_score);
+        const auto index = static_cast<std::size_t>(
+            std::find(names.begin(), names.end(), name) - names.begin());
+        if (score_result.ec != std::errc{} ||
+            score_result.ptr != score_text.data() + score_text.size() ||
+            index == names.size() || loaded[index]) {
+            throw std::runtime_error("Invalid food definition in " + path +
+                                     ": " + line);
+        }
+        pellet_definitions[index] = {
+            base_score, context.assets.LoadTexture(assets + sprite_path)};
+        loaded[index] = true;
+    }
+    if (file.bad() ||
+        std::find(loaded.begin(), loaded.end(), false) != loaded.end()) {
+        throw std::runtime_error(
+            "Could not load all four food definitions from " + path);
+    }
+}
+
 void Snake::Initialize(svanes::GameContext &context) {
     events = &context.events;
+    LoadFoodDefinitions(context);
     // Create colllidable reagions for edges
     InitializeEdges(context);
     const std::string font_path = svanes::AssetPath(
@@ -360,10 +423,8 @@ void Snake::InitializeEdges(svanes::GameContext &context) {
 }
 
 void Snake::SpawnFood(svanes::Registry &world) {
-    constexpr std::array<svanes::Color, 4> colors{
-        svanes::Color{240, 160, 50, 255}, svanes::Color{230, 60, 60, 255},
-        svanes::Color{120, 210, 255, 255}, svanes::Color{40, 70, 180, 255}};
-    std::uniform_int_distribution<std::size_t> type_index{0, colors.size() - 1};
+    std::uniform_int_distribution<std::size_t> type_index{
+        0, pellet_definitions.size() - 1};
     const auto type = static_cast<PelletType>(type_index(random));
     std::uniform_real_distribution<float> x{
         food_spawn_area.x - food_spawn_area.width * 0.5F,
@@ -376,10 +437,13 @@ void Snake::SpawnFood(svanes::Registry &world) {
     world.AddComponent<svanes::Transform>(
         entity, svanes::Transform{.x = x(random), .y = y(random)});
     const svanes::Circle2D geometry{.radius = kFoodRadius};
-    world.AddComponent<svanes::SolidShape>(
+    world.AddComponent<svanes::Sprite>(
         entity,
-        svanes::SolidShape{.color = colors[static_cast<std::size_t>(type)],
-                           .geometry = geometry});
+        svanes::Sprite{
+            .texture =
+                pellet_definitions[static_cast<std::size_t>(type)].texture,
+            .geometry = svanes::Rectangle2D{.width = kFoodSpriteSize,
+                                            .height = kFoodSpriteSize}});
     world.AddComponent<svanes::Collider2D>(entity,
                                            svanes::Collider2D{geometry});
     pellets.push_back(entity);
@@ -403,7 +467,7 @@ void Snake::HandleCollision(svanes::Registry &world,
         const auto previous_weight = weight;
         const auto type = world.GetComponent<PelletType>(other);
         const bool unhealthy =
-            type == PelletType::Orange || type == PelletType::Red;
+            type == PelletType::Pizza || type == PelletType::Burger;
         float balance = 0.5F;
         if (diet_balance <= 2) {
             balance = 0.0F;
@@ -414,19 +478,21 @@ void Snake::HandleCollision(svanes::Registry &world,
             unhealthy ? 1.0F + balance : 1.0F - 0.5F * balance;
         const float penalty_multiplier = 0.75F + 1.25F * balance;
         const float recovery_multiplier = 1.25F - 0.75F * balance;
+        const auto base_score =
+            pellet_definitions[static_cast<std::size_t>(type)].base_score;
         score += static_cast<std::uint64_t>(
-            std::lround((unhealthy ? 25.0F : 10.0F) * score_multiplier));
+            std::llround(static_cast<double>(base_score) * score_multiplier));
         switch (type) {
-        case PelletType::Orange:
+        case PelletType::Pizza:
             weight += penalty_multiplier;
             break;
-        case PelletType::Red:
+        case PelletType::Burger:
             head->AdjustTurnSpeed(-kTurnSpeedStep * penalty_multiplier);
             break;
-        case PelletType::LightBlue:
+        case PelletType::Apple:
             weight = std::max(0.0F, weight - recovery_multiplier);
             break;
-        case PelletType::DarkBlue:
+        case PelletType::Carrot:
             head->AdjustTurnSpeed(kTurnSpeedStep * recovery_multiplier);
             break;
         }
