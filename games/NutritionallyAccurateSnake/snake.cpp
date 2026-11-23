@@ -35,6 +35,7 @@ constexpr std::size_t kNeckSegmentCount = 2;
 constexpr float kFoodRadius = 18.0F;
 constexpr svanes::TicCount kFoodSpawnInterval = 5 * svanes::TicsPerSecond;
 constexpr float kWeightRadiusStep = 2.4F;
+constexpr std::uint32_t kMaxDietBalance = 10;
 
 static svanes::ConvexPolygon2D SnakeGeometry(float radius) {
     if (!std::isfinite(radius) || radius <= 0.0F) {
@@ -174,7 +175,8 @@ void Snake::ResetSnake(svanes::Registry &world) {
     pellets.clear();
     food_spawn_tics = 0;
     score = 0;
-    weight = 0;
+    weight = 0.0F;
+    diet_balance = 0;
     // Create the snake with initial position and heading
     head = head_pool.Make(world);
     const auto &transform =
@@ -372,30 +374,43 @@ void Snake::HandleCollision(svanes::Registry &world,
     const auto pellet = std::find(pellets.begin(), pellets.end(), other);
     if (pellet != pellets.end()) {
         const auto previous_weight = weight;
-        switch (world.GetComponent<PelletType>(other)) {
+        const auto type = world.GetComponent<PelletType>(other);
+        const bool unhealthy =
+            type == PelletType::Orange || type == PelletType::Red;
+        float balance = 0.5F;
+        if (diet_balance <= 2) {
+            balance = 0.0F;
+        } else if (diet_balance >= 8) {
+            balance = 1.0F;
+        }
+        const float score_multiplier =
+            unhealthy ? 1.0F + balance : 1.0F - 0.5F * balance;
+        const float penalty_multiplier = 0.75F + 1.25F * balance;
+        const float recovery_multiplier = 1.25F - 0.75F * balance;
+        score += static_cast<std::uint64_t>(
+            std::lround((unhealthy ? 25.0F : 10.0F) * score_multiplier));
+        switch (type) {
         case PelletType::Orange:
-            score += 25;
-            ++weight;
+            weight += penalty_multiplier;
             break;
         case PelletType::Red:
-            score += 25;
-            head->AdjustTurnSpeed(-kTurnSpeedStep);
+            head->AdjustTurnSpeed(-kTurnSpeedStep * penalty_multiplier);
             break;
         case PelletType::LightBlue:
-            score += 10;
-            if (weight > 0) {
-                --weight;
-            }
+            weight = std::max(0.0F, weight - recovery_multiplier);
             break;
         case PelletType::DarkBlue:
-            score += 10;
-            head->AdjustTurnSpeed(kTurnSpeedStep);
+            head->AdjustTurnSpeed(kTurnSpeedStep * recovery_multiplier);
             break;
+        }
+        if (unhealthy) {
+            diet_balance = std::min(diet_balance + 1, kMaxDietBalance);
+        } else if (diet_balance > 0) {
+            --diet_balance;
         }
         world.DestroyEntity(other);
         pellets.erase(pellet);
-        const float radius =
-            kRadius + static_cast<float>(weight) * kWeightRadiusStep;
+        const float radius = kRadius + weight * kWeightRadiusStep;
         if (weight != previous_weight) {
             head->SetRadius(world, radius);
             for (const auto &segment : body) {

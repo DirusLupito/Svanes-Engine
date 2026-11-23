@@ -74,7 +74,8 @@ private:
     svanes::Rectangle2D food_spawn_area{};
     svanes::TicCount food_spawn_tics = 0;
     std::uint64_t score = 0;
-    std::uint32_t weight = 0;
+    float weight = 0.0F;
+    std::uint32_t diet_balance = 0;
     std::mt19937 random{std::random_device{}()};
     std::array<svanes::Entity, 4> edges{};
     std::array<svanes::Entity, 3> game_over_shapes{};
