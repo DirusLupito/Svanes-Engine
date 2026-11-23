@@ -15,6 +15,19 @@ namespace {
 
 constexpr std::int32_t kCardZ = Phone::kAppZ;
 constexpr std::int32_t kLabelZ = Phone::kAppZ + 1;
+constexpr std::int32_t kPopupZ = Phone::kAppZ + 90;
+
+constexpr std::int64_t kPayCents = 50;
+constexpr float kMinWatchSeconds = 3.0F;
+
+constexpr float kPopupSeconds = 1.2F;
+constexpr float kPopupFromTop = 100.0F;
+constexpr float kPopupRise = 40.0F;
+constexpr float kPopupWidth = 120.0F;
+constexpr float kPopupHeight = 44.0F;
+constexpr svanes::Color kPopupPanelColor{
+    .red = 0, .green = 0, .blue = 0, .alpha = 150};
+constexpr svanes::Color kPopupTextColor{.red = 240, .green = 200, .blue = 80};
 
 constexpr float kDragSampleSeconds = 0.06F;
 constexpr float kFlickLookaheadSeconds = 0.3F;
@@ -98,6 +111,78 @@ void ReelsApp::Initialize(svanes::Registry &world, svanes::FontHandle font,
         world.AddComponent<svanes::ZOrder>(slot.label, svanes::ZOrder{kLabelZ});
         world.AddComponent<svanes::ClipRect>(slot.label, svanes::ClipRect{});
     }
+
+    popup_panel = world.CreateEntity();
+    world.AddComponent<svanes::Transform>(popup_panel, svanes::Transform{});
+    world.AddComponent<svanes::SolidShape>(
+        popup_panel, svanes::SolidShape{
+                         .color = {.alpha = 0},
+                         .geometry = RoundedRectangle(kPopupWidth, kPopupHeight,
+                                                      kPopupHeight * 0.5F)});
+    world.AddComponent<svanes::ZOrder>(popup_panel, svanes::ZOrder{kPopupZ});
+    world.AddComponent<svanes::ClipRect>(popup_panel, svanes::ClipRect{});
+
+    popup_label = world.CreateEntity();
+    world.AddComponent<svanes::TextLabel>(
+        popup_label,
+        svanes::TextLabel{.text = "+" + FormatDollars(kPayCents),
+                          .font = font,
+                          .alignment = svanes::TextAlignment::Center,
+                          .visible = false});
+    world.AddComponent<svanes::ZOrder>(popup_label, svanes::ZOrder{kPopupZ});
+    world.AddComponent<svanes::ClipRect>(popup_label, svanes::ClipRect{});
+}
+
+std::int64_t ReelsApp::Watch(float seconds, bool watching) {
+    if (current != watched_reel) {
+        watched_reel = current;
+        watch_seconds = 0.0F;
+    }
+    if (!watching) {
+        return 0;
+    }
+    watch_seconds += seconds;
+    if (current < first_unpaid_reel || watch_seconds < kMinWatchSeconds) {
+        return 0;
+    }
+    first_unpaid_reel = current + 1;
+    popup_seconds = 0.0F;
+    return kPayCents;
+}
+
+void ReelsApp::ShowPopup(svanes::Registry &world, svanes::Rectangle2D screen,
+                         svanes::Rectangle2D area, float shown, float seconds) {
+    float popup_shown = 0.0F;
+    float rise = 0.0F;
+    if (popup_seconds.has_value()) {
+        *popup_seconds += seconds;
+        const float progress = std::min(*popup_seconds / kPopupSeconds, 1.0F);
+        rise = kPopupRise * (1.0F - (1.0F - progress) * (1.0F - progress));
+        popup_shown = shown * std::min((1.0F - progress) * 2.0F, 1.0F);
+        if (progress == 1.0F) {
+            popup_seconds.reset();
+        }
+    }
+    const svanes::Vector2D center{screen.x, screen.y - screen.height * 0.5F +
+                                                kPopupFromTop - rise};
+
+    svanes::Transform &transform =
+        world.GetComponent<svanes::Transform>(popup_panel);
+    transform.x = center.x;
+    transform.y = center.y;
+    svanes::SolidShape &panel =
+        world.GetComponent<svanes::SolidShape>(popup_panel);
+    panel.color = kPopupPanelColor;
+    panel.color.alpha = Faded(kPopupPanelColor.alpha, popup_shown);
+    world.GetComponent<svanes::ClipRect>(popup_panel).area = area;
+
+    svanes::TextLabel &label =
+        world.GetComponent<svanes::TextLabel>(popup_label);
+    label.position = center;
+    label.color = kPopupTextColor;
+    label.color.alpha = Faded(kPopupTextColor.alpha, popup_shown);
+    label.visible = popup_shown > 0.0F;
+    world.GetComponent<svanes::ClipRect>(popup_label).area = area;
 }
 
 void ReelsApp::Release(float screen_height) {
@@ -179,20 +264,22 @@ void ReelsApp::TrackInput(const svanes::InputManager &input,
     }
 }
 
-void ReelsApp::Update(svanes::Registry &world,
-                      const svanes::InputManager &input, const Phone &phone,
-                      float seconds) {
+std::int64_t ReelsApp::Update(svanes::Registry &world,
+                              const svanes::InputManager &input,
+                              const Phone &phone, float seconds) {
     const svanes::Rectangle2D screen = phone.ScreenRectangle();
     const svanes::Rectangle2D area = phone.AppArea();
     const float shown = phone.AppShown(Phone::App::Instagram);
 
     elapsed += seconds;
-    if (shown == 1.0F && phone.IsFullyHeld()) {
+    const bool watching = shown == 1.0F && phone.IsFullyHeld();
+    if (watching) {
         TrackInput(input, screen);
     } else if (drag_anchor_y.has_value()) {
         Release(screen.height);
     }
     Settle(seconds);
+    const std::int64_t earned_cents = Watch(seconds, watching);
 
     for (std::size_t index = 0; index < slots.size(); ++index) {
         const Slot &slot = slots[index];
@@ -223,6 +310,9 @@ void ReelsApp::Update(svanes::Registry &world,
         label.visible = slot_shown > 0.0F;
         world.GetComponent<svanes::ClipRect>(slot.label).area = area;
     }
+
+    ShowPopup(world, screen, area, shown, seconds);
+    return earned_cents;
 }
 
 } // namespace grindset

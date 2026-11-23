@@ -31,6 +31,11 @@ namespace grindset {
  * another reel below. The first reel has nothing above it: pulling down on it
  * moves it less the further it is pulled, and it always springs back.
  *
+ * Staying on a reel for a few seconds pays $0.50 if no reel this far down
+ * has paid yet, and a "+$0.50" popup rises and fades near the top of the
+ * screen, above where reels write their text. Time only counts as watching
+ * while the app is fully shown and the phone is fully held.
+ *
  * Everything is laid out against the phone's screen, clipped to the area the
  * app currently covers, and faded in and out with the app.
  */
@@ -52,14 +57,18 @@ public:
      * to the area the app covers, and fades them with the app. Dragging and
      * the arrow keys only work while the app is fully shown and the phone is
      * fully held, and a drag cut short by either ending is let go where it is.
+     * Pays for staying on a new reel long enough, and shows the popup when it
+     * does.
      * @param world The world holding them.
      * @param input The mouse and keyboard state, with mouse positions
      * matching world coordinates.
      * @param phone The phone the app is on.
      * @param seconds The time since the previous update, in seconds.
+     * @return How much was earned this update, in cents.
      */
-    void Update(svanes::Registry &world, const svanes::InputManager &input,
-                const Phone &phone, float seconds);
+    std::int64_t Update(svanes::Registry &world,
+                        const svanes::InputManager &input, const Phone &phone,
+                        float seconds);
 
 private:
     /**
@@ -113,6 +122,27 @@ private:
      */
     void Settle(float seconds);
 
+    /**
+     * Times how long the current reel has been watched, starting over when the
+     * current reel changes, and pays once it has been watched long enough if
+     * no reel this far down has paid yet, starting the popup.
+     * @param seconds The time since the previous update, in seconds.
+     * @param watching Whether the reels can be watched right now.
+     * @return How much was earned, in cents.
+     */
+    std::int64_t Watch(float seconds, bool watching);
+
+    /**
+     * Rises and fades the popup while it is showing, and hides it otherwise.
+     * @param world The world holding it.
+     * @param screen Where the phone's screen is.
+     * @param area The area the app currently covers.
+     * @param shown How much of the app is showing, from 0 to 1.
+     * @param seconds The time since the previous update, in seconds.
+     */
+    void ShowPopup(svanes::Registry &world, svanes::Rectangle2D screen,
+                   svanes::Rectangle2D area, float shown, float seconds);
+
     std::array<Slot, 3> slots{};
     std::uint32_t current = 0;
     float offset = 0.0F;
@@ -120,6 +150,12 @@ private:
     float elapsed = 0.0F;
     std::optional<float> drag_anchor_y;
     std::vector<DragSample> drag_samples;
+    std::uint32_t watched_reel = 0;
+    std::uint32_t first_unpaid_reel = 0;
+    float watch_seconds = 0.0F;
+    svanes::Entity popup_panel{};
+    svanes::Entity popup_label{};
+    std::optional<float> popup_seconds;
 };
 
 } // namespace grindset

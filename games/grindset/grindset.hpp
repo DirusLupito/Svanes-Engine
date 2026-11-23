@@ -16,7 +16,8 @@ namespace grindset {
 /**
  * The grindset game: an endless sunrise drive with a phone in hand. It owns
  * the player's balance, which starts at $100, taking bets out of it and adding
- * payouts to it as the casino's blackjack rounds report them.
+ * payouts to it as the casino's blackjack rounds report them, and adding what
+ * the reels pay for watching them.
  */
 class Grindset final : public svanes::IGame {
 public:
@@ -31,7 +32,8 @@ public:
      * Checks whether Escape was pressed to quit and whether Space or Tab was
      * pressed to put away or take out the phone, then moves the road, bobs
      * the car interior along with it, slides the phone, which shows the
-     * balance, and lays the casino and reels apps out on the phone's screen.
+     * balance, and lays the casino and reels apps out on the phone's screen,
+     * adding what the reels earned to the balance.
      * @param frame The current frame's input and engine services.
      */
     void Update(const svanes::FrameContext &frame) override;
