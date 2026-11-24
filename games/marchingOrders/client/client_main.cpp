@@ -14,7 +14,7 @@ int main(int argc, char *argv[]) {
 
         marching_orders::MarchingOrdersClient client;
         svanes::NetworkClient application(
-            {.title = "marchingOrders", .width = 1280, .height = 720});
+            {.title = "marchingOrders", .width = 720, .height = 720});
         application.Connect(argc == 2 ? argv[1] : "127.0.0.1:5811");
         const auto result = application.run(client);
         application.Disconnect();

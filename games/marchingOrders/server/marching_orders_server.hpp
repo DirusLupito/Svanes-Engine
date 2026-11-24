@@ -10,7 +10,7 @@ namespace marching_orders {
 class MarchingOrdersServer final : public svanes::IServer {
 public:
     /**
-     * Prints the server's startup message.
+     * Prepares the server for a game session.
      *
      * @param context The engine services and configuration provided for
      * server initialization.
@@ -18,17 +18,17 @@ public:
     void Initialize(svanes::ServerContext &context) override;
 
     /**
-     * Accepts the client and reports its assigned ID.
+     * Decides whether to admit a client to the game.
      *
      * @param context The client's request and reserved ID.
      *
-     * @return An acceptance with no additional game data.
+     * @return The admission decision and the game data to send with it.
      */
     svanes::JoinResponse
     HandleJoinRequest(const svanes::ServerJoinContext &context) override;
 
     /**
-     * Reports a client that has disconnected or timed out.
+     * Handles the end of a client's session.
      *
      * @param world The server's registry.
      * @param client The ID of the disconnected client.

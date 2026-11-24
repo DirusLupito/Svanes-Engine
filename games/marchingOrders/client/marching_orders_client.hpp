@@ -10,7 +10,7 @@ namespace marching_orders {
 class MarchingOrdersClient final : public svanes::IClient {
 public:
     /**
-     * Prints the client's startup message.
+     * Initializes the client's local game state before the first frame.
      *
      * @param context The engine services and window dimensions provided for
      * client initialization.
@@ -20,12 +20,12 @@ public:
     /**
      * Creates the client's join request.
      *
-     * @return An empty message to send with the engine's join request.
+     * @return The game-specific data to include in the engine's join request.
      */
     svanes::NetworkMessage CreateJoinRequest() override;
 
     /**
-     * Reports the assigned client ID, or throws if the connection failed.
+     * Handles the outcome of the attempt to join the game.
      *
      * @param result The server's response or the engine's timeout result.
      *
@@ -42,28 +42,32 @@ public:
     void HandleDisconnect() override;
 
     /**
-     * Checks whether the Escape key was pressed to quit the client.
+     * Processes player input and updates client-side game state before
+     * rendering each frame.
      *
      * @param context The current frame's input and engine services.
      */
     void Update(const svanes::ClientFrameContext &context) override;
 
     /**
-     * Returns whether the user has requested that the client quit.
+     * Reports whether the client has requested shutdown.
      *
-     * @return True if the user has pressed Escape, false otherwise.
+     * @return True to end the frame loop, false to continue.
      */
     bool ShouldQuit() const override;
 
     /**
-     * Limits the client to approximately sixty frames per second.
+     * Provides the interval the engine uses to pace the client.
      *
-     * @return The interval between frames, in microseconds.
+     * @return The target interval between client frames, in microseconds.
      */
     svanes::TicCount GetFrameIntervalTics() const override;
 
 private:
-    // Set when the user presses Escape.
+    // Side length of the terrain sprite in world units, used to fit the camera.
+    float terrain_side = 0.0F;
+
+    // Set when the client is ready to exit the frame loop.
     bool quit = false;
 };
 

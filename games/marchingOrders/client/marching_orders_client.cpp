@@ -1,13 +1,27 @@
 #include "marching_orders_client.hpp"
+#include "terrain.hpp"
 
+#include <svanes/camera2d.hpp>
 #include <svanes/input/input_manager.hpp>
+#include <svanes/registry.hpp>
+#include <svanes/render/render_system.hpp>
+#include <svanes/render/texture_manager.hpp>
 
+#include <algorithm>
 #include <iostream>
 #include <stdexcept>
 
 namespace marching_orders {
 
-void MarchingOrdersClient::Initialize(svanes::ClientContext &) {
+void MarchingOrdersClient::Initialize(svanes::ClientContext &context) {
+    const svanes::ImageData image = LoadTerrainImage();
+    terrain_side = static_cast<float>(image.width);
+    const auto terrain = context.world.CreateEntity();
+    context.world.AddComponent<svanes::Transform>(terrain);
+    context.world.AddComponent<svanes::Sprite>(
+        terrain, svanes::Sprite{.texture = context.assets.CreateTexture(image),
+                                .geometry = {.width = terrain_side,
+                                             .height = terrain_side}});
     std::cout << "Hello, world! marchingOrders client.\n" << std::flush;
 }
 
@@ -34,6 +48,10 @@ void MarchingOrdersClient::HandleDisconnect() {
 }
 
 void MarchingOrdersClient::Update(const svanes::ClientFrameContext &context) {
+    const auto side = std::min(context.output_width, context.output_height);
+    if (side > 0) {
+        context.camera.zoom = static_cast<float>(side) / terrain_side;
+    }
     if (context.input.WasPressed(svanes::Key::Escape)) {
         quit = true;
     }
