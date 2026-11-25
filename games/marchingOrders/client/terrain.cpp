@@ -50,7 +50,7 @@ constexpr float kRidgeCelsius = 0.0F;
 constexpr svanes::Color kLowlandColor{.red = 146, .green = 159, .blue = 122};
 
 // Base color for land at the transition between lowlands and ridges.
-constexpr svanes::Color kUplandColor{.red = 222, .green = 200, .blue = 151};
+constexpr svanes::Color kUplandColor{.red = 136, .green = 138, .blue = 135};
 
 // Base color for land at the cold end of the temperature range.
 constexpr svanes::Color kRidgeColor{.red = 203, .green = 201, .blue = 185};
