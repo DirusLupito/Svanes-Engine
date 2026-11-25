@@ -104,4 +104,63 @@ Start every Doxygen block with a sentence describing the declaration's responsib
     svanes::TicCount GetFrameIntervalTics() const override;
 ```
 
+## 4. Comment each global and particularly important locals
+
+**Original example**
+
+```cpp
+// BIL stores one signed 16-bit sample per cell. The output image stores
+// one byte per channel in RGBA order.
+constexpr auto kBytesPerElevation = sizeof(std::int16_t);
+constexpr auto kBitsPerByte = std::numeric_limits<std::uint8_t>::digits;
+constexpr std::size_t kChannelsPerPixel = 4;
+
+// Water starts at sea level and reaches its deepest color at this depth.
+constexpr float kSeaLevelMeters = 0.0F;
+constexpr float kDeepWaterDepthMeters = 1300.0F;
+constexpr svanes::Color kShallowWaterColor{
+    .red = 105, .green = 174, .blue = 178};
+constexpr svanes::Color kDeepWaterColor{.red = 33, .green = 88, .blue = 121};
+
+// Land starts at the sea-level temperature and cools with elevation.
+constexpr float kSeaLevelCelsius = 30.0F;
+constexpr float kCoolingCelsiusPerMeter = 0.0065F;
+
+// Land colors blend from lowland at sea level, through upland at its
+// temperature threshold, to ridge at the coldest threshold.
+constexpr float kUplandCelsius = 16.0F;
+constexpr float kRidgeCelsius = 0.0F;
+constexpr svanes::Color kLowlandColor{.red = 222, .green = 200, .blue = 151};
+constexpr svanes::Color kUplandColor{.red = 146, .green = 159, .blue = 122};
+constexpr svanes::Color kRidgeColor{.red = 203, .green = 201, .blue = 185};
+
+// A larger rise scale gives the same slope less contrast. The adjustment
+// limits are fractions of the base land color's brightness.
+constexpr float kHillshadeRiseScaleMeters = 1050.0F;
+constexpr float kMinHillshadeAdjustment = -0.26F;
+constexpr float kMaxHillshadeAdjustment = 0.22F;
+```
+
+For globals, the team’s rule is “Every individual var gets its own inline comment. We do not give a single comment to multiple vars.” Place a separate `//` comment directly above each global variable, including each constant in an anonymous namespace. Describe what that particular value represents. Include units, a reference point, or the effect of changing it when that helps the reader.
+
+Inside a function, reserve individual comments for particularly important locals. For example, the square root in the terrain depth calculation gives shallow coastal waters more of the color range. That choice deserves an explanation. Routine loop indices, byte offsets, and other locals with clear names can stand on their own.
+
+**Example the team approved**
+
+```cpp
+
+// Samples along each edge of the packaged square elevation grid.
+constexpr std::int32_t kTerrainSide = 880;
+```
+
+For example, the two water levels answer different questions. Document each where it is declared.
+
+```cpp
+// Highest elevation, in meters, that the map treats as water.
+constexpr float kSeaLevelMeters = 0.0F;
+
+// Depth below sea level, in meters, where the deep-water color is reached.
+constexpr float kDeepWaterDepthMeters = 1300.0F;
+```
+
 When reviewing a comment, ask what its reader can rely on. If changing the asset, controls, or implementation would force a rewrite, check whether that detail is a real guarantee. If the guarantee itself changes, update the comment with the code.
