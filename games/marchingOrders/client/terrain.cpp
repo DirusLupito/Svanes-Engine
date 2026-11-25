@@ -10,9 +10,19 @@
 #include <cstdint>
 #include <limits>
 #include <stdexcept>
+#include <string_view>
 #include <vector>
 
 namespace {
+
+// Path to the grid of terrain elevations, relative to the executable.
+constexpr std::string_view kElevationGridPath =
+    "assets/marchingOrders/southern_red_sea.bil";
+
+// Path to the water mask aligned with the elevation grid, relative to the
+// executable.
+constexpr std::string_view kWaterMaskPath =
+    "assets/marchingOrders/southern_red_sea_water.mask";
 
 // Samples along each edge of the packaged square elevation grid.
 constexpr std::int32_t kTerrainSide = 880;
@@ -20,13 +30,13 @@ constexpr std::int32_t kTerrainSide = 880;
 // Number of consecutive channel bytes occupied by one RGBA pixel.
 constexpr std::size_t kChannelsPerPixel = 4;
 
-// Highest elevation, in meters, that the map treats as water.
+// Reference elevation in meters for water shading and land temperature.
 constexpr float kSeaLevelMeters = 0.0F;
 
 // Depth below sea level, in meters, where the deep-water color is reached.
 constexpr float kDeepWaterDepthMeters = 1300.0F;
 
-// Water color at the shoreline, where depth is zero.
+// Water color at or above sea level.
 constexpr svanes::Color kShallowWaterColor{
     .red = 105, .green = 174, .blue = 178};
 
@@ -87,23 +97,24 @@ static svanes::Color MixColors(svanes::Color low, svanes::Color high,
 }
 
 /**
- * Colors water by depth and land by its estimated temperature. Cells at or
- * below sea level use the water palette, including inland depressions.
+ * Colors a terrain cell according to its mapped surface.
  *
+ * @param is_water True if the water mask covers this cell.
  * @param height_meters Elevation in meters relative to sea level.
  * @param shade Brightness multiplier for land. A value of 1 keeps the
  * original palette color.
  *
  * @return The map color for this cell.
  */
-static svanes::Color TerrainColor(float height_meters, float shade) {
+static svanes::Color TerrainColor(bool is_water, float height_meters,
+                                  float shade) {
     const float height_above_sea = height_meters - kSeaLevelMeters;
-    if (height_above_sea <= 0.0F) {
+    if (is_water) {
         // The square root gives shallow coastal waters more of the color range.
         const float depth_fraction =
-            std::sqrt(-height_above_sea / kDeepWaterDepthMeters);
+            std::clamp(-height_above_sea / kDeepWaterDepthMeters, 0.0F, 1.0F);
         return MixColors(kShallowWaterColor, kDeepWaterColor,
-                         std::clamp(depth_fraction, 0.0F, 1.0F));
+                         std::sqrt(depth_fraction));
     }
 
     const float temperature =
@@ -112,7 +123,7 @@ static svanes::Color TerrainColor(float height_meters, float shade) {
     if (temperature >= kUplandCelsius) {
         const float warmth = (temperature - kUplandCelsius) /
                              (kSeaLevelCelsius - kUplandCelsius);
-        land = MixColors(kUplandColor, kLowlandColor, warmth);
+        land = MixColors(kUplandColor, kLowlandColor, std::min(warmth, 1.0F));
     } else {
         const float warmth =
             (temperature - kRidgeCelsius) / (kUplandCelsius - kRidgeCelsius);
@@ -127,12 +138,21 @@ static svanes::Color TerrainColor(float height_meters, float shade) {
 }
 
 svanes::ImageData marching_orders::LoadTerrainImage() {
-    const auto bytes = svanes::ReadFile(
-        svanes::AssetPath("assets/marchingOrders/southern_red_sea.bil"));
+    const auto bytes = svanes::ReadFile(svanes::AssetPath(kElevationGridPath));
     constexpr std::size_t cells = kTerrainSide * kTerrainSide;
     if (bytes.size() != sizeof(std::int16_t) * cells) {
         throw std::runtime_error(
-            "Unexpected size for the southern Red Sea elevation grid.");
+            "Unexpected size for the terrain elevation grid.");
+    }
+
+    const auto water_mask = svanes::ReadFile(svanes::AssetPath(kWaterMaskPath));
+    if (water_mask.size() != cells) {
+        throw std::runtime_error(
+            "Water mask size does not match the elevation grid.");
+    }
+    if (std::ranges::any_of(
+            water_mask, [](std::byte value) { return value > std::byte{1}; })) {
+        throw std::runtime_error("Water mask cells must be 0 or 1.");
     }
 
     // The Oceania/generic mapping tools data apparently stores signed 
@@ -174,7 +194,8 @@ svanes::ImageData marching_orders::LoadTerrainImage() {
                 1.0F + std::clamp(rise / kHillshadeRiseScaleMeters,
                                   kMinHillshadeAdjustment,
                                   kMaxHillshadeAdjustment);
-            const auto color = TerrainColor(heights[i], shade);
+            const auto color =
+                TerrainColor(water_mask[i] == std::byte{1}, heights[i], shade);
             const auto pixel = kChannelsPerPixel * i;
             image.rgba_pixels[pixel] = color.red;
             image.rgba_pixels[pixel + 1] = color.green;
