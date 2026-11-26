@@ -9,9 +9,11 @@
 #include <svanes/registry.hpp>
 #include <svanes/render/render_system.hpp>
 #include <svanes/render/texture_manager.hpp>
+#include <svanes/tilemaps/tilemap.hpp>
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <iostream>
 #include <stdexcept>
 
@@ -26,6 +28,15 @@ void MarchingOrdersClient::Initialize(svanes::ClientContext &context) {
         terrain, svanes::Sprite{.texture = context.assets.CreateTexture(image),
                                 .geometry = {.width = terrain_side,
                                              .height = terrain_side}});
+    const svanes::ImageData control_colors{
+        .width = 3,
+        .height = 1,
+        .rgba_pixels = {255, 0, 0, 24, 255, 0, 0, 48, 255, 0, 0, 72}};
+    control_atlas = context.assets.CreateTexture(control_colors);
+    control_map_entity = context.world.CreateEntity();
+    context.world.AddComponent<svanes::Transform>(control_map_entity);
+    context.world.AddComponent<svanes::ZOrder>(control_map_entity,
+                                               svanes::ZOrder{1});
     // Temporary unit created for testing. To be removed once actual gameplay is added.
     unit_entity = context.world.CreateEntity();
     context.world.AddComponent<svanes::Transform>(unit_entity);
@@ -35,7 +46,7 @@ void MarchingOrdersClient::Initialize(svanes::ClientContext &context) {
             .texture = context.assets.LoadTexture(svanes::AssetPath(
                 "assets/marchingOrders/sprites/infantry_01.png")),
             .geometry = svanes::Rectangle2D{.width = 64.0F, .height = 32.0F}});
-    context.world.AddComponent<svanes::ZOrder>(unit_entity, svanes::ZOrder{1});
+    context.world.AddComponent<svanes::ZOrder>(unit_entity, svanes::ZOrder{2});
     std::cout << "Hello, world! marchingOrders client.\n" << std::flush;
 }
 
@@ -66,15 +77,52 @@ void MarchingOrdersClient::Update(const svanes::ClientFrameContext &context) {
     if (side > 0) {
         context.camera.zoom = static_cast<float>(side) / terrain_side;
     }
-    // Process messages from the server to update entity positions.
-    for (const auto &message : context.network.PollMessages()) {
-        svanes::MessageReader reader(message);
+    // Process messages from the server to update entity positions and influence map values.
+    const auto messages = context.network.PollMessages();
+    if (!messages.empty()) {
+        svanes::MessageReader reader(messages.back());
         const svanes::Vector2D position{reader.ReadFloat32(),
                                         reader.ReadFloat32()};
-        if (reader.Remaining() != 0 || !std::isfinite(position.x) ||
-            !std::isfinite(position.y)) {
-            throw std::invalid_argument("Invalid unit position from server.");
+        const auto columns = reader.ReadUint32();
+        const auto rows = reader.ReadUint32();
+        const auto cell_size = reader.ReadUint32();
+        const svanes::Vector2D origin{reader.ReadFloat32(),
+                                      reader.ReadFloat32()};
+        const auto cell_count = static_cast<std::uint64_t>(columns) * rows;
+        if (!std::isfinite(position.x) || !std::isfinite(position.y) ||
+            !std::isfinite(origin.x) || !std::isfinite(origin.y) ||
+            columns == 0 || rows == 0 || cell_size == 0 ||
+            cell_count != reader.Remaining()) {
+            throw std::invalid_argument("Invalid world state from server.");
         }
+        if (!context.world.HasComponent<svanes::TileMap>(control_map_entity)) {
+            context.world.AddComponent<svanes::TileMap>(control_map_entity);
+        }
+        // Update the tilemap with the received control values
+        auto &overlay =
+            context.world.GetComponent<svanes::TileMap>(control_map_entity);
+        overlay.atlas = control_atlas;
+        overlay.columns = columns;
+        overlay.rows = rows;
+        overlay.tile_width = cell_size;
+        overlay.tile_height = cell_size;
+        overlay.atlas_tile_width = 1;
+        overlay.atlas_tile_height = 1;
+        overlay.atlas_columns = 3;
+        overlay.atlas_rows = 1;
+        overlay.cells.resize(static_cast<std::size_t>(cell_count));
+        for (auto &cell : overlay.cells) {
+            const auto tier = reader.ReadUint8();
+            if (tier > 3) {
+                throw std::invalid_argument(
+                    "Invalid team control tier from server.");
+            }
+            cell.tile_id = tier;
+        }
+        auto &overlay_transform =
+            context.world.GetComponent<svanes::Transform>(control_map_entity);
+        overlay_transform.x = origin.x;
+        overlay_transform.y = origin.y;
         auto &transform =
             context.world.GetComponent<svanes::Transform>(unit_entity);
         transform.x = position.x;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../unit.hpp"
+#include "../utils/influence_map.hpp"
 
 #include <svanes/network/clientserver/IServer.hpp>
 
@@ -53,6 +54,14 @@ public:
  */
 private:
     std::optional<Unit> unit;
+    static constexpr std::uint32_t kControlMapWidth = 88;
+    static constexpr std::uint32_t kControlMapHeight = 88;
+    static constexpr std::uint32_t kControlCellSize = 10;
+    static constexpr svanes::Vector2D kControlMapOrigin{-440.0F, -440.0F};
+    InfluenceMap team_control_map{kControlMapWidth, kControlMapHeight,
+                                  kControlCellSize, kControlMapOrigin};
+    std::optional<svanes::Vector2D> last_control_stamp;
+    svanes::TicCount control_stamp_tics = 0;
 };
 
 } // namespace marching_orders

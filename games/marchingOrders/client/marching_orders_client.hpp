@@ -2,6 +2,7 @@
 
 #include <svanes/entity.hpp>
 #include <svanes/network/clientserver/IClient.hpp>
+#include <svanes/render/basic_render_types.hpp>
 
 namespace marching_orders {
 
@@ -66,6 +67,8 @@ public:
 
 private:
     svanes::Entity unit_entity{};
+    svanes::Entity control_map_entity{};
+    svanes::TextureHandle control_atlas{};
 
     // Side length of the terrain sprite in world units, used to fit the camera.
     float terrain_side = 0.0F;

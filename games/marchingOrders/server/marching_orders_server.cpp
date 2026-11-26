@@ -2,11 +2,19 @@
 
 #include <svanes/geometry/geometry.hpp>
 #include <svanes/network/message_serialization.hpp>
+#include <svanes/timeline_system.hpp>
 
 #include <iostream>
 #include <stdexcept>
 
 namespace marching_orders {
+
+constexpr float kControlStampValue = 1.0F;
+constexpr float kControlStampRadius = 80.0F;
+constexpr float kControlHalfLifeSeconds = 5.0F;
+constexpr svanes::TicCount kIdleControlStampInterval = svanes::TicsPerSecond / 2;
+constexpr float kMediumControlThreshold = 1.0F;
+constexpr float kHighControlThreshold = 3.0F;
 
 void MarchingOrdersServer::Initialize(svanes::ServerContext &context) {
     // Test unit, to be removed later.
@@ -47,9 +55,49 @@ void MarchingOrdersServer::PhysicsUpdate(
     unit->PhysicsUpdate(context.world);
     const auto &transform =
         context.world.GetComponent<svanes::Transform>(unit->GetEntity());
+    // Update the influence map
+    const svanes::Vector2D position{transform.x, transform.y};
+    const auto delta_tics =
+        context.world.GetComponent<svanes::Timeline>(unit->GetEntity())
+            .GetDeltaTics();
+    // Fade old values
+    team_control_map.Fade(static_cast<float>(delta_tics) /
+                              static_cast<float>(svanes::TicsPerSecond),
+                          kControlHalfLifeSeconds);
+    control_stamp_tics += delta_tics;
+    // Stamp new values
+    if (!last_control_stamp || position.x != last_control_stamp->x ||
+        position.y != last_control_stamp->y ||
+        control_stamp_tics >= kIdleControlStampInterval) {
+        team_control_map.Stamp(position, kControlStampValue,
+                               kControlStampRadius,
+                               [](svanes::Vector2D, svanes::Vector2D,
+                                  float distance) { return 1.0F - distance; });
+        last_control_stamp = position;
+        control_stamp_tics = 0;
+    }
     svanes::MessageWriter writer;
     writer.WriteFloat32(transform.x);
     writer.WriteFloat32(transform.y);
+    writer.WriteUint32(kControlMapWidth);
+    writer.WriteUint32(kControlMapHeight);
+    writer.WriteUint32(kControlCellSize);
+    writer.WriteFloat32(kControlMapOrigin.x);
+    writer.WriteFloat32(kControlMapOrigin.y);
+    for (std::uint32_t y = 0; y < kControlMapHeight; ++y) {
+        for (std::uint32_t x = 0; x < kControlMapWidth; ++x) {
+            const float value = team_control_map.ReadCell(x, y);
+            std::uint8_t tier = 0;
+            if (value >= kHighControlThreshold) {
+                tier = 3;
+            } else if (value >= kMediumControlThreshold) {
+                tier = 2;
+            } else if (value > 0.0F) {
+                tier = 1;
+            }
+            writer.WriteUint8(tier);
+        }
+    }
     context.network.Broadcast(writer.Finish());
 }
 
