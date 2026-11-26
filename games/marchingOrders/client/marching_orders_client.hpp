@@ -4,6 +4,8 @@
 #include <svanes/network/clientserver/IClient.hpp>
 #include <svanes/render/basic_render_types.hpp>
 
+#include <cstdint>
+
 namespace marching_orders {
 
 /**
@@ -66,6 +68,13 @@ public:
     svanes::TicCount GetFrameIntervalTics() const override;
 
 private:
+    /**
+     * Zooms around the cursor and preserves the chosen map scale on resize.
+     *
+     * @param context The input, camera, output size, and elapsed frame time.
+     */
+    void UpdateZoom(const svanes::ClientFrameContext &context);
+
     // Entity that displays the unit at its server-reported position.
     svanes::Entity unit_entity{};
 
@@ -77,6 +86,16 @@ private:
 
     // Side length of the terrain sprite in world units, used to fit the camera.
     float terrain_side = 0.0F;
+
+    // Magnification relative to the view that fits the whole map.
+    double zoom_factor = 1.0;
+
+    // Seconds spent holding zoom in the current direction.
+    double zoom_hold_seconds = 0.0;
+
+    // Direction of zoom. Positive for zooming in, negative for zooming out, and
+    // zero when idle.
+    std::int8_t zoom_direction = 0;
 
     // Set when the client is ready to exit the frame loop.
     bool quit = false;

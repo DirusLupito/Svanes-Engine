@@ -23,6 +23,20 @@ namespace marching_orders {
 constexpr svanes::Rectangle2D kUnitIconGeometry{.width = 17.5F,
                                                 .height = 8.75F};
 
+// Smallest magnification allowed relative to one in which the whole map fits in
+// the output window.
+constexpr double kMinimumZoomFactor = 0.0001;
+
+// Largest magnification allowed relative to one in which the whole map fits in
+// the output window.
+constexpr double kMaximumZoomFactor = 100.0;
+
+// Initial rate of change of log magnification per second of held input.
+constexpr double kInitialZoomRate = 0.5;
+
+// Exponential growth rate per second while a zoom key remains held.
+constexpr double kZoomRateGrowth = 1.0;
+
 void MarchingOrdersClient::Initialize(svanes::ClientContext &context) {
     const svanes::ImageData image = LoadTerrainImage();
     terrain_side = static_cast<float>(image.width);
@@ -75,11 +89,48 @@ void MarchingOrdersClient::HandleDisconnect() {
     throw std::runtime_error("Lost connection to the marchingOrders server.");
 }
 
-void MarchingOrdersClient::Update(const svanes::ClientFrameContext &context) {
+void MarchingOrdersClient::UpdateZoom(
+    const svanes::ClientFrameContext &context) {
     const auto side = std::min(context.output_width, context.output_height);
-    if (side > 0) {
-        context.camera.zoom = static_cast<float>(side) / terrain_side;
+    if (side <= 0) {
+        return;
     }
+    const double fit_zoom = static_cast<double>(side) / terrain_side;
+    context.camera.zoom = static_cast<float>(fit_zoom * zoom_factor);
+
+    const auto direction =
+        static_cast<std::int8_t>(context.input.IsDown(svanes::Key::Equals) -
+                                 context.input.IsDown(svanes::Key::Minus));
+
+    if (direction != zoom_direction) {
+        zoom_direction = direction;
+        zoom_hold_seconds = 0.0;
+    }
+
+    if (direction == 0 ||
+        (direction > 0 && zoom_factor >= kMaximumZoomFactor) ||
+        (direction < 0 && zoom_factor <= kMinimumZoomFactor)) {
+        return;
+    }
+
+    const double seconds =
+        static_cast<double>(context.real_delta_tics) / svanes::TicsPerSecond;
+
+    // Integrate the accelerating zoom rate over this frame's elapsed time.
+    const double change =
+        kInitialZoomRate * std::exp(kZoomRateGrowth * zoom_hold_seconds) *
+        std::expm1(kZoomRateGrowth * seconds) / kZoomRateGrowth;
+    zoom_hold_seconds += seconds;
+
+    zoom_factor = std::clamp(zoom_factor * std::exp(direction * change),
+                             kMinimumZoomFactor, kMaximumZoomFactor);
+
+    context.camera.SetZoomAt(static_cast<float>(fit_zoom * zoom_factor),
+                             context.input.MousePosition());
+}
+
+void MarchingOrdersClient::Update(const svanes::ClientFrameContext &context) {
+    UpdateZoom(context);
     // Process messages from the server to update entity positions and influence map values.
     const auto messages = context.network.PollMessages();
     if (!messages.empty()) {
