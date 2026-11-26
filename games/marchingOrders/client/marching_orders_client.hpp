@@ -69,11 +69,11 @@ public:
 
 private:
     /**
-     * Zooms around the cursor and preserves the chosen map scale on resize.
+     * Applies camera movement and cursor-centered zoom to the player's view.
      *
      * @param context The input, camera, output size, and elapsed frame time.
      */
-    void UpdateZoom(const svanes::ClientFrameContext &context);
+    void UpdateCamera(const svanes::ClientFrameContext &context);
 
     // Entity that displays the unit at its server-reported position.
     svanes::Entity unit_entity{};

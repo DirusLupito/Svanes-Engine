@@ -23,6 +23,9 @@ namespace marching_orders {
 constexpr svanes::Rectangle2D kUnitIconGeometry{.width = 17.5F,
                                                 .height = 8.75F};
 
+// Camera travel in screen pixels per second while an arrow key is held.
+constexpr float kKeyboardPanPixelsPerSecond = 480.0F;
+
 // Smallest magnification allowed relative to one in which the whole map fits in
 // the output window.
 constexpr double kMinimumZoomFactor = 0.0001;
@@ -89,7 +92,40 @@ void MarchingOrdersClient::HandleDisconnect() {
     throw std::runtime_error("Lost connection to the marchingOrders server.");
 }
 
-void MarchingOrdersClient::UpdateZoom(
+/**
+ * Moves the camera in the arrow-key direction and lets a middle-button drag
+ * move the terrain with the cursor.
+ *
+ * @param context The camera and current input state.
+ * @param seconds Unscaled time elapsed since the previous frame, in seconds.
+ */
+static void PanCamera(const svanes::ClientFrameContext &context,
+                      float seconds) {
+    const svanes::Vector2D direction{
+        static_cast<float>(context.input.IsDown(svanes::Key::Right) -
+                           context.input.IsDown(svanes::Key::Left)),
+        static_cast<float>(context.input.IsDown(svanes::Key::Down) -
+                           context.input.IsDown(svanes::Key::Up))};
+
+    svanes::Vector2D pan_pixels{};
+    const float length = std::hypot(direction.x, direction.y);
+    if (length > 0.0F) {
+        pan_pixels =
+            direction * (kKeyboardPanPixelsPerSecond * seconds / length);
+    }
+
+    if (context.input.IsMouseButtonDown(svanes::MouseButton::Middle) &&
+        !context.input.WasMouseButtonPressed(svanes::MouseButton::Middle)) {
+        pan_pixels -= context.input.MouseDeltaThisFrame();
+    }
+
+    const auto pan_world =
+        pan_pixels / (context.camera.zoom * context.camera.Scale());
+    context.camera.x += pan_world.x;
+    context.camera.y += pan_world.y;
+}
+
+void MarchingOrdersClient::UpdateCamera(
     const svanes::ClientFrameContext &context) {
     const auto side = std::min(context.output_width, context.output_height);
     if (side <= 0) {
@@ -97,6 +133,12 @@ void MarchingOrdersClient::UpdateZoom(
     }
     const double fit_zoom = static_cast<double>(side) / terrain_side;
     context.camera.zoom = static_cast<float>(fit_zoom * zoom_factor);
+
+    const double seconds =
+        static_cast<double>(context.real_delta_tics) / svanes::TicsPerSecond;
+    // We move the grabbed point under the cursor before using it as the zoom
+    // anchor.
+    PanCamera(context, static_cast<float>(seconds));
 
     const auto direction =
         static_cast<std::int8_t>(context.input.IsDown(svanes::Key::Equals) -
@@ -113,9 +155,6 @@ void MarchingOrdersClient::UpdateZoom(
         return;
     }
 
-    const double seconds =
-        static_cast<double>(context.real_delta_tics) / svanes::TicsPerSecond;
-
     // Integrate the accelerating zoom rate over this frame's elapsed time.
     const double change =
         kInitialZoomRate * std::exp(kZoomRateGrowth * zoom_hold_seconds) *
@@ -130,7 +169,7 @@ void MarchingOrdersClient::UpdateZoom(
 }
 
 void MarchingOrdersClient::Update(const svanes::ClientFrameContext &context) {
-    UpdateZoom(context);
+    UpdateCamera(context);
     // Process messages from the server to update entity positions and influence map values.
     const auto messages = context.network.PollMessages();
     if (!messages.empty()) {
