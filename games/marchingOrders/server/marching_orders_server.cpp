@@ -11,8 +11,9 @@ namespace marching_orders {
 
 constexpr float kControlStampValue = 1.0F;
 constexpr float kControlStampRadius = 80.0F;
-constexpr float kControlHalfLifeSeconds = 5.0F;
-constexpr svanes::TicCount kIdleControlStampInterval = svanes::TicsPerSecond / 2;
+constexpr float kControlHalfLifeSeconds = .75F;
+constexpr svanes::TicCount kControlStampInterval = svanes::TicsPerSecond / 16;
+constexpr float kLowControlThreshold = 0.25F;
 constexpr float kMediumControlThreshold = 1.0F;
 constexpr float kHighControlThreshold = 3.0F;
 
@@ -66,14 +67,12 @@ void MarchingOrdersServer::PhysicsUpdate(
                           kControlHalfLifeSeconds);
     control_stamp_tics += delta_tics;
     // Stamp new values
-    if (!last_control_stamp || position.x != last_control_stamp->x ||
-        position.y != last_control_stamp->y ||
-        control_stamp_tics >= kIdleControlStampInterval) {
+    if (!control_stamped || control_stamp_tics >= kControlStampInterval) {
         team_control_map.Stamp(position, kControlStampValue,
                                kControlStampRadius,
                                [](svanes::Vector2D, svanes::Vector2D,
                                   float distance) { return 1.0F - distance; });
-        last_control_stamp = position;
+        control_stamped = true;
         control_stamp_tics = 0;
     }
     svanes::MessageWriter writer;
@@ -92,7 +91,7 @@ void MarchingOrdersServer::PhysicsUpdate(
                 tier = 3;
             } else if (value >= kMediumControlThreshold) {
                 tier = 2;
-            } else if (value > 0.0F) {
+            } else if (value >= kLowControlThreshold) {
                 tier = 1;
             }
             writer.WriteUint8(tier);

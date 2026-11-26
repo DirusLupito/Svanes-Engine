@@ -60,7 +60,7 @@ private:
     static constexpr svanes::Vector2D kControlMapOrigin{-440.0F, -440.0F};
     InfluenceMap team_control_map{kControlMapWidth, kControlMapHeight,
                                   kControlCellSize, kControlMapOrigin};
-    std::optional<svanes::Vector2D> last_control_stamp;
+    bool control_stamped = false;
     svanes::TicCount control_stamp_tics = 0;
 };
 
