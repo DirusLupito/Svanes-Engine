@@ -9,12 +9,25 @@
 
 namespace marching_orders {
 
+// Influence added at the center of a control stamp.
 constexpr float kControlStampValue = 1.0F;
+
+// Radius in world units over which a stamp adds influence.
 constexpr float kControlStampRadius = 80.0F;
+
+// Time in seconds for accumulated influence to fall by half.
 constexpr float kControlHalfLifeSeconds = .75F;
+
+// Simulation tics between consecutive control stamps.
 constexpr svanes::TicCount kControlStampInterval = svanes::TicsPerSecond / 16;
+
+// Minimum cell influence for the low control tier.
 constexpr float kLowControlThreshold = 0.25F;
+
+// Minimum cell influence for the medium control tier.
 constexpr float kMediumControlThreshold = 1.0F;
+
+// Minimum cell influence for the high control tier.
 constexpr float kHighControlThreshold = 3.0F;
 
 void MarchingOrdersServer::Initialize(svanes::ServerContext &context) {

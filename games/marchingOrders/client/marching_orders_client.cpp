@@ -19,6 +19,10 @@
 
 namespace marching_orders {
 
+// Size of a unit icon on the map, in world units.
+constexpr svanes::Rectangle2D kUnitIconGeometry{.width = 17.5F,
+                                                .height = 8.75F};
+
 void MarchingOrdersClient::Initialize(svanes::ClientContext &context) {
     const svanes::ImageData image = LoadTerrainImage();
     terrain_side = static_cast<float>(image.width);
@@ -42,10 +46,9 @@ void MarchingOrdersClient::Initialize(svanes::ClientContext &context) {
     context.world.AddComponent<svanes::Transform>(unit_entity);
     context.world.AddComponent<svanes::Sprite>(
         unit_entity,
-        svanes::Sprite{
-            .texture = context.assets.LoadTexture(svanes::AssetPath(
-                "assets/marchingOrders/sprites/infantry_01.png")),
-            .geometry = svanes::Rectangle2D{.width = 64.0F, .height = 32.0F}});
+        svanes::Sprite{.texture = context.assets.LoadTexture(svanes::AssetPath(
+                           "assets/marchingOrders/sprites/infantry_01.png")),
+                       .geometry = kUnitIconGeometry});
     context.world.AddComponent<svanes::ZOrder>(unit_entity, svanes::ZOrder{2});
     std::cout << "Hello, world! marchingOrders client.\n" << std::flush;
 }

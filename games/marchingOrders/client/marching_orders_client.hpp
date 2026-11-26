@@ -66,8 +66,13 @@ public:
     svanes::TicCount GetFrameIntervalTics() const override;
 
 private:
+    // Entity that displays the unit at its server-reported position.
     svanes::Entity unit_entity{};
+
+    // Entity that draws the team's control overlay on the terrain.
     svanes::Entity control_map_entity{};
+
+    // Texture containing the overlay tile for each visible control tier.
     svanes::TextureHandle control_atlas{};
 
     // Side length of the terrain sprite in world units, used to fit the camera.
