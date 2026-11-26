@@ -1,6 +1,10 @@
 #pragma once
 
+#include "../unit.hpp"
+
 #include <svanes/network/clientserver/IServer.hpp>
+
+#include <optional>
 
 namespace marching_orders {
 
@@ -42,6 +46,13 @@ public:
      * @param context The engine services for this update.
      */
     void Update(const svanes::ServerUpdateContext &context) override;
+    void PhysicsUpdate(const svanes::ServerPhysicsContext &context) override;
+
+/**
+ * Temporary test unit. To be removed.
+ */
+private:
+    std::optional<Unit> unit;
 };
 
 } // namespace marching_orders

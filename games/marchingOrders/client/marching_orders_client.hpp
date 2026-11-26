@@ -1,5 +1,6 @@
 #pragma once
 
+#include <svanes/entity.hpp>
 #include <svanes/network/clientserver/IClient.hpp>
 
 namespace marching_orders {
@@ -64,6 +65,8 @@ public:
     svanes::TicCount GetFrameIntervalTics() const override;
 
 private:
+    svanes::Entity unit_entity{};
+
     // Side length of the terrain sprite in world units, used to fit the camera.
     float terrain_side = 0.0F;
 

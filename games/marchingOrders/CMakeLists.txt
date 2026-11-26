@@ -9,6 +9,8 @@ target_link_libraries(svanes_game_marching_orders PRIVATE Svanes::Engine)
 svanes_game_package(svanes_game_marching_orders marchingOrders marchingOrders marchingOrders)
 
 add_executable(svanes_game_marching_orders_server
+    unit.cpp
+    unit.hpp
     server/server_main.cpp
     server/marching_orders_server.cpp
     server/marching_orders_server.hpp
