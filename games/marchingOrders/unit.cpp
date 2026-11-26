@@ -25,7 +25,7 @@ Unit::Unit(svanes::Registry &world, svanes::Vector2D position, float speed)
 }
 
 void Unit::SetDestination(svanes::Registry &world, svanes::Vector2D position) {
-    const auto &transform = world.GetComponent<svanes::Transform>(entity);
+    auto &transform = world.GetComponent<svanes::Transform>(entity);
     const auto offset = position - svanes::Vector2D{transform.x, transform.y};
     const float distance = std::hypot(offset.x, offset.y);
     if (!std::isfinite(position.x) || !std::isfinite(position.y) ||
@@ -41,6 +41,7 @@ void Unit::SetDestination(svanes::Registry &world, svanes::Vector2D position) {
         return;
     }
     destination = position;
+    transform.rotation = std::atan2(offset.y, offset.x);
     motion.velocity_x = (offset.x / distance) * speed;
     motion.velocity_y = (offset.y / distance) * speed;
 }

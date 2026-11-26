@@ -91,6 +91,7 @@ void MarchingOrdersServer::PhysicsUpdate(
     svanes::MessageWriter writer;
     writer.WriteFloat32(transform.x);
     writer.WriteFloat32(transform.y);
+    writer.WriteFloat32(transform.rotation);
     writer.WriteUint32(kControlMapWidth);
     writer.WriteUint32(kControlMapHeight);
     writer.WriteUint32(kControlCellSize);

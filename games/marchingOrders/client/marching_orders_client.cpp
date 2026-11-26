@@ -15,6 +15,7 @@
 #include <cmath>
 #include <cstddef>
 #include <iostream>
+#include <numbers>
 #include <stdexcept>
 
 namespace marching_orders {
@@ -22,6 +23,9 @@ namespace marching_orders {
 // Size of a unit icon on the map, in world units.
 constexpr svanes::Rectangle2D kUnitIconGeometry{.width = 17.5F,
                                                 .height = 8.75F};
+
+// Rotation from the unit's heading to the icon's long edge, in radians.
+constexpr float kUnitIconRotationOffset = std::numbers::pi_v<float> / 2.0F;
 
 // Camera travel in screen pixels per second while an arrow key is held.
 constexpr float kKeyboardPanPixelsPerSecond = 480.0F;
@@ -60,7 +64,8 @@ void MarchingOrdersClient::Initialize(svanes::ClientContext &context) {
                                                svanes::ZOrder{1});
     // Temporary unit created for testing. To be removed once actual gameplay is added.
     unit_entity = context.world.CreateEntity();
-    context.world.AddComponent<svanes::Transform>(unit_entity);
+    context.world.AddComponent<svanes::Transform>(
+        unit_entity, svanes::Transform{.rotation = kUnitIconRotationOffset});
     context.world.AddComponent<svanes::Sprite>(
         unit_entity,
         svanes::Sprite{.texture = context.assets.LoadTexture(svanes::AssetPath(
@@ -170,19 +175,23 @@ void MarchingOrdersClient::UpdateCamera(
 
 void MarchingOrdersClient::Update(const svanes::ClientFrameContext &context) {
     UpdateCamera(context);
-    // Process messages from the server to update entity positions and influence map values.
+    // Apply the latest world state received from the server.
     const auto messages = context.network.PollMessages();
     if (!messages.empty()) {
         svanes::MessageReader reader(messages.back());
-        const svanes::Vector2D position{reader.ReadFloat32(),
-                                        reader.ReadFloat32()};
+        const svanes::Transform icon_transform{
+            .x = reader.ReadFloat32(),
+            .y = reader.ReadFloat32(),
+            .rotation = reader.ReadFloat32() + kUnitIconRotationOffset};
         const auto columns = reader.ReadUint32();
         const auto rows = reader.ReadUint32();
         const auto cell_size = reader.ReadUint32();
         const svanes::Vector2D origin{reader.ReadFloat32(),
                                       reader.ReadFloat32()};
         const auto cell_count = static_cast<std::uint64_t>(columns) * rows;
-        if (!std::isfinite(position.x) || !std::isfinite(position.y) ||
+        if (!std::isfinite(icon_transform.x) ||
+            !std::isfinite(icon_transform.y) ||
+            !std::isfinite(icon_transform.rotation) ||
             !std::isfinite(origin.x) || !std::isfinite(origin.y) ||
             columns == 0 || rows == 0 || cell_size == 0 ||
             cell_count != reader.Remaining()) {
@@ -216,10 +225,8 @@ void MarchingOrdersClient::Update(const svanes::ClientFrameContext &context) {
             context.world.GetComponent<svanes::Transform>(control_map_entity);
         overlay_transform.x = origin.x;
         overlay_transform.y = origin.y;
-        auto &transform =
-            context.world.GetComponent<svanes::Transform>(unit_entity);
-        transform.x = position.x;
-        transform.y = position.y;
+        context.world.GetComponent<svanes::Transform>(unit_entity) =
+            icon_transform;
     }
     // Send input over the network on right click. Will need to be updated to allow unit selection.
     if (context.network.IsConnected() &&
