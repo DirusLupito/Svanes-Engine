@@ -1,10 +1,13 @@
 #pragma once
 
+#include "../scenario.hpp"
+
 #include <svanes/entity.hpp>
 #include <svanes/network/clientserver/IClient.hpp>
 #include <svanes/render/basic_render_types.hpp>
 
 #include <cstdint>
+#include <map>
 
 namespace marching_orders {
 
@@ -75,17 +78,24 @@ private:
      */
     void UpdateCamera(const svanes::ClientFrameContext &context);
 
-    // Entity that displays the unit at its server-reported position.
-    svanes::Entity unit_entity{};
+    /**
+     * Updates unit icons and the control overlay from the current scenario.
+     *
+     * @param world The registry containing the client's render entities.
+     */
+    void UpdateScenarioView(svanes::Registry &world);
+
+    // Match state received from the server.
+    Scenario scenario{Terrain::Get()};
+
+    // Local icon entities keyed by the unit IDs used in orders and snapshots.
+    std::map<svanes::Entity, svanes::Entity> unit_icons;
+
+    // Texture used to draw units on the map.
+    svanes::TextureHandle unit_texture{};
 
     // Entity that draws the team's control overlay on the terrain.
     svanes::Entity control_map_entity{};
-
-    // Texture containing the overlay tile for each visible control tier.
-    svanes::TextureHandle control_atlas{};
-
-    // Side length of the terrain sprite in world units, used to fit the camera.
-    float terrain_side = 0.0F;
 
     // Magnification relative to the view that fits the whole map.
     double zoom_factor = 1.0;

@@ -1,7 +1,6 @@
 #pragma once
 
-#include "../unit.hpp"
-#include "../utils/influence_map.hpp"
+#include "../scenario.hpp"
 
 #include <svanes/network/clientserver/IServer.hpp>
 
@@ -47,33 +46,17 @@ public:
      * @param context The engine services for this update.
      */
     void Update(const svanes::ServerUpdateContext &context) override;
+
+    /**
+     * Completes the scenario's physics step and publishes its state.
+     *
+     * @param context The engine services for the completed step.
+     */
     void PhysicsUpdate(const svanes::ServerPhysicsContext &context) override;
 
 private:
-    // Test unit that receives movement orders from clients.
-    std::optional<Unit> unit;
-
-    // Number of columns in the control map.
-    static constexpr std::uint32_t kControlMapWidth = 88;
-
-    // Number of rows in the control map.
-    static constexpr std::uint32_t kControlMapHeight = 88;
-
-    // Side length of a control cell in world units.
-    static constexpr std::uint32_t kControlCellSize = 10;
-
-    // World coordinates where the first control cell begins.
-    static constexpr svanes::Vector2D kControlMapOrigin{-440.0F, -440.0F};
-
-    // Accumulated team influence in each cell, used to determine control tiers.
-    InfluenceMap team_control_map{kControlMapWidth, kControlMapHeight,
-                                  kControlCellSize, kControlMapOrigin};
-
-    // Set once the first control stamp has been applied.
-    bool control_stamped = false;
-
-    // Simulation tics elapsed since the last control stamp.
-    svanes::TicCount control_stamp_tics = 0;
+    // Authoritative match, created when the engine supplies its registry.
+    std::optional<Scenario> scenario;
 };
 
 } // namespace marching_orders

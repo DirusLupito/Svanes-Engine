@@ -163,4 +163,31 @@ constexpr float kSeaLevelMeters = 0.0F;
 constexpr float kDeepWaterDepthMeters = 1300.0F;
 ```
 
+## 5. Document struct fields once in `FIELDS:`
+
+**Original example**
+
+```cpp
+/**
+ * Holds the state used to advance a match on the server.
+ *
+ * FIELDS:
+ * - world contains the units' movement and physics components.
+ * - influence accumulates the exact control value in each cell.
+ * - tics_until_stamp gives the time remaining before units contribute again.
+ */
+struct Scenario::Simulation {
+    // Registry that advances the units' physics.
+    svanes::Registry &world;
+    // Exact influence before conversion to control tiers.
+    InfluenceMap influence;
+    // Simulation tics remaining before the next stamp.
+    svanes::TicCount tics_until_stamp = 0;
+};
+```
+
+Give each struct field one entry under `FIELDS:` in the struct's documentation block. Use the exact field name and include units there when they matter. Leave the field declarations themselves bare. In this example, the `tics_until_stamp` entry should specify simulation tics.
+
+For structs with member functions, `HGrid2D::Cell` and `HGrid2D::CellHash` in `include/svanes/spatial/hgrid2d.hpp` show how to include a one-line method summary under `FIELDS:`. Keep the full function contract with the declaration, where readers can find its parameters, return value, and any exceptions.
+
 When reviewing a comment, ask what its reader can rely on. If changing the asset, controls, or implementation would force a rewrite, check whether that detail is a real guarantee. If the guarantee itself changes, update the comment with the code.

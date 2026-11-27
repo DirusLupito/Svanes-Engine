@@ -10,8 +10,8 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    marching_orders::MarchingOrdersServer server;
     svanes::NetworkServer application;
+    marching_orders::MarchingOrdersServer server;
     application.Listen(argc == 2 ? argv[1] : "127.0.0.1:5811");
     return application.run(server);
 }

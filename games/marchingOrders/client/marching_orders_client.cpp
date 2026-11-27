@@ -5,7 +5,6 @@
 #include <svanes/camera2d.hpp>
 #include <svanes/input/input_manager.hpp>
 #include <svanes/network/clientserver/network_client.hpp>
-#include <svanes/network/message_serialization.hpp>
 #include <svanes/registry.hpp>
 #include <svanes/render/render_system.hpp>
 #include <svanes/render/texture_manager.hpp>
@@ -45,33 +44,39 @@ constexpr double kInitialZoomRate = 0.5;
 constexpr double kZoomRateGrowth = 1.0;
 
 void MarchingOrdersClient::Initialize(svanes::ClientContext &context) {
-    const svanes::ImageData image = LoadTerrainImage();
-    terrain_side = static_cast<float>(image.width);
+    const svanes::ImageData image = LoadTerrainImage(scenario.GetTerrain());
     const auto terrain = context.world.CreateEntity();
     context.world.AddComponent<svanes::Transform>(terrain);
     context.world.AddComponent<svanes::Sprite>(
-        terrain, svanes::Sprite{.texture = context.assets.CreateTexture(image),
-                                .geometry = {.width = terrain_side,
-                                             .height = terrain_side}});
+        terrain, svanes::Sprite{
+                     .texture = context.assets.CreateTexture(image),
+                     .geometry = {.width = static_cast<float>(image.width),
+                                  .height = static_cast<float>(image.height)}});
     const svanes::ImageData control_colors{
         .width = 3,
         .height = 1,
         .rgba_pixels = {255, 0, 0, 24, 255, 0, 0, 48, 255, 0, 0, 72}};
-    control_atlas = context.assets.CreateTexture(control_colors);
+    const auto &control = scenario.GetControl();
     control_map_entity = context.world.CreateEntity();
-    context.world.AddComponent<svanes::Transform>(control_map_entity);
+    context.world.AddComponent<svanes::Transform>(
+        control_map_entity,
+        svanes::Transform{.x = control.origin.x, .y = control.origin.y});
+    auto &overlay =
+        context.world.AddComponent<svanes::TileMap>(control_map_entity);
+    overlay.atlas = context.assets.CreateTexture(control_colors);
+    overlay.columns = control.columns;
+    overlay.rows = control.rows;
+    overlay.tile_width = control.cell_size;
+    overlay.tile_height = control.cell_size;
+    overlay.atlas_tile_width = 1;
+    overlay.atlas_tile_height = 1;
+    overlay.atlas_columns = control_colors.width;
+    overlay.atlas_rows = control_colors.height;
+    overlay.cells.resize(control.tiers.size());
     context.world.AddComponent<svanes::ZOrder>(control_map_entity,
                                                svanes::ZOrder{1});
-    // Temporary unit created for testing. To be removed once actual gameplay is added.
-    unit_entity = context.world.CreateEntity();
-    context.world.AddComponent<svanes::Transform>(
-        unit_entity, svanes::Transform{.rotation = kUnitIconRotationOffset});
-    context.world.AddComponent<svanes::Sprite>(
-        unit_entity,
-        svanes::Sprite{.texture = context.assets.LoadTexture(svanes::AssetPath(
-                           "assets/marchingOrders/sprites/infantry_01.png")),
-                       .geometry = kUnitIconGeometry});
-    context.world.AddComponent<svanes::ZOrder>(unit_entity, svanes::ZOrder{2});
+    unit_texture = context.assets.LoadTexture(
+        svanes::AssetPath("assets/marchingOrders/sprites/infantry_01.png"));
     std::cout << "Hello, world! marchingOrders client.\n" << std::flush;
 }
 
@@ -132,11 +137,13 @@ static void PanCamera(const svanes::ClientFrameContext &context,
 
 void MarchingOrdersClient::UpdateCamera(
     const svanes::ClientFrameContext &context) {
-    const auto side = std::min(context.output_width, context.output_height);
-    if (side <= 0) {
+    if (context.output_width <= 0 || context.output_height <= 0) {
         return;
     }
-    const double fit_zoom = static_cast<double>(side) / terrain_side;
+    const auto &terrain = scenario.GetTerrain();
+    const double fit_zoom =
+        std::min(static_cast<double>(context.output_width) / terrain.Width(),
+                 static_cast<double>(context.output_height) / terrain.Height());
     context.camera.zoom = static_cast<float>(fit_zoom * zoom_factor);
 
     const double seconds =
@@ -173,71 +180,57 @@ void MarchingOrdersClient::UpdateCamera(
                              context.input.MousePosition());
 }
 
+void MarchingOrdersClient::UpdateScenarioView(svanes::Registry &world) {
+    const auto &units = scenario.GetUnits();
+    std::erase_if(unit_icons, [&](const auto &icon) {
+        if (units.contains(icon.first)) {
+            return false;
+        }
+        world.DestroyEntity(icon.second);
+        return true;
+    });
+
+    for (const auto &[id, transform] : units) {
+        auto [icon, inserted] = unit_icons.try_emplace(id);
+        if (inserted) {
+            icon->second = world.CreateEntity();
+            world.AddComponent<svanes::Sprite>(
+                icon->second, svanes::Sprite{.texture = unit_texture,
+                                             .geometry = kUnitIconGeometry});
+            world.AddComponent<svanes::ZOrder>(icon->second, svanes::ZOrder{2});
+            world.AddComponent<svanes::Transform>(icon->second);
+        }
+
+        auto &pose = world.GetComponent<svanes::Transform>(icon->second);
+        pose = transform;
+        pose.rotation += kUnitIconRotationOffset;
+    }
+
+    auto &overlay = world.GetComponent<svanes::TileMap>(control_map_entity);
+    const auto &tiers = scenario.GetControl().tiers;
+    for (std::size_t i = 0; i < tiers.size(); ++i) {
+        overlay.cells[i].tile_id = tiers[i];
+    }
+}
+
 void MarchingOrdersClient::Update(const svanes::ClientFrameContext &context) {
     UpdateCamera(context);
-    // Apply the latest world state received from the server.
     const auto messages = context.network.PollMessages();
     if (!messages.empty()) {
-        svanes::MessageReader reader(messages.back());
-        const svanes::Transform icon_transform{
-            .x = reader.ReadFloat32(),
-            .y = reader.ReadFloat32(),
-            .rotation = reader.ReadFloat32() + kUnitIconRotationOffset};
-        const auto columns = reader.ReadUint32();
-        const auto rows = reader.ReadUint32();
-        const auto cell_size = reader.ReadUint32();
-        const svanes::Vector2D origin{reader.ReadFloat32(),
-                                      reader.ReadFloat32()};
-        const auto cell_count = static_cast<std::uint64_t>(columns) * rows;
-        if (!std::isfinite(icon_transform.x) ||
-            !std::isfinite(icon_transform.y) ||
-            !std::isfinite(icon_transform.rotation) ||
-            !std::isfinite(origin.x) || !std::isfinite(origin.y) ||
-            columns == 0 || rows == 0 || cell_size == 0 ||
-            cell_count != reader.Remaining()) {
-            throw std::invalid_argument("Invalid world state from server.");
-        }
-        if (!context.world.HasComponent<svanes::TileMap>(control_map_entity)) {
-            context.world.AddComponent<svanes::TileMap>(control_map_entity);
-        }
-        // Update the tilemap with the received control values
-        auto &overlay =
-            context.world.GetComponent<svanes::TileMap>(control_map_entity);
-        overlay.atlas = control_atlas;
-        overlay.columns = columns;
-        overlay.rows = rows;
-        overlay.tile_width = cell_size;
-        overlay.tile_height = cell_size;
-        overlay.atlas_tile_width = 1;
-        overlay.atlas_tile_height = 1;
-        overlay.atlas_columns = 3;
-        overlay.atlas_rows = 1;
-        overlay.cells.resize(static_cast<std::size_t>(cell_count));
-        for (auto &cell : overlay.cells) {
-            const auto tier = reader.ReadUint8();
-            if (tier > 3) {
-                throw std::invalid_argument(
-                    "Invalid team control tier from server.");
-            }
-            cell.tile_id = tier;
-        }
-        auto &overlay_transform =
-            context.world.GetComponent<svanes::Transform>(control_map_entity);
-        overlay_transform.x = origin.x;
-        overlay_transform.y = origin.y;
-        context.world.GetComponent<svanes::Transform>(unit_entity) =
-            icon_transform;
+        scenario.ApplySnapshot(messages.back());
+        UpdateScenarioView(context.world);
     }
-    // Send input over the network on right click. Will need to be updated to allow unit selection.
-    if (context.network.IsConnected() &&
+
+    const auto &units = scenario.GetUnits();
+    // With one unit on the map, the order target is unambiguous.
+    if (context.network.IsConnected() && units.size() == 1 &&
         context.input.WasMouseButtonPressed(svanes::MouseButton::Right)) {
         const auto mouse = context.input.MousePosition();
         const auto destination =
             context.camera.ScreenToWorld({mouse.x, mouse.y, 0.0F, 0.0F});
-        svanes::MessageWriter writer;
-        writer.WriteFloat32(destination.x);
-        writer.WriteFloat32(destination.y);
-        context.network.Send(writer.Finish());
+        const MoveOrder order{.unit = units.begin()->first,
+                              .destination = {destination.x, destination.y}};
+        context.network.Send(order.Encode());
     }
     if (context.input.WasPressed(svanes::Key::Escape)) {
         quit = true;

@@ -1,7 +1,5 @@
 #include "terrain_image.hpp"
 
-#include "../terrain.hpp"
-
 #include <svanes/asset_path.hpp>
 #include <svanes/utility/file_io.hpp>
 
@@ -130,8 +128,7 @@ static svanes::Color TerrainColor(bool is_water, float height_meters,
     return {lit(land.red), lit(land.green), lit(land.blue)};
 }
 
-svanes::ImageData marching_orders::LoadTerrainImage() {
-    const auto &terrain = Terrain::Get();
+svanes::ImageData marching_orders::LoadTerrainImage(const Terrain &terrain) {
     svanes::ImageData image{.width = terrain.Width(),
                             .height = terrain.Height()};
     const auto cells = static_cast<std::size_t>(image.width) * image.height;
