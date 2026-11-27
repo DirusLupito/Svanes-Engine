@@ -1,31 +1,24 @@
-#include "terrain.hpp"
+#include "terrain_image.hpp"
+
+#include "../terrain.hpp"
 
 #include <svanes/asset_path.hpp>
 #include <svanes/utility/file_io.hpp>
 
 #include <algorithm>
-#include <bit>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <stdexcept>
 #include <string_view>
-#include <vector>
 
 namespace {
-
-// Path to the grid of terrain elevations, relative to the executable.
-constexpr std::string_view kElevationGridPath =
-    "assets/marchingOrders/southern_red_sea.bil";
 
 // Path to the water mask aligned with the elevation grid, relative to the
 // executable.
 constexpr std::string_view kWaterMaskPath =
     "assets/marchingOrders/southern_red_sea_water.mask";
-
-// Samples along each edge of the packaged square elevation grid.
-constexpr std::int32_t kTerrainSide = 880;
 
 // Number of consecutive channel bytes occupied by one RGBA pixel.
 constexpr std::size_t kChannelsPerPixel = 4;
@@ -138,13 +131,10 @@ static svanes::Color TerrainColor(bool is_water, float height_meters,
 }
 
 svanes::ImageData marching_orders::LoadTerrainImage() {
-    const auto bytes = svanes::ReadFile(svanes::AssetPath(kElevationGridPath));
-    constexpr std::size_t cells = kTerrainSide * kTerrainSide;
-    if (bytes.size() != sizeof(std::int16_t) * cells) {
-        throw std::runtime_error(
-            "Unexpected size for the terrain elevation grid.");
-    }
-
+    const auto &terrain = Terrain::Get();
+    svanes::ImageData image{.width = terrain.Width(),
+                            .height = terrain.Height()};
+    const auto cells = static_cast<std::size_t>(image.width) * image.height;
     const auto water_mask = svanes::ReadFile(svanes::AssetPath(kWaterMaskPath));
     if (water_mask.size() != cells) {
         throw std::runtime_error(
@@ -155,30 +145,14 @@ svanes::ImageData marching_orders::LoadTerrainImage() {
         throw std::runtime_error("Water mask cells must be 0 or 1.");
     }
 
-    // The Oceania/generic mapping tools data apparently stores signed 
-    // 16-bit elevations, low byte first so we decode them explicitly here
-    // just in case other clients/the server would disagree on endianness.
-
-    std::vector<std::int16_t> heights(cells);
-    for (std::size_t i = 0; i < cells; ++i) {
-        const auto offset = sizeof(std::int16_t) * i;
-        const auto low_byte = std::to_integer<std::uint8_t>(bytes[offset]);
-        const auto high_byte = std::to_integer<std::uint8_t>(bytes[offset + 1]);
-        const auto value = static_cast<std::uint16_t>(
-            low_byte |
-            (high_byte << std::numeric_limits<std::uint8_t>::digits));
-        heights[i] = std::bit_cast<std::int16_t>(value);
-    }
-
-    svanes::ImageData image{.width = kTerrainSide, .height = kTerrainSide};
     image.rgba_pixels.resize(cells * kChannelsPerPixel);
-    for (std::int32_t y = 0; y < kTerrainSide; ++y) {
-        for (std::int32_t x = 0; x < kTerrainSide; ++x) {
-            const auto i = y * kTerrainSide + x;
+    for (std::int32_t y = 0; y < image.height; ++y) {
+        for (std::int32_t x = 0; x < image.width; ++x) {
+            const auto i = static_cast<std::size_t>(y) * image.width + x;
 
-            // 
+            //
             // POST PROCESSING: LIGHTING BAKED INTO THE TERRAIN IMAGE
-            // 
+            //
 
             // Shade the terrain texture so ridges are visible on the flat map.
             // Land above the average height of its north and west neighbors
@@ -186,16 +160,17 @@ svanes::ImageData marching_orders::LoadTerrainImage() {
             // cell serves as its own neighbor so that height difference is
             // zero.
 
-            const auto west = heights[y * kTerrainSide + std::max(0, x - 1)];
-            const auto north = heights[std::max(0, y - 1) * kTerrainSide + x];
+            const auto height = terrain.ElevationAt(x, y);
+            const auto west = terrain.ElevationAt(std::max(0, x - 1), y);
+            const auto north = terrain.ElevationAt(x, std::max(0, y - 1));
             // Sum of the elevation gains from the two neighbors, in meters.
-            const auto rise = 2 * heights[i] - west - north;
+            const auto rise = 2 * height - west - north;
             const float shade =
                 1.0F + std::clamp(rise / kHillshadeRiseScaleMeters,
                                   kMinHillshadeAdjustment,
                                   kMaxHillshadeAdjustment);
             const auto color =
-                TerrainColor(water_mask[i] == std::byte{1}, heights[i], shade);
+                TerrainColor(water_mask[i] == std::byte{1}, height, shade);
             const auto pixel = kChannelsPerPixel * i;
             image.rgba_pixels[pixel] = color.red;
             image.rgba_pixels[pixel + 1] = color.green;

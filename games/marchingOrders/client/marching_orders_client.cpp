@@ -1,5 +1,5 @@
 #include "marching_orders_client.hpp"
-#include "terrain.hpp"
+#include "terrain_image.hpp"
 
 #include <svanes/asset_path.hpp>
 #include <svanes/camera2d.hpp>
