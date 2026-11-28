@@ -221,15 +221,43 @@ void MarchingOrdersClient::Update(const svanes::ClientFrameContext &context) {
         UpdateScenarioView(context.world);
     }
 
+    const auto mouse = context.input.MousePosition();
+    const auto position =
+        context.camera.ScreenToWorld({mouse.x, mouse.y, 0.0F, 0.0F});
     const auto &units = scenario.GetUnits();
-    // With one unit on the map, the order target is unambiguous.
-    if (context.network.IsConnected() && units.size() == 1 &&
+    if (selected_unit && !units.contains(*selected_unit)) {
+        selected_unit.reset();
+    }
+    if (context.input.WasMouseButtonPressed(svanes::MouseButton::Left)) {
+        const auto previous = selected_unit;
+        selected_unit.reset();
+        for (const auto &[id, icon] : unit_icons) {
+            const auto &pose =
+                context.world.GetComponent<svanes::Transform>(icon);
+            const float dx = position.x - pose.x;
+            const float dy = position.y - pose.y;
+            const float cosine = std::cos(pose.rotation);
+            const float sine = std::sin(pose.rotation);
+            const float local_x = dx * cosine + dy * sine;
+            const float local_y = -dx * sine + dy * cosine;
+            if (std::abs(local_x) <= kUnitIconGeometry.width * 0.5F &&
+                std::abs(local_y) <= kUnitIconGeometry.height * 0.5F) {
+                if (previous != id) {
+                    selected_unit = id;
+                }
+                break;
+            }
+        }
+    }
+    if (context.network.IsConnected() &&
+        context.input.WasPressed(svanes::Key::P)) {
+        const SpawnOrder order{.position = {position.x, position.y}};
+        context.network.Send(order.Encode());
+    }
+    if (context.network.IsConnected() && selected_unit &&
         context.input.WasMouseButtonPressed(svanes::MouseButton::Right)) {
-        const auto mouse = context.input.MousePosition();
-        const auto destination =
-            context.camera.ScreenToWorld({mouse.x, mouse.y, 0.0F, 0.0F});
-        const MoveOrder order{.unit = units.begin()->first,
-                              .destination = {destination.x, destination.y}};
+        const MoveOrder order{.unit = *selected_unit,
+                              .destination = {position.x, position.y}};
         context.network.Send(order.Encode());
     }
     if (context.input.WasPressed(svanes::Key::Escape)) {

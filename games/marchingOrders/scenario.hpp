@@ -15,6 +15,8 @@
 
 namespace marching_orders {
 
+enum class OrderType : std::uint8_t { Move, Spawn };
+
 /**
  * Directs a unit to a position on the map.
  *
@@ -45,6 +47,13 @@ struct MoveOrder {
      * @throws std::invalid_argument if the request is malformed.
      */
     static MoveOrder Decode(const svanes::NetworkMessage &message);
+};
+
+struct SpawnOrder {
+    svanes::Vector2D position;
+
+    svanes::NetworkMessage Encode() const;
+    static SpawnOrder Decode(const svanes::NetworkMessage &message);
 };
 
 /**

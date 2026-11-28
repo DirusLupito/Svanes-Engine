@@ -149,6 +149,7 @@ struct Scenario::Simulation {
 
 svanes::NetworkMessage MoveOrder::Encode() const {
     svanes::MessageWriter writer;
+    writer.WriteUint8(static_cast<std::uint8_t>(OrderType::Move));
     writer.WriteUint32(unit);
     writer.WriteFloat32(destination.x);
     writer.WriteFloat32(destination.y);
@@ -157,12 +158,37 @@ svanes::NetworkMessage MoveOrder::Encode() const {
 
 MoveOrder MoveOrder::Decode(const svanes::NetworkMessage &message) {
     svanes::MessageReader reader(message);
+    if (reader.ReadUint8() != static_cast<std::uint8_t>(OrderType::Move)) {
+        throw std::invalid_argument("Expected a unit movement request.");
+    }
     const MoveOrder order{
         .unit = reader.ReadUint32(),
         .destination = {reader.ReadFloat32(), reader.ReadFloat32()}};
     if (reader.Remaining() != 0 || !std::isfinite(order.destination.x) ||
         !std::isfinite(order.destination.y)) {
         throw std::invalid_argument("Invalid unit movement request.");
+    }
+    return order;
+}
+
+svanes::NetworkMessage SpawnOrder::Encode() const {
+    svanes::MessageWriter writer;
+    writer.WriteUint8(static_cast<std::uint8_t>(OrderType::Spawn));
+    writer.WriteFloat32(position.x);
+    writer.WriteFloat32(position.y);
+    return writer.Finish();
+}
+
+SpawnOrder SpawnOrder::Decode(const svanes::NetworkMessage &message) {
+    svanes::MessageReader reader(message);
+    if (reader.ReadUint8() != static_cast<std::uint8_t>(OrderType::Spawn)) {
+        throw std::invalid_argument("Expected a unit spawn request.");
+    }
+    const SpawnOrder order{
+        .position = {reader.ReadFloat32(), reader.ReadFloat32()}};
+    if (reader.Remaining() != 0 || !std::isfinite(order.position.x) ||
+        !std::isfinite(order.position.y)) {
+        throw std::invalid_argument("Invalid unit spawn request.");
     }
     return order;
 }

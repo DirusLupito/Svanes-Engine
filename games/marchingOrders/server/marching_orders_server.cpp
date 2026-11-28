@@ -1,5 +1,6 @@
 #include "marching_orders_server.hpp"
 
+#include <svanes/network/message_serialization.hpp>
 #include <svanes/physics_system.hpp>
 
 #include <iostream>
@@ -12,7 +13,6 @@ constexpr float kStartingUnitSpeed = 80.0F;
 
 void MarchingOrdersServer::Initialize(svanes::ServerContext &context) {
     scenario.emplace(Terrain::Get(), context.world);
-    scenario->SpawnUnit({}, kStartingUnitSpeed);
     std::cout << "Hello, world! marchingOrders server.\n" << std::flush;
 }
 
@@ -32,10 +32,24 @@ void MarchingOrdersServer::HandleDisconnect(svanes::Registry &,
 void MarchingOrdersServer::Update(const svanes::ServerUpdateContext &context) {
     for (const auto &input : context.network.PollInputs()) {
         try {
-            const auto order = MoveOrder::Decode(input.message);
-            if (!scenario->MoveUnit(order)) {
-                std::cerr << "Client " << input.client
-                          << " ordered an unknown unit " << order.unit << ".\n";
+            svanes::MessageReader reader(input.message);
+            switch (static_cast<OrderType>(reader.ReadUint8())) {
+            case OrderType::Move: {
+                const auto order = MoveOrder::Decode(input.message);
+                if (!scenario->MoveUnit(order)) {
+                    std::cerr << "Client " << input.client
+                              << " ordered an unknown unit " << order.unit
+                              << ".\n";
+                }
+                break;
+            }
+            case OrderType::Spawn: {
+                const auto order = SpawnOrder::Decode(input.message);
+                scenario->SpawnUnit(order.position, kStartingUnitSpeed);
+                break;
+            }
+            default:
+                throw std::invalid_argument("Unknown order type.");
             }
         } catch (const std::invalid_argument &error) {
             std::cerr << "Invalid order from client " << input.client << ": "
