@@ -41,7 +41,7 @@ constexpr std::array kControlThresholds{0.25F, 1.0F, 3.0F};
 
 // Bytes occupied by a server ID, two coordinates, and a heading on the wire.
 constexpr std::size_t kUnitRecordBytes =
-    sizeof(std::uint32_t) + 3 * sizeof(float);
+    2 * sizeof(std::uint32_t) + 3 * sizeof(float);
 
 static auto MakeLandControlDecay(const Terrain &terrain,
                                  svanes::Vector2D location,
@@ -233,19 +233,23 @@ Scenario::Simulation &Scenario::GetSimulation() {
 
 const Terrain &Scenario::GetTerrain() const { return terrain; }
 
-const std::map<svanes::Entity, svanes::Transform> &Scenario::GetUnits() const {
+const std::map<svanes::Entity, UnitState> &Scenario::GetUnits() const {
     return units;
 }
 
 const ControlGrid &Scenario::GetControl() const { return control; }
 
-svanes::Entity Scenario::SpawnUnit(svanes::Vector2D position, float speed) {
+svanes::Entity Scenario::SpawnUnit(svanes::Vector2D position, float speed,
+                                   std::uint32_t team) {
     auto &world = GetSimulation().world;
-    Unit unit(world, position, speed);
+    Unit unit(world, position, speed, team);
     const auto id = unit.GetEntity();
     try {
         world.AddComponent<Unit>(id, std::move(unit));
-        units.emplace(id, world.GetComponent<svanes::Transform>(id));
+        units.emplace(
+            id,
+            UnitState{.transform = world.GetComponent<svanes::Transform>(id),
+                      .team = team});
     } catch (...) {
         world.DestroyEntity(id);
         throw;
@@ -283,11 +287,12 @@ void Scenario::Advance(svanes::TicCount delta_tics) {
         stamp ? kControlStampInterval : server.tics_until_stamp - delta_tics;
 
     // Resolve arrivals before stamping influence at each unit's position.
-    for (auto &[id, transform] : units) {
+    for (auto &[id, state] : units) {
         server.world.GetComponent<Unit>(id).PhysicsUpdate(server.world);
-        transform = server.world.GetComponent<svanes::Transform>(id);
+        state.transform = server.world.GetComponent<svanes::Transform>(id);
         if (stamp) {
-            const svanes::Vector2D position{transform.x, transform.y};
+            const svanes::Vector2D position{state.transform.x,
+                                            state.transform.y};
             server.influence.Stamp(
                 position, kControlStampValue, kControlStampRadius,
                 MakeLandControlDecay(terrain, position, control.origin,
@@ -315,11 +320,12 @@ svanes::NetworkMessage Scenario::MakeSnapshot() const {
 
     svanes::MessageWriter writer;
     writer.WriteUint32(static_cast<std::uint32_t>(units.size()));
-    for (const auto &[id, transform] : units) {
+    for (const auto &[id, state] : units) {
         writer.WriteUint32(id);
-        writer.WriteFloat32(transform.x);
-        writer.WriteFloat32(transform.y);
-        writer.WriteFloat32(transform.rotation);
+        writer.WriteFloat32(state.transform.x);
+        writer.WriteFloat32(state.transform.y);
+        writer.WriteFloat32(state.transform.rotation);
+        writer.WriteUint32(state.team);
     }
 
     writer.WriteBytes(std::as_bytes(std::span{control.tiers}));
@@ -342,19 +348,22 @@ void Scenario::ApplySnapshot(const svanes::NetworkMessage &message) {
     }
 
     // Keep the previous roster and tiers together until every field is valid.
-    std::map<svanes::Entity, svanes::Transform> received;
+    std::map<svanes::Entity, UnitState> received;
     for (std::uint32_t i = 0; i < count; ++i) {
         const auto id = reader.ReadUint32();
         const svanes::Transform transform{.x = reader.ReadFloat32(),
                                           .y = reader.ReadFloat32(),
                                           .rotation = reader.ReadFloat32()};
+        const auto team = reader.ReadUint32();
         if (!std::isfinite(transform.x) || !std::isfinite(transform.y) ||
             !std::isfinite(transform.rotation)) {
             throw std::invalid_argument(
                 "Scenario snapshot contains a nonfinite unit transform.");
         }
 
-        if (!received.emplace(id, transform).second) {
+        if (!received
+                 .emplace(id, UnitState{.transform = transform, .team = team})
+                 .second) {
             throw std::invalid_argument(
                 "Scenario snapshot contains a duplicate unit ID.");
         }

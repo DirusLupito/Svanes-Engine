@@ -3,6 +3,7 @@
 #include <svanes/entity.hpp>
 #include <svanes/vector2d.hpp>
 
+#include <cstdint>
 #include <optional>
 
 namespace svanes {
@@ -27,7 +28,8 @@ public:
      *
      * @throws std::invalid_argument if the initial position is invalid/out of bounds.
      */
-    Unit(svanes::Registry &world, svanes::Vector2D position, float speed);
+    Unit(svanes::Registry &world, svanes::Vector2D position, float speed,
+         std::uint32_t team = 0);
 
     /**
      *
@@ -56,6 +58,8 @@ public:
      */
     svanes::Entity GetEntity() const;
 
+    std::uint32_t GetTeam() const;
+
 private:
     // The entity ID for this unit.
     svanes::Entity entity;
@@ -65,6 +69,7 @@ private:
 
     // The base speed at which a unit will move towards its destination.
     float speed;
+    std::uint32_t team;
 };
 
 }

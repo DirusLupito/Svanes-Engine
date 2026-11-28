@@ -10,8 +10,9 @@
 
 namespace marching_orders {
 
-Unit::Unit(svanes::Registry &world, svanes::Vector2D position, float speed)
-    : speed(svanes::PerSecondToPerTic(speed)) {
+Unit::Unit(svanes::Registry &world, svanes::Vector2D position, float speed,
+           std::uint32_t team)
+    : speed(svanes::PerSecondToPerTic(speed)), team(team) {
     if (!std::isfinite(position.x) || !std::isfinite(position.y) ||
         !std::isfinite(speed) || speed <= 0.0F) {
         throw std::invalid_argument(
@@ -65,4 +66,5 @@ void Unit::PhysicsUpdate(svanes::Registry &world) {
 
 svanes::Entity Unit::GetEntity() const { return entity; }
 
+std::uint32_t Unit::GetTeam() const { return team; }
 }

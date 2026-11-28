@@ -85,6 +85,7 @@ svanes::NetworkMessage MarchingOrdersClient::CreateJoinRequest() { return {}; }
 void MarchingOrdersClient::HandleJoinResult(const svanes::JoinResult &result) {
     switch (result.status) {
     case svanes::JoinStatus::Accepted:
+        client_id = result.client_id;
         std::cout << "Connected to marchingOrders as client "
                   << result.client_id << ".\n"
                   << std::flush;
@@ -190,7 +191,7 @@ void MarchingOrdersClient::UpdateScenarioView(svanes::Registry &world) {
         return true;
     });
 
-    for (const auto &[id, transform] : units) {
+    for (const auto &[id, state] : units) {
         auto [icon, inserted] = unit_icons.try_emplace(id);
         if (inserted) {
             icon->second = world.CreateEntity();
@@ -202,7 +203,7 @@ void MarchingOrdersClient::UpdateScenarioView(svanes::Registry &world) {
         }
 
         auto &pose = world.GetComponent<svanes::Transform>(icon->second);
-        pose = transform;
+        pose = state.transform;
         pose.rotation += kUnitIconRotationOffset;
     }
 
@@ -225,13 +226,19 @@ void MarchingOrdersClient::Update(const svanes::ClientFrameContext &context) {
     const auto position =
         context.camera.ScreenToWorld({mouse.x, mouse.y, 0.0F, 0.0F});
     const auto &units = scenario.GetUnits();
-    if (selected_unit && !units.contains(*selected_unit)) {
-        selected_unit.reset();
+    if (selected_unit) {
+        const auto unit = units.find(*selected_unit);
+        if (unit == units.end() || unit->second.team != client_id) {
+            selected_unit.reset();
+        }
     }
     if (context.input.WasMouseButtonPressed(svanes::MouseButton::Left)) {
         const auto previous = selected_unit;
         selected_unit.reset();
         for (const auto &[id, icon] : unit_icons) {
+            if (units.at(id).team != client_id) {
+                continue;
+            }
             const auto &pose =
                 context.world.GetComponent<svanes::Transform>(icon);
             const float dx = position.x - pose.x;

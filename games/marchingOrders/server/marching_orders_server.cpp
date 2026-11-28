@@ -36,6 +36,12 @@ void MarchingOrdersServer::Update(const svanes::ServerUpdateContext &context) {
             switch (static_cast<OrderType>(reader.ReadUint8())) {
             case OrderType::Move: {
                 const auto order = MoveOrder::Decode(input.message);
+                const auto &units = scenario->GetUnits();
+                const auto unit = units.find(order.unit);
+                if (unit != units.end() && unit->second.team != input.client) {
+                    throw std::invalid_argument(
+                        "Unit does not belong to this client's team.");
+                }
                 if (!scenario->MoveUnit(order)) {
                     std::cerr << "Client " << input.client
                               << " ordered an unknown unit " << order.unit
@@ -45,7 +51,8 @@ void MarchingOrdersServer::Update(const svanes::ServerUpdateContext &context) {
             }
             case OrderType::Spawn: {
                 const auto order = SpawnOrder::Decode(input.message);
-                scenario->SpawnUnit(order.position, kStartingUnitSpeed);
+                scenario->SpawnUnit(order.position, kStartingUnitSpeed,
+                                    input.client);
                 break;
             }
             default:

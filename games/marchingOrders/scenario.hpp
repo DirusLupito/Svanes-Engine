@@ -56,6 +56,11 @@ struct SpawnOrder {
     static SpawnOrder Decode(const svanes::NetworkMessage &message);
 };
 
+struct UnitState {
+    svanes::Transform transform;
+    std::uint32_t team;
+};
+
 /**
  * Describes territorial control as it is visible to players.
  *
@@ -112,7 +117,7 @@ public:
      *
      * @return Unit transforms keyed by their server entity IDs.
      */
-    const std::map<svanes::Entity, svanes::Transform> &GetUnits() const;
+    const std::map<svanes::Entity, UnitState> &GetUnits() const;
 
     /**
      * Provides the current territorial control visible to players.
@@ -129,7 +134,8 @@ public:
      *
      * @return The server entity ID used to address the unit in orders.
      */
-    svanes::Entity SpawnUnit(svanes::Vector2D position, float speed);
+    svanes::Entity SpawnUnit(svanes::Vector2D position, float speed,
+                             std::uint32_t team = 0);
 
     /**
      * Removes a unit from the server simulation and subsequent snapshots.
@@ -187,7 +193,7 @@ private:
     const Terrain &terrain;
 
     // Latest completed world transform for each server unit.
-    std::map<svanes::Entity, svanes::Transform> units;
+    std::map<svanes::Entity, UnitState> units;
 
     // Territorial control as reported to clients.
     ControlGrid control;

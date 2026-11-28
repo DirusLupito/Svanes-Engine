@@ -93,6 +93,7 @@ private:
     std::map<svanes::Entity, svanes::Entity> unit_icons;
 
     std::optional<svanes::Entity> selected_unit;
+    std::uint32_t client_id = 0;
 
     // Texture used to draw units on the map.
     svanes::TextureHandle unit_texture{};
