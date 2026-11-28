@@ -43,6 +43,30 @@ constexpr double kInitialZoomRate = 0.5;
 // Exponential growth rate per second while a zoom key remains held.
 constexpr double kZoomRateGrowth = 1.0;
 
+// Create an atlas of potential color tiles for rendering mixed/overlapping control.
+// This way any color that needs to be represented can have an associated tile ID.
+static svanes::ImageData MakeControlAtlas() {
+    constexpr auto levels = ControlGrid::kColorLevels;
+    const auto &opacities = ControlGrid::kOpacities;
+    svanes::ImageData atlas{
+        .width = static_cast<std::int32_t>(levels * levels),
+        .height = static_cast<std::int32_t>(levels * opacities.size())};
+    atlas.rgba_pixels.reserve(ControlGrid::kTileCount * 4);
+    for (std::uint32_t red = 0; red < levels; ++red) {
+        for (std::uint32_t green = 0; green < levels; ++green) {
+            for (std::uint32_t blue = 0; blue < levels; ++blue) {
+                for (const auto alpha : opacities) {
+                    atlas.rgba_pixels.push_back(red * 255 / (levels - 1));
+                    atlas.rgba_pixels.push_back(green * 255 / (levels - 1));
+                    atlas.rgba_pixels.push_back(blue * 255 / (levels - 1));
+                    atlas.rgba_pixels.push_back(alpha);
+                }
+            }
+        }
+    }
+    return atlas;
+}
+
 void MarchingOrdersClient::Initialize(svanes::ClientContext &context) {
     const svanes::ImageData image = LoadTerrainImage(scenario.GetTerrain());
     const auto terrain = context.world.CreateEntity();
@@ -52,10 +76,7 @@ void MarchingOrdersClient::Initialize(svanes::ClientContext &context) {
                      .texture = context.assets.CreateTexture(image),
                      .geometry = {.width = static_cast<float>(image.width),
                                   .height = static_cast<float>(image.height)}});
-    const svanes::ImageData control_colors{
-        .width = 3,
-        .height = 1,
-        .rgba_pixels = {255, 0, 0, 24, 255, 0, 0, 48, 255, 0, 0, 72}};
+    const auto control_colors = MakeControlAtlas();
     const auto &control = scenario.GetControl();
     control_map_entity = context.world.CreateEntity();
     context.world.AddComponent<svanes::Transform>(
@@ -72,7 +93,7 @@ void MarchingOrdersClient::Initialize(svanes::ClientContext &context) {
     overlay.atlas_tile_height = 1;
     overlay.atlas_columns = control_colors.width;
     overlay.atlas_rows = control_colors.height;
-    overlay.cells.resize(control.tiers.size());
+    overlay.cells.resize(control.tiles.size());
     context.world.AddComponent<svanes::ZOrder>(control_map_entity,
                                                svanes::ZOrder{1});
     unit_texture = context.assets.LoadTexture(
@@ -208,9 +229,9 @@ void MarchingOrdersClient::UpdateScenarioView(svanes::Registry &world) {
     }
 
     auto &overlay = world.GetComponent<svanes::TileMap>(control_map_entity);
-    const auto &tiers = scenario.GetControl().tiers;
-    for (std::size_t i = 0; i < tiers.size(); ++i) {
-        overlay.cells[i].tile_id = tiers[i];
+    const auto &tiles = scenario.GetControl().tiles;
+    for (std::size_t i = 0; i < tiles.size(); ++i) {
+        overlay.cells[i].tile_id = tiles[i];
     }
 }
 

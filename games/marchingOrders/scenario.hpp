@@ -8,6 +8,7 @@
 #include <svanes/timeline_system.hpp>
 #include <svanes/vector2d.hpp>
 
+#include <array>
 #include <cstdint>
 #include <map>
 #include <memory>
@@ -72,11 +73,16 @@ struct UnitState {
  * - tiers holds the control level of each cell in row-major order.
  */
 struct ControlGrid {
+    static constexpr std::uint32_t kColorLevels = 16;
+    static constexpr std::array<std::uint8_t, 3> kOpacities{24, 48, 72};
+    static constexpr std::uint32_t kTileCount =
+        kColorLevels * kColorLevels * kColorLevels * kOpacities.size();
+
     std::uint32_t columns;
     std::uint32_t rows;
     std::uint32_t cell_size;
     svanes::Vector2D origin;
-    std::vector<std::uint8_t> tiers;
+    std::vector<std::uint16_t> tiles;
 };
 
 /**

@@ -5,6 +5,7 @@
 
 #include <svanes/network/message_serialization.hpp>
 #include <svanes/registry.hpp>
+#include <svanes/render/basic_render_types.hpp>
 
 #include <algorithm>
 #include <array>
@@ -12,7 +13,6 @@
 #include <functional>
 #include <limits>
 #include <queue>
-#include <span>
 #include <stdexcept>
 #include <utility>
 
@@ -42,6 +42,24 @@ constexpr std::array kControlThresholds{0.25F, 1.0F, 3.0F};
 // Bytes occupied by a server ID, two coordinates, and a heading on the wire.
 constexpr std::size_t kUnitRecordBytes =
     2 * sizeof(std::uint32_t) + 3 * sizeof(float);
+
+// Define team colors for control mapping
+static svanes::Color TeamColor(std::uint32_t team) {
+    if (team == 1) {
+        return {255, 0, 0};
+    }
+    if (team == 2) {
+        return {0, 0, 255};
+    }
+    const double hue = std::fmod(team * 0.618033988749895, 1.0) * 6.0;
+    const auto channel = static_cast<std::uint8_t>(
+        std::lround(255.0 * (1.0 - std::abs(std::fmod(hue, 2.0) - 1.0))));
+    const std::array<svanes::Color, 6> colors{
+        svanes::Color{255, channel, 0}, svanes::Color{channel, 255, 0},
+        svanes::Color{0, 255, channel}, svanes::Color{0, channel, 255},
+        svanes::Color{channel, 0, 255}, svanes::Color{255, 0, channel}};
+    return colors[static_cast<std::size_t>(hue)];
+}
 
 static auto MakeLandControlDecay(const Terrain &terrain,
                                  svanes::Vector2D location,
@@ -133,6 +151,16 @@ static auto MakeLandControlDecay(const Terrain &terrain,
     };
 }
 
+struct TeamControl {
+    TeamControl(std::uint32_t team, const ControlGrid &control)
+        : influence(control.columns, control.rows, control.cell_size,
+                    control.origin),
+          color(TeamColor(team)) {}
+
+    InfluenceMap influence;
+    svanes::Color color;
+};
+
 /**
  * Holds the state used to advance a match on the server.
  *
@@ -143,7 +171,7 @@ static auto MakeLandControlDecay(const Terrain &terrain,
  */
 struct Scenario::Simulation {
     svanes::Registry &world;
-    InfluenceMap influence;
+    std::map<std::uint32_t, TeamControl> teams;
     svanes::TicCount tics_until_stamp = 0;
 };
 
@@ -203,15 +231,13 @@ Scenario::Scenario(const Terrain &terrain) : terrain(terrain) {
     control.rows = cells_along(terrain.Height());
     control.cell_size = kControlCellSize;
     control.origin = {-0.5F * terrain.Width(), -0.5F * terrain.Height()};
-    control.tiers.resize(static_cast<std::size_t>(control.columns) *
+    control.tiles.resize(static_cast<std::size_t>(control.columns) *
                          control.rows);
 }
 
 Scenario::Scenario(const Terrain &terrain, svanes::Registry &world)
     : Scenario(terrain) {
-    simulation = std::make_unique<Simulation>(
-        world, InfluenceMap(control.columns, control.rows, control.cell_size,
-                            control.origin));
+    simulation = std::make_unique<Simulation>(world);
 }
 
 Scenario::~Scenario() {
@@ -241,7 +267,9 @@ const ControlGrid &Scenario::GetControl() const { return control; }
 
 svanes::Entity Scenario::SpawnUnit(svanes::Vector2D position, float speed,
                                    std::uint32_t team) {
-    auto &world = GetSimulation().world;
+    auto &server = GetSimulation();
+    auto &world = server.world;
+    server.teams.try_emplace(team, team, control);
     Unit unit(world, position, speed, team);
     const auto id = unit.GetEntity();
     try {
@@ -279,9 +307,11 @@ void Scenario::Advance(svanes::TicCount delta_tics) {
     auto &server = GetSimulation();
 
     // Fade influence once per step and check whether a stamp is due.
-    server.influence.Fade(static_cast<float>(delta_tics) /
-                              svanes::TicsPerSecond,
-                          kControlHalfLifeSeconds);
+    for (auto &[team, state] : server.teams) {
+        state.influence.Fade(static_cast<float>(delta_tics) /
+                                 svanes::TicsPerSecond,
+                             kControlHalfLifeSeconds);
+    }
     const bool stamp = delta_tics >= server.tics_until_stamp;
     server.tics_until_stamp =
         stamp ? kControlStampInterval : server.tics_until_stamp - delta_tics;
@@ -293,22 +323,50 @@ void Scenario::Advance(svanes::TicCount delta_tics) {
         if (stamp) {
             const svanes::Vector2D position{state.transform.x,
                                             state.transform.y};
-            server.influence.Stamp(
-                position, kControlStampValue, kControlStampRadius,
-                MakeLandControlDecay(terrain, position, control.origin,
-                                     kControlStampRadius));
+            server.teams.at(state.team)
+                .influence.Stamp(
+                    position, kControlStampValue, kControlStampRadius,
+                    MakeLandControlDecay(terrain, position, control.origin,
+                                         kControlStampRadius));
         }
     }
 
     // Convert accumulated influence into the control tiers sent to clients.
     for (std::uint32_t y = 0; y < control.rows; ++y) {
         for (std::uint32_t x = 0; x < control.columns; ++x) {
-            const float value = server.influence.ReadCell(x, y);
+            // Calculate what color a tile should be based on all teams current control there
+            double value = 0.0;
+            double red = 0.0;
+            double green = 0.0;
+            double blue = 0.0;
+            for (const auto &[team, state] : server.teams) {
+                const float contribution = state.influence.ReadCell(x, y);
+                value += contribution;
+                red += contribution * state.color.red;
+                green += contribution * state.color.green;
+                blue += contribution * state.color.blue;
+            }
             const auto tier =
                 std::ranges::upper_bound(kControlThresholds, value) -
                 kControlThresholds.begin();
-            control.tiers[static_cast<std::size_t>(y) * control.columns + x] =
-                static_cast<std::uint8_t>(tier);
+            auto &tile =
+                control
+                    .tiles[static_cast<std::size_t>(y) * control.columns + x];
+            tile = 0;
+            if (tier == 0) {
+                continue;
+            }
+            const auto channel = [value](double weighted) {
+                return static_cast<std::uint32_t>(
+                    std::lround(weighted / value *
+                                (ControlGrid::kColorLevels - 1) / 255.0));
+            };
+            const auto color =
+                (channel(red) * ControlGrid::kColorLevels + channel(green)) *
+                    ControlGrid::kColorLevels +
+                channel(blue);
+            tile = static_cast<std::uint16_t>(
+                color * ControlGrid::kOpacities.size() + tier);
         }
     }
 }
@@ -328,7 +386,9 @@ svanes::NetworkMessage Scenario::MakeSnapshot() const {
         writer.WriteUint32(state.team);
     }
 
-    writer.WriteBytes(std::as_bytes(std::span{control.tiers}));
+    for (const auto tile : control.tiles) {
+        writer.WriteUint16(tile);
+    }
     return writer.Finish();
 }
 
@@ -340,8 +400,9 @@ void Scenario::ApplySnapshot(const svanes::NetworkMessage &message) {
 
     svanes::MessageReader reader(message);
     const auto count = reader.ReadUint32();
-    if (reader.Remaining() < control.tiers.size() ||
-        reader.Remaining() - control.tiers.size() !=
+    const auto grid_bytes = control.tiles.size() * sizeof(std::uint16_t);
+    if (reader.Remaining() < grid_bytes ||
+        reader.Remaining() - grid_bytes !=
             static_cast<std::uint64_t>(count) * kUnitRecordBytes) {
         throw std::invalid_argument(
             "Scenario snapshot has an invalid roster or control grid size.");
@@ -369,17 +430,18 @@ void Scenario::ApplySnapshot(const svanes::NetworkMessage &message) {
         }
     }
 
-    const auto tiers = reader.ReadBytes(control.tiers.size());
-    if (std::ranges::any_of(tiers, [](std::byte tier) {
-            return std::to_integer<std::uint8_t>(tier) >
-                   kControlThresholds.size();
-        })) {
-        throw std::invalid_argument(
-            "Scenario snapshot contains an invalid control tier.");
+    std::vector<std::uint16_t> tiles;
+    tiles.reserve(control.tiles.size());
+    for (std::size_t index = 0; index < control.tiles.size(); ++index) {
+        const auto tile = reader.ReadUint16();
+        if (tile > ControlGrid::kTileCount) {
+            throw std::invalid_argument(
+                "Scenario snapshot contains an invalid control tile.");
+        }
+        tiles.push_back(tile);
     }
 
-    std::ranges::copy(tiers,
-                      std::as_writable_bytes(std::span{control.tiers}).begin());
+    control.tiles.swap(tiles);
     units.swap(received);
 }
 
