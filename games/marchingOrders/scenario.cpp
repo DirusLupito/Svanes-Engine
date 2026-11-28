@@ -37,6 +37,69 @@ constexpr std::array kControlThresholds{0.25F, 1.0F, 3.0F};
 constexpr std::size_t kUnitRecordBytes =
     sizeof(std::uint32_t) + 3 * sizeof(float);
 
+static auto MakeLandControlDecay(const Terrain &terrain,
+                                 svanes::Vector2D location,
+                                 svanes::Vector2D origin, float radius) {
+    const auto source = location - origin;
+    const auto bound = [](float coordinate, std::int32_t count) {
+        return static_cast<std::int32_t>(std::clamp(
+            std::floor(coordinate), 0.0F, static_cast<float>(count)));
+    };
+    const auto begin_x = bound(source.x - radius, terrain.Width());
+    const auto begin_y = bound(source.y - radius, terrain.Height());
+    const auto end_x = bound(source.x + radius + 1.0F, terrain.Width());
+    const auto end_y = bound(source.y + radius + 1.0F, terrain.Height());
+    const auto width = static_cast<std::size_t>(end_x - begin_x);
+    std::vector<std::uint8_t> reachable(
+        width * static_cast<std::size_t>(end_y - begin_y));
+    std::vector<std::pair<std::int32_t, std::int32_t>> pending;
+    // Recursive function for flood searching connected squares
+    const auto visit = [&](std::int32_t x, std::int32_t y) {
+        if (x < begin_x || x >= end_x || y < begin_y || y >= end_y) {
+            return;
+        }
+        auto &state = reachable[static_cast<std::size_t>(y - begin_y) * width +
+                                x - begin_x];
+        if (state != 0) {
+            return;
+        }
+        state = 2;
+        if (terrain.IsWaterAt(x, y) ||
+            std::hypot(x + 0.5F - source.x, y + 0.5F - source.y) > radius) {
+            return;
+        }
+        state = 1;
+        pending.emplace_back(x, y);
+    };
+    if (source.x >= begin_x && source.x < end_x && source.y >= begin_y &&
+        source.y < end_y) {
+        visit(static_cast<std::int32_t>(std::floor(source.x)),
+              static_cast<std::int32_t>(std::floor(source.y)));
+    }
+    // Execute flood search
+    for (std::size_t index = 0; index < pending.size(); ++index) {
+        const auto [x, y] = pending[index];
+        visit(x - 1, y);
+        visit(x + 1, y);
+        visit(x, y - 1);
+        visit(x, y + 1);
+    }
+    return [origin, begin_x, begin_y, end_x, end_y, width,
+            reachable = std::move(reachable)](
+               svanes::Vector2D, svanes::Vector2D cell, float distance) {
+        const auto position = cell - origin;
+        if (position.x < begin_x || position.x >= end_x ||
+            position.y < begin_y || position.y >= end_y) {
+            return 0.0F;
+        }
+        const auto x = static_cast<std::int32_t>(std::floor(position.x));
+        const auto y = static_cast<std::int32_t>(std::floor(position.y));
+        const auto index =
+            static_cast<std::size_t>(y - begin_y) * width + x - begin_x;
+        return reachable[index] == 1 ? 1.0F - distance : 0.0F;
+    };
+}
+
 /**
  * Holds the state used to advance a match on the server.
  *
@@ -165,12 +228,11 @@ void Scenario::Advance(svanes::TicCount delta_tics) {
         server.world.GetComponent<Unit>(id).PhysicsUpdate(server.world);
         transform = server.world.GetComponent<svanes::Transform>(id);
         if (stamp) {
+            const svanes::Vector2D position{transform.x, transform.y};
             server.influence.Stamp(
-                {transform.x, transform.y}, kControlStampValue,
-                kControlStampRadius,
-                [](svanes::Vector2D, svanes::Vector2D, float distance) {
-                    return 1.0F - distance;
-                });
+                position, kControlStampValue, kControlStampRadius,
+                MakeLandControlDecay(terrain, position, control.origin,
+                                     kControlStampRadius));
         }
     }
 

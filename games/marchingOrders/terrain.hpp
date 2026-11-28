@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 
@@ -49,6 +50,8 @@ public:
      */
     std::int16_t ElevationAt(std::int32_t x, std::int32_t y) const;
 
+    bool IsWaterAt(std::int32_t x, std::int32_t y) const;
+
 private:
     /**
      * Decodes the packaged elevation samples into the grid.
@@ -77,6 +80,7 @@ private:
 
     // Elevations in meters, stored row by row.
     std::vector<std::int16_t> elevations;
+    std::vector<std::byte> water_mask;
 };
 
 } // namespace marching_orders

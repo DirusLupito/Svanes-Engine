@@ -1,22 +1,12 @@
 #include "terrain_image.hpp"
 
-#include <svanes/asset_path.hpp>
-#include <svanes/utility/file_io.hpp>
-
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
-#include <stdexcept>
-#include <string_view>
 
 namespace {
-
-// Path to the water mask aligned with the elevation grid, relative to the
-// executable.
-constexpr std::string_view kWaterMaskPath =
-    "assets/marchingOrders/southern_red_sea_water.mask";
 
 // Number of consecutive channel bytes occupied by one RGBA pixel.
 constexpr std::size_t kChannelsPerPixel = 4;
@@ -132,16 +122,6 @@ svanes::ImageData marching_orders::LoadTerrainImage(const Terrain &terrain) {
     svanes::ImageData image{.width = terrain.Width(),
                             .height = terrain.Height()};
     const auto cells = static_cast<std::size_t>(image.width) * image.height;
-    const auto water_mask = svanes::ReadFile(svanes::AssetPath(kWaterMaskPath));
-    if (water_mask.size() != cells) {
-        throw std::runtime_error(
-            "Water mask size does not match the elevation grid.");
-    }
-    if (std::ranges::any_of(
-            water_mask, [](std::byte value) { return value > std::byte{1}; })) {
-        throw std::runtime_error("Water mask cells must be 0 or 1.");
-    }
-
     image.rgba_pixels.resize(cells * kChannelsPerPixel);
     for (std::int32_t y = 0; y < image.height; ++y) {
         for (std::int32_t x = 0; x < image.width; ++x) {
@@ -167,7 +147,7 @@ svanes::ImageData marching_orders::LoadTerrainImage(const Terrain &terrain) {
                                   kMinHillshadeAdjustment,
                                   kMaxHillshadeAdjustment);
             const auto color =
-                TerrainColor(water_mask[i] == std::byte{1}, height, shade);
+                TerrainColor(terrain.IsWaterAt(x, y), height, shade);
             const auto pixel = kChannelsPerPixel * i;
             image.rgba_pixels[pixel] = color.red;
             image.rgba_pixels[pixel + 1] = color.green;

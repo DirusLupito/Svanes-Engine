@@ -3,6 +3,7 @@
 #include <svanes/asset_path.hpp>
 #include <svanes/utility/file_io.hpp>
 
+#include <algorithm>
 #include <bit>
 #include <cstddef>
 #include <limits>
@@ -14,6 +15,11 @@ namespace marching_orders {
 // Path to the grid of terrain elevations, relative to the executable.
 constexpr std::string_view kElevationGridPath =
     "assets/marchingOrders/southern_red_sea.bil";
+
+// Path to the water mask aligned with the elevation grid, relative to the
+// executable.
+constexpr std::string_view kWaterMaskPath =
+    "assets/marchingOrders/southern_red_sea_water.mask";
 
 // Samples along each edge of the packaged square elevation grid.
 constexpr std::int32_t kTerrainSide = 880;
@@ -40,6 +46,16 @@ Terrain::Terrain() {
             (high_byte << std::numeric_limits<std::uint8_t>::digits));
         elevations[i] = std::bit_cast<std::int16_t>(value);
     }
+
+    water_mask = svanes::ReadFile(svanes::AssetPath(kWaterMaskPath));
+    if (water_mask.size() != cells) {
+        throw std::runtime_error(
+            "Water mask size does not match the elevation grid.");
+    }
+    if (std::ranges::any_of(
+            water_mask, [](std::byte value) { return value > std::byte{1}; })) {
+        throw std::runtime_error("Water mask cells must be 0 or 1.");
+    }
 }
 
 const Terrain &Terrain::Get() {
@@ -57,6 +73,15 @@ std::int16_t Terrain::ElevationAt(std::int32_t x, std::int32_t y) const {
             "Terrain cell coordinates are outside the grid.");
     }
     return elevations[static_cast<std::size_t>(y) * Width() + x];
+}
+
+bool Terrain::IsWaterAt(std::int32_t x, std::int32_t y) const {
+    if (x < 0 || x >= Width() || y < 0 || y >= Height()) {
+        throw std::out_of_range(
+            "Terrain cell coordinates are outside the grid.");
+    }
+    return water_mask[static_cast<std::size_t>(y) * Width() + x] ==
+           std::byte{1};
 }
 
 } // namespace marching_orders
