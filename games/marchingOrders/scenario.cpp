@@ -270,7 +270,7 @@ svanes::Entity Scenario::SpawnUnit(svanes::Vector2D position, float speed,
     auto &server = GetSimulation();
     auto &world = server.world;
     server.teams.try_emplace(team, team, control);
-    Unit unit(world, position, speed, team);
+    Unit unit(world, terrain, position, speed, team);
     const auto id = unit.GetEntity();
     try {
         world.AddComponent<Unit>(id, std::move(unit));
