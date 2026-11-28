@@ -9,6 +9,9 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <functional>
+#include <limits>
+#include <queue>
 #include <span>
 #include <stdexcept>
 #include <utility>
@@ -23,6 +26,9 @@ constexpr float kControlStampValue = 1.0F;
 
 // Radius in world units over which a stamp adds influence.
 constexpr float kControlStampRadius = 80.0F;
+
+// Multiplier that reduces control values as terrain elevation increases.
+constexpr float kControlUphillPenalty = 0.025F;
 
 // Time in seconds for accumulated influence to fall by half.
 constexpr float kControlHalfLifeSeconds = 0.75F;
@@ -50,43 +56,70 @@ static auto MakeLandControlDecay(const Terrain &terrain,
     const auto end_x = bound(source.x + radius + 1.0F, terrain.Width());
     const auto end_y = bound(source.y + radius + 1.0F, terrain.Height());
     const auto width = static_cast<std::size_t>(end_x - begin_x);
-    std::vector<std::uint8_t> reachable(
-        width * static_cast<std::size_t>(end_y - begin_y));
-    std::vector<std::pair<std::int32_t, std::int32_t>> pending;
+    // Get elevation costs for stamp grid area
+    std::vector<float> costs(width * static_cast<std::size_t>(end_y - begin_y),
+                             std::numeric_limits<float>::infinity());
+    using Candidate = std::pair<float, std::size_t>;
+    std::priority_queue<Candidate, std::vector<Candidate>, std::greater<>>
+        pending;
     // Recursive function for flood searching connected squares
-    const auto visit = [&](std::int32_t x, std::int32_t y) {
-        if (x < begin_x || x >= end_x || y < begin_y || y >= end_y) {
+    const auto visit = [&](std::int32_t x, std::int32_t y, float cost) {
+        if (x < begin_x || x >= end_x || y < begin_y || y >= end_y ||
+            cost >= radius) {
             return;
         }
-        auto &state = reachable[static_cast<std::size_t>(y - begin_y) * width +
-                                x - begin_x];
-        if (state != 0) {
+        const auto index =
+            static_cast<std::size_t>(y - begin_y) * width + x - begin_x;
+        if (cost >= costs[index]) {
             return;
         }
-        state = 2;
         if (terrain.IsWaterAt(x, y) ||
             std::hypot(x + 0.5F - source.x, y + 0.5F - source.y) > radius) {
             return;
         }
-        state = 1;
-        pending.emplace_back(x, y);
+        costs[index] = cost;
+        pending.emplace(cost, index);
     };
     if (source.x >= begin_x && source.x < end_x && source.y >= begin_y &&
         source.y < end_y) {
         visit(static_cast<std::int32_t>(std::floor(source.x)),
-              static_cast<std::int32_t>(std::floor(source.y)));
+              static_cast<std::int32_t>(std::floor(source.y)), 0.0F);
     }
-    // Execute flood search
-    for (std::size_t index = 0; index < pending.size(); ++index) {
-        const auto [x, y] = pending[index];
-        visit(x - 1, y);
-        visit(x + 1, y);
-        visit(x, y - 1);
-        visit(x, y + 1);
+    // Execute flood search. Costs are factored in when visiting squares.
+    while (!pending.empty()) {
+        const auto [cost, index] = pending.top();
+        pending.pop();
+        if (cost > costs[index]) {
+            continue;
+        }
+        const auto x = begin_x + static_cast<std::int32_t>(index % width);
+        const auto y = begin_y + static_cast<std::int32_t>(index / width);
+        const auto elevation = terrain.ElevationAt(x, y);
+        for (std::int32_t dy = -1; dy <= 1; ++dy) {
+            for (std::int32_t dx = -1; dx <= 1; ++dx) {
+                const auto next_x = x + dx;
+                const auto next_y = y + dy;
+                if ((dx == 0 && dy == 0) || next_x < begin_x ||
+                    next_x >= end_x || next_y < begin_y || next_y >= end_y) {
+                    continue;
+                }
+                if (dx != 0 && dy != 0 &&
+                    (terrain.IsWaterAt(next_x, y) ||
+                     terrain.IsWaterAt(x, next_y))) {
+                    continue;
+                }
+                const auto rise = std::max(
+                    0, terrain.ElevationAt(next_x, next_y) - elevation);
+                const float step =
+                    std::hypot(static_cast<float>(dx), static_cast<float>(dy));
+                visit(next_x, next_y,
+                      cost + step + kControlUphillPenalty * rise);
+            }
+        }
     }
-    return [origin, begin_x, begin_y, end_x, end_y, width,
-            reachable = std::move(reachable)](
-               svanes::Vector2D, svanes::Vector2D cell, float distance) {
+    return [origin, begin_x, begin_y, end_x, end_y, width, radius,
+            costs = std::move(costs)](svanes::Vector2D, svanes::Vector2D cell,
+                                      float) {
         const auto position = cell - origin;
         if (position.x < begin_x || position.x >= end_x ||
             position.y < begin_y || position.y >= end_y) {
@@ -96,7 +129,7 @@ static auto MakeLandControlDecay(const Terrain &terrain,
         const auto y = static_cast<std::int32_t>(std::floor(position.y));
         const auto index =
             static_cast<std::size_t>(y - begin_y) * width + x - begin_x;
-        return reachable[index] == 1 ? 1.0F - distance : 0.0F;
+        return std::max(0.0F, 1.0F - costs[index] / radius);
     };
 }
 
